@@ -15,12 +15,13 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/cobe-news
+  # lower case: registries and cosign accept only lower-case repository names (the account is G0urmetD)
+  IMAGE: ghcr.io/g0urmetd/cobe-news
 
 jobs:
   checks:
     name: Checks and tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
       postgres:
@@ -110,7 +111,7 @@ jobs:
   image:
     name: Image (amd64 + arm64), signed
     needs: checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -165,7 +166,7 @@ jobs:
   release:
     name: GitHub release
     needs: image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write

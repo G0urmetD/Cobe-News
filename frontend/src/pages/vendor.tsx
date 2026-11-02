@@ -778,14 +778,14 @@ function ProductDrawer({ productKey, open, onClose, onClosed }: { productKey: st
       setWant(pages)
       setAll(v)
     },
-    [pages],
+    [pages, setWant, setAll],
   )
   const setSort = useCallback(
     (v: FindingSort) => {
       setWant(pages)
       setSortState(v)
     },
-    [pages],
+    [pages, setWant, setSortState],
   )
   useEffect(() => {
     if (!hasNextPage || isFetching || isPlaceholderData) return
