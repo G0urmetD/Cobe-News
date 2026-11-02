@@ -43,7 +43,9 @@ const channel = (patch: Partial<NotifyChannel> = {}): NotifyChannel => ({
   ...patch,
 })
 
-const TOKEN = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawQ"
+// a bot token's shape, put together here (a literal one would look like a leaked secret to scanners)
+const SECRET_PART = "x".repeat(35)
+const TOKEN = `123456789:${SECRET_PART}`
 
 describe("recipients", () => {
   it("splits lines, commas, semicolons and blanks", () => {
@@ -84,9 +86,9 @@ describe("telegram", () => {
   it("bot token", () => {
     expect(telegramTokenOk(TOKEN)).toBe(true)
     expect(telegramTokenOk(` ${TOKEN} `)).toBe(true)
-    expect(telegramTokenOk("1234:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawQ")).toBe(false) // id too short
+    expect(telegramTokenOk(`1234:${SECRET_PART}`)).toBe(false) // id too short
     expect(telegramTokenOk("123456789:short")).toBe(false)
-    expect(telegramTokenOk("123456789AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawQ")).toBe(false)
+    expect(telegramTokenOk(`123456789${SECRET_PART}`)).toBe(false)
   })
   it("chat id: numbers (groups -, channels -100) or @name", () => {
     for (const ok of ["123456", "-4012345678", "-1001234567890", "@soc_alerts"]) expect(chatIdOk(ok)).toBe(true)

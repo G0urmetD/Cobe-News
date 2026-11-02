@@ -26,12 +26,6 @@ DELETE FROM product_suggestions;
 DELETE FROM vendor_follows WHERE product LIKE 'custom-%';`)
 }
 
-const dueIn = async (page) =>
-  page
-    .locator("[data-slot=sheet-content]")
-    .getByText(/Bitte prüfen|Please review|Check/)
-    .count()
-
 async function versions(page, ctx, t, tag, wide) {
   await page.goto(`${BASE}/vendor?product=panos`)
   await settle(page)
