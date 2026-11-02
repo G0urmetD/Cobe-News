@@ -37,4 +37,5 @@ package = false
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+markers = ["host_networks: reads the real /proc/net/route instead of the neutral host networks of the tests"]
 pythonpath = ["."]

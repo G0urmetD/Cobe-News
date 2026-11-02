@@ -225,6 +225,7 @@ def test_address_rules(monkeypatch):
     assert not netaddr._forbidden_ip(ip("172.31.251.10"), True)
 
 
+@pytest.mark.host_networks
 def test_stack_networks_from_proc_net_route(monkeypatch, tmp_path):
     route = tmp_path / "route"
     # little-endian hex as in /proc/net/route: the default route, 172.31.250.0/24 and 10.0.0.0/8

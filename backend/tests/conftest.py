@@ -245,3 +245,16 @@ async def reader_client():
         await sign_in(c, u)
         c.user = u
         yield c
+
+
+@pytest.fixture(autouse=True)
+def _no_host_networks(request, monkeypatch):  # noqa: ANN001, ANN202
+    """The tests run on a host, not in the app's container: the host's own routes (a CI runner's 10.1.0.0/16) are not the
+    Docker networks netaddr.stack_networks() guards – without this a runner's network would count as "own" and the
+    address rules would differ by machine. A test about /proc/net/route itself is marked `host_networks`."""
+    if request.node.get_closest_marker("host_networks"):
+        return
+    from app import netaddr
+
+    monkeypatch.setattr(netaddr, "stack_networks", lambda: ())
+    monkeypatch.setattr(netaddr, "container_gateway", lambda: None)
