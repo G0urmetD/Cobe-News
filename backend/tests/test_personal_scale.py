@@ -14,7 +14,7 @@ from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlalchemy import event, func, insert, select
+from sqlalchemy import event, func, insert, select, text
 
 from app import db, notify, personal
 from app.crypto import encrypt_str
@@ -108,6 +108,11 @@ async def seed(n: int) -> None:
             )
         )
         await s.commit()
+    # fresh statistics for the thousands of rows just written – autovacuum would have them in a real installation; without
+    # them a slow machine (CI) plans the routing join badly and runs into the statement timeout
+    async with db.engine().connect() as conn:
+        await conn.execute(text("ANALYZE"))
+        await conn.commit()
 
 
 async def open_rows() -> int:
