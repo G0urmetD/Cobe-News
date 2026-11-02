@@ -1,0 +1,329 @@
+{
+ "document": {
+  "aggregate_severity": {
+   "text": "hoch"
+  },
+  "category": "csaf_base",
+  "csaf_version": "2.0",
+  "distribution": {
+   "tlp": {
+    "label": "WHITE",
+    "url": "https://www.first.org/tlp/"
+   }
+  },
+  "lang": "de-DE",
+  "notes": [
+   {
+    "category": "legal_disclaimer",
+    "text": "Das BSI ist als Anbieter f\u00fcr die eigenen, zur Nutzung bereitgestellten Inhalte nach den allgemeinen Gesetzen verantwortlich. Nutzerinnen und Nutzer sind jedoch daf\u00fcr verantwortlich, die Verwendung und/oder die Umsetzung der mit den Inhalten bereitgestellten Informationen sorgf\u00e4ltig im Einzelfall zu pr\u00fcfen."
+   },
+   {
+    "category": "description",
+    "text": "GitLab ist eine Webanwendung zur Versionsverwaltung f\u00fcr Softwareprojekte auf Basis von git.",
+    "title": "Produktbeschreibung"
+   },
+   {
+    "category": "summary",
+    "text": "Ein Angreifer kann mehrere Schwachstellen in GitLab ausnutzen, um beliebigen Code auszuf\u00fchren, Sicherheitsma\u00dfnahmen zu umgehen, erweiterte Berechtigungen zu erlangen, Daten zu manipulieren oder Informationen offenzulegen.",
+    "title": "Angriff"
+   },
+   {
+    "category": "general",
+    "text": "- Linux\n- MacOS X\n- UNIX\n- Windows",
+    "title": "Betroffene Betriebssysteme"
+   }
+  ],
+  "publisher": {
+   "category": "other",
+   "contact_details": "csaf-provider@cert-bund.de",
+   "name": "Bundesamt f\u00fcr Sicherheit in der Informationstechnik",
+   "namespace": "https://www.bsi.bund.de"
+  },
+  "references": [
+   {
+    "category": "self",
+    "summary": "WID-SEC-W-2026-4115 - CSAF Version",
+    "url": "https://wid.cert-bund.de/.well-known/csaf/white/2026/wid-sec-w-2026-4115.json"
+   },
+   {
+    "category": "self",
+    "summary": "WID-SEC-2026-4115 - Portal Version",
+    "url": "https://wid.cert-bund.de/portal/wid/securityadvisory?name=WID-SEC-2026-4115"
+   },
+   {
+    "category": "external",
+    "summary": "GitLab Critical Patch Release vom 2026-10-21",
+    "url": "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:88880 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:88880"
+   }
+  ],
+  "source_lang": "en-US",
+  "title": "GitLab: Mehrere Schwachstellen",
+  "tracking": {
+   "current_release_date": "2026-10-27T23:00:00.000+00:00",
+   "generator": {
+    "date": "2026-10-28T12:41:51.561+00:00",
+    "engine": {
+     "name": "BSI-WID",
+     "version": "1.7.0"
+    }
+   },
+   "id": "WID-SEC-W-2026-4115",
+   "initial_release_date": "2026-10-21T22:00:00.000+00:00",
+   "revision_history": [
+    {
+     "date": "2026-10-21T22:00:00.000+00:00",
+     "number": "1",
+     "summary": "Initiale Fassung"
+    },
+    {
+     "date": "2026-10-27T23:00:00.000+00:00",
+     "number": "2",
+     "summary": "Neue Updates von Red Hat aufgenommen"
+    }
+   ],
+   "status": "final",
+   "version": "2"
+  }
+ },
+ "product_tree": {
+  "branches": [
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<19.5.1",
+        "product": {
+         "name": "Open Source GitLab <19.5.1",
+         "product_id": "T061622"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.5.1",
+        "product": {
+         "name": "Open Source GitLab 19.5.1",
+         "product_id": "T061622-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.5.1"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<19.4.3",
+        "product": {
+         "name": "Open Source GitLab <19.4.3",
+         "product_id": "T061623"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.4.3",
+        "product": {
+         "name": "Open Source GitLab 19.4.3",
+         "product_id": "T061623-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.4.3"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<19.3.6",
+        "product": {
+         "name": "Open Source GitLab <19.3.6",
+         "product_id": "T061624"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.3.6",
+        "product": {
+         "name": "Open Source GitLab 19.3.6",
+         "product_id": "T061624-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.3.6"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<19.2.9",
+        "product": {
+         "name": "Open Source GitLab <19.2.9",
+         "product_id": "T061625"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.2.9",
+        "product": {
+         "name": "Open Source GitLab 19.2.9",
+         "product_id": "T061625-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.2.9"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<19.1.9",
+        "product": {
+         "name": "Open Source GitLab <19.1.9",
+         "product_id": "T061626"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.1.9",
+        "product": {
+         "name": "Open Source GitLab 19.1.9",
+         "product_id": "T061626-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.1.9"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<19.0.10",
+        "product": {
+         "name": "Open Source GitLab <19.0.10",
+         "product_id": "T061627"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.0.10",
+        "product": {
+         "name": "Open Source GitLab 19.0.10",
+         "product_id": "T061627-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.0.10"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<18.11.13",
+        "product": {
+         "name": "Open Source GitLab <18.11.13",
+         "product_id": "T061628"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "18.11.13",
+        "product": {
+         "name": "Open Source GitLab 18.11.13",
+         "product_id": "T061628-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:18.11.13"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "GitLab"
+     }
+    ],
+    "category": "vendor",
+    "name": "Open Source"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Red Hat Enterprise Linux",
+      "product": {
+       "name": "Red Hat Enterprise Linux",
+       "product_id": "67646",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:redhat:enterprise_linux:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Red Hat"
+   }
+  ]
+ },
+ "vulnerabilities": [
+  {
+   "cve": "CVE-2026-103515",
+   "product_status": {
+    "known_affected": [
+     "T061627",
+     "T061628",
+     "T061623",
+     "67646",
+     "T061624",
+     "T061625",
+     "T061626",
+     "T061622"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-103515"
+  },
+  {
+   "cve": "CVE-2026-105711",
+   "product_status": {
+    "known_affected": [
+     "T061627",
+     "T061628",
+     "T061623",
+     "67646",
+     "T061624",
+     "T061625",
+     "T061626",
+     "T061622"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-105711"
+  },
+  {
+   "cve": "CVE-2026-105777",
+   "product_status": {
+    "known_affected": [
+     "T061627",
+     "T061628",
+     "T061623",
+     "67646",
+     "T061624",
+     "T061625",
+     "T061626",
+     "T061622"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-105777"
+  },
+  {
+   "cve": "CVE-2026-112212",
+   "product_status": {
+    "known_affected": [
+     "T061627",
+     "T061628",
+     "T061623",
+     "67646",
+     "T061624",
+     "T061625",
+     "T061626",
+     "T061622"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-112212"
+  }
+ ]
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel><title>Beispiel-CERT</title>
+<item><title>Warnung: Schwachstelle in Beispiel-Firewall (CVE&#8209;2026&#8209;41234)</title><link>https://cert.example.org/warnung/1</link>
+<pubDate>Di, 27 Okt 2026 10:00:00 MEZ</pubDate><description>Ein Update steht bereit.</description></item>
+<item><title>Sommerzeit-Meldung</title><link>https://cert.example.org/warnung/2</link>
+<pubDate>Mi, 27 Mai 2026 10:00:00 MESZ</pubDate><description>Text.</description></item>
+<item><title>Advisory in English, central European summer time</title><link>https://cert.example.org/warnung/3</link>
+<pubDate>Wed, 27 May 2026 10:00:00 CEST</pubDate><description>Text.</description></item>
+<item><title>Ohne Datum</title><link>https://cert.example.org/warnung/4</link><description>Eine Seite ohne Datum.</description></item>
+</channel></rss>

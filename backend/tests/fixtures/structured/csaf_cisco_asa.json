@@ -1,0 +1,238 @@
+{
+ "document": {
+  "category": "csaf_security_advisory",
+  "csaf_version": "2.0",
+  "notes": [
+   {
+    "category": "summary",
+    "title": "Summary",
+    "text": "A vulnerability in the Remote Access SSL VPN service of Cisco Secure Firewall Adaptive Security Appliance (ASA) Software and Cisco Secure Firewall Threat Defense (FTD) Software could allow an unauthenticated, remote attacker to cause the device to reload unexpectedly, resulting in a denial of service (DoS) condition.\r\n\r\nThis vulnerability is due to logic errors when secondary authentication is configured on a tunnel group. An attacker could exploit this vulnerability by sending a crafted request when connecting to the SSL remote access VPN. A successful exploit could allow the attacker to cause the affected device to reload, resulting in a DoS condition.\r\n\r\nCisco has released software updates that address this vulnerability. There are no workarounds that address this vulnerability.\r\n\r\n"
+   },
+   {
+    "category": "general",
+    "title": "Vulnerable Products",
+    "text": "This vulnerability affects Cisco devices if they are running a vulnerable release of Cisco Secure Firewall ASA Software or Cisco Secure FTD Software, the SSL remote access VPN login service is reachable, and secondary authentication is configured in the tunnel group scope that is described in the fo"
+   }
+  ],
+  "publisher": {
+   "category": "vendor",
+   "contact_details": "psirt@cisco.com",
+   "issuing_authority": "Cisco PSIRT",
+   "name": "Cisco",
+   "namespace": "https://wwww.cisco.com"
+  },
+  "references": [
+   {
+    "category": "self",
+    "summary": "Cisco Secure Firewall Adaptive Security Appliance and Secure Firewall Threat Defense Software Remote Access SSL VPN Tunnel Denial of Service Vulnerability",
+    "url": "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-asaftd-tunnel-dos-s6mgkb75"
+   },
+   {
+    "category": "external",
+    "summary": "Cisco Security Vulnerability Policy",
+    "url": "https://sec.cloudapps.cisco.com/security/center/resources/security_vulnerability_policy.html"
+   }
+  ],
+  "title": "Cisco Secure Firewall Adaptive Security Appliance and Secure Firewall Threat Defense Software Remote Access SSL VPN Tunnel Denial of Service Vulnerability",
+  "tracking": {
+   "current_release_date": "2026-10-28T16:00:00+00:00",
+   "generator": {
+    "date": "2026-10-28T20:00:34+00:00",
+    "engine": {
+     "name": "TVCE"
+    }
+   },
+   "id": "cisco-sa-asaftd-tunnel-dos-s6mgkb75",
+   "initial_release_date": "2026-10-28T19:15:00+00:00",
+   "revision_history": [
+    {
+     "date": "2026-10-28T19:13:23+00:00",
+     "number": "1.0.0",
+     "summary": "Initial public release."
+    }
+   ],
+   "status": "final",
+   "version": "1.0.0"
+  }
+ },
+ "product_tree": {
+  "branches": [
+   {
+    "name": "Cisco",
+    "category": "vendor",
+    "branches": [
+     {
+      "name": "Cisco Secure Firewall Adaptive Security Appliance (ASA) Software",
+      "category": "product_family",
+      "branches": [
+       {
+        "name": "9.18",
+        "category": "product_version",
+        "branches": [
+         {
+          "name": "9.18.1",
+          "category": "service_pack",
+          "product": {
+           "name": "9.18.1",
+           "product_id": "CSAFPID-287079"
+          }
+         },
+         {
+          "name": "9.18.1.3",
+          "category": "service_pack",
+          "product": {
+           "name": "9.18.1.3",
+           "product_id": "CSAFPID-287200"
+          }
+         },
+         {
+          "name": "9.18.2",
+          "category": "service_pack",
+          "product": {
+           "name": "9.18.2",
+           "product_id": "CSAFPID-289282"
+          }
+         }
+        ]
+       },
+       {
+        "name": "9.20",
+        "category": "product_version",
+        "branches": [
+         {
+          "name": "9.20.1",
+          "category": "service_pack",
+          "product": {
+           "name": "9.20.1",
+           "product_id": "CSAFPID-300766"
+          }
+         },
+         {
+          "name": "9.20.1.5",
+          "category": "service_pack",
+          "product": {
+           "name": "9.20.1.5",
+           "product_id": "CSAFPID-300898"
+          }
+         },
+         {
+          "name": "9.20.2",
+          "category": "service_pack",
+          "product": {
+           "name": "9.20.2",
+           "product_id": "CSAFPID-301114"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "Cisco Firepower 2100 Series",
+      "category": "product_name",
+      "product": {
+       "name": "Cisco Firepower 2100 Series",
+       "product_id": "CSAFPID-277392"
+      }
+     }
+    ]
+   }
+  ],
+  "relationships": [
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Secure Firewall Adaptive Security Appliance (ASA) Software 9.18.1 when installed on Cisco Firepower 2100 Series",
+     "product_id": "CSAFPID-287079:277392"
+    },
+    "product_reference": "CSAFPID-287079",
+    "relates_to_product_reference": "CSAFPID-277392"
+   },
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Secure Firewall Adaptive Security Appliance (ASA) Software 9.18.1.3 when installed on Cisco Firepower 2100 Series",
+     "product_id": "CSAFPID-287200:277392"
+    },
+    "product_reference": "CSAFPID-287200",
+    "relates_to_product_reference": "CSAFPID-277392"
+   },
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Secure Firewall Adaptive Security Appliance (ASA) Software 9.18.2 when installed on Cisco Firepower 2100 Series",
+     "product_id": "CSAFPID-289282:277392"
+    },
+    "product_reference": "CSAFPID-289282",
+    "relates_to_product_reference": "CSAFPID-277392"
+   },
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Secure Firewall Adaptive Security Appliance (ASA) Software 9.20.2 when installed on Cisco Firepower 2100 Series",
+     "product_id": "CSAFPID-301114:277392"
+    },
+    "product_reference": "CSAFPID-301114",
+    "relates_to_product_reference": "CSAFPID-277392"
+   }
+  ]
+ },
+ "vulnerabilities": [
+  {
+   "cve": "CVE-2026-76418",
+   "ids": [
+    {
+     "system_name": "Cisco Bug ID",
+     "text": "CSCwx26625"
+    }
+   ],
+   "notes": [
+    {
+     "category": "other",
+     "title": "Affected Product Comprehensiveness",
+     "text": "Complete."
+    }
+   ],
+   "product_status": {
+    "known_affected": [
+     "CSAFPID-287079:277392",
+     "CSAFPID-287200:277392",
+     "CSAFPID-289282:277392",
+     "CSAFPID-301114:277392"
+    ]
+   },
+   "release_date": "2026-10-28T19:15:00+00:00",
+   "remediations": [
+    {
+     "category": "vendor_fix",
+     "details": "Cisco has released software updates that address this vulnerability.",
+     "product_ids": [
+      "CSAFPID-287079:277392",
+      "CSAFPID-287200:277392",
+      "CSAFPID-289282:277392",
+      "CSAFPID-301114:277392"
+     ],
+     "url": "https://software.cisco.com"
+    }
+   ],
+   "scores": [
+    {
+     "cvss_v3": {
+      "baseScore": 8.6,
+      "baseSeverity": "HIGH",
+      "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H",
+      "version": "3.1"
+     },
+     "products": [
+      "CSAFPID-287079:277392",
+      "CSAFPID-287200:277392",
+      "CSAFPID-289282:277392",
+      "CSAFPID-301114:277392"
+     ]
+    }
+   ],
+   "title": "Cisco Secure Firewall Adaptive Security Appliance and Secure Firewall Threat Defense Software Remote Access SSL VPN Tunnel Denial of Service Vulnerability",
+   "references": []
+  }
+ ]
+}

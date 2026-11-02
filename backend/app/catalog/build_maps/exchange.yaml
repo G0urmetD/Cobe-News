@@ -1,0 +1,256 @@
+# yaml-language-server: $schema=../schema/build_map_names.schema.json
+# Microsoft Exchange Server: which build a cumulative update (CU) and security/hotfix update (SU/HU) is. Admins often
+# say "2019 CU15" or "2019 CU15 Apr25HU"; Microsoft's CVE records compare builds (15.02.1748.024). A name typed for
+# msexchange is looked up here and stored as the build (app/build_maps.py) – never guessed.
+#
+# Source (fetched 2026-11-02): Microsoft Learn "Exchange Server build numbers and release dates"
+#   https://learn.microsoft.com/en-us/exchange/new-features/build-numbers-and-release-dates
+# Taken: Exchange Server SE, 2019 and 2016 (2013 and older are out of support).
+#
+# A CU without an update ("2019 CU15", "SE RTM") is its line: 15.2.1748 stands for every build of CU15 – the matching
+# decides only what holds for all of them (vendor_match.evaluate, catalogue depth 4); the CU's own release build is
+# "2019 CU15 RTM". The name forms are Microsoft's: SU = security update, HU = hotfix update ("Apr25HU", "Nov24SUv2").
+# A new update: add its row from the page above and raise catalog_version in catalog.yaml.
+kind: names
+fetched: "2026-11-02"
+sources:
+  - "https://learn.microsoft.com/en-us/exchange/new-features/build-numbers-and-release-dates"
+products: [msexchange]
+strip: [microsoft, exchange, server]
+# "2019 CU12", "SE RTM", "2016 CU23 Mar23SU", AdminDisplayVersion "Version 15.2 (Build 1748.10)": not in the table → refused
+claims: '(?i)\b(?:rtm|cu\s*\d+|se|subscription|[a-z]{3}\d{2}[sh]u(?:v\d)?)\b|^(?:(?:microsoft\s+)?exchange(?:\s+server)?\s+)?20(?:07|10|13|16|19)\b|\(\s*build\s'
+hint: exchange_names
+rows:
+  - {value: "15.2.2562", names: ["SE RTM"], date: "2025-07-01"}
+  - {value: "15.2.1748", names: ["2019 CU15"], date: "2025-02-10"}
+  - {value: "15.2.1544", names: ["2019 CU14"], date: "2024-02-13"}
+  - {value: "15.2.1258", names: ["2019 CU13"], date: "2023-05-03"}
+  - {value: "15.2.1118", names: ["2019 CU12"], date: "2022-04-20"}
+  - {value: "15.2.986", names: ["2019 CU11"], date: "2021-09-28"}
+  - {value: "15.2.922", names: ["2019 CU10"], date: "2021-06-29"}
+  - {value: "15.2.858", names: ["2019 CU9"], date: "2021-03-16"}
+  - {value: "15.2.792", names: ["2019 CU8"], date: "2020-12-15"}
+  - {value: "15.2.721", names: ["2019 CU7"], date: "2020-09-15"}
+  - {value: "15.2.659", names: ["2019 CU6"], date: "2020-06-16"}
+  - {value: "15.2.595", names: ["2019 CU5"], date: "2020-03-17"}
+  - {value: "15.2.529", names: ["2019 CU4"], date: "2019-12-17"}
+  - {value: "15.2.464", names: ["2019 CU3"], date: "2019-09-17"}
+  - {value: "15.2.397", names: ["2019 CU2"], date: "2019-06-18"}
+  - {value: "15.2.330", names: ["2019 CU1"], date: "2019-02-12"}
+  - {value: "15.2.221", names: ["2019 RTM"], date: "2018-10-22"}
+  - {value: "15.1.2507", names: ["2016 CU23"], date: "2022-04-20"}
+  - {value: "15.1.2375", names: ["2016 CU22"], date: "2021-09-28"}
+  - {value: "15.1.2308", names: ["2016 CU21"], date: "2021-06-29"}
+  - {value: "15.1.2242", names: ["2016 CU20"], date: "2021-03-16"}
+  - {value: "15.1.2176", names: ["2016 CU19"], date: "2020-12-15"}
+  - {value: "15.1.2106", names: ["2016 CU18"], date: "2020-09-15"}
+  - {value: "15.1.2044", names: ["2016 CU17"], date: "2020-06-16"}
+  - {value: "15.1.1979", names: ["2016 CU16"], date: "2020-03-17"}
+  - {value: "15.1.1913", names: ["2016 CU15"], date: "2019-12-17"}
+  - {value: "15.1.1847", names: ["2016 CU14"], date: "2019-09-17"}
+  - {value: "15.1.1779", names: ["2016 CU13"], date: "2019-06-18"}
+  - {value: "15.1.1713", names: ["2016 CU12"], date: "2019-02-12"}
+  - {value: "15.1.1591", names: ["2016 CU11"], date: "2018-10-16"}
+  - {value: "15.1.1531", names: ["2016 CU10"], date: "2018-06-19"}
+  - {value: "15.1.1466", names: ["2016 CU9"], date: "2018-03-20"}
+  - {value: "15.1.1415", names: ["2016 CU8"], date: "2017-12-19"}
+  - {value: "15.1.1261", names: ["2016 CU7"], date: "2017-09-19"}
+  - {value: "15.1.1034", names: ["2016 CU6"], date: "2017-06-27"}
+  - {value: "15.1.845", names: ["2016 CU5"], date: "2017-03-21"}
+  - {value: "15.1.669", names: ["2016 CU4"], date: "2016-12-13"}
+  - {value: "15.1.544", names: ["2016 CU3"], date: "2016-09-20"}
+  - {value: "15.1.466", names: ["2016 CU2"], date: "2016-06-21"}
+  - {value: "15.1.396", names: ["2016 CU1"], date: "2016-03-15"}
+  - {value: "15.1.225", names: ["2016 RTM"], date: "2015-10-01"}
+  - {value: "15.2.2562.56", names: ["SE RTM Oct26SU"], date: "2026-10-13"}
+  - {value: "15.2.2562.53", names: ["SE RTM Sep26SUv2"], date: "2026-10-02"}
+  - {value: "15.2.2562.49", names: ["SE RTM Sep26SU"], date: "2026-09-08"}
+  - {value: "15.2.2562.46", names: ["SE RTM Aug26SU"], date: "2026-08-11"}
+  - {value: "15.2.2562.45", names: ["SE RTM Jul26SU"], date: "2026-07-14"}
+  - {value: "15.2.2562.43", names: ["SE RTM Jun26SU"], date: "2026-06-09"}
+  - {value: "15.2.2562.41", names: ["SE RTM May26HU"], date: "2026-05-07"}
+  - {value: "15.2.2562.37", names: ["SE RTM Feb26SU"], date: "2026-02-10"}
+  - {value: "15.2.2562.35", names: ["SE RTM Dec25SU"], date: "2025-12-09"}
+  - {value: "15.2.2562.29", names: ["SE RTM Oct25SU"], date: "2025-10-14"}
+  - {value: "15.2.2562.27", names: ["SE RTM Sep25HU"], date: "2025-09-08"}
+  - {value: "15.2.2562.20", names: ["SE RTM Aug25SU"], date: "2025-08-12"}
+  - {value: "15.2.1748.55", names: ["2019 CU15 Oct26SU"], date: "2026-10-13"}
+  - {value: "15.2.1748.53", names: ["2019 CU15 Sep26SUv2"], date: "2026-10-02"}
+  - {value: "15.2.1748.51", names: ["2019 CU15 Sep26SU"], date: "2026-09-08"}
+  - {value: "15.2.1748.49", names: ["2019 CU15 Aug26SU"], date: "2026-08-11"}
+  - {value: "15.2.1748.48", names: ["2019 CU15 Jul26SU"], date: "2026-07-14"}
+  - {value: "15.2.1748.46", names: ["2019 CU15 Jun26SU"], date: "2026-06-09"}
+  - {value: "15.2.1748.43", names: ["2019 CU15 Feb26SU"], date: "2026-02-10"}
+  - {value: "15.2.1748.42", names: ["2019 CU15 Dec25SU"], date: "2025-12-09"}
+  - {value: "15.2.1748.39", names: ["2019 CU15 Oct25SU"], date: "2025-10-14"}
+  - {value: "15.2.1748.37", names: ["2019 CU15 Sep25HU"], date: "2025-09-08"}
+  - {value: "15.2.1748.36", names: ["2019 CU15 Aug25SU"], date: "2025-08-12"}
+  - {value: "15.2.1748.26", names: ["2019 CU15 May25HU"], date: "2025-05-29"}
+  - {value: "15.2.1748.24", names: ["2019 CU15 Apr25HU"], date: "2025-04-18"}
+  - {value: "15.2.1748.10", names: ["2019 CU15 RTM"], date: "2025-02-10"}
+  - {value: "15.2.1544.50", names: ["2019 CU14 Oct26SU"], date: "2026-10-13"}
+  - {value: "15.2.1544.48", names: ["2019 CU14 Sep26SUv2"], date: "2026-10-02"}
+  - {value: "15.2.1544.46", names: ["2019 CU14 Sep26SU"], date: "2026-09-08"}
+  - {value: "15.2.1544.44", names: ["2019 CU14 Aug26SU"], date: "2026-08-11"}
+  - {value: "15.2.1544.43", names: ["2019 CU14 Jul26SU"], date: "2026-07-14"}
+  - {value: "15.2.1544.41", names: ["2019 CU14 Jun26SU"], date: "2026-06-09"}
+  - {value: "15.2.1544.39", names: ["2019 CU14 Feb26SU"], date: "2026-02-10"}
+  - {value: "15.2.1544.37", names: ["2019 CU14 Dec25SU"], date: "2025-12-09"}
+  - {value: "15.2.1544.36", names: ["2019 CU14 Oct25SU"], date: "2025-10-14"}
+  - {value: "15.2.1544.34", names: ["2019 CU14 Sep25HU"], date: "2025-09-08"}
+  - {value: "15.2.1544.33", names: ["2019 CU14 Aug25SU"], date: "2025-08-12"}
+  - {value: "15.2.1544.27", names: ["2019 CU14 May25HU"], date: "2025-05-29"}
+  - {value: "15.2.1544.25", names: ["2019 CU14 Apr25HU"], date: "2025-04-18"}
+  - {value: "15.2.1544.14", names: ["2019 CU14 Nov24SUv2"], date: "2024-11-27"}
+  - {value: "15.2.1544.13", names: ["2019 CU14 Nov24SU"], date: "2024-11-12"}
+  - {value: "15.2.1544.11", names: ["2019 CU14 Apr24HU"], date: "2024-04-23"}
+  - {value: "15.2.1544.9", names: ["2019 CU14 Mar24SU"], date: "2024-03-12"}
+  - {value: "15.2.1544.4", names: ["2019 CU14 RTM"], date: "2024-02-13"}
+  - {value: "15.2.1258.39", names: ["2019 CU13 Nov24SUv2"], date: "2024-11-27"}
+  - {value: "15.2.1258.38", names: ["2019 CU13 Nov24SU"], date: "2024-11-12"}
+  - {value: "15.2.1258.34", names: ["2019 CU13 Apr24HU"], date: "2024-04-23"}
+  - {value: "15.2.1258.32", names: ["2019 CU13 Mar24SU"], date: "2024-03-12"}
+  - {value: "15.2.1258.28", names: ["2019 CU13 Nov23SU"], date: "2023-11-14"}
+  - {value: "15.2.1258.27", names: ["2019 CU13 Oct23SU"], date: "2023-10-10"}
+  - {value: "15.2.1258.25", names: ["2019 CU13 Aug23SUv2"], date: "2023-08-15"}
+  - {value: "15.2.1258.23", names: ["2019 CU13 Aug23SU"], date: "2023-08-08"}
+  - {value: "15.2.1258.16", names: ["2019 CU13 Jun23SU"], date: "2023-06-13"}
+  - {value: "15.2.1258.12", names: ["2019 CU13 RTM"], date: "2023-05-03"}
+  - {value: "15.2.1118.40", names: ["2019 CU12 Nov23SU"], date: "2023-11-14"}
+  - {value: "15.2.1118.39", names: ["2019 CU12 Oct23SU"], date: "2023-10-10"}
+  - {value: "15.2.1118.37", names: ["2019 CU12 Aug23SUv2"], date: "2023-08-15"}
+  - {value: "15.2.1118.36", names: ["2019 CU12 Aug23SU"], date: "2023-08-08"}
+  - {value: "15.2.1118.30", names: ["2019 CU12 Jun23SU"], date: "2023-06-13"}
+  - {value: "15.2.1118.26", names: ["2019 CU12 Mar23SU"], date: "2023-03-14"}
+  - {value: "15.2.1118.25", names: ["2019 CU12 Feb23SU"], date: "2023-02-14"}
+  - {value: "15.2.1118.21", names: ["2019 CU12 Jan23SU"], date: "2023-01-10"}
+  - {value: "15.2.1118.20", names: ["2019 CU12 Nov22SU"], date: "2022-11-08"}
+  - {value: "15.2.1118.15", names: ["2019 CU12 Oct22SU"], date: "2022-10-11"}
+  - {value: "15.2.1118.12", names: ["2019 CU12 Aug22SU"], date: "2022-08-09"}
+  - {value: "15.2.1118.9", names: ["2019 CU12 May22SU"], date: "2022-05-10"}
+  - {value: "15.2.1118.7", names: ["2019 CU12 RTM"], date: "2022-04-20"}
+  - {value: "15.2.986.42", names: ["2019 CU11 Mar23SU"], date: "2023-03-14"}
+  - {value: "15.2.986.41", names: ["2019 CU11 Feb23SU"], date: "2023-02-14"}
+  - {value: "15.2.986.37", names: ["2019 CU11 Jan23SU"], date: "2023-01-10"}
+  - {value: "15.2.986.36", names: ["2019 CU11 Nov22SU"], date: "2022-11-08"}
+  - {value: "15.2.986.30", names: ["2019 CU11 Oct22SU"], date: "2022-10-11"}
+  - {value: "15.2.986.29", names: ["2019 CU11 Aug22SU"], date: "2022-08-09"}
+  - {value: "15.2.986.26", names: ["2019 CU11 May22SU"], date: "2022-05-10"}
+  - {value: "15.2.986.22", names: ["2019 CU11 Mar22SU"], date: "2022-03-08"}
+  - {value: "15.2.986.15", names: ["2019 CU11 Jan22SU"], date: "2022-01-11"}
+  - {value: "15.2.986.14", names: ["2019 CU11 Nov21SU"], date: "2021-11-09"}
+  - {value: "15.2.986.9", names: ["2019 CU11 Oct21SU"], date: "2021-10-12"}
+  - {value: "15.2.986.5", names: ["2019 CU11 RTM"], date: "2021-09-28"}
+  - {value: "15.2.922.27", names: ["2019 CU10 Mar22SU"], date: "2022-03-08"}
+  - {value: "15.2.922.20", names: ["2019 CU10 Jan22SU"], date: "2022-01-11"}
+  - {value: "15.2.922.19", names: ["2019 CU10 Nov21SU"], date: "2021-11-09"}
+  - {value: "15.2.922.14", names: ["2019 CU10 Oct21SU"], date: "2021-10-12"}
+  - {value: "15.2.922.13", names: ["2019 CU10 Jul21SU"], date: "2021-07-13"}
+  - {value: "15.2.922.7", names: ["2019 CU10 RTM"], date: "2021-06-29"}
+  - {value: "15.2.858.15", names: ["2019 CU9 Jul21SU"], date: "2021-07-13"}
+  - {value: "15.2.858.12", names: ["2019 CU9 May21SU"], date: "2021-05-11"}
+  - {value: "15.2.858.10", names: ["2019 CU9 Apr21SU"], date: "2021-04-13"}
+  - {value: "15.2.858.5", names: ["2019 CU9 RTM"], date: "2021-03-16"}
+  - {value: "15.2.792.15", names: ["2019 CU8 May21SU"], date: "2021-05-11"}
+  - {value: "15.2.792.13", names: ["2019 CU8 Apr21SU"], date: "2021-04-13"}
+  - {value: "15.2.792.10", names: ["2019 CU8 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.792.3", names: ["2019 CU8 RTM"], date: "2020-12-15"}
+  - {value: "15.2.721.13", names: ["2019 CU7 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.721.2", names: ["2019 CU7 RTM"], date: "2020-09-15"}
+  - {value: "15.2.659.12", names: ["2019 CU6 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.659.4", names: ["2019 CU6 RTM"], date: "2020-06-16"}
+  - {value: "15.2.595.8", names: ["2019 CU5 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.595.3", names: ["2019 CU5 RTM"], date: "2020-03-17"}
+  - {value: "15.2.529.13", names: ["2019 CU4 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.529.5", names: ["2019 CU4 RTM"], date: "2019-12-17"}
+  - {value: "15.2.464.15", names: ["2019 CU3 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.464.5", names: ["2019 CU3 RTM"], date: "2019-09-17"}
+  - {value: "15.2.397.11", names: ["2019 CU2 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.397.3", names: ["2019 CU2 RTM"], date: "2019-06-18"}
+  - {value: "15.2.330.11", names: ["2019 CU1 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.330.5", names: ["2019 CU1 RTM"], date: "2019-02-12"}
+  - {value: "15.2.221.18", names: ["2019 RTM Mar21SU"], date: "2021-03-02"}
+  - {value: "15.2.196.0", names: ["2019 Preview"], date: "2018-07-24"}
+  - {value: "15.1.2507.77", names: ["2016 CU23 Oct26SU"], date: "2026-10-13"}
+  - {value: "15.1.2507.75", names: ["2016 CU23 Sep26SUv2"], date: "2026-10-02"}
+  - {value: "15.1.2507.73", names: ["2016 CU23 Sep26SU"], date: "2026-09-08"}
+  - {value: "15.1.2507.72", names: ["2016 CU23 Aug26SU"], date: "2026-08-11"}
+  - {value: "15.1.2507.71", names: ["2016 CU23 Jul26SU"], date: "2026-07-14"}
+  - {value: "15.1.2507.69", names: ["2016 CU23 Jun26SU"], date: "2026-06-09"}
+  - {value: "15.1.2507.66", names: ["2016 CU23 Feb26SU"], date: "2026-02-10"}
+  - {value: "15.1.2507.63", names: ["2016 CU23 Dec25SU"], date: "2025-12-09"}
+  - {value: "15.1.2507.61", names: ["2016 CU23 Oct25SU"], date: "2025-10-14"}
+  - {value: "15.1.2507.59", names: ["2016 CU23 Sep25HU"], date: "2025-09-08"}
+  - {value: "15.1.2507.58", names: ["2016 CU23 Aug25SU"], date: "2025-08-12"}
+  - {value: "15.1.2507.57", names: ["2016 CU23 May25HU"], date: "2025-05-29"}
+  - {value: "15.1.2507.55", names: ["2016 CU23 Apr25HU"], date: "2025-04-18"}
+  - {value: "15.1.2507.44", names: ["2016 CU23 Nov24SUv2"], date: "2024-11-27"}
+  - {value: "15.1.2507.43", names: ["2016 CU23 Nov24SU"], date: "2024-11-12"}
+  - {value: "15.1.2507.39", names: ["2016 CU23 Apr24HU"], date: "2024-04-23"}
+  - {value: "15.1.2507.37", names: ["2016 CU23 Mar24SU"], date: "2024-03-12"}
+  - {value: "15.1.2507.35", names: ["2016 CU23 Nov23SU"], date: "2023-11-14"}
+  - {value: "15.1.2507.34", names: ["2016 CU23 Oct23SU"], date: "2023-10-10"}
+  - {value: "15.1.2507.32", names: ["2016 CU23 Aug23SUv2"], date: "2023-08-15"}
+  - {value: "15.1.2507.31", names: ["2016 CU23 Aug23SU"], date: "2023-08-08"}
+  - {value: "15.1.2507.27", names: ["2016 CU23 Jun23SU"], date: "2023-06-13"}
+  - {value: "15.1.2507.23", names: ["2016 CU23 Mar23SU"], date: "2023-03-14"}
+  - {value: "15.1.2507.21", names: ["2016 CU23 Feb23SU"], date: "2023-02-14"}
+  - {value: "15.1.2507.17", names: ["2016 CU23 Jan23SU"], date: "2023-01-10"}
+  - {value: "15.1.2507.16", names: ["2016 CU23 Nov22SU"], date: "2022-11-08"}
+  - {value: "15.1.2507.13", names: ["2016 CU23 Oct22SU"], date: "2022-10-11"}
+  - {value: "15.1.2507.12", names: ["2016 CU23 Aug22SU"], date: "2022-08-09"}
+  - {value: "15.1.2507.9", names: ["2016 CU23 May22SU"], date: "2022-05-10"}
+  - {value: "15.1.2507.6", names: ["2016 CU23 RTM"], date: "2022-04-20"}
+  - {value: "15.1.2375.37", names: ["2016 CU22 Nov22SU"], date: "2022-11-08"}
+  - {value: "15.1.2375.32", names: ["2016 CU22 Oct22SU"], date: "2022-10-11"}
+  - {value: "15.1.2375.31", names: ["2016 CU22 Aug22SU"], date: "2022-08-09"}
+  - {value: "15.1.2375.28", names: ["2016 CU22 May22SU"], date: "2022-05-10"}
+  - {value: "15.1.2375.24", names: ["2016 CU22 Mar22SU"], date: "2022-03-08"}
+  - {value: "15.1.2375.18", names: ["2016 CU22 Jan22SU"], date: "2022-01-11"}
+  - {value: "15.1.2375.17", names: ["2016 CU22 Nov21SU"], date: "2021-11-09"}
+  - {value: "15.1.2375.12", names: ["2016 CU22 Oct21SU"], date: "2021-10-12"}
+  - {value: "15.1.2375.7", names: ["2016 CU22 RTM"], date: "2021-09-28"}
+  - {value: "15.1.2308.27", names: ["2016 CU21 Mar22SU"], date: "2022-03-08"}
+  - {value: "15.1.2308.21", names: ["2016 CU21 Jan22SU"], date: "2022-01-11"}
+  - {value: "15.1.2308.20", names: ["2016 CU21 Nov21SU"], date: "2021-11-09"}
+  - {value: "15.1.2308.15", names: ["2016 CU21 Oct21SU"], date: "2021-10-12"}
+  - {value: "15.1.2308.14", names: ["2016 CU21 Jul21SU"], date: "2021-07-13"}
+  - {value: "15.1.2308.8", names: ["2016 CU21 RTM"], date: "2021-06-29"}
+  - {value: "15.1.2242.12", names: ["2016 CU20 Jul21SU"], date: "2021-07-13"}
+  - {value: "15.1.2242.10", names: ["2016 CU20 May21SU"], date: "2021-05-11"}
+  - {value: "15.1.2242.8", names: ["2016 CU20 Apr21SU"], date: "2021-04-13"}
+  - {value: "15.1.2242.4", names: ["2016 CU20 RTM"], date: "2021-03-16"}
+  - {value: "15.1.2176.14", names: ["2016 CU19 May21SU"], date: "2021-05-11"}
+  - {value: "15.1.2176.12", names: ["2016 CU19 Apr21SU"], date: "2021-04-13"}
+  - {value: "15.1.2176.9", names: ["2016 CU19 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.2176.2", names: ["2016 CU19 RTM"], date: "2020-12-15"}
+  - {value: "15.1.2106.13", names: ["2016 CU18 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.2106.2", names: ["2016 CU18 RTM"], date: "2020-09-15"}
+  - {value: "15.1.2044.13", names: ["2016 CU17 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.2044.4", names: ["2016 CU17 RTM"], date: "2020-06-16"}
+  - {value: "15.1.1979.8", names: ["2016 CU16 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1979.3", names: ["2016 CU16 RTM"], date: "2020-03-17"}
+  - {value: "15.1.1913.12", names: ["2016 CU15 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1913.5", names: ["2016 CU15 RTM"], date: "2019-12-17"}
+  - {value: "15.1.1847.12", names: ["2016 CU14 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1847.3", names: ["2016 CU14 RTM"], date: "2019-09-17"}
+  - {value: "15.1.1779.8", names: ["2016 CU13 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1779.2", names: ["2016 CU13 RTM"], date: "2019-06-18"}
+  - {value: "15.1.1713.10", names: ["2016 CU12 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1713.5", names: ["2016 CU12 RTM"], date: "2019-02-12"}
+  - {value: "15.1.1591.18", names: ["2016 CU11 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1591.10", names: ["2016 CU11 RTM"], date: "2018-10-16"}
+  - {value: "15.1.1531.12", names: ["2016 CU10 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1531.3", names: ["2016 CU10 RTM"], date: "2018-06-19"}
+  - {value: "15.1.1466.16", names: ["2016 CU9 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1466.3", names: ["2016 CU9 RTM"], date: "2018-03-20"}
+  - {value: "15.1.1415.10", names: ["2016 CU8 Mar21SU"], date: "2021-03-02"}
+  - {value: "15.1.1415.2", names: ["2016 CU8 RTM"], date: "2017-12-19"}
+  - {value: "15.1.1261.35", names: ["2016 CU7 RTM"], date: "2017-09-19"}
+  - {value: "15.1.1034.26", names: ["2016 CU6 RTM"], date: "2017-06-27"}
+  - {value: "15.1.845.34", names: ["2016 CU5 RTM"], date: "2017-03-21"}
+  - {value: "15.1.669.32", names: ["2016 CU4 RTM"], date: "2016-12-13"}
+  - {value: "15.1.544.27", names: ["2016 CU3 RTM"], date: "2016-09-20"}
+  - {value: "15.1.466.34", names: ["2016 CU2 RTM"], date: "2016-06-21"}
+  - {value: "15.1.396.30", names: ["2016 CU1 RTM"], date: "2016-03-15"}
+  - {value: "15.1.225.16", names: ["2016 Preview"], date: "2015-07-22"}

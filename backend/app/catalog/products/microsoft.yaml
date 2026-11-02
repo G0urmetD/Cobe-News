@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'microsoft' (Microsoft servers). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Microsoft servers
+- key: msexchange
+  label: Microsoft Exchange Server
+  vendor: Microsoft
+  cpes: []
+  cna: [[Microsoft, Microsoft Exchange Server], [Microsoft, Microsoft Exchange Server Subscription Edition RTM], [Microsoft, Microsoft Exchange Server Subscription Edition]]
+  kw: [Exchange Server, Exchange]
+  example: 15.2.1748.24
+  hint: exchange
+  version_cmd: "Get-Command ExSetup.exe | % {$_.FileVersionInfo}"
+  depth: 4  # 15.2.1748 ("2019 CU15") stands for every build of CU15
+  where: exchange
+  pattern: '\d{1,2}\.\d{1,2}\.\d{1,4}(?:\.\d{1,4})?'  # a build – names (2019 CU15 …) are looked up first
+  pattern_hint: exchange_names
+  line_depth: 3  # Microsoft's records have one row per CU (15.2.1748 = 2019 CU15), each from 15.02.0 on
+- key: sharepoint
+  label: Microsoft SharePoint Server
+  vendor: Microsoft
+  cpes: [a:microsoft:sharepoint_server, a:microsoft:sharepoint_enterprise_server]
+  cna: [[Microsoft, Microsoft SharePoint Server], [Microsoft, Microsoft SharePoint Enterprise Server], [Microsoft, Microsoft SharePoint Server Subscription Edition]]
+  kw: [SharePoint]
+  example: 16.0.17928.20238
+  hint: sharepoint
+  where: sharepoint
+  pattern: '1[2-6]\.0\.\d{4,5}\.\d{4,5}'
+  pattern_hint: sharepoint
+  editions:  # all 16.0.x – Microsoft's rows name the edition, the build says which one is installed
+    - {name: "2016", from: "16.0.4000", below: "16.0.10000", cpe: "2016"}
+    - {name: "2019", from: "16.0.10000", below: "16.0.14000", cpe: "2019"}
+    - {name: Subscription Edition, from: "16.0.14000", cpe: subscription}
+- key: mssqlserver
+  label: Microsoft SQL Server
+  vendor: Microsoft
+  cpes: []
+  cna: [[Microsoft, Microsoft SQL Server]]
+  kw: [SQL Server]
+  example: 16.0.4155.4
+  depth: 4
+  where: sqlserver
+  pattern: '(?:[6-9]|1\d)\.\d{1,2}\.\d{3,4}(?:\.\d{1,4})?'  # a build – names (2022 CU16, KB…) are looked up first
+  pattern_hint: sqlserver_names
+  editions:  # GDR and CU branches of one release: Microsoft's rows ("2022 (GDR)", "2022 (CU 19)") each speak for their branch
+    - {name: 2025 GDR, from: "17.0.1000", below: "17.0.4000"}
+    - {name: 2025 CU, from: "17.0.4000", below: "18"}
+    - {name: 2022 GDR, from: "16.0.1000", below: "16.0.4000"}
+    - {name: 2022 CU, from: "16.0.4000", below: "17"}
+    - {name: 2019 GDR, from: "15.0.2000", below: "15.0.4000"}
+    - {name: 2019 CU, from: "15.0.4000", below: "16"}
+    - {name: 2017 GDR, from: "14.0.1000", below: "14.0.3000"}
+    - {name: 2017 CU, from: "14.0.3000", below: "15"}
+- key: iis
+  label: Microsoft IIS
+  vendor: Microsoft
+  cpes: [a:microsoft:internet_information_services]
+  kw: [IIS, Internet Information Services]
+  example: "10.0"
+  hint: windows_component
+- key: azure-devops-server
+- key: skype-business-server
+  label: Skype for Business Server
+  vendor: Microsoft
+  cpes: [a:microsoft:skype_for_business_server]
+  cna: [[Microsoft, Skype for Business Server]]
+  kw: [Skype for Business]
+  aliases: [Lync, Lync Server, SfB]
+  example: 2019 CU8
+- key: configmgr
+  label: Microsoft Configuration Manager (SCCM)
+  vendor: Microsoft
+  cpes: [a:microsoft:configuration_manager, a:microsoft:system_center_configuration_manager]
+  kw: [Configuration Manager, SCCM, ConfigMgr, MECM]
+  aliases: [MECM, ConfigMgr, SCCM, Endpoint Configuration Manager, System Center Configuration Manager]
+  example: "2409"
+
+# ---------------------------------------------------------------- Windows Server roles (0.1.45) – the Windows Server CPEs, a filter word picks the role
+- key: windows-wsus
+  label: Windows Server Update Services (WSUS)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [WSUS, Windows Server Update Service]
+  aliases: [WSUS, Windows Update Server]
+  example: 10.0.20348.2762
+  hint: windows_role
+  where: windows_build
+  filter: "Server Update Service"

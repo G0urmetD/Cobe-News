@@ -1,0 +1,187 @@
+{
+ "resultsPerPage": 1,
+ "startIndex": 0,
+ "totalResults": 1,
+ "format": "NVD_CVE",
+ "version": "2.0",
+ "timestamp": "2026-10-29T08:00:00.000",
+ "vulnerabilities": [
+  {
+   "cve": {
+    "id": "CVE-2026-109619",
+    "sourceIdentifier": "security@php.example",
+    "published": "2026-10-20T15:15:00.000",
+    "lastModified": "2026-10-28T12:00:00.000",
+    "vulnStatus": "Analyzed",
+    "cisaExploitAdd": "2026-10-26",
+    "cisaActionDue": "2026-10-29",
+    "cisaVulnerabilityName": "PHP Stale Internal Request-State Vulnerability",
+    "descriptions": [
+     {
+      "lang": "en",
+      "value": "PHP has various global state that temporarily points into request memory; stale state can lead to remote code execution (RCE)."
+     }
+    ],
+    "metrics": {
+     "cvssMetricV31": [
+      {
+       "source": "nvd@nist.gov",
+       "type": "Primary",
+       "cvssData": {
+        "version": "3.1",
+        "baseScore": 9.8,
+        "baseSeverity": "CRITICAL"
+       }
+      }
+     ]
+    },
+    "configurations": [
+     {
+      "nodes": [
+       {
+        "operator": "OR",
+        "negate": false,
+        "cpeMatch": [
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:a:php:php:*:*:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000",
+          "versionStartIncluding": "8.3.0",
+          "versionEndExcluding": "8.3.36"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "nodes": [
+       {
+        "operator": "OR",
+        "negate": false,
+        "cpeMatch": [
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:*:*:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000",
+          "versionStartIncluding": "10.2.0",
+          "versionEndExcluding": "10.2.7"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:10.2.13:-:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:10.2.13:h1:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:10.2.13:h5:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:10.2.13:h26:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "nodes": [
+       {
+        "operator": "OR",
+        "negate": false,
+        "cpeMatch": [
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:*:*:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000",
+          "versionStartIncluding": "11.2.0",
+          "versionEndExcluding": "11.2.4"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:11.2.4:-:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:11.2.4:h1:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:11.2.4:h2:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:11.2.4:h9:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:11.2.4:h18:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         },
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:11.2.4:h20:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "nodes": [
+       {
+        "operator": "OR",
+        "negate": false,
+        "cpeMatch": [
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:-:*:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "operator": "AND",
+      "nodes": [
+       {
+        "operator": "OR",
+        "negate": false,
+        "cpeMatch": [
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:a:php:php:*:*:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000",
+          "versionEndExcluding": "8.3.36"
+         }
+        ]
+       },
+       {
+        "operator": "OR",
+        "negate": false,
+        "cpeMatch": [
+         {
+          "vulnerable": false,
+          "criteria": "cpe:2.3:o:paloaltonetworks:pan-os:*:*:*:*:*:*:*:*",
+          "matchCriteriaId": "00000000-0000-0000-0000-000000000000"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

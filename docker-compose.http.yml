@@ -1,0 +1,6 @@
+# Optional: plain http that only redirects to https. Enable with COMPOSE_FILE=docker-compose.yml:docker-compose.http.yml
+# in .env (HTTP_PORT, default 8094).
+services:
+  proxy:
+    ports:
+      - "${BIND:-127.0.0.1}:${HTTP_PORT:-8094}:80"

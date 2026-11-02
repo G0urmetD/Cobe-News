@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'itsm' (ITSM & ticketing). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- collaboration, DevOps
+- key: jira-service-management
+  label: Atlassian Jira Service Management
+  vendor: Atlassian
+  cpes: [a:atlassian:jira_service_management]
+  cna: [[Atlassian, Jira Service Management Data Center]]
+  kw: [Jira Service Management]
+  example: 5.12.15
+
+# ---------------------------------------------------------------- remote access, IT management
+- key: solarwinds-whd
+  label: SolarWinds Web Help Desk
+  vendor: SolarWinds
+  cpes: [a:solarwinds:web_help_desk]
+  kw: [Web Help Desk]
+  example: 12.8.5
+- key: manageengine-servicedesk
+  label: ManageEngine ServiceDesk Plus
+  vendor: Zoho ManageEngine
+  cpes: [a:zohocorp:manageengine_servicedesk_plus]
+  kw: [ServiceDesk Plus]
+  example: 14.9 build 14910
+
+# ---------------------------------------------------------------- ITSM, ticketing
+- key: servicenow
+  label: ServiceNow
+  vendor: ServiceNow
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [ServiceNow]
+- key: znuny
+  label: Znuny / OTRS
+  vendor: Znuny / OTRS AG
+  cpes: [a:znuny:znuny, a:otrs:otrs]
+  kw: [Znuny, OTRS]
+  aliases: [OTRS]
+  example: 7.1.7
+- key: glpi
+  label: GLPI
+  vendor: Teclib
+  cpes: [a:glpi-project:glpi]
+  kw: [GLPI]
+  example: 10.0.18
+  osv: [[Packagist, glpi/glpi]]
+- key: topdesk
+  label: TOPdesk
+  vendor: TOPdesk
+  cpes: [a:topdesk:topdesk]
+  kw: [TOPdesk]
+- key: zammad
+  label: Zammad
+  vendor: Zammad
+  cpes: [a:zammad:zammad]
+  kw: [Zammad]
+  example: 6.5.0
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: ivanti-neurons-itsm
+  label: "Ivanti Neurons for ITSM (on-prem)"
+  vendor: Ivanti
+  cpes: [a:ivanti:neurons_for_itsm]
+  cna: [[Ivanti, "Neurons for ITSM (on-prem)"], [Ivanti, Neurons for ITSM]]
+  kw: [Neurons for ITSM, Ivanti ITSM]
+  aliases: [Ivanti Service Manager, HEAT ITSM]
+  example: "2024.3"
+  where: web_about

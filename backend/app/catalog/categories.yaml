@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=schema/categories.schema.json
+# The Vendor News categories in the order the catalogue shows them: label in German and English, icon (lucide name).
+categories:
+  - key: firewall
+    icon: brick-wall
+    de: Firewalls & VPN
+    en: Firewalls & VPN
+  - key: network
+    icon: network
+    de: Switches, Router & WLAN
+    en: Switches, routers & WLAN
+  - key: lb
+    icon: split
+    de: Load Balancer & Reverse Proxy
+    en: Load balancers & reverse proxies
+  - key: dns
+    icon: globe
+    de: DNS, DHCP & IPAM
+    en: DNS, DHCP & IPAM
+  - key: os
+    icon: terminal
+    de: Betriebssysteme
+    en: Operating systems
+  - key: virtualization
+    icon: layers
+    de: Virtualisierung & Hypervisor
+    en: Virtualisation & hypervisors
+  - key: containers
+    icon: container
+    de: Container & Kubernetes
+    en: Containers & Kubernetes
+  - key: storage
+    icon: hard-drive
+    de: Storage & NAS
+    en: Storage & NAS
+  - key: backup
+    icon: archive-restore
+    de: Backup & Wiederherstellung
+    en: Backup & recovery
+  - key: microsoft
+    icon: server
+    de: Microsoft-Server
+    en: Microsoft servers
+  - key: mail
+    icon: mail
+    de: Mail & Mail-Security
+    en: Mail & mail security
+  - key: collaboration
+    icon: users
+    de: Collaboration & DevOps
+    en: Collaboration & DevOps
+  - key: itsm
+    icon: ticket
+    de: ITSM & Ticketing
+    en: ITSM & ticketing
+  - key: erp
+    icon: briefcase
+    de: ERP & Business
+    en: ERP & business
+  - key: web
+    icon: app-window
+    de: Web-/App-Server & Laufzeiten
+    en: Web/app servers & runtimes
+  - key: database
+    icon: database
+    de: Datenbanken
+    en: Databases
+  - key: monitoring
+    icon: activity
+    de: Monitoring & Observability
+    en: Monitoring & observability
+  - key: security
+    icon: shield
+    de: Security & Endpoint
+    en: Security & endpoint
+  - key: siem
+    icon: scroll-text
+    de: SIEM & Logging
+    en: SIEM & logging
+  - key: scanner
+    icon: scan-search
+    de: Schwachstellen-Scanner
+    en: Vulnerability scanners
+  - key: iam
+    icon: key-round
+    de: Identität & Zugriff (IAM/SSO)
+    en: Identity & access (IAM/SSO)
+  - key: pki
+    icon: file-badge
+    de: PKI & Zertifikate
+    en: PKI & certificates
+  - key: passwords
+    icon: lock-keyhole
+    de: Passwortmanager & Zugangsverwaltung
+    en: Password managers & PAM
+  - key: ot
+    icon: factory
+    de: OT/ICS (Industrie)
+    en: OT/ICS (industrial)
+  - key: remote
+    icon: monitor-smartphone
+    de: Fernzugriff & IT-Management
+    en: Remote access & IT management
+  - key: client
+    icon: laptop
+    de: Browser & Client-Software
+    en: Browsers & client software
+  - key: devices
+    icon: printer
+    de: Geräte & Firmware
+    en: Devices & firmware
+  - key: cloud
+    icon: cloud
+    de: Cloud-Dienste
+    en: Cloud services
+  - key: dev
+    icon: code
+    de: Frameworks & Entwicklung
+    en: Frameworks & development
+  - key: other
+    icon: package
+    de: Weitere Server-Software
+    en: Other server software

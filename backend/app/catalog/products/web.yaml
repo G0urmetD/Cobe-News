@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'web' (Web/app servers & runtimes). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- web/app servers, runtimes
+- key: php
+  label: PHP
+  vendor: The PHP Group
+  cpes: []
+  cna: [[PHP Group, PHP]]
+  kw: [PHP]
+  example: 8.3.14
+- key: apache-http-server
+  label: Apache HTTP Server
+  vendor: Apache Software Foundation
+  cpes: []
+  cna: [[Apache Software Foundation, Apache HTTP Server]]
+  kw: [Apache HTTP Server, httpd]
+  example: 2.4.62
+- key: tomcat
+  label: Apache Tomcat
+  vendor: Apache Software Foundation
+  cpes: []
+  cna: [[Apache Software Foundation, Apache Tomcat]]
+  kw: [Tomcat]
+  example: 10.1.34
+  osv: [[Maven, org.apache.tomcat:tomcat-catalina], [Maven, org.apache.tomcat.embed:tomcat-embed-core]]
+- key: openssh
+  label: OpenSSH
+  vendor: OpenBSD
+  cpes: [a:openbsd:openssh]
+  kw: [OpenSSH]
+  example: 9.8p1
+- key: openssl
+  label: OpenSSL
+  vendor: OpenSSL
+  cpes: []
+  cna: [[OpenSSL, OpenSSL]]
+  kw: [OpenSSL]
+  example: 3.0.15
+- key: nodejs
+  label: Node.js
+  vendor: OpenJS Foundation
+  cpes: []
+  cna: [[nodejs, node], [Node.js, Node.js]]
+  kw: [Node.js]
+  example: 22.12.0
+- key: python
+  label: Python
+  vendor: Python Software Foundation
+  cpes: []
+  cna: [[Python Software Foundation, CPython]]
+  kw: [Python, CPython]
+  example: 3.12.8
+- key: dotnet
+  label: Microsoft .NET
+  vendor: Microsoft
+  cpes: []
+  cna: [[Microsoft, .NET]]
+  kw: [.NET]
+  example: 8.0.11
+  version_cmd: dotnet --list-runtimes
+  where: dotnet
+  pattern: '\d{1,2}\.\d{1,2}\.\d{1,2}(?:-[a-z0-9.]+)?'
+  pattern_hint: dotnet_runtime
+- key: oracle-jdk
+  label: Oracle Java SE (JDK/JRE)
+  vendor: Oracle
+  cpes: [a:oracle:jre, a:oracle:java_se]
+  cna: [[Oracle Corporation, Java SE JDK and JRE], [Oracle Corporation, Java SE]]
+  kw: [Java SE, Oracle Java]
+  example: 21.0.5
+  depth: 3  # endoflife.date lists five-part builds (27.0.1.0.3); a release is 21.0.5
+  scheme: java
+  where: java
+  version_cmd: java -version
+- key: openjdk-builds-from-oracle
+  label: OpenJDK
+  vendor: Oracle
+  cpes: []
+  kw: [OpenJDK]
+  example: 21.0.5
+- key: eclipse-temurin
+- key: redhat-jboss-eap
+  cpes: [a:redhat:jboss_enterprise_application_platform]
+# endoflife.date no longer lists WildFly (only JBoss EAP) – a product of its own since catalogue 2026.10.29-2
+- key: wildfly
+  label: WildFly
+  vendor: Red Hat
+  cpes: [a:redhat:wildfly]
+  kw: [WildFly]
+  aliases: [JBoss AS, WildFly Application Server]
+  example: 37.0.1
+  version_cmd: $JBOSS_HOME/bin/standalone.sh --version
+- key: weblogic
+  label: Oracle WebLogic Server
+  vendor: Oracle
+  cpes: [a:oracle:weblogic_server]
+  cna: [[Oracle Corporation, WebLogic Server]]
+  kw: [WebLogic]
+  example: 14.1.1.0.0
+- key: websphere
+  label: IBM WebSphere Application Server
+  vendor: IBM
+  cpes: [a:ibm:websphere_application_server]
+  cna: [[IBM, WebSphere Application Server]]
+  kw: [WebSphere]
+  example: 9.0.5.22
+- key: coldfusion
+- key: log4j
+  cpes: [a:apache:log4j]
+  osv: [[Maven, org.apache.logging.log4j:log4j-core]]
+- key: spring-framework
+  cpes: [a:vmware:spring_framework]
+  osv: [[Maven, org.springframework:spring-core], [Maven, org.springframework:spring-web], [Maven, org.springframework:spring-webmvc]]
+- key: ruby
+- key: go
+  cpes: [a:golang:go]
+  osv: [[Go, stdlib]]
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: dotnetfx

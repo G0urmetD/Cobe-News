@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'dns' (DNS, DHCP & IPAM). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- DNS, DHCP, IPAM
+- key: infoblox-nios
+  label: Infoblox NIOS
+  vendor: Infoblox
+  cpes: [o:infoblox:nios]
+  kw: [Infoblox, NIOS]
+  example: 9.0.6
+- key: bind-9
+  cpes: [a:isc:bind]
+- key: unbound
+  label: Unbound
+  vendor: NLnet Labs
+  cpes: [a:nlnetlabs:unbound]
+  kw: [Unbound]
+  example: 1.23.0
+  version_cmd: unbound -V
+- key: windows-dns
+  label: Windows DNS Server
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [Windows DNS]
+  aliases: [Microsoft DNS]
+  example: 10.0.20348.2762
+  hint: windows_role
+  where: windows_build
+  filter: DNS Server
+- key: isc-dhcp
+  cpes: [a:isc:dhcp]
+- key: isc-kea
+  label: ISC Kea DHCP
+  vendor: ISC
+  cpes: [a:isc:kea]
+  kw: [Kea]
+  example: 2.6.3
+
+# ---------------------------------------------------------------- Windows Server roles (0.1.45) – the Windows Server CPEs, a filter word picks the role
+- key: windows-dhcp
+  label: Windows DHCP Server
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [Windows DHCP, DHCP Server]
+  aliases: [Microsoft DHCP]
+  example: 10.0.20348.2762
+  hint: windows_role
+  where: windows_build
+  filter: "DHCP Server"

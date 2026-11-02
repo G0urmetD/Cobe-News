@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'other' (Other server software). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme, a hint or its OSV packages).
+
+# ---------------------------------------------------------------- open-source server software: their packages in OSV
+- key: drupal
+  osv: [[Packagist, drupal/core]]
+- key: typo3
+  osv: [[Packagist, typo3/cms-core]]
+- key: consul
+  osv: [[Go, github.com/hashicorp/consul]]
+- key: nomad
+  osv: [[Go, github.com/hashicorp/nomad]]
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: papercut
+  label: PaperCut NG / MF
+  vendor: PaperCut
+  cpes: [a:papercut:papercut_ng, a:papercut:papercut_mf]
+  cna: [[PaperCut, NG], [PaperCut, MF], [PaperCut, PaperCut NG], [PaperCut, PaperCut MF]]
+  kw: [PaperCut]
+  aliases: [PaperCut NG, PaperCut MF]
+  example: "22.0.5 (Build 63914)"
+  where: web_about

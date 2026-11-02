@@ -1,0 +1,169 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'erp' (ERP & business). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- ERP, business
+- key: sap-netweaver-abap
+  label: SAP NetWeaver AS ABAP
+  vendor: SAP
+  cpes: [a:sap:netweaver_application_server_abap, a:sap:netweaver_as_abap]
+  cna: [[SAP_SE, SAP NetWeaver]]
+  kw: [SAP NetWeaver]
+  example: "7.58"
+  hint: sap
+  scheme: sap
+  where: sap
+  pattern_hint: sap_component
+- key: sap-netweaver-java
+  label: SAP NetWeaver AS Java
+  vendor: SAP
+  cpes: [a:sap:netweaver_application_server_java, a:sap:netweaver_as_java]
+  cna: [[SAP_SE, SAP NetWeaver Application Server Java]]
+  kw: [SAP NetWeaver, Visual Composer]
+  example: "7.50"
+  hint: sap
+  scheme: sap
+  where: sap
+  pattern_hint: sap_component
+- key: sap-s4hana
+  label: SAP S/4HANA
+  vendor: SAP
+  cpes: [a:sap:s\/4hana]
+  cna: [[SAP_SE, SAP S/4HANA], [SAP_SE, SAP S/4HANA (Private Cloud or On-Premise)]]
+  kw: [S/4HANA]
+  example: S4CORE 108
+  hint: sap
+  scheme: sap
+  where: sap
+  pattern_hint: sap_component
+- key: sap-businessobjects
+  label: SAP BusinessObjects BI Platform
+  vendor: SAP
+  cpes: [a:sap:businessobjects_business_intelligence_platform]
+  cna: [[SAP_SE, SAP BusinessObjects Business Intelligence Platform]]
+  kw: [BusinessObjects]
+  example: "4.3"
+  hint: sap
+- key: sap-gui
+  label: SAP GUI for Windows
+  vendor: SAP
+  cpes: [a:sap:gui_for_windows]
+  kw: [SAP GUI]
+  example: "8.00"
+  hint: sap
+- key: dynamics-365
+  label: Microsoft Dynamics 365 (on-premises)
+  vendor: Microsoft
+  cpes: [a:microsoft:dynamics_365]
+  cna: [[Microsoft, Microsoft Dynamics 365 (on-premises)]]
+  kw: [Dynamics 365]
+  example: "9.1"
+- key: dynamics-bc
+  label: Microsoft Dynamics 365 Business Central
+  vendor: Microsoft
+  cpes: [a:microsoft:dynamics_365_business_central]
+  cna: [[Microsoft, Microsoft Dynamics 365 Business Central]]
+  kw: [Business Central]
+  example: "25.0"
+- key: oracle-ebs
+  label: Oracle E-Business Suite
+  vendor: Oracle
+  cpes: [a:oracle:e-business_suite]
+  cna: [[Oracle Corporation, E-Business Suite]]
+  kw: [E-Business Suite]
+  example: 12.2.13
+- key: oracle-peoplesoft
+  label: Oracle PeopleSoft
+  vendor: Oracle
+  cpes: [a:oracle:peoplesoft_enterprise_peopletools]
+  cna: [[Oracle Corporation, PeopleSoft Enterprise PeopleTools]]
+  kw: [PeopleSoft]
+  example: "8.61"
+- key: odoo
+  label: Odoo
+  vendor: Odoo
+  cpes: [a:odoo:odoo]
+  kw: [Odoo]
+  example: "17.0"
+- key: datev
+  label: DATEV (Arbeitsplatz)
+  vendor: DATEV
+  cpes: []
+  kw: [DATEV]
+  hint: nocpe
+- key: infor
+  label: Infor (M3, LN)
+  vendor: Infor
+  cpes: []
+  kw: [Infor]
+  hint: nocpe
+- key: proalpha
+  label: proALPHA ERP
+  vendor: proALPHA
+  cpes: []
+  kw: [proALPHA]
+  hint: nocpe
+- key: abacus
+  label: Abacus ERP
+  vendor: Abacus Research
+  cpes: []
+  kw: [Abacus]
+  hint: nocpe
+- key: sage
+  label: Sage (100, X3)
+  vendor: Sage
+  cpes: []
+  kw: [Sage X3, Sage 100]
+  hint: nocpe
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: dvelop-documents  # no CPE in NVD (checked 2026-11-02)
+  label: d.velop documents
+  vendor: d.velop
+  cpes: []
+  kw: [d.velop]
+  aliases: [d.3ecm, d.3]
+  hint: nocpe
+  where: web_about
+- key: elo-ecm  # no CPE in NVD (checked 2026-11-02)
+  label: ELO ECM Suite
+  vendor: ELO Digital Office
+  cpes: []
+  kw: [ELO ECM, ELO Digital Office]
+  aliases: [ELOprofessional, ELOenterprise]
+  hint: nocpe
+  where: client_about
+- key: docuware  # NVD has only a:docuware:fulltext_server (one component) – news and vendor data
+  label: DocuWare
+  vendor: DocuWare
+  cpes: []
+  kw: [DocuWare]
+  hint: nocpe
+  where: web_about
+- key: sap-business-one
+  label: SAP Business One
+  vendor: SAP
+  cpes: [a:sap:business_one]
+  kw: [SAP Business One]
+  aliases: [SAP B1]
+  example: "10.0"
+  hint: sap
+  where: client_about
+- key: sap-web-dispatcher
+  label: SAP Web Dispatcher
+  vendor: SAP
+  cpes: [a:sap:web_dispatcher, a:sap:web_dispatcher_and_internet_communication_manager]
+  kw: [SAP Web Dispatcher]
+  example: "7.93"
+  hint: sap
+  where: sap_kernel
+- key: sap-router  # no CPE in NVD (checked 2026-11-02)
+  label: SAProuter
+  vendor: SAP
+  cpes: []
+  kw: [SAProuter, SAP Router]
+  aliases: [SAP Router]
+  example: "7.93"
+  hint: nocpe
+  where: sap_kernel

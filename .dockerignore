@@ -1,0 +1,10 @@
+**/node_modules
+frontend/dist
+backend/.venv
+backend/.pytest_cache
+**/__pycache__
+data
+.git
+.env
+# screenshots for the README – never part of the image (only docs/handbuch is copied)
+docs/images

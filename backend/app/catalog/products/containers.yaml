@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'containers' (Containers & Kubernetes). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- virtualisation, containers
+- key: kubernetes
+  osv: [[Go, k8s.io/kubernetes]]
+- key: docker-engine
+- key: containerd
+  osv: [[Go, github.com/containerd/containerd], [Go, github.com/containerd/containerd/v2]]
+- key: podman
+- key: red-hat-openshift
+- key: rancher
+- key: harbor
+  osv: [[Go, github.com/goharbor/harbor]]
+  aliases: [Harbor Registry, VMware Harbor Registry]
+  replaces: [vmware-harbor-registry]  # VMware's build of Harbor – the same CVEs (migration 0025 moved follows)
+
+# ---------------------------------------------------------------- containers, Kubernetes
+- key: contour
+- key: dce
+- key: external-dns
+- key: haproxy-ingress
+- key: karpenter
+- key: kubernetes-csi-node-driver-registrar
+- key: kubernetes-node-feature-discovery
+- key: kyverno
+- key: metallb
+- key: argo-cd
+  osv: [[Go, github.com/argoproj/argo-cd/v2], [Go, github.com/argoproj/argo-cd/v3]]
+- key: argo-workflows
+- key: istio
+- key: helm
+  label: Helm
+  vendor: CNCF (Helm)
+  cpes: [a:helm:helm]
+  kw: [Helm]
+  example: 3.18.4
+  version_cmd: helm version
+- key: portainer
+  label: Portainer
+  vendor: Portainer.io
+  cpes: [a:portainer:portainer]
+  kw: [Portainer]
+  example: 2.27.9
+- key: k3s
+  label: K3s
+  vendor: SUSE (Rancher)
+  cpes: [a:k3s:k3s]
+  kw: [K3s]
+  example: 1.33.2+k3s1
+  version_cmd: k3s --version
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: cert-manager

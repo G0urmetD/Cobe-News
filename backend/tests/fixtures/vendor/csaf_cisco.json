@@ -1,0 +1,679 @@
+{
+ "document": {
+  "acknowledgments": [
+   {
+    "summary": "Cisco would like to thank Australian Signals Directorate\ufffd\ufffd\ufffds Australian Cyber Security Centre for reporting this vulnerability."
+   }
+  ],
+  "category": "csaf_security_advisory",
+  "csaf_version": "2.0",
+  "notes": [
+   {
+    "category": "summary",
+    "title": "Summary",
+    "text": "A vulnerability in the peering authentication in Cisco Catalyst SD-WAN Controller, formerly SD-WAN vSmart, Cisco Catalyst SD-WAN Manager, formerly SD-WAN vManage, and Cisco Catalyst SD-WAN Validator, formerly SD-WAN vBond, could allow an unauthenticated, remote attacker to bypass authentication and "
+   },
+   {
+    "category": "general",
+    "title": "Vulnerable Products",
+    "text": "This vulnerability affects Cisco Catalyst SD-WAN Controller, Cisco Catalyst SD-WAN Manager, and Cisco Catalyst SD-WAN Validator, regardless of device configuration.\r\n\r\nThis vulnerability affects the following deployment types:\r\n\r\nOn-Prem Deployment\r\nCisco Hosted SD-WAN Cloud\r\nCisco Hosted SD-WAN Clo"
+   },
+   {
+    "category": "general",
+    "title": "Products Confirmed Not Vulnerable",
+    "text": "Only products listed in the Vulnerable Products [\"#vp\"] section of this advisory are known to be affected by these vulnerabilities."
+   },
+   {
+    "category": "general",
+    "title": "Details",
+    "text": "Important: To achieve simplification and consistency, the Cisco SD-WAN solution has been rebranded as Cisco Catalyst SD-WAN. In addition, from Cisco IOS XE SD-WAN Release 17.12.1a and Cisco Catalyst SD-WAN Release 20.12.1, the following component changes apply:\r\n\r\nCisco SD-WAN Controllers are now Ci"
+   },
+   {
+    "category": "general",
+    "title": "Indicators of Compromise",
+    "text": "Cisco Catalyst SD-WAN Controller systems that are exposed to the internet and that have ports exposed to the internet are at risk of exposure to compromise.\r\n\r\nCustomers are encouraged to audit the auth.log file, located at /var/log/auth.log, for entries that are related to Accepted publickey for vm"
+   },
+   {
+    "category": "general",
+    "title": "Workarounds",
+    "text": "There are no workarounds that address this vulnerability. However, as a mitigation, customers may use the following guidance to temporarily mitigate the impact of this vulnerability while they are planning to upgrade to a first fixed release.\r\n        Action Owner  On-Prem Deployment          Custom"
+   },
+   {
+    "category": "general",
+    "title": "Fixed Software",
+    "text": "Cisco considers any workarounds and mitigations (if applicable) to be temporary solutions until an upgrade to a fixed software release is available. To fully remediate these vulnerabilities and avoid future exposure as described in this advisory, Cisco strongly recommends that customers upgrade to t"
+   },
+   {
+    "category": "general",
+    "title": "Recommendations",
+    "text": "Cisco recommends upgrading the affected systems to a fixed software release.\r\n\r\nGeneral Recommendations for Hardening\r\n\r\nPrevent access from unsecured networks, such as the internet, to the system. If internet access to the system is required, restrict system access to only known, trusted hosts on p"
+   },
+   {
+    "category": "general",
+    "title": "Vulnerability Policy",
+    "text": "To learn about Cisco security vulnerability disclosure policies and publications, see the Security Vulnerability Policy [\"http://www.cisco.com/web/about/security/psirt/security_vulnerability_policy.html\"]. This document also contains instructions for obtaining fixed software and receiving security v"
+   },
+   {
+    "category": "general",
+    "title": "Exploitation and Public Announcements",
+    "text": "The Cisco PSIRT is aware of limited exploitation of this vulnerability. Cisco continues to strongly recommend that customers upgrade to a fixed software release to remediate this vulnerability.\r\n\r\nCustomers can review additional information in the following Talos Intelligence Blog post: https://blog"
+   },
+   {
+    "category": "general",
+    "title": "Source",
+    "text": "Cisco would like to thank Australian Signals Directorate\ufffd\ufffd\ufffds Australian Cyber Security Centre for reporting this vulnerability."
+   },
+   {
+    "category": "legal_disclaimer",
+    "title": "Legal Disclaimer",
+    "text": "SOFTWARE DOWNLOADS AND TECHNICAL SUPPORT\r\n\r\nThe Cisco Support and Downloads [\"https://www.cisco.com/c/en/us/support/index.html\"] page on Cisco.com provides information about licensing and downloads. This page can also display customer device support coverage for customers who use the My Devices tool"
+   }
+  ],
+  "publisher": {
+   "category": "vendor",
+   "contact_details": "psirt@cisco.com",
+   "issuing_authority": "Cisco PSIRT",
+   "name": "Cisco",
+   "namespace": "https://wwww.cisco.com"
+  },
+  "references": [
+   {
+    "category": "self",
+    "summary": "Cisco Catalyst SD-WAN Controller Authentication Bypass Vulnerability",
+    "url": "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-sdwan-rpa-EHchtZk"
+   },
+   {
+    "category": "external",
+    "summary": "Cisco Security Vulnerability Policy",
+    "url": "https://sec.cloudapps.cisco.com/security/center/resources/security_vulnerability_policy.html"
+   },
+   {
+    "category": "external",
+    "summary": "Firewall Ports for Cisco Catalyst SD-WAN Deployments",
+    "url": "https://www.cisco.com/c/en/us/td/docs/routers/sdwan/configuration/sdwan-xe-gs-book/cisco-sd-wan-overlay-network-bringup.html#c_Firewall_Ports_for_Viptela_Deployments_8690.xml"
+   }
+  ],
+  "title": "Cisco Catalyst SD-WAN Controller Authentication Bypass Vulnerability",
+  "tracking": {
+   "current_release_date": "2026-10-28T21:54:35+00:00",
+   "generator": {
+    "date": "2026-10-28T21:54:38+00:00",
+    "engine": {
+     "name": "TVCE"
+    }
+   },
+   "id": "cisco-sa-sdwan-rpa-EHchtZk",
+   "initial_release_date": "2026-02-25T16:00:00+00:00",
+   "revision_history": [
+    {
+     "date": "2026-02-25T15:59:40+00:00",
+     "number": "1.0.0",
+     "summary": "Initial public release."
+    },
+    {
+     "date": "2026-02-27T00:41:24+00:00",
+     "number": "1.1.0",
+     "summary": "Updated the fixed releases table. Added the link to a public remediation document."
+    },
+    {
+     "date": "2026-03-03T00:38:56+00:00",
+     "number": "1.2.0",
+     "summary": "Updated mitigation information."
+    },
+    {
+     "date": "2026-06-16T17:39:47+00:00",
+     "number": "2.0.0",
+     "summary": "Added Cisco Catalyst SD-WAN Validator."
+    },
+    {
+     "date": "2026-10-28T21:54:35+00:00",
+     "number": "2.1.0",
+     "summary": "Added URL for Talos blog."
+    }
+   ],
+   "status": "final",
+   "version": "2.1.0"
+  }
+ },
+ "product_tree": {
+  "branches": [
+   {
+    "name": "Cisco",
+    "category": "vendor",
+    "branches": [
+     {
+      "name": "Cisco Catalyst SD-WAN Manager",
+      "category": "product_family",
+      "branches": [
+       {
+        "name": "17.2",
+        "category": "product_version",
+        "branches": [
+         {
+          "name": "17.2.6",
+          "category": "service_pack",
+          "product": {
+           "name": "17.2.6",
+           "product_id": "CSAFPID-271452"
+          }
+         },
+         {
+          "name": "17.2.7",
+          "category": "service_pack",
+          "product": {
+           "name": "17.2.7",
+           "product_id": "CSAFPID-271459"
+          }
+         },
+         {
+          "name": "17.2.8",
+          "category": "service_pack",
+          "product": {
+           "name": "17.2.8",
+           "product_id": "CSAFPID-271460"
+          }
+         },
+         {
+          "name": "17.2.9",
+          "category": "service_pack",
+          "product": {
+           "name": "17.2.9",
+           "product_id": "CSAFPID-271461"
+          }
+         }
+        ]
+       },
+       {
+        "name": "18.3",
+        "category": "product_version",
+        "branches": [
+         {
+          "name": "18.3.1.1",
+          "category": "service_pack",
+          "product": {
+           "name": "18.3.1.1",
+           "product_id": "CSAFPID-271454"
+          }
+         },
+         {
+          "name": "18.3.3.1",
+          "category": "service_pack",
+          "product": {
+           "name": "18.3.3.1",
+           "product_id": "CSAFPID-271463"
+          }
+         },
+         {
+          "name": "18.3.3",
+          "category": "service_pack",
+          "product": {
+           "name": "18.3.3",
+           "product_id": "CSAFPID-271464"
+          }
+         },
+         {
+          "name": "18.3.4",
+          "category": "service_pack",
+          "product": {
+           "name": "18.3.4",
+           "product_id": "CSAFPID-271465"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "Cisco Catalyst SD-WAN",
+      "category": "product_name",
+      "product": {
+       "name": "Cisco Catalyst SD-WAN",
+       "product_id": "CSAFPID-277995"
+      },
+      "branches": []
+     }
+    ]
+   }
+  ],
+  "relationships": [
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Catalyst SD-WAN Manager 17.2.6 when installed on Cisco Catalyst SD-WAN",
+     "product_id": "CSAFPID-271452:277995"
+    },
+    "product_reference": "CSAFPID-271452",
+    "relates_to_product_reference": "CSAFPID-277995"
+   },
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Catalyst SD-WAN Manager 17.2.7 when installed on Cisco Catalyst SD-WAN",
+     "product_id": "CSAFPID-271459:277995"
+    },
+    "product_reference": "CSAFPID-271459",
+    "relates_to_product_reference": "CSAFPID-277995"
+   },
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Catalyst SD-WAN Manager 17.2.8 when installed on Cisco Catalyst SD-WAN",
+     "product_id": "CSAFPID-271460:277995"
+    },
+    "product_reference": "CSAFPID-271460",
+    "relates_to_product_reference": "CSAFPID-277995"
+   },
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Catalyst SD-WAN Manager 17.2.9 when installed on Cisco Catalyst SD-WAN",
+     "product_id": "CSAFPID-271461:277995"
+    },
+    "product_reference": "CSAFPID-271461",
+    "relates_to_product_reference": "CSAFPID-277995"
+   },
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Catalyst SD-WAN Manager 18.3.1.1 when installed on Cisco Catalyst SD-WAN",
+     "product_id": "CSAFPID-271454:277995"
+    },
+    "product_reference": "CSAFPID-271454",
+    "relates_to_product_reference": "CSAFPID-277995"
+   },
+   {
+    "category": "installed_on",
+    "full_product_name": {
+     "name": "Cisco Catalyst SD-WAN Manager 18.3.3.1 when installed on Cisco Catalyst SD-WAN",
+     "product_id": "CSAFPID-271463:277995"
+    },
+    "product_reference": "CSAFPID-271463",
+    "relates_to_product_reference": "CSAFPID-277995"
+   }
+  ]
+ },
+ "vulnerabilities": [
+  {
+   "cve": "CVE-2026-20127",
+   "ids": [
+    {
+     "system_name": "Cisco Bug ID",
+     "text": "CSCws52722"
+    }
+   ],
+   "product_status": {
+    "known_affected": [
+     "CSAFPID-271452",
+     "CSAFPID-271454",
+     "CSAFPID-271459",
+     "CSAFPID-271460",
+     "CSAFPID-271461",
+     "CSAFPID-271463",
+     "CSAFPID-271464",
+     "CSAFPID-271465"
+    ]
+   },
+   "remediations": [
+    {
+     "category": "vendor_fix",
+     "details": "Cisco has released software updates that address this vulnerability.",
+     "product_ids": [
+      "CSAFPID-271452",
+      "CSAFPID-271454",
+      "CSAFPID-271459",
+      "CSAFPID-271460",
+      "CSAFPID-271461",
+      "CSAFPID-271463",
+      "CSAFPID-271464",
+      "CSAFPID-271465"
+     ],
+     "url": "https://software.cisco.com"
+    }
+   ],
+   "scores": [
+    {
+     "cvss_v3": {
+      "baseScore": 10.0,
+      "baseSeverity": "CRITICAL",
+      "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+      "version": "3.1"
+     },
+     "products": [
+      "CSAFPID-271450",
+      "CSAFPID-271452",
+      "CSAFPID-271454",
+      "CSAFPID-271456",
+      "CSAFPID-271458",
+      "CSAFPID-271459",
+      "CSAFPID-271460",
+      "CSAFPID-271461",
+      "CSAFPID-271462",
+      "CSAFPID-271463",
+      "CSAFPID-271464",
+      "CSAFPID-271465",
+      "CSAFPID-271466",
+      "CSAFPID-271467",
+      "CSAFPID-271468",
+      "CSAFPID-271469",
+      "CSAFPID-271470",
+      "CSAFPID-271471",
+      "CSAFPID-271472",
+      "CSAFPID-271473",
+      "CSAFPID-271474",
+      "CSAFPID-271475",
+      "CSAFPID-278034",
+      "CSAFPID-278035",
+      "CSAFPID-278036",
+      "CSAFPID-278037",
+      "CSAFPID-278038",
+      "CSAFPID-278040",
+      "CSAFPID-280080",
+      "CSAFPID-280081",
+      "CSAFPID-280083",
+      "CSAFPID-280084",
+      "CSAFPID-280086",
+      "CSAFPID-280088",
+      "CSAFPID-280089",
+      "CSAFPID-280091",
+      "CSAFPID-280092",
+      "CSAFPID-280094",
+      "CSAFPID-280095",
+      "CSAFPID-280096",
+      "CSAFPID-280097",
+      "CSAFPID-280101",
+      "CSAFPID-280102",
+      "CSAFPID-280214",
+      "CSAFPID-280406",
+      "CSAFPID-280407",
+      "CSAFPID-280667",
+      "CSAFPID-280753",
+      "CSAFPID-280781",
+      "CSAFPID-280796",
+      "CSAFPID-280835",
+      "CSAFPID-280836",
+      "CSAFPID-280837",
+      "CSAFPID-280839",
+      "CSAFPID-280909",
+      "CSAFPID-280941",
+      "CSAFPID-281303",
+      "CSAFPID-281490",
+      "CSAFPID-281491",
+      "CSAFPID-281492",
+      "CSAFPID-281583",
+      "CSAFPID-281584",
+      "CSAFPID-281971",
+      "CSAFPID-282024",
+      "CSAFPID-282038",
+      "CSAFPID-282067",
+      "CSAFPID-282068",
+      "CSAFPID-282110",
+      "CSAFPID-282111",
+      "CSAFPID-282147",
+      "CSAFPID-282643",
+      "CSAFPID-282644",
+      "CSAFPID-282645",
+      "CSAFPID-282646",
+      "CSAFPID-282647",
+      "CSAFPID-282648",
+      "CSAFPID-283761",
+      "CSAFPID-284106",
+      "CSAFPID-284107",
+      "CSAFPID-284108",
+      "CSAFPID-284298",
+      "CSAFPID-284299",
+      "CSAFPID-284300",
+      "CSAFPID-284301",
+      "CSAFPID-284302",
+      "CSAFPID-284332",
+      "CSAFPID-284333",
+      "CSAFPID-284370",
+      "CSAFPID-285023",
+      "CSAFPID-285024",
+      "CSAFPID-285025",
+      "CSAFPID-285026",
+      "CSAFPID-285027",
+      "CSAFPID-285028",
+      "CSAFPID-285029",
+      "CSAFPID-285030",
+      "CSAFPID-285031",
+      "CSAFPID-285032",
+      "CSAFPID-285033",
+      "CSAFPID-286240",
+      "CSAFPID-286244",
+      "CSAFPID-286246",
+      "CSAFPID-286248",
+      "CSAFPID-286251",
+      "CSAFPID-286255",
+      "CSAFPID-286256",
+      "CSAFPID-286257",
+      "CSAFPID-286258",
+      "CSAFPID-286259",
+      "CSAFPID-286263",
+      "CSAFPID-286264",
+      "CSAFPID-286265",
+      "CSAFPID-286266",
+      "CSAFPID-286267",
+      "CSAFPID-286268",
+      "CSAFPID-286269",
+      "CSAFPID-286274",
+      "CSAFPID-286276",
+      "CSAFPID-286282",
+      "CSAFPID-286285",
+      "CSAFPID-286286",
+      "CSAFPID-286287",
+      "CSAFPID-286289",
+      "CSAFPID-286347",
+      "CSAFPID-286468",
+      "CSAFPID-286469",
+      "CSAFPID-286470",
+      "CSAFPID-286471",
+      "CSAFPID-286530",
+      "CSAFPID-286586",
+      "CSAFPID-286587",
+      "CSAFPID-286588",
+      "CSAFPID-286735",
+      "CSAFPID-286737",
+      "CSAFPID-286738",
+      "CSAFPID-286908",
+      "CSAFPID-288251",
+      "CSAFPID-288252",
+      "CSAFPID-288253",
+      "CSAFPID-288254",
+      "CSAFPID-288255",
+      "CSAFPID-288256",
+      "CSAFPID-288257",
+      "CSAFPID-288258",
+      "CSAFPID-288259",
+      "CSAFPID-288260",
+      "CSAFPID-288261",
+      "CSAFPID-288262",
+      "CSAFPID-289311",
+      "CSAFPID-289313",
+      "CSAFPID-289329",
+      "CSAFPID-292771",
+      "CSAFPID-292772",
+      "CSAFPID-292773",
+      "CSAFPID-292774",
+      "CSAFPID-292775",
+      "CSAFPID-292776",
+      "CSAFPID-292777",
+      "CSAFPID-292778",
+      "CSAFPID-292779",
+      "CSAFPID-292780",
+      "CSAFPID-292781",
+      "CSAFPID-292782",
+      "CSAFPID-292783",
+      "CSAFPID-292784",
+      "CSAFPID-292796",
+      "CSAFPID-294804",
+      "CSAFPID-295309",
+      "CSAFPID-295310",
+      "CSAFPID-295311",
+      "CSAFPID-295312",
+      "CSAFPID-295325",
+      "CSAFPID-295326",
+      "CSAFPID-295328",
+      "CSAFPID-295540",
+      "CSAFPID-295541",
+      "CSAFPID-295542",
+      "CSAFPID-295543",
+      "CSAFPID-295544",
+      "CSAFPID-295545",
+      "CSAFPID-295546",
+      "CSAFPID-295547",
+      "CSAFPID-295548",
+      "CSAFPID-295549",
+      "CSAFPID-295550",
+      "CSAFPID-295551",
+      "CSAFPID-295552",
+      "CSAFPID-295553",
+      "CSAFPID-295554",
+      "CSAFPID-295555",
+      "CSAFPID-295556",
+      "CSAFPID-295557",
+      "CSAFPID-295558",
+      "CSAFPID-295559",
+      "CSAFPID-295560",
+      "CSAFPID-295561",
+      "CSAFPID-295562",
+      "CSAFPID-295563",
+      "CSAFPID-295564",
+      "CSAFPID-295565",
+      "CSAFPID-295566",
+      "CSAFPID-295567",
+      "CSAFPID-295568",
+      "CSAFPID-295569",
+      "CSAFPID-295570",
+      "CSAFPID-295571",
+      "CSAFPID-295572",
+      "CSAFPID-295573",
+      "CSAFPID-295574",
+      "CSAFPID-295575",
+      "CSAFPID-296635",
+      "CSAFPID-296653",
+      "CSAFPID-296655",
+      "CSAFPID-296657",
+      "CSAFPID-299106",
+      "CSAFPID-299946",
+      "CSAFPID-299947",
+      "CSAFPID-300350",
+      "CSAFPID-300352",
+      "CSAFPID-300353",
+      "CSAFPID-300354",
+      "CSAFPID-300355",
+      "CSAFPID-300356",
+      "CSAFPID-300357",
+      "CSAFPID-300358",
+      "CSAFPID-300359",
+      "CSAFPID-300360",
+      "CSAFPID-300361",
+      "CSAFPID-300362",
+      "CSAFPID-300363",
+      "CSAFPID-300364",
+      "CSAFPID-300365",
+      "CSAFPID-300366",
+      "CSAFPID-300367",
+      "CSAFPID-300368",
+      "CSAFPID-300369",
+      "CSAFPID-300370",
+      "CSAFPID-300371",
+      "CSAFPID-300372",
+      "CSAFPID-300373",
+      "CSAFPID-300374",
+      "CSAFPID-300375",
+      "CSAFPID-300762",
+      "CSAFPID-300763",
+      "CSAFPID-300764",
+      "CSAFPID-300771",
+      "CSAFPID-300772",
+      "CSAFPID-300773",
+      "CSAFPID-300774",
+      "CSAFPID-300775",
+      "CSAFPID-300833",
+      "CSAFPID-300840",
+      "CSAFPID-301197",
+      "CSAFPID-301198",
+      "CSAFPID-301199",
+      "CSAFPID-301200",
+      "CSAFPID-301847",
+      "CSAFPID-301848",
+      "CSAFPID-301849",
+      "CSAFPID-301850",
+      "CSAFPID-301851",
+      "CSAFPID-301852",
+      "CSAFPID-301853",
+      "CSAFPID-301854",
+      "CSAFPID-301855",
+      "CSAFPID-301856",
+      "CSAFPID-301858",
+      "CSAFPID-301859",
+      "CSAFPID-301860",
+      "CSAFPID-301861",
+      "CSAFPID-301862",
+      "CSAFPID-301863",
+      "CSAFPID-301864",
+      "CSAFPID-301865",
+      "CSAFPID-301866",
+      "CSAFPID-302638",
+      "CSAFPID-302639",
+      "CSAFPID-302683",
+      "CSAFPID-302811",
+      "CSAFPID-302812",
+      "CSAFPID-302818",
+      "CSAFPID-302819",
+      "CSAFPID-303126",
+      "CSAFPID-303127",
+      "CSAFPID-303128",
+      "CSAFPID-303129",
+      "CSAFPID-303130",
+      "CSAFPID-303131",
+      "CSAFPID-303132",
+      "CSAFPID-303133",
+      "CSAFPID-303134",
+      "CSAFPID-303135",
+      "CSAFPID-303189",
+      "CSAFPID-303190",
+      "CSAFPID-303207",
+      "CSAFPID-303208",
+      "CSAFPID-303209",
+      "CSAFPID-303210",
+      "CSAFPID-303211",
+      "CSAFPID-303312",
+      "CSAFPID-303313",
+      "CSAFPID-303347",
+      "CSAFPID-303348",
+      "CSAFPID-303724",
+      "CSAFPID-304020",
+      "CSAFPID-304021",
+      "CSAFPID-305239",
+      "CSAFPID-306932",
+      "CSAFPID-306933",
+      "CSAFPID-306934",
+      "CSAFPID-306935",
+      "CSAFPID-306936",
+      "CSAFPID-306937",
+      "CSAFPID-306938",
+      "CSAFPID-306939",
+      "CSAFPID-306940",
+      "CSAFPID-306941",
+      "CSAFPID-306942",
+      "CSAFPID-306943",
+      "CSAFPID-306944",
+      "CSAFPID-306945",
+      "CSAFPID-306947",
+      "CSAFPID-306948",
+      "CSAFPID-306949",
+      "CSAFPID-306950",
+      "CSAFPID-306951",
+      "CSAFPID-306952",
+      "CSAFPID-306953",
+      "CSAFPID-306954",
+      "CSAFPID-306955",
+      "CSAFPID-307388"
+     ]
+    }
+   ],
+   "title": "Cisco Catalyst SD-WAN Controller Authentication Bypass Vulnerability"
+  }
+ ]
+}

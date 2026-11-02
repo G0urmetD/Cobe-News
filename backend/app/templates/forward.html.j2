@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>{{ subject }}</title>
+</head>
+{#- "An mein Team weiterleiten" (app/forward.py) in the style of mail.html.j2. Everything here is escaped by Jinja's
+    autoescape; the comment comes defanged (no link in it) and keeps its line breaks through white-space:pre-line. -#}
+<body style="margin:0;padding:0;background:#f3f4f7;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2330;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ head }}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f7;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+
+<tr><td style="padding:0 4px 14px;">
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td style="width:30px;height:30px;background:#3d55d4;border-radius:8px;color:#ffffff;font-weight:700;font-size:15px;text-align:center;vertical-align:middle;">C</td>
+    <td style="padding-left:10px;font-size:15px;font-weight:600;color:#1f2330;">Cobe News</td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="background:#ffffff;border:1px solid #e3e5ec;border-radius:12px;overflow:hidden;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr><td style="height:4px;background:{{ accent }};font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:24px 28px 6px;">
+      <h1 style="margin:0;font-size:18px;line-height:1.35;font-weight:650;color:#1f2330;">{{ head }}</h1>
+    </td></tr>
+    {% if comment %}
+    <tr><td style="padding:12px 28px 4px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-left:3px solid #3d55d4;background:#f5f6fb;">
+        <tr><td style="padding:10px 14px 2px;font-size:12px;color:#5b6175;">{{ comment_label }}</td></tr>
+        <tr><td style="padding:2px 14px 12px;font-size:14px;line-height:1.55;color:#1f2330;white-space:pre-line;">{{ comment }}</td></tr>
+      </table>
+    </td></tr>
+    {% endif %}
+    <tr><td style="padding:12px 28px 8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e5ec;border-radius:10px;">
+        <tr><td style="padding:14px 16px 4px;">
+          <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:{{ sev_bg }};color:{{ sev_color }};font-size:11px;font-weight:600;">{{ meta }}</span>
+        </td></tr>
+        <tr><td style="padding:4px 16px 2px;font-size:16px;font-weight:600;line-height:1.35;">{% if url %}<a href="{{ url }}" style="color:#1f2330;text-decoration:none;">{{ title }}</a>{% else %}{{ title }}{% endif %}</td></tr>
+        {% if summary %}<tr><td style="padding:6px 16px 4px;font-size:14px;line-height:1.55;color:#4a5066;">{{ summary }}</td></tr>{% endif %}
+        {% for x in facts %}<tr><td style="padding:4px 16px 0;font-size:13px;line-height:1.5;color:#1f2330;">{{ x }}</td></tr>{% endfor %}
+        <tr><td style="padding:10px 16px 14px;font-size:13px;">{% if url %}<a href="{{ url }}" style="color:#3d55d4;">{{ labels.article }}</a> &nbsp;·&nbsp; {% endif %}<a href="{{ link }}" style="color:#3d55d4;">{{ labels.open }}</a></td></tr>
+      </table>
+    </td></tr>
+
+    <tr><td style="padding:16px 28px 28px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td style="background:#3d55d4;border-radius:8px;"><a href="{{ app_url }}" style="display:inline-block;padding:11px 20px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">{{ labels.button }}</a></td>
+      </tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+
+<tr><td style="padding:16px 8px 0;font-size:12px;line-height:1.5;color:#7a8094;text-align:center;">
+  <p style="margin:0 0 4px;">{{ footer }}</p>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

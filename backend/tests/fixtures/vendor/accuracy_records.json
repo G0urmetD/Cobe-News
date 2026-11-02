@@ -1,0 +1,1315 @@
+{
+ "records": {
+  "CVE-2025-53786": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft Exchange Server 2016 Cumulative Update 23",
+       "versions": [
+        {
+         "version": "15.01.0.0",
+         "lessThan": "15.01.2507.055",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft Exchange Server 2019 Cumulative Update 14",
+       "versions": [
+        {
+         "version": "15.02.0.0",
+         "lessThan": "15.02.1544.025",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft Exchange Server 2019 Cumulative Update 15",
+       "versions": [
+        {
+         "version": "15.02.0.0",
+         "lessThan": "15.02.1748.024",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft Exchange Server Subscription Edition RTM",
+       "versions": [
+        {
+         "version": "15.02.0.0",
+         "lessThan": "15.02.2562.017",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2024-21410": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft Exchange Server 2016 Cumulative Update 23",
+       "versions": [
+        {
+         "version": "15.01.0",
+         "lessThan": "15.01.2507.037",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft Exchange Server 2019 Cumulative Update 13",
+       "versions": [
+        {
+         "version": "15.02.0",
+         "lessThan": "15.2.1544.004",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft Exchange Server 2019 Cumulative Update 14",
+       "versions": [
+        {
+         "version": "15.02.0",
+         "lessThan": "15.2.1544.004",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2025-53770": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SharePoint Enterprise Server 2016",
+       "versions": [
+        {
+         "version": "16.0.0",
+         "lessThan": "16.0.5513.1001",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SharePoint Server 2019",
+       "versions": [
+        {
+         "version": "16.0.0",
+         "lessThan": "16.0.10417.20037",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SharePoint Server Subscription Edition",
+       "versions": [
+        {
+         "version": "16.0.0",
+         "lessThan": "16.0.18526.20508",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2025-49719": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SQL Server 2016 for Service Pack 2 (GDR)",
+       "versions": [
+        {
+         "version": "13.0.0",
+         "lessThan": "13.0.6460.7",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SQL Server 2016 Service Pack 3 Azure Connect Feature Pack",
+       "versions": [
+        {
+         "version": "13.0.0",
+         "lessThan": "13.0.7055.9",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SQL Server 2017 (CU 31)",
+       "versions": [
+        {
+         "version": "14.0.0",
+         "lessThan": "14.0.3495.9",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SQL Server 2017 (GDR)",
+       "versions": [
+        {
+         "version": "14.0.0",
+         "lessThan": "14.0.2075.8",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SQL Server 2019 (CU 32)",
+       "versions": [
+        {
+         "version": "15.0.0.0",
+         "lessThan": "15.0.4435.7",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SQL Server 2019 (GDR)",
+       "versions": [
+        {
+         "version": "15.0.0",
+         "lessThan": "15.0.2135.5",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SQL Server 2022 (CU 19)",
+       "versions": [
+        {
+         "version": "16.0.0.0",
+         "lessThan": "16.0.4200.1",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Microsoft",
+       "product": "Microsoft SQL Server 2022 (GDR)",
+       "versions": [
+        {
+         "version": "16.0.0",
+         "lessThan": "16.0.1140.6",
+         "versionType": "custom",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2024-12727": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "defaultStatus": "unaffected",
+       "product": "Sophos Firewall",
+       "vendor": "Sophos",
+       "versions": [
+        {
+         "lessThan": "21.0 MR1 (21.0.1)",
+         "status": "affected",
+         "version": "0",
+         "versionType": "semver"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2025-42957": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "defaultStatus": "unaffected",
+       "product": "SAP S/4HANA (Private Cloud or On-Premise)",
+       "vendor": "SAP_SE",
+       "versions": [
+        {
+         "status": "affected",
+         "version": "S4CORE 102"
+        },
+        {
+         "status": "affected",
+         "version": "103"
+        },
+        {
+         "status": "affected",
+         "version": "104"
+        },
+        {
+         "status": "affected",
+         "version": "105"
+        },
+        {
+         "status": "affected",
+         "version": "106"
+        },
+        {
+         "status": "affected",
+         "version": "107"
+        },
+        {
+         "status": "affected",
+         "version": "108"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2025-21587": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Oracle Corporation",
+       "product": "Oracle Java SE",
+       "versions": [
+        {
+         "version": "8u441",
+         "status": "affected"
+        },
+        {
+         "version": "8u441-perf",
+         "status": "affected"
+        },
+        {
+         "version": "11.0.26",
+         "status": "affected"
+        },
+        {
+         "version": "17.0.14",
+         "status": "affected"
+        },
+        {
+         "version": "21.0.6",
+         "status": "affected"
+        },
+        {
+         "version": "24",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Oracle Corporation",
+       "product": "Oracle GraalVM for JDK",
+       "versions": [
+        {
+         "version": "17.0.14",
+         "status": "affected"
+        },
+        {
+         "version": "21.0.6",
+         "status": "affected"
+        },
+        {
+         "version": "24",
+         "status": "affected"
+        }
+       ]
+      },
+      {
+       "vendor": "Oracle Corporation",
+       "product": "Oracle GraalVM Enterprise Edition",
+       "versions": [
+        {
+         "version": "20.3.17",
+         "status": "affected"
+        },
+        {
+         "version": "21.3.13",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2023-4966": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "defaultStatus": "unaffected",
+       "product": "NetScaler ADC",
+       "vendor": "Citrix",
+       "versions": [
+        {
+         "lessThan": "8.50",
+         "status": "affected",
+         "version": "14.1",
+         "versionType": "patch"
+        },
+        {
+         "lessThan": "49.15",
+         "status": "affected",
+         "version": "13.1",
+         "versionType": "patch"
+        },
+        {
+         "lessThan": "92.19",
+         "status": "affected",
+         "version": "13.0",
+         "versionType": "patch"
+        },
+        {
+         "lessThan": "37.164",
+         "status": "affected",
+         "version": "13.1-FIPS",
+         "versionType": "patch"
+        },
+        {
+         "lessThan": "55.300",
+         "status": "affected",
+         "version": "12.1-FIPS",
+         "versionType": "patch"
+        },
+        {
+         "lessThan": "55.300",
+         "status": "affected",
+         "version": "12.1-NDcPP",
+         "versionType": "patch"
+        }
+       ]
+      },
+      {
+       "defaultStatus": "unaffected",
+       "product": "NetScaler Gateway",
+       "vendor": "Citrix",
+       "versions": [
+        {
+         "lessThan": "8.50",
+         "status": "affected",
+         "version": "14.1",
+         "versionType": "patch"
+        },
+        {
+         "lessThan": "49.15",
+         "status": "affected",
+         "version": "13.1",
+         "versionType": "patch"
+        },
+        {
+         "lessThan": "92.19",
+         "status": "affected",
+         "version": "13.0",
+         "versionType": "patch"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2024-7347": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "F5",
+       "product": "NGINX Open Source",
+       "versions": [
+        {
+         "status": "affected",
+         "version": "1.5.13",
+         "lessThan": "*",
+         "changes": [
+          {
+           "at": "1.26.2",
+           "status": "unaffected"
+          },
+          {
+           "at": "1.27.1",
+           "status": "unaffected"
+          }
+         ],
+         "versionType": "semver"
+        }
+       ],
+       "defaultStatus": "unknown"
+      },
+      {
+       "vendor": "F5",
+       "product": "NGINX Plus",
+       "versions": [
+        {
+         "status": "affected",
+         "version": "R4",
+         "lessThan": "*",
+         "changes": [
+          {
+           "at": "R31 P3",
+           "status": "unaffected"
+          },
+          {
+           "at": "R32 P1",
+           "status": "unaffected"
+          }
+         ],
+         "versionType": "custom"
+        }
+       ],
+       "defaultStatus": "unknown"
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2024-23897": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "defaultStatus": "affected",
+       "product": "Jenkins",
+       "vendor": "Jenkins Project",
+       "versions": [
+        {
+         "lessThan": "1.606",
+         "status": "unaffected",
+         "version": "0",
+         "versionType": "maven"
+        },
+        {
+         "lessThan": "*",
+         "status": "unaffected",
+         "version": "2.442",
+         "versionType": "maven"
+        },
+        {
+         "lessThan": "2.426.*",
+         "status": "unaffected",
+         "version": "2.426.3",
+         "versionType": "maven"
+        },
+        {
+         "lessThan": "2.440.*",
+         "status": "unaffected",
+         "version": "2.440.1",
+         "versionType": "maven"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2025-20281": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Cisco",
+       "product": "Cisco Identity Services Engine Software",
+       "versions": [
+        {
+         "version": "3.3.0",
+         "status": "affected"
+        },
+        {
+         "version": "3.3 Patch 2",
+         "status": "affected"
+        },
+        {
+         "version": "3.3 Patch 1",
+         "status": "affected"
+        },
+        {
+         "version": "3.3 Patch 3",
+         "status": "affected"
+        },
+        {
+         "version": "3.4.0",
+         "status": "affected"
+        },
+        {
+         "version": "3.3 Patch 4",
+         "status": "affected"
+        },
+        {
+         "version": "3.4 Patch 1",
+         "status": "affected"
+        },
+        {
+         "version": "3.3 Patch 5",
+         "status": "affected"
+        },
+        {
+         "version": "3.3 Patch 6",
+         "status": "affected"
+        }
+       ],
+       "defaultStatus": "unknown"
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "CVE-2025-4918-nvd": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:mozilla:firefox:*:*:*:*:esr:*:*:*",
+         "versionEndExcluding": "115.23.1"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:mozilla:firefox:*:*:*:*:-:*:*:*",
+         "versionEndExcluding": "138.0.4"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:mozilla:firefox:*:*:*:*:esr:*:*:*",
+         "versionStartIncluding": "116.0",
+         "versionEndExcluding": "128.10.1"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "gp-6.2.8-h10": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Palo Alto Networks",
+       "product": "GlobalProtect App",
+       "versions": [
+        {
+         "version": "6.2.8",
+         "lessThan": "6.2.8-h10",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "defaultStatus": "unaffected"
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "vmware-tools-12.5.1": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:vmware:tools:*:*:*:*:*:*:*:*",
+         "versionStartIncluding": "12.0.0",
+         "versionEndExcluding": "12.5.1"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "ilo6-1.63": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:o:hpe:integrated_lights-out_6_firmware:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "1.63"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "acrobat-24.005.20320": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:adobe:acrobat_dc:*:*:*:*:continuous:*:*:*",
+         "versionStartIncluding": "15.008.20082",
+         "versionEndExcluding": "24.005.20320"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "pfsense-ce-plus": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:netgate:pfsense_plus:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "24.11"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:pfsense:pfsense:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "2.8.0"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "jenkins-lts-weekly": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:jenkins:jenkins:*:*:*:*:lts:*:*:*",
+         "versionEndIncluding": "2.492.1"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:jenkins:jenkins:*:*:*:*:-:*:*:*",
+         "versionEndIncluding": "2.499"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "sophos-le-21.0.0": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Sophos",
+       "product": "Sophos Firewall",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "21.0.0",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "defaultStatus": "unaffected"
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "dotnet-8.0.11": {
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Microsoft",
+       "product": ".NET 8.0",
+       "versions": [
+        {
+         "version": "8.0.0",
+         "lessThan": "8.0.11",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "azure-local-hci": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:microsoft:azure_stack_hci:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "10.0.25398.1700"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "ios-15.9-3-m9": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:o:cisco:ios:15.9\\(3\\)m9:*:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:o:cisco:ios:15.9\\(3\\)m8:*:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "fortios-7.4.4": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:o:fortinet:fortios:*:*:*:*:*:*:*:*",
+         "versionStartIncluding": "7.4.0",
+         "versionEndExcluding": "7.4.4"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  },
+  "win11-24h2": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:o:microsoft:windows_11_24h2:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "10.0.26100.2894"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": ""
+  }
+ },
+ "cases": [
+  {
+   "case": "Exchange: '2019 CU15' stands for every CU15 build",
+   "product": "msexchange",
+   "source": "cvelist",
+   "record": "CVE-2025-53786",
+   "version": "2019 CU15",
+   "after": "possible"
+  },
+  {
+   "case": "Exchange: CU15 release build by name",
+   "product": "msexchange",
+   "source": "cvelist",
+   "record": "CVE-2025-53786",
+   "version": "2019 CU15 RTM",
+   "after": "affected"
+  },
+  {
+   "case": "Exchange: CU15 with the fixing HU by name",
+   "product": "msexchange",
+   "source": "cvelist",
+   "record": "CVE-2025-53786",
+   "version": "2019 CU15 Apr25HU",
+   "after": "not_affected"
+  },
+  {
+   "case": "Exchange: CU14 patched – CU15 and SE rows say nothing about it",
+   "product": "msexchange",
+   "source": "cvelist",
+   "record": "CVE-2025-53786",
+   "version": "15.2.1544.25",
+   "after": "not_affected"
+  },
+  {
+   "case": "Exchange: CU15 patched – the SE row says nothing about it",
+   "product": "msexchange",
+   "source": "cvelist",
+   "record": "CVE-2025-53786",
+   "version": "15.2.1748.24",
+   "after": "not_affected"
+  },
+  {
+   "case": "Exchange SE unpatched (Subscription Edition RTM row)",
+   "product": "msexchange",
+   "source": "cvelist",
+   "record": "CVE-2025-53786",
+   "version": "15.2.2562.15",
+   "after": "affected"
+  },
+  {
+   "case": "Exchange SE on a record before SE existed",
+   "product": "msexchange",
+   "source": "cvelist",
+   "record": "CVE-2024-21410",
+   "version": "15.2.2562.17",
+   "after": "not_affected"
+  },
+  {
+   "case": "Exchange: AdminDisplayVersion hides the SU",
+   "product": "msexchange",
+   "source": "cvelist",
+   "record": "CVE-2025-53786",
+   "version": "Version 15.2 (Build 1748.10)",
+   "after": "possible"
+  },
+  {
+   "case": "SharePoint 2016 patched – the 2019 row is another edition",
+   "product": "sharepoint",
+   "source": "cvelist",
+   "record": "CVE-2025-53770",
+   "version": "16.0.5513.1001",
+   "after": "not_affected"
+  },
+  {
+   "case": "SharePoint SE unpatched (Subscription Edition row)",
+   "product": "sharepoint",
+   "source": "cvelist",
+   "record": "CVE-2025-53770",
+   "version": "16.0.18526.20400",
+   "after": "affected"
+  },
+  {
+   "case": "SharePoint 2019 unpatched",
+   "product": "sharepoint",
+   "source": "cvelist",
+   "record": "CVE-2025-53770",
+   "version": "16.0.10417.20030",
+   "after": "affected"
+  },
+  {
+   "case": "SQL Server: '2022 CU16' is 16.0.4165.4 (below CU19's fix)",
+   "product": "mssqlserver",
+   "source": "cvelist",
+   "record": "CVE-2025-49719",
+   "version": "2022 CU16",
+   "after": "affected"
+  },
+  {
+   "case": "SQL Server 2022 GDR patched – the CU row is the other branch",
+   "product": "mssqlserver",
+   "source": "cvelist",
+   "record": "CVE-2025-49719",
+   "version": "16.0.1140.6",
+   "after": "not_affected"
+  },
+  {
+   "case": "SQL Server: SELECT @@VERSION line, CU20",
+   "product": "mssqlserver",
+   "source": "cvelist",
+   "record": "CVE-2025-49719",
+   "version": "Microsoft SQL Server 2022 (RTM-CU20) (KB5059390) - 16.0.4205.1 (X64)",
+   "after": "not_affected"
+  },
+  {
+   "case": "SQL Server: KB number of 2022 CU20",
+   "product": "mssqlserver",
+   "source": "cvelist",
+   "record": "CVE-2025-49719",
+   "version": "KB5059390",
+   "after": "not_affected"
+  },
+  {
+   "case": "Java 8 as java -version shows it",
+   "product": "oracle-jdk",
+   "source": "cvelist",
+   "record": "CVE-2025-21587",
+   "version": "1.8.0_441",
+   "after": "affected"
+  },
+  {
+   "case": "Java 8 as the control panel shows it",
+   "product": "oracle-jdk",
+   "source": "cvelist",
+   "record": "CVE-2025-21587",
+   "version": "Java 8 Update 441",
+   "after": "affected"
+  },
+  {
+   "case": "Java 21",
+   "product": "oracle-jdk",
+   "source": "cvelist",
+   "record": "CVE-2025-21587",
+   "version": "21.0.6",
+   "after": "affected"
+  },
+  {
+   "case": "SFOS 21.0.1 MR1 as displayed – the fix itself",
+   "product": "sophos-firewall",
+   "source": "cvelist",
+   "record": "CVE-2024-12727",
+   "version": "SFOS 21.0.1 MR-1-Build272",
+   "after": "not_affected"
+  },
+  {
+   "case": "SFOS 21.0 GA build 169",
+   "product": "sophos-firewall",
+   "source": "cvelist",
+   "record": "CVE-2024-12727",
+   "version": "21.0.0 GA-Build169",
+   "after": "affected"
+  },
+  {
+   "case": "SFOS '21.0.0 and older' covers its builds",
+   "product": "sophos-firewall",
+   "source": "cvelist",
+   "record": "sophos-le-21.0.0",
+   "version": "21.0.0.169",
+   "after": "affected"
+  },
+  {
+   "case": "S/4HANA S4CORE 108 (record: Private Cloud or On-Premise)",
+   "product": "sap-s4hana",
+   "source": "cvelist",
+   "record": "CVE-2025-42957",
+   "version": "S4CORE 108",
+   "after": "affected"
+  },
+  {
+   "case": "S/4HANA product release '2023' is no component release",
+   "product": "sap-s4hana",
+   "source": "cvelist",
+   "record": "CVE-2025-42957",
+   "version": "2023",
+   "after": "possible"
+  },
+  {
+   "case": "NetScaler 14.1-8.20: 'lessThan 8.50' is the build within 14.1",
+   "product": "netscaler-adc",
+   "source": "cvelist",
+   "record": "CVE-2023-4966",
+   "version": "14.1-8.20",
+   "after": "affected"
+  },
+  {
+   "case": "NetScaler show version, fixed build",
+   "product": "netscaler-adc",
+   "source": "cvelist",
+   "record": "CVE-2023-4966",
+   "version": "NS13.1: Build 49.15.nc",
+   "after": "not_affected"
+  },
+  {
+   "case": "NetScaler 13.1 below the fix – the FIPS row is another line",
+   "product": "netscaler-adc",
+   "source": "cvelist",
+   "record": "CVE-2023-4966",
+   "version": "13.1-37.150",
+   "after": "affected"
+  },
+  {
+   "case": "NetScaler 14.1-29.72 (fixed) – no 13.x row speaks for 14.1",
+   "product": "netscaler-adc",
+   "source": "cvelist",
+   "record": "CVE-2023-4966",
+   "version": "14.1-29.72",
+   "after": "not_affected"
+  },
+  {
+   "case": "NetScaler 12.1: only its FIPS/NDcPP builds are named",
+   "product": "netscaler-adc",
+   "source": "cvelist",
+   "record": "CVE-2023-4966",
+   "version": "12.1-55.290",
+   "after": "possible"
+  },
+  {
+   "case": "nginx 1.27.0: the fix of 1.26 does not fix 1.27",
+   "product": "nginx",
+   "source": "cvelist",
+   "record": "CVE-2024-7347",
+   "version": "1.27.0",
+   "after": "affected"
+  },
+  {
+   "case": "nginx 1.27.1 (the 1.27 fix)",
+   "product": "nginx",
+   "source": "cvelist",
+   "record": "CVE-2024-7347",
+   "version": "1.27.1",
+   "after": "not_affected"
+  },
+  {
+   "case": "NGINX Plus R32 (fixed in R32 P1)",
+   "product": "nginx-plus",
+   "source": "cvelist",
+   "record": "CVE-2024-7347",
+   "version": "R32",
+   "after": "affected"
+  },
+  {
+   "case": "NGINX Plus nginx -v output, R33",
+   "product": "nginx-plus",
+   "source": "cvelist",
+   "record": "CVE-2024-7347",
+   "version": "nginx/1.27.2 (nginx-plus-r33)",
+   "after": "not_affected"
+  },
+  {
+   "case": "Jenkins LTS 2.426.3: 'up to 2.426.*' is the line",
+   "product": "jenkins",
+   "source": "cvelist",
+   "record": "CVE-2024-23897",
+   "version": "2.426.3",
+   "after": "not_affected"
+  },
+  {
+   "case": "Jenkins weekly 2.441",
+   "product": "jenkins-weekly",
+   "source": "cvelist",
+   "record": "CVE-2024-23897",
+   "version": "2.441",
+   "after": "affected"
+  },
+  {
+   "case": "Jenkins weekly 2.442 (the fix)",
+   "product": "jenkins-weekly",
+   "source": "cvelist",
+   "record": "CVE-2024-23897",
+   "version": "2.442",
+   "after": "not_affected"
+  },
+  {
+   "case": "Jenkins LTS 2.492.2 – the weekly CPE edition is not LTS",
+   "product": "jenkins",
+   "source": "nvd",
+   "record": "jenkins-lts-weekly",
+   "version": "2.492.2",
+   "after": "not_affected"
+  },
+  {
+   "case": "Firefox ESR 128.10.1 – the release-channel CPE is not ESR",
+   "product": "firefox-esr",
+   "source": "nvd",
+   "record": "CVE-2025-4918-nvd",
+   "version": "128.10.1",
+   "after": "not_affected"
+  },
+  {
+   "case": "Firefox ESR 128.10.0",
+   "product": "firefox-esr",
+   "source": "nvd",
+   "record": "CVE-2025-4918-nvd",
+   "version": "128.10.0",
+   "after": "affected"
+  },
+  {
+   "case": "Firefox 138.0.3 (release)",
+   "product": "firefox",
+   "source": "nvd",
+   "record": "CVE-2025-4918-nvd",
+   "version": "138.0.3",
+   "after": "affected"
+  },
+  {
+   "case": "Cisco ISE show version (build + patch)",
+   "product": "cisco-ise",
+   "source": "cvelist",
+   "record": "CVE-2025-20281",
+   "version": "3.3.0.430 Patch 4",
+   "after": "affected"
+  },
+  {
+   "case": "GlobalProtect build c431 is 6.2.8-h6",
+   "product": "pangp",
+   "source": "cvelist",
+   "record": "gp-6.2.8-h10",
+   "version": "6.2.8-c431",
+   "after": "affected"
+  },
+  {
+   "case": "GlobalProtect build c948 is 6.2.8-h10",
+   "product": "pangp",
+   "source": "cvelist",
+   "record": "gp-6.2.8-h10",
+   "version": "6.2.8-c948",
+   "after": "not_affected"
+  },
+  {
+   "case": "VMware Tools code 12416 is 12.4.0",
+   "product": "vmware-tools",
+   "source": "nvd",
+   "record": "vmware-tools-12.5.1",
+   "version": "12416",
+   "after": "affected"
+  },
+  {
+   "case": "iLO with its generation in front",
+   "product": "hpe-ilo",
+   "source": "nvd",
+   "record": "ilo6-1.63",
+   "version": "iLO 6 v1.62",
+   "after": "affected"
+  },
+  {
+   "case": "Acrobat with a four-digit year",
+   "product": "adobe-acrobat",
+   "source": "nvd",
+   "record": "acrobat-24.005.20320",
+   "version": "2024.004.20272",
+   "after": "affected"
+  },
+  {
+   "case": "pfSense CE 2.8.0 – Plus' range is another product",
+   "product": "pfsense",
+   "source": "nvd",
+   "record": "pfsense-ce-plus",
+   "version": "2.8.0",
+   "after": "not_affected"
+  },
+  {
+   "case": "pfSense Plus 24.03",
+   "product": "pfsense-plus",
+   "source": "nvd",
+   "record": "pfsense-ce-plus",
+   "version": "24.03",
+   "after": "affected"
+  },
+  {
+   "case": ".NET: the SDK version is no runtime version",
+   "product": "dotnet",
+   "source": "cvelist",
+   "record": "dotnet-8.0.11",
+   "version": "8.0.403",
+   "after": "possible"
+  },
+  {
+   "case": "Azure Local: its own CPE counts next to the build's",
+   "product": "azure-local",
+   "source": "nvd",
+   "record": "azure-local-hci",
+   "version": "10.0.25398.1611",
+   "after": "affected"
+  },
+  {
+   "case": "Classic IOS listed",
+   "product": "cisco-ios",
+   "source": "nvd",
+   "record": "ios-15.9-3-m9",
+   "version": "15.9(3)M9",
+   "after": "affected"
+  },
+  {
+   "case": "Classic IOS not listed: never 'not affected'",
+   "product": "cisco-ios",
+   "source": "nvd",
+   "record": "ios-15.9-3-m9",
+   "version": "15.9(3)M10",
+   "after": "possible"
+  },
+  {
+   "case": "FortiOS CLI line",
+   "product": "fortios",
+   "source": "nvd",
+   "record": "fortios-7.4.4",
+   "version": "FortiGate-60F v7.4.3,build2573,240201 (GA.F)",
+   "after": "affected"
+  },
+  {
+   "case": "Windows winver 'OS Build'",
+   "product": "windows",
+   "source": "nvd",
+   "record": "win11-24h2",
+   "version": "OS Build 26100.2605",
+   "after": "affected"
+  }
+ ]
+}

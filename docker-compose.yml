@@ -1,0 +1,206 @@
+# Cobe News – start: docker compose up -d --build  →  https://localhost:8095
+# HTTPS through the bundled nginx (service "proxy"): a self-signed certificate the app makes and renews itself, or your
+# own (TLS_MODE=own, TLS_SOURCE). Behind a reverse proxy of your own: PROXY_ENABLED=0, TLS_MODE=external (docs/BETRIEB.md).
+# Settings come from .env (template: .env.example) – scripts/setup-env.sh creates it once with a generated database
+# password. Data: PostgreSQL 18 (service "db", volume db18). Plain-http redirect port: docker-compose.http.yml (docs/BETRIEB.md).
+name: cobe-news
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+services:
+  app:
+    build: .
+    image: cobe-news:latest
+    container_name: cobe-news-app
+    logging: *logging
+    restart: unless-stopped
+    mem_limit: ${APP_MEM:-512m}
+    pids_limit: 256
+    environment:
+      BASE_URL: ${BASE_URL:-https://localhost:8095}   # the address in the browser – links in notifications, Entra redirect
+      NEWS_HOSTNAME: ${NEWS_HOSTNAME:-}               # FQDN for the self-signed certificate (besides localhost/127.0.0.1)
+      TLS_NAMES: ${TLS_NAMES:-}                       # more names/IPs for it, comma separated
+      TLS_MODE: ${TLS_MODE:-selfsigned}               # selfsigned | own | external
+      TLS_PATH: /tls
+      HSTS: ${HSTS:-0}
+      PROXY_ENABLED: ${PROXY_ENABLED:-1}
+      PROXY_IP: ${PROXY_IP:-172.31.250.10}            # X-Forwarded-For is trusted only from here (and TRUSTED_PROXIES)
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      SHARED_ADDRESSES: ${SHARED_ADDRESSES:-}         # addresses many people share: never blocked (docs/BETRIEB.md)
+      COOKIE_SECURE: ${COOKIE_SECURE:-1}
+      SECRET_KEY: ${SECRET_KEY:-}                     # empty: a key file in ./data (secret.key, 0600)
+      WEBHOOK_HOSTS: ${WEBHOOK_HOSTS:-}               # own webhook hosts besides Teams/Slack, e.g. chat.corp.example
+      SMTP_ALLOW_INTERNAL: ${SMTP_ALLOW_INTERNAL:-}   # SMTP relay at an internal address (Docker host), docs/BETRIEB.md
+      WEBHOOK_PRIVATE_NETS: ${WEBHOOK_PRIVATE_NETS:-} # private addresses/networks channels may post to (n8n next door), docs/BETRIEB.md
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      CA_FILE: ${CA_FILE:-}
+      ALLOW_PRIVATE_FEEDS: ${ALLOW_PRIVATE_FEEDS:-0}
+      WEB_PUSH: ${WEB_PUSH:-1}                        # desktop notifications with the tab closed (docs/BETRIEB.md: Web Push)
+      PUSH_CONTACT: ${PUSH_CONTACT:-}                 # mailto:/https: contact for the push services; empty: BASE_URL
+      POSTGRES_HOST: db
+      # the app's own role – owner of the database, no superuser (db-init creates it; docs/BETRIEB.md: PostgreSQL, Rollen)
+      POSTGRES_USER: cobe_news_app
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?missing in .env – run scripts/setup-env.sh once (docs/BETRIEB.md)}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}       # set: backups encrypted, with the key (docs/BETRIEB.md: Sicherung)
+      # the restore test's throwaway database (its own role, no right on the app's database – db-init makes both when
+      # the password is set; empty: no restore test). docs/BETRIEB.md: Rücksicherungs-Test
+      POSTGRES_RESTORE_PASSWORD: ${POSTGRES_RESTORE_PASSWORD:-}
+      SQLITE_IMPORT: ${SQLITE_IMPORT:-1}              # 0: never move data/news.db (up to 0.1.15) into an empty database (docs/BETRIEB.md)
+    ports:
+      # plain http, this machine only: health checks and emergency access. Users come through the proxy (https).
+      - "127.0.0.1:${APP_PORT:-8096}:8000"
+    volumes:
+      - ./data:/data
+      - ${TLS_SOURCE:-tls}:/tls   # the app writes its self-signed certificate here (or reads your own to watch its expiry)
+    networks:
+      - edge
+      - db
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # PostgreSQL 18 – reachable only from the app (network "db" is internal, no port published). Up to 0.1.15 the data
+  # was in data/news.db (SQLite): the first start of 0.1.16 moves it here once and leaves the file as it is (docs/BETRIEB.md).
+  db:
+    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    container_name: cobe-news-db
+    logging: *logging
+    restart: unless-stopped
+    mem_limit: ${DB_MEM:-512m}
+    shm_size: 128m
+    environment:
+      POSTGRES_USER: cobe_news
+      POSTGRES_DB: cobe_news
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?missing in .env – run scripts/setup-env.sh once (docs/BETRIEB.md)}
+      # byte order (as SQLite compared), no dependence on the C library's collation (no reindex after an image update)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=builtin --locale=C.UTF-8"
+    volumes:
+      # PostgreSQL 18 keeps its data under /var/lib/postgresql/18/docker: the volume is mounted one level up
+      - db18:/var/lib/postgresql
+    networks:
+      - db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cobe_news -d cobe_news"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    pids_limit: 256
+    read_only: true   # writes only to its volume and these tmpfs
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    # the entrypoint (root) fixes the data folder's owner and switches to the user postgres – nothing else
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+
+  # once at every start, before the app: the app's role cobe_news_app (no superuser) and its ownership of the database
+  # – the only container that knows the superuser's password (deploy/postgres/app-role.sql, docs/BETRIEB.md: PostgreSQL, Rollen)
+  db-init:
+    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    container_name: cobe-news-db-init
+    logging: *logging
+    restart: "no"
+    entrypoint: ["/bin/sh", "/init/db-init.sh"]
+    user: "70:70"   # postgres in the alpine image – psql needs no root
+    environment:
+      PGHOST: db
+      PGUSER: cobe_news
+      PGDATABASE: cobe_news
+      PGAPPNAME: cobe-news-db-init
+      PGPASSWORD: ${POSTGRES_PASSWORD:?missing in .env – run scripts/setup-env.sh once (docs/BETRIEB.md)}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?missing in .env – run scripts/setup-env.sh once (docs/BETRIEB.md)}
+      POSTGRES_RESTORE_PASSWORD: ${POSTGRES_RESTORE_PASSWORD:-}   # optional: the restore test's role (restore-role.sql)
+    volumes:
+      - ./deploy/postgres:/init:ro
+    networks:
+      - db
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 64m
+    pids_limit: 32
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  proxy:
+    image: nginx:1.30-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
+    container_name: cobe-news-proxy
+    logging: *logging
+    restart: unless-stopped
+    scale: ${PROXY_ENABLED:-1}
+    mem_limit: 128m
+    pids_limit: 64
+    environment:
+      NEWS_HTTPS_PORT: ${PORT:-8095}
+      NGINX_ENVSUBST_FILTER: "^NEWS_"
+    ports:
+      # with a sign-in in front, BIND=0.0.0.0 may open it to the network (docs/BETRIEB.md)
+      - "${BIND:-127.0.0.1}:${PORT:-8095}:443"
+    volumes:
+      - ./deploy/nginx/cobe-news.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./deploy/nginx/40-cert-watch.sh:/docker-entrypoint.d/40-cert-watch.sh:ro
+      - ${TLS_SOURCE:-tls}:/etc/nginx/tls:ro
+    networks:
+      edge:
+        ipv4_address: ${PROXY_IP:-172.31.250.10}
+    depends_on:
+      app:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /etc/nginx/conf.d
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    # the master process reads the certificate and binds 443, the workers run as the user nginx
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+
+networks:
+  # app ↔ proxy, with a fixed address for the proxy (the one the app trusts).
+  edge:
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.31.250.0/24}
+          # dynamic addresses only from the upper half – the proxy's fixed one (.10) is never given to anyone else
+          ip_range: ${EDGE_RANGE:-172.31.250.128/25}
+  # app ↔ database only: internal (no route out, nothing published)
+  db:
+    internal: true
+
+volumes:
+  tls:
+  db18:

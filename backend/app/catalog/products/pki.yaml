@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'pki' (PKI & certificates). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- PKI
+- key: ejbca
+  label: Keyfactor EJBCA
+  vendor: Keyfactor (PrimeKey)
+  cpes: [a:primekey:ejbca, a:keyfactor:ejbca]
+  kw: [EJBCA]
+  example: 9.1.1
+- key: adcs
+  label: Active Directory Certificate Services (AD CS)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [AD CS, Certificate Services]
+  aliases: [ADCS, Microsoft CA]
+  example: 10.0.20348.2762
+  hint: windows_role
+  where: windows_build
+  filter: Certificate Services

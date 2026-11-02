@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'os' (Operating systems). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Microsoft servers
+- key: windows-server-core
+
+# ---------------------------------------------------------------- operating systems
+- key: windows
+  label: Microsoft Windows (Client)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_10_22h2, o:microsoft:windows_11_23h2, o:microsoft:windows_11_24h2, o:microsoft:windows_11_25h2]
+  scheme: windows
+  cna: [[Microsoft, Windows 1]]
+  kw: [Windows 10, Windows 11]
+  example: 10.0.26100.2605
+  hint: windows
+- key: windows-server
+  label: Microsoft Windows Server
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [Windows Server]
+  aliases: [WS2016, WS2019, WS2022, WS2025, Server 2022, Server 2025]
+  example: 10.0.20348.2762
+  hint: windows
+- key: macos
+- key: linux
+  label: Linux Kernel
+  vendor: The Linux Foundation
+  cpes: []
+  cna: [[Linux, Linux]]
+  kw: [Linux kernel, Linux-Kernel]
+  example: 6.6.63
+  hint: kernel
+- key: rhel
+  scheme: distro
+  hint: distro
+- key: debian
+  scheme: distro
+  hint: distro
+- key: ubuntu
+  scheme: distro
+  hint: distro
+- key: sles
+  scheme: distro
+  hint: distro
+- key: almalinux
+  scheme: distro
+  hint: distro
+- key: rocky-linux
+  scheme: distro
+  hint: distro
+- key: oracle-linux
+  scheme: distro
+  hint: distro
+- key: centos
+  scheme: distro
+  hint: distro
+- key: centos-stream
+  scheme: distro
+  hint: distro
+- key: fedora
+  scheme: distro
+  hint: distro
+- key: alpine-linux
+  scheme: distro
+  hint: distro
+- key: amazon-linux
+  scheme: distro
+  hint: distro
+- key: opensuse
+  scheme: distro
+  hint: distro
+- key: suse-linux-micro
+  scheme: distro
+  hint: distro
+- key: photon
+  scheme: distro
+  hint: distro
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: igel-os
+  label: IGEL OS
+  vendor: IGEL Technology
+  cpes: [o:igel:igel_os]
+  kw: [IGEL OS, IGEL]
+  aliases: [IGEL]
+  example: "12.5.0"
+  where: client_about

@@ -1,0 +1,107 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'devices' (Devices & firmware). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- storage, backup
+- key: dell-idrac
+  label: Dell iDRAC9
+  vendor: Dell
+  cpes: [o:dell:idrac9_firmware]
+  cna: [[Dell, Integrated Dell Remote Access Controller 9]]
+  kw: [iDRAC]
+  aliases: [iDRAC 9, Integrated Dell Remote Access Controller 9]
+  example: 7.00.00.181
+  where: idrac
+- key: hpe-ilo
+  label: HPE iLO 6
+  vendor: HPE
+  cpes: [o:hpe:integrated_lights-out_6_firmware]
+  kw: [iLO 6]
+  aliases: [Integrated Lights-Out 6]
+  example: "1.62"
+  where: ilo
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: hpe-ilo5
+  label: HPE iLO 5
+  vendor: HPE
+  cpes: [o:hpe:integrated_lights-out_5_firmware, o:hp:integrated_lights-out_5_firmware]
+  kw: [iLO 5]
+  aliases: [Integrated Lights-Out 5]
+  example: "3.10"
+  where: ilo
+- key: hpe-ilo7  # no CPE in NVD yet (checked 2026-11-02)
+  label: HPE iLO 7
+  vendor: HPE
+  cpes: []
+  kw: [iLO 7]
+  aliases: [Integrated Lights-Out 7]
+  example: "1.12"
+  hint: nocpe
+  where: ilo
+- key: dell-idrac10  # no CPE in NVD yet (checked 2026-11-02); CNA names in the form of iDRAC9's records
+  label: Dell iDRAC10
+  vendor: Dell
+  cpes: []
+  cna: [[Dell, Integrated Dell Remote Access Controller 10], [Dell, iDRAC10]]
+  kw: [iDRAC10, iDRAC 10]
+  example: "1.20.25.00"
+  hint: nocpe
+  where: idrac
+- key: lenovo-xcc
+  label: "Lenovo XClarity Controller (XCC)"
+  vendor: Lenovo
+  cpes: [a:lenovo:xclarity_controller]
+  kw: [XClarity Controller]
+  aliases: [XCC, XClarity]
+  example: "9.40"
+  where: bmc
+- key: fujitsu-irmc  # no CPE in NVD (checked 2026-11-02)
+  label: Fujitsu iRMC
+  vendor: "Fsas Technologies (Fujitsu)"
+  cpes: []
+  kw: [iRMC]
+  aliases: [iRMC S5, iRMC S6]
+  hint: nocpe
+  where: bmc
+- key: dell-openmanage-enterprise
+  label: "Dell OpenManage Enterprise (OME)"
+  vendor: Dell
+  cpes: [a:dell:openmanage_enterprise, a:dell:emc_openmanage_enterprise, a:dell:openmanage_enterprise-modular]
+  kw: [OpenManage Enterprise]
+  aliases: [OME, OME-Modular]
+  example: "4.4.0"
+  where: web_about
+- key: mfp-hp
+  label: "HP Drucker / MFP (Firmware)"
+  vendor: HP Inc.
+  cpes: []
+  kw: [HP LaserJet, HP printer, HP MFP]
+  aliases: [LaserJet, HP FutureSmart]
+  hint: mfp
+  where: firmware_dashboard
+- key: mfp-canon
+  label: "Canon Drucker / MFP (Firmware)"
+  vendor: Canon
+  cpes: []
+  kw: [Canon imageRUNNER, Canon printer, Canon i-SENSYS]
+  aliases: [imageRUNNER, i-SENSYS]
+  hint: mfp
+  where: firmware_dashboard
+- key: mfp-kyocera
+  label: "Kyocera Drucker / MFP (Firmware)"
+  vendor: Kyocera
+  cpes: []
+  kw: [Kyocera, TASKalfa, ECOSYS]
+  aliases: [TASKalfa, ECOSYS]
+  hint: mfp
+  where: firmware_dashboard
+- key: mfp-konica-minolta
+  label: "Konica Minolta Drucker / MFP (Firmware)"
+  vendor: Konica Minolta
+  cpes: []
+  kw: [Konica Minolta, bizhub]
+  aliases: [bizhub]
+  hint: mfp
+  where: firmware_dashboard

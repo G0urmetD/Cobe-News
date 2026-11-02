@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:ns0="https://fortiguard.fortinet.com/rss/ns/csaf" xmlns:ns1="https://fortiguard.fortinet.com/rss/ns/cvrf" version="2.0"><channel><title>FortiGuard Labs | FortiGuard Center - IR Advisories</title><link>https://fortiguard.fortinet.com/rss/ir.xml</link><description>The following is a list of advisories for issues resolved in Fortinet products. The resolution of such issues is coordinated by the Fortinet Product Security Incident Response Team (PSIRT), a dedicated, global team that manages the receipt, investigation, and public reporting of information about security vulnerabilities and issues related to Fortinet products and services.</description><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><lastBuildDate>Thu, 29 Oct 2026 08:30:08 +0000</lastBuildDate><pubDate>Thu, 29 Oct 2026 08:30:08 -0700</pubDate><item><title>Node2Shell CVEs</title><link>https://fortiguard.fortinet.com/psirt/FG-IR-26-187</link><description>&lt;p&gt;
+ &lt;strong&gt;
+  CVSSv3 Score:
+ &lt;/strong&gt;
+ 9.8
+&lt;/p&gt;
+&lt;p&gt;
+ CVE-2026-105482 - (high)This vulnerability affects Node.js 26.x, 24.x, and 22.x.CVE-2026-105483 - (high)This vulnerability affects Node.js 26.x and 24.x.CVE-2026-106069 - (high)This vulnerability affects Node.js 26.x, 24.x, and 22.x.CVE-2026-11</description><guid isPermaLink="true">https://fortiguard.fortinet.com/psirt/FG-IR-26-187</guid><pubDate>Mon, 26 Oct 2026 00:00:00 -0700</pubDate><ns0:link>https://filestore.fortinet.com/fortiguard/psirt/csaf_multiple-node-js-cves_fg-ir-26-187.json</ns0:link><ns1:link>https://fortiguard.fortinet.com/psirt/cvrf/FG-IR-26-187</ns1:link></item><item><title>PHP2Shell core RCE vulnerability patches (CVE-2026-109618 and CVE-2026-109619)</title><link>https://fortiguard.fortinet.com/psirt/FG-IR-26-186</link><description>&lt;p&gt;
+ &lt;strong&gt;
+  CVSSv3 Score:
+ &lt;/strong&gt;
+ 9.8
+&lt;/p&gt;
+&lt;p&gt;
+ CVE-2026-109618PHP uses longjmp() for out-of-memory (OOM) errors to exit the current context and abort handling of the request. Some contexts may not properly account for this scenario and leave request memory in an uninitialized state before p</description><guid isPermaLink="true">https://fortiguard.fortinet.com/psirt/FG-IR-26-186</guid><pubDate>Wed, 21 Oct 2026 00:00:00 -0700</pubDate><ns0:link>https://filestore.fortinet.com/fortiguard/psirt/csaf_php-core-rce-vulnerability-patches-cve-2026-109618-and-cve-2026-109619_fg-ir-26-186.json</ns0:link><ns1:link>https://fortiguard.fortinet.com/psirt/cvrf/FG-IR-26-186</ns1:link></item><item><title>Arbitrary file write in grpc phQueryMaster</title><link>https://fortiguard.fortinet.com/psirt/FG-IR-26-180</link><description>&lt;p&gt;
+ &lt;strong&gt;
+  CVSSv3 Score:
+ &lt;/strong&gt;
+ 9.4
+&lt;/p&gt;
+&lt;p&gt;
+ An Improper limitation of a pathname to a restricted directory ('path traversal') [CWE-22] in FortiSIEM may allow an unauthenticated attacker to execute unauthorized code or commands via specially crafted packets.
+&lt;/p&gt;
+&lt;p&gt;
+ &lt;em&gt;
+  Revised on 20</description><guid isPermaLink="true">https://fortiguard.fortinet.com/psirt/FG-IR-26-180</guid><pubDate>Tue, 13 Oct 2026 00:00:00 -0700</pubDate><ns0:link>https://filestore.fortinet.com/fortiguard/psirt/csaf_arbitrary-file-write-in-grpc-phquerymaster_fg-ir-26-180.json</ns0:link><ns1:link>https://fortiguard.fortinet.com/psirt/cvrf/FG-IR-26-180</ns1:link></item></channel></rss>

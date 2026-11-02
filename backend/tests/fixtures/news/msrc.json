@@ -1,0 +1,42 @@
+{
+ "@odata.context": "https://api.msrc.microsoft.com/$metadata#Updates",
+ "value": [
+  {
+   "ID": "2026-Sep",
+   "Alias": "2026-Sep",
+   "DocumentTitle": "September 2026 Security Updates",
+   "Severity": null,
+   "InitialReleaseDate": "2026-09-08T07:00:00Z",
+   "CurrentReleaseDate": "2026-10-28T17:07:00Z",
+   "CvrfUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Sep"
+  },
+  {
+   "ID": "2026-Oct",
+   "Alias": "2026-Oct",
+   "DocumentTitle": "October 2026 Security Updates",
+   "Severity": null,
+   "InitialReleaseDate": "2026-10-13T07:00:00Z",
+   "CurrentReleaseDate": "2026-10-29T01:43:28Z",
+   "CvrfUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct"
+  },
+  {
+   "ID": "2017-May-B",
+   "Alias": "2017-May-B",
+   "DocumentTitle": "May 2017 Security Updates (B)",
+   "Severity": null,
+   "InitialReleaseDate": "2017-05-12T07:00:00Z",
+   "CurrentReleaseDate": "2017-05-12T07:00:00Z",
+   "CvrfUrl": ""
+  },
+  {
+   "ID": "../../evil",
+   "DocumentTitle": "<script>x</script>",
+   "InitialReleaseDate": "2026-10-20T00:00:00Z"
+  },
+  {
+   "ID": "2026-Nov",
+   "DocumentTitle": "<b>November</b> & more",
+   "InitialReleaseDate": "2026-10-27T07:00:00Z"
+  }
+ ]
+}

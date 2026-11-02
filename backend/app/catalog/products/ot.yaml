@@ -1,0 +1,187 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'ot' (OT/ICS (industrial)). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- OT / ICS
+- key: siemens-s7-1500
+  label: Siemens SIMATIC S7-1500 (CPU-Firmware)
+  vendor: Siemens
+  cpes: [o:siemens:simatic_s7-1500_cpu_firmware, o:siemens:simatic_s7-1500_cpu_1518-4_pn\/dp_firmware, o:siemens:simatic_s7-1500_software_controller_firmware, o:siemens:simatic_s7-1500_cpu_1511-1_pn_firmware, o:siemens:simatic_s7-1500_cpu_1513-1_pn_firmware, o:siemens:simatic_s7-1500_cpu_1515-2_pn_firmware]
+  cna: [[Siemens, SIMATIC S7-1500 CPU family (incl. related ET200 CPUs and SIPLUS variants)]]
+  kw: [S7-1500, SIMATIC S7]
+  example: 3.1.5
+  hint: ot
+- key: siemens-s7-1200
+  label: Siemens SIMATIC S7-1200 (CPU-Firmware)
+  vendor: Siemens
+  cpes: [o:siemens:simatic_s7-1200_cpu_firmware]
+  cna: [[Siemens, SIMATIC S7-1200 CPU family (incl. SIPLUS variants)]]
+  kw: [S7-1200]
+  example: "4.7"
+  hint: ot
+- key: siemens-wincc
+  label: Siemens SIMATIC WinCC
+  vendor: Siemens
+  cpes: [a:siemens:simatic_wincc]
+  cna: [[Siemens, SIMATIC WinCC]]
+  kw: [WinCC]
+  example: 8.0 Update 5
+  hint: ot
+- key: siemens-tia-portal
+  label: Siemens TIA Portal
+  vendor: Siemens
+  cpes: [a:siemens:totally_integrated_automation_portal, a:siemens:tia_portal]
+  cna: [[Siemens, Totally Integrated Automation Portal (TIA Portal)]]
+  kw: [TIA Portal]
+  example: V19 Update 3
+  hint: ot
+- key: siemens-scalance
+  label: Siemens SCALANCE (Switches, Router, WLAN)
+  vendor: Siemens
+  cpes: [o:siemens:scalance_x200-4p_irt_firmware, o:siemens:scalance_m-800_firmware, o:siemens:scalance_w700_firmware, o:siemens:scalance_x300_firmware, o:siemens:scalance_s615_firmware]
+  kw: [SCALANCE]
+  example: "8.2"
+  hint: ot
+- key: siemens-sinec-nms
+  label: Siemens SINEC NMS
+  vendor: Siemens
+  cpes: [a:siemens:sinec_nms]
+  cna: [[Siemens, SINEC NMS]]
+  kw: [SINEC NMS]
+  example: 4.0 SP1
+  hint: ot
+- key: rockwell-controllogix
+  label: Rockwell ControlLogix / GuardLogix (Firmware)
+  vendor: Rockwell Automation
+  cpes: [o:rockwellautomation:controllogix_5580_firmware, o:rockwellautomation:controllogix_5580_process_firmware]
+  kw: [ControlLogix, GuardLogix]
+  example: "35.013"
+  hint: ot
+- key: rockwell-factorytalk
+  label: Rockwell FactoryTalk (View, Linx, AssetCentre)
+  vendor: Rockwell Automation
+  cpes: [a:rockwellautomation:factorytalk_view, a:rockwellautomation:factorytalk_linx, a:rockwellautomation:factorytalk_assetcentre]
+  kw: [FactoryTalk]
+  example: "14.0"
+  hint: ot
+- key: schneider-modicon
+  label: Schneider Electric Modicon (M340, M580)
+  vendor: Schneider Electric
+  cpes: [o:schneider-electric:modicon_m580_firmware, o:schneider-electric:modicon_m340_firmware, o:schneider-electric:bmep584040_firmware, o:schneider-electric:modicon_m580_bmep584040_firmware, o:schneider-electric:modicon_m580_bmep582040_firmware, o:schneider-electric:modicon_m580_bmep581020_firmware]
+  kw: [Modicon]
+  example: "4.20"
+  hint: ot
+- key: schneider-ecostruxure
+  label: Schneider Electric EcoStruxure (Control Expert, Machine Expert)
+  vendor: Schneider Electric
+  cpes: [a:schneider-electric:ecostruxure_control_expert, a:schneider-electric:ecostruxure_machine_expert]
+  kw: [EcoStruxure]
+  aliases: [Unity Pro]
+  example: "16.1"
+  hint: ot
+- key: phoenix-plcnext
+  label: Phoenix Contact PLCnext
+  vendor: Phoenix Contact
+  cpes: [o:phoenixcontact:axc_f_2152_firmware, a:phoenixcontact:plcnext_engineer, a:codesys:control_for_plcnext, o:phoenixcontact:plcnext_technology_starterkit_firmware]
+  kw: [PLCnext]
+  example: 2025.0.2
+  hint: ot
+- key: wago-pfc
+  label: WAGO PFC100 / PFC200
+  vendor: WAGO
+  cpes: [o:wago:pfc200_firmware, o:wago:pfc100_firmware, o:wago:750-8212_firmware]
+  kw: [WAGO, PFC200]
+  example: 04.06.03(28)
+  hint: ot
+- key: beckhoff-twincat
+  label: Beckhoff TwinCAT
+  vendor: Beckhoff
+  cpes: [a:beckhoff:twincat, o:beckhoff:twincat\/bsd]
+  kw: [TwinCAT, Beckhoff]
+  example: 3.1.4026.14
+  hint: ot
+- key: moxa
+  label: Moxa (NPort, EDS, MXview)
+  vendor: Moxa
+  cpes: [o:moxa:nport_5150_firmware, o:moxa:eds-g516e_firmware, a:moxa:mxview, o:moxa:nport_5110_firmware, o:moxa:nport_5230_firmware]
+  kw: [Moxa]
+  hint: ot
+- key: hirschmann
+  label: Belden Hirschmann (HiOS, Classic)
+  vendor: Belden (Hirschmann)
+  cpes: [o:belden:hirschmann_hios]
+  kw: [Hirschmann, HiOS]
+  example: 09.4.04
+  hint: ot
+- key: codesys
+  label: CODESYS Control (Runtime)
+  vendor: CODESYS
+  cpes: [a:codesys:control_runtime_system_toolkit, a:codesys:runtime_toolkit, a:codesys:control_for_linux_sl, a:codesys:control_win_sl, a:codesys:control_rte_sl, a:codesys:control_for_pfc200_sl]
+  cna: [[CODESYS, CODESYS Control Win (SL)]]
+  kw: [CODESYS]
+  example: 3.5.21.0
+  hint: ot
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: phoenix-mguard
+  label: "Phoenix Contact mGuard (FL/TC MGUARD)"
+  vendor: Phoenix Contact
+  cpes: [o:phoenixcontact:mguard_firmware, o:innominate:mguard_firmware, "o:phoenixcontact:fl_mguard_rs4004_tx\\/dtx_firmware", "o:phoenixcontact:fl_mguard_rs4004_tx\\/dtx_vpn_firmware", o:phoenixcontact:fl_mguard_1102_firmware, o:phoenixcontact:fl_mguard_1105_firmware, o:phoenixcontact:fl_mguard_core_tx_vpn_firmware, o:phoenixcontact:fl_mguard_centerport_vpn-1000_firmware]
+  kw: [mGuard, FL MGUARD]
+  aliases: [mGuard, Innominate mGuard]
+  example: "10.5.1"
+  hint: per_model
+  where: ot_firmware
+- key: siemens-sinema-rc
+  label: Siemens SINEMA Remote Connect
+  vendor: Siemens
+  cpes: [a:siemens:sinema_remote_connect_server, a:siemens:sinema_remote_connect_client]
+  kw: [SINEMA Remote Connect, SINEMA RC]
+  aliases: [SINEMA RC]
+  example: "3.2 SP2"
+  hint: ot
+  where: ot_firmware
+- key: siemens-ruggedcom-ros
+  label: Siemens RUGGEDCOM ROS
+  vendor: Siemens
+  cpes: [o:siemens:ruggedcom_ros, o:siemens:ruggedcom_ros_rsg2100, o:siemens:ruggedcom_ros_rsg2300, o:siemens:ruggedcom_ros_rsg2288, o:siemens:ruggedcom_ros_rs900, o:siemens:ruggedcom_ros_rs900g, o:siemens:ruggedcom_ros_rsg2488, o:siemens:ruggedcom_ros_rsg900]
+  kw: [RUGGEDCOM ROS, RUGGEDCOM]
+  aliases: [RUGGEDCOM, Rugged Operating System]
+  example: "5.9.0"
+  hint: per_model
+  where: ot_firmware
+- key: teltonika-rutos
+  label: "Teltonika RutOS (RUT/RUTX)"
+  vendor: Teltonika Networks
+  cpes: [o:teltonika-networks:rut240_firmware, o:teltonika-networks:rut241_firmware, o:teltonika-networks:rut950_firmware, o:teltonika-networks:rut955_firmware, o:teltonika-networks:rutx11_firmware, o:teltonika-networks:rutx50_firmware, o:teltonika:rut950_firmware, o:teltonika:rut955_firmware]
+  kw: [Teltonika, RutOS]
+  aliases: [RUT240, RUTX11, RutOS]
+  example: "07.06.1"
+  hint: per_model
+  where: firmware_dashboard
+- key: insys-icom  # no CPE in NVD (checked 2026-11-02)
+  label: "INSYS icom OS (Router)"
+  vendor: INSYS icom
+  cpes: []
+  kw: [INSYS icom, icom OS]
+  aliases: [icom OS, INSYS]
+  hint: nocpe
+  where: ot_firmware
+- key: ewon
+  label: "HMS Ewon Flexy / Cosy (Talk2M)"
+  vendor: HMS Networks
+  cpes: [o:hms-networks:ewon_flexy_firmware, "o:hms-networks:ewon_cosy\\+_firmware", o:hms-networks:ewon_cosy_firmware, o:ewon:ewon_firmware]
+  kw: [Ewon, Talk2M]
+  aliases: [Talk2M, Ewon Flexy, Ewon Cosy]
+  example: "14.9s2"
+  hint: per_model
+  where: ot_firmware
+- key: mbconnect24
+  label: MB connect line mbCONNECT24
+  vendor: MB connect line
+  cpes: [a:mbconnectline:mbconnect24]
+  kw: [mbCONNECT24, MB connect line]
+  aliases: [mbNET, mymbCONNECT24]
+  example: "2.16.2"
+  where: web_about

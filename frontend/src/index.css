@@ -1,0 +1,253 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./shadcn-tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --color-sev-critical: var(--sev-critical);
+  --color-sev-high: var(--sev-high);
+  --color-sev-medium: var(--sev-medium);
+  --color-sev-low: var(--sev-low);
+  --color-sev-info: var(--sev-info);
+  --color-phase-ir: var(--phase-ir);
+  --color-phase-analysis: var(--phase-analysis);
+  --color-phase-closing: var(--phase-closing);
+  --color-phase-closed: var(--phase-closed);
+  --color-actor-security: var(--actor-security);
+  --color-actor-trendmicro: var(--actor-trendmicro);
+  --color-actor-microsoft: var(--actor-microsoft);
+  --color-actor-it: var(--actor-it);
+  --color-actor-third: var(--actor-third);
+  --color-actor-system: var(--actor-system);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ---------- Design tokens ---------- */
+:root {
+  --background: oklch(0.982 0.003 255);
+  --foreground: oklch(0.2 0.02 262);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.02 262);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.02 262);
+  --primary: oklch(0.53 0.2 264);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.008 260);
+  --secondary-foreground: oklch(0.27 0.03 262);
+  --muted: oklch(0.955 0.006 260);
+  --muted-foreground: oklch(0.52 0.02 260);
+  --accent: oklch(0.95 0.02 264);
+  --accent-foreground: oklch(0.3 0.08 264);
+  --destructive: oklch(0.577 0.22 27);
+  --border: oklch(0.91 0.008 260);
+  --input: oklch(0.89 0.01 260);
+  --ring: oklch(0.6 0.17 264);
+  --chart-1: oklch(0.53 0.2 264);
+  --chart-2: oklch(0.65 0.14 190);
+  --chart-3: oklch(0.72 0.16 60);
+  --chart-4: oklch(0.6 0.2 25);
+  --chart-5: oklch(0.6 0.02 260);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.975 0.004 258);
+  --sidebar-foreground: oklch(0.3 0.02 262);
+  --sidebar-primary: oklch(0.53 0.2 264);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.935 0.018 264);
+  --sidebar-accent-foreground: oklch(0.25 0.06 264);
+  --sidebar-border: oklch(0.91 0.008 260);
+  --sidebar-ring: oklch(0.6 0.17 264);
+
+  /* Semantic: severity */
+  --sev-critical: oklch(0.56 0.22 22);
+  --sev-high: oklch(0.63 0.19 42);
+  --sev-medium: oklch(0.7 0.15 75);
+  --sev-low: oklch(0.58 0.13 240);
+  --sev-info: oklch(0.58 0.02 260);
+  /* Semantic: phases */
+  --phase-ir: oklch(0.58 0.2 20);
+  --phase-analysis: oklch(0.55 0.19 285);
+  --phase-closing: oklch(0.58 0.12 190);
+  --phase-closed: oklch(0.55 0.13 150);
+  /* Semantic: timeline actors */
+  --actor-security: oklch(0.53 0.2 264);
+  --actor-trendmicro: oklch(0.57 0.21 25);
+  --actor-microsoft: oklch(0.55 0.15 245);
+  --actor-it: oklch(0.58 0.12 185);
+  --actor-third: oklch(0.6 0.14 75);
+  --actor-system: oklch(0.58 0.02 260);
+  /* Status */
+  --success: oklch(0.56 0.14 150);
+  --warning: oklch(0.7 0.15 70);
+}
+
+.dark {
+  --background: oklch(0.215 0.013 264);
+  --foreground: oklch(0.95 0.005 260);
+  --card: oklch(0.252 0.015 264);
+  --card-foreground: oklch(0.95 0.005 260);
+  --popover: oklch(0.27 0.016 264);
+  --popover-foreground: oklch(0.95 0.005 260);
+  --primary: oklch(0.68 0.16 266);
+  --primary-foreground: oklch(0.2 0.03 264);
+  --secondary: oklch(0.3 0.017 264);
+  --secondary-foreground: oklch(0.93 0.005 260);
+  --muted: oklch(0.29 0.015 264);
+  --muted-foreground: oklch(0.74 0.015 260);
+  --accent: oklch(0.33 0.045 266);
+  --accent-foreground: oklch(0.93 0.02 266);
+  --destructive: oklch(0.68 0.19 22);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.68 0.16 266);
+  --chart-1: oklch(0.68 0.16 266);
+  --chart-2: oklch(0.72 0.12 190);
+  --chart-3: oklch(0.78 0.14 70);
+  --chart-4: oklch(0.68 0.18 25);
+  --chart-5: oklch(0.65 0.02 260);
+  --sidebar: oklch(0.232 0.014 264);
+  --sidebar-foreground: oklch(0.88 0.008 260);
+  --sidebar-primary: oklch(0.68 0.16 266);
+  --sidebar-primary-foreground: oklch(0.2 0.03 264);
+  --sidebar-accent: oklch(0.31 0.035 266);
+  --sidebar-accent-foreground: oklch(0.95 0.01 266);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.68 0.16 266);
+
+  --sev-critical: oklch(0.68 0.2 22);
+  --sev-high: oklch(0.73 0.17 45);
+  --sev-medium: oklch(0.8 0.14 80);
+  --sev-low: oklch(0.7 0.12 240);
+  --sev-info: oklch(0.7 0.02 260);
+  --phase-ir: oklch(0.7 0.18 20);
+  --phase-analysis: oklch(0.72 0.15 285);
+  --phase-closing: oklch(0.74 0.11 190);
+  --phase-closed: oklch(0.72 0.13 150);
+  --actor-security: oklch(0.7 0.15 266);
+  --actor-trendmicro: oklch(0.7 0.18 25);
+  --actor-microsoft: oklch(0.72 0.13 245);
+  --actor-it: oklch(0.74 0.11 185);
+  --actor-third: oklch(0.8 0.13 80);
+  --actor-system: oklch(0.68 0.02 260);
+  --success: oklch(0.72 0.14 150);
+  --warning: oklch(0.8 0.14 75);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@utility scroll-shadow {
+  background:
+    linear-gradient(var(--popover) 30%, transparent) top / 100% 2rem no-repeat local,
+    linear-gradient(transparent, var(--popover) 70%) bottom / 100% 2rem no-repeat local,
+    radial-gradient(farthest-side at 50% 0, color-mix(in oklch, var(--foreground) 22%, transparent), transparent) top / 100% 0.75rem no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, color-mix(in oklch, var(--foreground) 22%, transparent), transparent) bottom / 100% 0.75rem no-repeat scroll;
+}
+
+@layer base {
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 25%, transparent);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* JetBrains Mono ligatures turn "//" and "->" into single glyphs – in URLs, hashes and IOCs every character
+     has to stay exactly as typed ("https://" looked like "https: /"). */
+  .font-mono,
+  code,
+  pre,
+  kbd,
+  samp {
+    font-variant-ligatures: none;
+    font-feature-settings:
+      "liga" 0,
+      "calt" 0;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--foreground) 14%, transparent);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* The CSP allows no inline <style> elements (src/lib/no-inline-styles.ts): what Radix Select and the theme switch put
+   into one is here instead. */
+[data-radix-select-viewport] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+[data-radix-select-viewport]::-webkit-scrollbar {
+  display: none;
+}
+/* lib/theme.tsx: no colour transitions while the theme switches – everything changes at once */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}

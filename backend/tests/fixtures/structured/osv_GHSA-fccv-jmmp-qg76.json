@@ -1,0 +1,156 @@
+{
+ "id": "GHSA-fccv-jmmp-qg76",
+ "summary": "Apache Tomcat Improper Input Validation vulnerability",
+ "details": "Improper Input Validation vulnerability in Apache Tomcat. Tomcat from 11.0.0-M1 through 11.0.0-M10, from 10.1.0-M1 through 10.1.15, from 9.0.0-M1 through 9.0.82, and from 8.5.0 through 8.5.95 did not ",
+ "aliases": [
+  "BIT-tomcat-2023-46589",
+  "CVE-2023-46589"
+ ],
+ "modified": "2026-10-02T20:30:05.627846032Z",
+ "published": "2023-11-28T18:30:23Z",
+ "database_specific": {
+  "github_reviewed": true,
+  "github_reviewed_at": "2023-11-28T23:28:54Z",
+  "nvd_published_at": "2023-11-28T16:15:06Z",
+  "cwe_ids": [
+   "CWE-20",
+   "CWE-444"
+  ],
+  "severity": "HIGH"
+ },
+ "references": [
+  {
+   "type": "ADVISORY",
+   "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-46589"
+  },
+  {
+   "type": "WEB",
+   "url": "https://github.com/apache/tomcat/commit/6f181e1062a472bc5f0234980f66cbde42c1041b"
+  }
+ ],
+ "affected": [
+  {
+   "package": {
+    "name": "org.apache.tomcat:tomcat-catalina",
+    "ecosystem": "Maven",
+    "purl": "pkg:maven/org.apache.tomcat/tomcat-catalina"
+   },
+   "ranges": [
+    {
+     "type": "ECOSYSTEM",
+     "events": [
+      {
+       "introduced": "11.0.0-M1"
+      },
+      {
+       "fixed": "11.0.0-M11"
+      }
+     ]
+    }
+   ],
+   "versions": [
+    "11.0.0-M1",
+    "11.0.0-M10",
+    "11.0.0-M3",
+    "11.0.0-M4"
+   ],
+   "database_specific": {
+    "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2023/11/GHSA-fccv-jmmp-qg76/GHSA-fccv-jmmp-qg76.json"
+   }
+  },
+  {
+   "package": {
+    "name": "org.apache.tomcat:tomcat-catalina",
+    "ecosystem": "Maven",
+    "purl": "pkg:maven/org.apache.tomcat/tomcat-catalina"
+   },
+   "ranges": [
+    {
+     "type": "ECOSYSTEM",
+     "events": [
+      {
+       "introduced": "10.1.0-M1"
+      },
+      {
+       "fixed": "10.1.16"
+      }
+     ]
+    }
+   ],
+   "versions": [
+    "10.1.0",
+    "10.1.0-M1",
+    "10.1.0-M10",
+    "10.1.0-M11"
+   ],
+   "database_specific": {
+    "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2023/11/GHSA-fccv-jmmp-qg76/GHSA-fccv-jmmp-qg76.json"
+   }
+  },
+  {
+   "package": {
+    "name": "org.apache.tomcat:tomcat-catalina",
+    "ecosystem": "Maven",
+    "purl": "pkg:maven/org.apache.tomcat/tomcat-catalina"
+   },
+   "ranges": [
+    {
+     "type": "ECOSYSTEM",
+     "events": [
+      {
+       "introduced": "9.0.0-M1"
+      },
+      {
+       "fixed": "9.0.83"
+      }
+     ]
+    }
+   ],
+   "versions": [
+    "9.0.0.M1",
+    "9.0.0.M10",
+    "9.0.0.M11",
+    "9.0.0.M13"
+   ],
+   "database_specific": {
+    "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2023/11/GHSA-fccv-jmmp-qg76/GHSA-fccv-jmmp-qg76.json"
+   }
+  },
+  {
+   "package": {
+    "name": "org.apache.tomcat:tomcat-catalina",
+    "ecosystem": "Maven",
+    "purl": "pkg:maven/org.apache.tomcat/tomcat-catalina"
+   },
+   "ranges": [
+    {
+     "type": "ECOSYSTEM",
+     "events": [
+      {
+       "introduced": "8.5.0"
+      },
+      {
+       "fixed": "8.5.96"
+      }
+     ]
+    }
+   ],
+   "versions": [
+    "8.5.0",
+    "8.5.11",
+    "8.5.12",
+    "8.5.13"
+   ],
+   "database_specific": {
+    "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2023/11/GHSA-fccv-jmmp-qg76/GHSA-fccv-jmmp-qg76.json"
+   }
+  }
+ ],
+ "schema_version": "1.9.0",
+ "severity": [
+  {
+   "type": "CVSS_V3",
+   "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+  }
+ ]
+}

@@ -1,0 +1,130 @@
+{
+ "resultsPerPage": 8,
+ "startIndex": 0,
+ "totalResults": 477,
+ "format": "NVD_CPE",
+ "version": "2.0",
+ "timestamp": "2026-10-29T08:35:28.230",
+ "products": [
+  {
+   "cpe": {
+    "deprecated": false,
+    "cpeName": "cpe:2.3:a:citrix:netscaler:-:*:*:*:*:*:*:*",
+    "cpeNameId": "98D9CB38-C790-4420-B7BD-E55404AA519C",
+    "lastModified": "2007-11-20T19:50:45.857",
+    "created": "2007-11-20T19:50:45.857",
+    "titles": [
+     {
+      "title": "Citrix NetScaler",
+      "lang": "en"
+     }
+    ]
+   }
+  },
+  {
+   "cpe": {
+    "deprecated": false,
+    "cpeName": "cpe:2.3:a:citrix:netscaler:8.0_build_47.8:*:*:*:*:*:*:*",
+    "cpeNameId": "3E29C8BF-A5B4-484B-B5EF-5EB3CB93B653",
+    "lastModified": "2007-11-20T19:50:58.733",
+    "created": "2007-11-20T19:50:58.733",
+    "titles": [
+     {
+      "title": "Citrix NetScaler 8.0 build 47.8",
+      "lang": "en"
+     }
+    ]
+   }
+  },
+  {
+   "cpe": {
+    "deprecated": false,
+    "cpeName": "cpe:2.3:a:citrix:netscaler:8.0:*:*:*:*:*:*:*",
+    "cpeNameId": "3F7D420F-D945-42CB-B761-5A6AB21E2FE2",
+    "lastModified": "2007-12-01T00:37:27.377",
+    "created": "2007-12-01T00:37:27.377",
+    "titles": [
+     {
+      "title": "Citrix NetScaler 8.0",
+      "lang": "en"
+     }
+    ]
+   }
+  },
+  {
+   "cpe": {
+    "deprecated": false,
+    "cpeName": "cpe:2.3:a:citrix:edgesight_for_netscaler:-:*:*:*:*:*:*:*",
+    "cpeNameId": "1FCDD7C8-2C42-4714-9446-EC5FF1983887",
+    "lastModified": "2007-12-07T17:48:56.217",
+    "created": "2007-12-07T17:48:56.217",
+    "titles": [
+     {
+      "title": "Citrix EdgeSight for NetScaler",
+      "lang": "en"
+     }
+    ]
+   }
+  },
+  {
+   "cpe": {
+    "deprecated": false,
+    "cpeName": "cpe:2.3:a:citrix:edgesight_for_netscaler:1.0:*:*:*:*:*:*:*",
+    "cpeNameId": "273221C2-E6D7-4383-8BBE-75A41201FE25",
+    "lastModified": "2007-12-07T17:49:04.450",
+    "created": "2007-12-07T17:49:04.450",
+    "titles": [
+     {
+      "title": "Citrix EdgeSight for NetScaler 1.0",
+      "lang": "en"
+     }
+    ]
+   }
+  },
+  {
+   "cpe": {
+    "deprecated": false,
+    "cpeName": "cpe:2.3:a:citrix:edgesight_for_netscaler:1.1:*:*:*:*:*:*:*",
+    "cpeNameId": "E720C152-4D8D-4DB5-9A9D-E55B5F0005FD",
+    "lastModified": "2007-12-07T17:49:09.063",
+    "created": "2007-12-07T17:49:09.063",
+    "titles": [
+     {
+      "title": "Citrix EdgeSight for NetScaler 1.1",
+      "lang": "en"
+     }
+    ]
+   }
+  },
+  {
+   "cpe": {
+    "deprecated": false,
+    "cpeName": "cpe:2.3:o:citrix:netscaler_access_gateway_firmware:10.0:*:*:*:*:*:*:*",
+    "cpeNameId": "1846AB10-38D9-4C34-8950-943B74ED76D0",
+    "lastModified": "2013-05-01T01:46:27.887",
+    "created": "2013-04-26T13:36:58.143",
+    "titles": [
+     {
+      "title": "Citrix NetScaler Access Gateway Appliance Firmware 10.0",
+      "lang": "en"
+     }
+    ]
+   }
+  },
+  {
+   "cpe": {
+    "deprecated": false,
+    "cpeName": "cpe:2.3:o:citrix:netscaler_access_gateway_firmware:10.0.74.4:*:*:*:*:*:*:*",
+    "cpeNameId": "872A2195-C56A-4D83-93D4-1C54412CD0F3",
+    "lastModified": "2013-05-01T01:46:28.003",
+    "created": "2013-04-26T13:36:58.210",
+    "titles": [
+     {
+      "title": "Citrix NetScaler Access Gateway Appliance Firmware 10.0.74.4",
+      "lang": "en"
+     }
+    ]
+   }
+  }
+ ]
+}

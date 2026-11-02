@@ -1,0 +1,156 @@
+{
+ "document": {
+  "title": "Stack buffer overflow in WAD",
+  "category": "Fortinet PSIRT Advisories",
+  "csaf_version": "2.0",
+  "publisher": {
+   "category": "vendor",
+   "contact_details": "https://fortiguard.fortinet.com/faq/psirt-contact",
+   "issuing_authority": "Fortinet PSIRT",
+   "name": "Fortinet PSIRT",
+   "namespace": "https://fortiguard.fortinet.com/psirt"
+  },
+  "tracking": {
+   "id": "FG-IR-26-161",
+   "current_release_date": "2026-08-12T00:00:00",
+   "initial_release_date": "2026-08-12T00:00:00",
+   "revision_history": [
+    {
+     "number": "1",
+     "date": "2026-08-12T00:00:00",
+     "summary": "Initial Publication"
+    }
+   ],
+   "status": "final",
+   "version": "0"
+  },
+  "acknowledgments": [
+   {
+    "summary": "Fortinet is pleased to thank The UK's National Cyber Security Centre (NCSC) for reporting this vulnerability under responsible disclosure. "
+   }
+  ]
+ },
+ "product_tree": {
+  "branches": [
+   {
+    "category": "vendor",
+    "name": "Fortinet PSIRT",
+    "branches": [
+     {
+      "category": "product",
+      "name": "FortiOS",
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "FortiOS/ 8.0 all versions",
+        "product": {
+         "product_id": "FortiOS/ 8.0 all versions",
+         "name": "FortiOS"
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "FortiOS/>=7.6.1|<=7.6.6",
+        "product": {
+         "product_id": "FortiOS >=7.6.1|<=7.6.6",
+         "name": "FortiOS"
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "FortiOS/ 7.4 all versions",
+        "product": {
+         "product_id": "FortiOS/ 7.4 all versions",
+         "name": "FortiOS"
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "FortiOS/ 7.2 all versions",
+        "product": {
+         "product_id": "FortiOS/ 7.2 all versions",
+         "name": "FortiOS"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "vulnerabilities": [
+  {
+   "cve": "CVE-2026-71407",
+   "cwe": {
+    "id": "CWE-121",
+    "name": "Stack-based Buffer Overflow"
+   },
+   "title": "FortiOS - MEDIUM - FG-IR-26-161",
+   "scores": [
+    {
+     "products": [
+      "FortiOS"
+     ],
+     "cvss_v3": {
+      "version": "3.1",
+      "baseScore": 5.1,
+      "baseSeverity": "MEDIUM",
+      "temporalScore": 5.1,
+      "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:L/E:P/RL:O/RC:C"
+     }
+    }
+   ],
+   "notes": [
+    {
+     "category": "summary",
+     "title": "Summary",
+     "text": "Unauthenticated stack buffer overflow vulnerability\n\n"
+    },
+    {
+     "category": "general",
+     "title": "Additional info",
+     "text": "Disable the SOCKS proxy.\n\nconfig web-proxy explicit\n    set socks disable\nend\n\nOR\n\nModify the authentication scheme for the SOCKS proxy to not use Kerberos authentication in config authentication rule and config authentication scheme settings.\n\nVirtual Patch named \"FG-VD-10009617.0day.\" is available in FMWP db update 26.073"
+    }
+   ],
+   "product_status": {
+    "known_affected": [
+     "FortiOS >=7.6.1|<=7.6.6"
+    ],
+    "known_not_affected": [
+     "FortiOS/ 8.0 all versions",
+     "FortiOS-7.6.7",
+     "FortiOS/ 7.4 all versions",
+     "FortiOS/ 7.2 all versions"
+    ]
+   },
+   "threats": [
+    {
+     "category": "impact",
+     "details": "Execute unauthorized code or commands"
+    }
+   ],
+   "remediations": [
+    {
+     "details": "FortiOS 8.0: Not Applicable\nFortiOS 7.6: Upgrade to 7.6.7 or above\nFortiOS 7.4: Not Applicable\nFortiOS 7.2: Not Applicable",
+     "category": "vendor_fix",
+     "product_ids": [
+      "FortiOS"
+     ]
+    },
+    {
+     "category": "mitigation",
+     "details": "A virtual patch is available. FortiGuard IPS signature package: Virtual Patch named \"FG-VD-10009617.0day.\" is available in FMWP db update 26.073",
+     "product_ids": [
+      "FortiOS"
+     ]
+    }
+   ],
+   "references": [
+    {
+     "url": "https://fortiguard.fortinet.com/psirt/FG-IR-26-161",
+     "summary": "A Stack-based Buffer Overflow vulnerability [CWE-121] in FortiOS explicit proxy may allow an unauthenticated attacker who can bypass stack protection and ASLR to execute arbitrary code or commands in the context of the WAD daemon via crafted sockets, only if the explicit proxy is configured with Kerberos authentication and SOCKS enabled."
+    }
+   ]
+  }
+ ]
+}

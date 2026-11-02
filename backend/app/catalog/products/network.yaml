@@ -1,0 +1,462 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'network' (Switches, routers & WLAN). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Palo Alto Networks
+- key: prisma-sdwan-ion
+  label: Prisma SD-WAN ION
+  vendor: Palo Alto Networks
+  cpes: [o:paloaltonetworks:prisma_sd-wan_ion]
+  adv: paloalto
+  names: [Prisma SD-WAN ION, Prisma SD-WAN]
+  kw: [Prisma SD-WAN]
+  example: 6.4.1
+  aliases: [CloudGenix]
+
+# ---------------------------------------------------------------- Fortinet
+- key: fortiswitch
+  label: FortiSwitch
+  vendor: Fortinet
+  cpes: [o:fortinet:fortiswitch]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiSwitch]
+  cna: [[Fortinet, FortiSwitch]]
+  kw: [FortiSwitch]
+  example: 7.4.4
+- key: fortiap
+  label: FortiAP
+  vendor: Fortinet
+  cpes: [o:fortinet:fortiap]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiAP, FortiAP-W2, FortiAP-S, FortiAP-U]
+  cna: [[Fortinet, FortiAP]]
+  kw: [FortiAP]
+  example: 7.4.3
+- key: fortiswitchmanager
+  label: FortiSwitchManager
+  vendor: Fortinet
+  cpes: [a:fortinet:fortiswitchmanager]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiSwitchManager]
+  cna: [[Fortinet, FortiSwitchManager]]
+  kw: [FortiSwitchManager]
+  example: 7.2.5
+
+# ---------------------------------------------------------------- Cisco
+- key: cisco-ios
+  label: Cisco IOS
+  vendor: Cisco
+  cpes: [o:cisco:ios]
+  scheme: cisco
+  cna: [[Cisco, IOS]]
+  kw: [Cisco IOS]
+  example: 15.9(3)M9
+  hint: cisco_ios
+- key: cisco-ios-xe
+  label: Cisco IOS XE
+  vendor: Cisco
+  cpes: [o:cisco:ios_xe]
+  scheme: cisco
+  cna: [[Cisco, Cisco IOS XE Software]]
+  kw: [IOS XE]
+  example: 17.9.4a
+- key: cisco-ios-xr
+  label: Cisco IOS XR
+  vendor: Cisco
+  cpes: [o:cisco:ios_xr]
+  scheme: cisco
+  cna: [[Cisco, Cisco IOS XR Software]]
+  kw: [IOS XR]
+  example: 7.11.2
+- key: cisco-nx-os
+  label: Cisco NX-OS
+  vendor: Cisco
+  cpes: [o:cisco:nx-os]
+  scheme: cisco
+  cna: [[Cisco, Cisco NX-OS Software]]
+  kw: [NX-OS, Nexus]
+  example: 10.2(5)
+- key: cisco-meraki
+  label: Cisco Meraki (MS, MR, MX)
+  vendor: Cisco
+  cpes: [o:cisco:meraki_mx64_firmware, o:cisco:meraki_mx65_firmware, o:cisco:meraki_mx100_firmware, o:cisco:meraki_mx250_firmware, o:cisco:meraki_mx450_firmware]
+  kw: [Meraki]
+  aliases: [Meraki MX, Meraki MS, Meraki MR]
+  example: MX 18.211.5
+  hint: meraki
+
+# ---------------------------------------------------------------- switches, routers, WLAN
+- key: aruba-aoscx
+  label: HPE Aruba AOS-CX
+  vendor: HPE Aruba Networking
+  cpes: [o:hpe:arubaos-cx, o:arubanetworks:arubaos-cx]
+  cna: [[Hewlett Packard Enterprise (HPE), AOS-CX]]
+  kw: [AOS-CX, ArubaOS-CX]
+  aliases: [Aruba CX, HPE Aruba Switch, Aruba 6300, Aruba 8360]
+  example: 10.13.1010
+  version_cmd: show version
+- key: arubaos
+  label: HPE Aruba ArubaOS / AOS-10
+  vendor: HPE Aruba Networking
+  cpes: [o:arubanetworks:arubaos, o:hpe:arubaos]
+  cna: [[Hewlett Packard Enterprise (HPE), ArubaOS]]
+  kw: [ArubaOS, AOS-8, AOS-10]
+  example: 8.12.0.1
+- key: aruba-instant
+  label: HPE Aruba Instant (IAP)
+  vendor: HPE Aruba Networking
+  cpes: [o:arubanetworks:instant]
+  kw: [Aruba Instant]
+  example: 8.10.0.12
+- key: junos
+  label: Juniper Junos OS (SRX, EX, MX, QFX)
+  vendor: Juniper Networks
+  cpes: [o:juniper:junos]
+  cna: [[Juniper Networks, Junos OS]]
+  kw: [Junos OS, Juniper SRX]
+  aliases: [SRX, Juniper SRX, Juniper EX, Juniper MX]
+  example: 22.4R3-S5
+  hint: junos
+  where: junos
+  replaces: [juniper-srx]  # SRX firewalls run Junos OS – one product (migration 0025 moved follows)
+- key: junos-evolved
+  label: Juniper Junos OS Evolved
+  vendor: Juniper Networks
+  cpes: [o:juniper:junos_os_evolved]
+  cna: [[Juniper Networks, Junos OS Evolved]]
+  kw: [Junos OS Evolved]
+  example: 23.2R2-S1-EVO
+  where: junos
+- key: extreme-exos
+  label: Extreme Networks EXOS / Switch Engine
+  vendor: Extreme Networks
+  cpes: [o:extremenetworks:exos]
+  kw: [ExtremeXOS, Extreme Networks]
+  example: 32.6.1
+- key: extreme-voss
+  label: Extreme Networks VOSS / Fabric Engine
+  vendor: Extreme Networks
+  cpes: [o:extremenetworks:voss]
+  kw: [VOSS, Fabric Engine]
+  example: 8.10.1.0
+- key: unifi-network
+  label: Ubiquiti UniFi Network Application
+  vendor: Ubiquiti
+  cpes: [a:ui:unifi_network_application, a:ui:unifi_network]
+  kw: [UniFi]
+  aliases: [UniFi Controller, UniFi Network Server]
+  example: 9.0.114
+- key: unifi-os
+  label: Ubiquiti UniFi OS (Cloud Gateways)
+  vendor: Ubiquiti
+  cpes: [o:ui:unifi_os]
+  kw: [UniFi OS]
+  example: 4.1.13
+- key: routeros
+  label: MikroTik RouterOS
+  vendor: MikroTik
+  cpes: [o:mikrotik:routeros]
+  kw: [RouterOS, MikroTik]
+  example: 7.24.5
+  version_cmd: /system resource print
+- key: lancom-lcos
+  label: LANCOM LCOS
+  vendor: LANCOM Systems
+  cpes: [o:lancom-systems:lcos, o:lancom-systems:lcos_lx]
+  kw: [LANCOM, LCOS]
+  aliases: [LANCOM Router, LANCOM Access Point, LCOS LX]
+  example: 10.80 RU5
+  where: lancom
+- key: openwrt
+- key: hpe-comware
+  label: HPE Comware (FlexNetwork)
+  vendor: HPE
+  cpes: []
+  kw: [Comware]
+  hint: nocpe
+- key: cisco-wlc
+  label: Cisco Wireless LAN Controller (AireOS)
+  vendor: Cisco
+  cpes: [o:cisco:wireless_lan_controller_software]
+  scheme: cisco
+  kw: [Wireless LAN Controller, AireOS]
+  example: 8.10.190.0
+
+# ---------------------------------------------------------------- switches, routers, WLAN (more)
+- key: aruba-aos-s
+  label: HPE Aruba AOS-S (ArubaOS-Switch, ProVision)
+  vendor: HPE Aruba Networking
+  cpes: [o:hpe:arubaos-switch, o:hp:procurve_switch_software]
+  cna: [[Hewlett Packard Enterprise (HPE), ArubaOS-Switch], [Hewlett Packard Enterprise (HPE), AOS-S]]
+  kw: [ArubaOS-Switch, AOS-S, ProCurve]
+  aliases: [ProCurve, ProVision, Aruba 2530, Aruba 2930F, Aruba 3810, Aruba 5400R, HPE Switch]
+  example: 16.11.0024
+  version_cmd: show version
+- key: aruba-central
+  label: HPE Aruba Networking Central
+  vendor: HPE Aruba Networking
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Aruba Central]
+  aliases: [Aruba Central]
+- key: aruba-edgeconnect
+  label: HPE Aruba EdgeConnect SD-WAN (Silver Peak)
+  vendor: HPE Aruba Networking
+  cpes: [a:arubanetworks:edgeconnect_sd-wan_orchestrator, o:hpe:edgeconnect_operating_system, a:arubanetworks:edgeconnect_enterprise]
+  kw: [EdgeConnect, Silver Peak]
+  aliases: [Silver Peak, Orchestrator]
+  example: 9.4.2.0
+- key: aruba-instant-on
+  label: HPE Aruba Instant On
+  vendor: HPE Aruba Networking
+  cpes: [o:hpe:aruba_instant_on_1930_8g_2sfp_firmware]
+  kw: [Instant On]
+  aliases: [Aruba Instant On]
+  example: 3.1.0.0
+- key: hpe-officeconnect
+  label: HPE OfficeConnect Switches
+  vendor: HPE
+  cpes: [o:hp:officeconnect_1820_24g_switch_j9980a_firmware, o:hp:officeconnect_1820_48g_switch_j9981a_firmware]
+  kw: [OfficeConnect]
+  aliases: [HPE 1920S, HPE 1820]
+  example: PD.02.21
+- key: unifi-switch
+  label: Ubiquiti UniFi Switch (USW, Firmware)
+  vendor: Ubiquiti
+  cpes: [o:ui:unifi_switch_firmware]
+  kw: [UniFi Switch, USW]
+  aliases: [Unifi Switch, USW]
+  example: 7.1.26
+- key: unifi-ap
+  label: Ubiquiti UniFi Access Points (Firmware)
+  vendor: Ubiquiti
+  cpes: [o:ui:unifi_uap_firmware]
+  kw: [UniFi Access Point, UniFi AP]
+  aliases: [UAP, U6, U7]
+  example: 6.7.31
+- key: unifi-protect
+  label: Ubiquiti UniFi Protect
+  vendor: Ubiquiti
+  cpes: [a:ui:unifi_protect]
+  kw: [UniFi Protect]
+  example: 5.3.48
+- key: unifi-access
+  label: Ubiquiti UniFi Access
+  vendor: Ubiquiti
+  cpes: [a:ui:unifi_access]
+  kw: [UniFi Access]
+  example: 3.3.22
+- key: unifi-talk
+  label: Ubiquiti UniFi Talk
+  vendor: Ubiquiti
+  cpes: []
+  kw: [UniFi Talk]
+  example: 4.0.12
+  hint: nocpe
+- key: edgeos
+  label: Ubiquiti EdgeRouter (EdgeOS)
+  vendor: Ubiquiti
+  cpes: [o:ui:edgeos]
+  kw: [EdgeRouter, EdgeOS]
+  aliases: [EdgeRouter, EdgeMAX]
+  example: 2.0.9-hotfix.7
+  version_cmd: show version
+- key: uisp-airos
+  label: Ubiquiti UISP / airMAX (airOS)
+  vendor: Ubiquiti
+  cpes: [o:ui:airos]
+  kw: [airOS, airMAX, UISP]
+  aliases: [airMAX, UNMS]
+  example: 8.7.17
+- key: cisco-catalyst-center
+  label: Cisco Catalyst Center (DNA Center)
+  vendor: Cisco
+  cpes: [a:cisco:catalyst_center, a:cisco:dna_center, a:cisco:digital_network_architecture_center]
+  kw: [Catalyst Center, DNA Center]
+  aliases: [DNA Center, DNAC]
+  example: 2.3.7.9
+- key: cisco-sb-switch
+  label: Cisco Business / Small Business Switches (CBS, SG)
+  vendor: Cisco
+  cpes: []
+  kw: [Small Business Switch, Cisco Business]
+  aliases: [CBS350, SG350, SG300]
+  example: 3.4.1.3
+  hint: nocpe
+- key: dell-os10
+  label: Dell SmartFabric OS10 (PowerSwitch)
+  vendor: Dell
+  cpes: [o:dell:networking_os10, o:dell:smartfabric_os10, o:dell:emc_networking_os10]
+  kw: [OS10, PowerSwitch]
+  aliases: [PowerSwitch]
+  example: 10.5.6.4
+  version_cmd: show version
+- key: netgear-switch
+  label: NETGEAR Managed Switches (ProSAFE, Insight)
+  vendor: NETGEAR
+  cpes: [o:netgear:gs108t_firmware, o:netgear:gs110tp_firmware, o:netgear:m4300-28g_firmware, a:netgear:insight, o:netgear:m4300-24x_firmware]
+  kw: [NETGEAR]
+  aliases: [ProSAFE, NETGEAR Insight]
+- key: tp-link-omada
+  label: TP-Link Omada (Controller, Switches)
+  vendor: TP-Link
+  cpes: [a:tp-link:omada_software_controller]
+  kw: [Omada]
+  aliases: [TP-Link, Omada Controller]
+  example: 5.15.24.18
+- key: dlink-switch
+  label: D-Link Business Switches (DGS, DXS)
+  vendor: D-Link
+  cpes: [o:dlink:dgs-1510-28x_firmware, o:dlink:dgs-1510-52x_firmware, o:dlink:dgs-1510-28_firmware]
+  kw: [D-Link]
+  aliases: [DGS, DXS]
+- key: zyxel-switch
+  label: Zyxel Switches (Nebula)
+  vendor: Zyxel
+  cpes: [o:zyxel:gs1900-24_firmware, o:zyxel:xgs2220-30_firmware, o:zyxel:gs1900-48_firmware, o:zyxel:gs1900-8_firmware]
+  kw: [Zyxel]
+  aliases: [Zyxel Nebula, GS1900, XGS2220]
+- key: lancom-lcos-sx
+  label: LANCOM Switches (LCOS SX)
+  vendor: LANCOM Systems
+  cpes: [o:lancom-systems:lcos_sx]
+  kw: [LCOS SX, LANCOM]
+  aliases: [LANCOM GS, LANCOM XS]
+  example: 5.20 RU3
+- key: allied-telesis
+  label: Allied Telesis AlliedWare Plus
+  vendor: Allied Telesis
+  cpes: []
+  kw: [AlliedWare Plus, Allied Telesis]
+  example: 5.5.4-1.1
+  version_cmd: show version
+  hint: nocpe
+- key: huawei-vrp
+  label: Huawei VRP (Switches, Router)
+  vendor: Huawei
+  cpes: [o:huawei:s5700_firmware, o:huawei:ar_firmware]
+  kw: [Huawei VRP, Huawei]
+  example: V200R022C00
+  version_cmd: display version
+- key: h3c-comware
+  label: H3C Comware
+  vendor: H3C
+  cpes: []
+  kw: [H3C]
+  example: 7.1.070
+  version_cmd: display version
+  hint: nocpe
+- key: arista-eos
+  label: Arista EOS
+  vendor: Arista Networks
+  cpes: [o:arista:eos]
+  kw: [Arista EOS]
+  example: 4.33.2F
+  version_cmd: show version
+- key: arista-cloudvision
+  label: Arista CloudVision (CVP, CVaaS)
+  vendor: Arista Networks
+  cpes: [a:arista:cloudvision_portal, a:arista:cloudvision_exchange]
+  kw: [CloudVision]
+  aliases: [CVP, CVaaS]
+  example: 2024.3.1
+- key: nvidia-cumulus
+  label: NVIDIA Cumulus Linux / Onyx (Mellanox)
+  vendor: NVIDIA
+  cpes: [o:nvidia:cumulus_linux, o:nvidia:onyx, o:nvidia:mlnx-os, o:cumulusnetworks:cumulus_linux]
+  kw: [Cumulus Linux, Mellanox Onyx]
+  aliases: [Mellanox, Onyx]
+  example: 5.12.0
+- key: ruckus-icx
+  label: RUCKUS ICX (FastIron)
+  vendor: RUCKUS (CommScope)
+  cpes: []
+  kw: [FastIron, RUCKUS ICX]
+  aliases: [Brocade ICX, FastIron]
+  example: 10.0.10f
+  version_cmd: show version
+  hint: nocpe
+- key: ruckus-smartzone
+  label: RUCKUS SmartZone / Unleashed
+  vendor: RUCKUS (CommScope)
+  cpes: [o:ruckuswireless:unleashed_firmware]
+  kw: [SmartZone, Unleashed, RUCKUS]
+  aliases: [Ruckus Unleashed, vSZ]
+  example: 7.1.0
+- key: extreme-cloudiq
+  label: ExtremeCloud IQ
+  vendor: Extreme Networks
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [ExtremeCloud IQ]
+  aliases: [XIQ]
+- key: mikrotik-swos
+  label: MikroTik SwOS
+  vendor: MikroTik
+  cpes: []
+  kw: [SwOS]
+  example: "2.17"
+  hint: nocpe
+- key: vyos
+  label: VyOS
+  vendor: VyOS
+  cpes: [o:vyos:vyos]
+  kw: [VyOS]
+  example: 1.4.2
+  version_cmd: show version
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: avm-fritzos
+  label: "AVM FRITZ!OS (FRITZ!Box)"
+  vendor: "AVM (FRITZ!)"
+  cpes: ["o:avm:fritz\\!os", "o:avm:fritz\\!_os", "o:avm:fritz\\!box_7490_firmware"]
+  kw: ["FRITZ!OS", "FRITZ!Box", Fritzbox]
+  aliases: ["FRITZ!Box", Fritzbox, FritzOS]
+  example: "7.59"
+  where: firmware_dashboard
+- key: draytek-vigor
+  label: "DrayTek Vigor (Router/VPN)"
+  vendor: DrayTek
+  cpes: [o:draytek:vigor2865_firmware, o:draytek:vigor2866_firmware, o:draytek:vigor2927_firmware, o:draytek:vigor2962_firmware, o:draytek:vigor3910_firmware, o:draytek:vigor2960_firmware, o:draytek:vigor300b_firmware, o:draytek:vigor3220_firmware]
+  kw: [DrayTek, Vigor]
+  aliases: [Vigor]
+  example: "4.4.5"
+  hint: per_model
+  where: firmware_dashboard
+- key: cisco-sdwan-manager
+  label: "Cisco Catalyst SD-WAN Manager (vManage)"
+  vendor: Cisco
+  cpes: [a:cisco:catalyst_sd-wan_manager, a:cisco:sd-wan_vmanage]
+  cna: [[Cisco, Cisco Catalyst SD-WAN Manager], [Cisco, Cisco SD-WAN vManage]]
+  kw: [SD-WAN Manager, vManage]
+  aliases: [vManage, Viptela, Catalyst SD-WAN]
+  example: "20.12.4"
+  where: web_about
+- key: fortiextender
+  label: FortiExtender
+  vendor: Fortinet
+  cpes: [o:fortinet:fortiextender_firmware]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiExtender]
+  cna: [[Fortinet, FortiExtender]]
+  kw: [FortiExtender]
+  example: "7.4.6"
+  where: fortinet
+- key: fortiwlm
+  label: "FortiWLM (Wireless Manager)"
+  vendor: Fortinet
+  cpes: [a:fortinet:fortiwlm]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiWLM]
+  cna: [[Fortinet, FortiWLM]]
+  kw: [FortiWLM]
+  example: "8.6.6"
+  where: web_about

@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=schema/csaf.schema.json
+# CSAF 2.0 providers Vendor News reads (app/csaf_providers.py) – only while a followed product has one of the vendors
+# below (the products' vendor field). How to add one: docs/BETRIEB.md, section „Katalog pflegen“ → „CSAF-Anbieter“.
+#
+# The provider-metadata.json is found in the CSAF aggregator of the BSI (by the host of its address), else at
+# https://<domain>/.well-known/csaf/provider-metadata.json; `metadata` names it when it is in neither place.
+# Read: ROLIE feeds labelled TLP:WHITE/CLEAR, or the changes.csv of a directory distribution – never TLP:GREEN or above.
+#
+# Not mapped on purpose: Red Hat and SUSE (distribution packages – Vendor News judges a distribution by release line
+# and support only), Microsoft (VEX documents per CVE for every product – the build ranges come from the CNA data of
+# the NVD already), Fortinet and Palo Alto Networks (their own advisory sources, `adv` in the products).
+providers:
+  - key: siemens
+    name: Siemens ProductCERT
+    domain: cert-portal.siemens.com    # listed in the BSI aggregator (ROLIE feed, TLP:WHITE)
+    vendors: [Siemens]
+  - key: cisco
+    name: Cisco PSIRT
+    domain: www.cisco.com              # /.well-known/csaf/ (directory with changes.csv)
+    vendors: [Cisco, Cisco (Duo), Splunk (Cisco)]   # Duo and Splunk belong to Cisco
+  - key: schneider
+    name: Schneider Electric CPCERT
+    domain: www.se.com                 # listed in the BSI aggregator and at /.well-known/csaf/ (directory)
+    vendors: [Schneider Electric]
+  - key: openxchange
+    name: Open-Xchange GmbH
+    domain: www.open-xchange.com       # listed in the BSI aggregator; directories on documentation.open-xchange.com (App Suite, Dovecot)
+    vendors: [Open-Xchange]

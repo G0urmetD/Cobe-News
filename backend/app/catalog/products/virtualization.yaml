@@ -1,0 +1,270 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'virtualization' (Virtualisation & hypervisors). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- virtualisation, containers
+- key: esxi
+  label: VMware ESXi
+  vendor: Broadcom (VMware)
+  cpes: []
+  scheme: vmware
+  cna: [[VMware, VMware ESXi], [VMware, ESXi]]
+  kw: [ESXi]
+  aliases: [vSphere, vSphere Hypervisor, vSphere ESXi]
+  example: 8.0 U3c
+  version_cmd: vmware -v
+  where: vmware_esxi
+- key: vcenter
+  label: VMware vCenter Server
+  vendor: Broadcom (VMware)
+  cpes: []
+  scheme: vmware
+  cna: [[VMware, VMware vCenter Server], [VMware, vCenter Server]]
+  kw: [vCenter]
+  aliases: [vSphere, vSphere Client, VCSA, vCenter Server Appliance]
+  example: 8.0 U3d
+  where: vmware_vcenter
+- key: vmware-cloud-foundation
+  label: VMware Cloud Foundation
+  vendor: Broadcom (VMware)
+  cpes: [a:vmware:cloud_foundation]
+  cna: [[VMware, VMware Cloud Foundation]]
+  kw: [Cloud Foundation, VCF]
+  aliases: [VCF]
+  example: 9.0.2.0
+- key: vmware-tools
+  label: VMware Tools
+  vendor: Broadcom (VMware)
+  cpes: [a:vmware:tools]
+  cna: [[VMware, VMware Tools]]
+  kw: [VMware Tools]
+  example: 12.5.0
+  where: vmware_tools
+  pattern: '\d{1,2}\.\d{1,2}(?:\.\d{1,3})?'
+  pattern_hint: vmware_tools_names
+- key: vmware-workstation
+  label: VMware Workstation
+  vendor: Broadcom (VMware)
+  cpes: [a:vmware:workstation]
+  cna: [[VMware, VMware Workstation]]
+  kw: [VMware Workstation]
+  example: 17.6.2
+- key: vmware-nsx
+  label: VMware NSX
+  vendor: Broadcom (VMware)
+  cpes: [a:vmware:nsx]
+  cna: [[VMware, VMware NSX]]
+  kw: [VMware NSX]
+  aliases: [NSX-T, NSX-V, NSX Data Center]
+  example: 4.2.1
+- key: vmware-aria-operations
+  label: VMware Aria Operations
+  vendor: Broadcom (VMware)
+  cpes: [a:vmware:aria_operations]
+  cna: [[VMware, VMware Aria Operations]]
+  kw: [Aria Operations, vRealize Operations]
+  aliases: [vRealize Operations, vROps, Aria Operations]
+  example: 8.18.2
+- key: horizon
+  label: Omnissa Horizon (VMware Horizon)
+  vendor: Omnissa
+  cpes: [a:vmware:horizon]  # a:omnissa:horizon is not in the NVD CPE dictionary (checked 2026-11-02)
+  cna: [[Omnissa, Omnissa Horizon], [VMware, VMware Horizon]]
+  kw: [Omnissa Horizon, VMware Horizon]
+  aliases: [VMware Horizon, Horizon 8, Horizon View]
+  example: "8.2412"
+  where: horizon
+  normalize: [horizon_yymm]  # "2412" → 8.2412, the form of endoflife.date's lines and NVD's 8.x versions
+  replaces: [vmware-horizon]  # the curated entry had its own key next to endoflife.date's horizon (migration 0025)
+- key: vmware-srm
+  cpes: [a:vmware:site_recovery_manager]
+- key: hyper-v
+  label: Hyper-V (Windows Server)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [Hyper-V]
+  aliases: [HyperV, Hyper V, Microsoft Hyper-V]
+  example: 10.0.20348.2762
+  version_cmd: "[Environment]::OSVersion.Version (PowerShell) oder winver"
+  hint: hyperv
+  filter: Hyper-V
+- key: proxmox-ve
+  label: Proxmox VE
+  vendor: Proxmox
+  cpes: [a:proxmox:virtual_environment]
+  kw: [Proxmox VE, Proxmox]
+  aliases: [Proxmox Virtual Environment, PVE]
+  example: 8.4.1
+  version_cmd: pveversion
+- key: nutanix-aos
+  cpes: [a:nutanix:aos]
+- key: nutanix-prism
+  cpes: [a:nutanix:prism_central]
+- key: citrix-hypervisor
+  label: Citrix Hypervisor (XenServer)
+  vendor: Cloud Software Group
+  cpes: [a:citrix:hypervisor, a:xenserver:xenserver]
+  kw: [Citrix Hypervisor, XenServer]
+  example: 8.2 CU1
+- key: xcp-ng
+- key: virtualbox
+  label: Oracle VirtualBox
+  vendor: Oracle
+  cpes: [a:oracle:vm_virtualbox]
+  cna: [[Oracle Corporation, VM VirtualBox]]
+  kw: [VirtualBox]
+  example: 7.1.4
+- key: citrix-vad
+  cpes: [a:citrix:virtual_apps_and_desktops]
+  aliases: [XenApp, XenDesktop, Citrix Virtual Apps, Citrix Virtual Desktops, CVAD]
+  hint: citrix
+
+# ---------------------------------------------------------------- virtualisation, hypervisors (more)
+- key: azure-local
+  label: Azure Local (Azure Stack HCI)
+  vendor: Microsoft
+  cpes: [a:microsoft:azure_stack_hci]
+  scheme: windows
+  kw: [Azure Local, Azure Stack HCI]
+  aliases: [Azure Stack HCI]
+  example: 10.0.25398.1611
+  hint: windows
+- key: scvmm
+  label: System Center Virtual Machine Manager (SCVMM)
+  vendor: Microsoft
+  cpes: [a:microsoft:system_center_virtual_machine_manager, a:microsoft:virtual_machine_manager]
+  kw: [Virtual Machine Manager, SCVMM]
+  aliases: [SCVMM, VMM]
+  example: 10.22.1287.0
+- key: windows-admin-center
+  label: Windows Admin Center
+  vendor: Microsoft
+  cpes: [a:microsoft:windows_admin_center]
+  kw: [Windows Admin Center]
+  aliases: [WAC]
+  example: "2410"
+- key: hyper-v-server-2019
+  label: Microsoft Hyper-V Server 2019 (standalone)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2019]
+  scheme: windows
+  kw: [Hyper-V Server]
+  aliases: [Hyper-V Server, HyperV Server]
+  example: 10.0.17763.6893
+  hint: hyperv_server
+- key: proxmox-datacenter-manager
+- key: nutanix-ahv
+  label: Nutanix AHV
+  vendor: Nutanix
+  cpes: [o:nutanix:ahv]
+  kw: [Nutanix AHV, AHV]
+  aliases: [Acropolis Hypervisor]
+  example: 10.0.1
+- key: ovirt
+  cpes: [a:ovirt:ovirt, a:redhat:ovirt-engine]
+- key: rhv
+  label: Red Hat Virtualization
+  vendor: Red Hat
+  cpes: [a:redhat:virtualization, a:redhat:virtualization_manager, a:redhat:enterprise_virtualization]
+  kw: [Red Hat Virtualization, RHV]
+  aliases: [RHEV]
+  example: 4.4.10
+- key: openshift-virtualization
+  label: Red Hat OpenShift Virtualization (KubeVirt)
+  vendor: Red Hat
+  cpes: [a:redhat:openshift_virtualization, a:kubevirt:kubevirt]
+  kw: [OpenShift Virtualization, KubeVirt]
+  aliases: [KubeVirt, CNV]
+  example: 4.18.3
+- key: openstack
+  label: OpenStack (Nova, Neutron, Keystone …)
+  vendor: OpenInfra Foundation
+  cpes: [a:openstack:nova, a:openstack:neutron, a:openstack:keystone, a:openstack:openstack]
+  kw: [OpenStack]
+  aliases: [Nova]
+  example: "2025.1"
+- key: qemu
+  label: QEMU
+  vendor: QEMU
+  cpes: [a:qemu:qemu]
+  kw: [QEMU]
+  example: 9.2.4
+  version_cmd: qemu-system-x86_64 --version
+- key: libvirt
+  label: libvirt
+  vendor: Red Hat
+  cpes: [a:redhat:libvirt]
+  kw: [libvirt]
+  example: 11.5.0
+  version_cmd: virsh version
+- key: kvm
+  label: KVM (Linux kernel)
+  vendor: Linux
+  cpes: [o:linux:linux_kernel]
+  kw: [KVM]
+  example: 6.12.38
+  version_cmd: uname -r
+  hint: kernel
+  filter: KVM
+- key: xen
+  label: Xen Project Hypervisor
+  vendor: Xen Project
+  cpes: [o:xen:xen, a:xen:xen]
+  kw: [Xen]
+  example: 4.20.1
+- key: xen-orchestra
+  label: Xen Orchestra
+  vendor: Vates
+  cpes: [a:xen-orchestra:xen_orchestra_server, a:xen-orchestra:xen_orchestra_web]
+  kw: [Xen Orchestra]
+  example: 5.108.0
+- key: harvester
+  label: SUSE Harvester (HCI)
+  vendor: SUSE
+  cpes: []
+  kw: [Harvester]
+  example: 1.5.1
+  hint: nocpe
+- key: parallels-desktop
+  label: Parallels Desktop
+  vendor: Parallels (Alludo)
+  cpes: [a:parallels:parallels_desktop]
+  kw: [Parallels Desktop]
+  example: 20.3.2
+- key: parallels-ras
+  label: Parallels RAS
+  vendor: Parallels (Alludo)
+  cpes: [a:parallels:remote_application_server]
+  kw: [Parallels RAS]
+  example: "20.0"
+- key: vsphere-replication
+  label: VMware vSphere Replication
+  vendor: Broadcom (VMware)
+  cpes: [a:vmware:vsphere_replication]
+  cna: [[VMware, vSphere Replication]]
+  kw: [vSphere Replication]
+  example: 9.0.2
+- key: vsan
+  label: VMware vSAN
+  vendor: Broadcom (VMware)
+  cpes: []
+  cna: [[VMware, VMware vSAN]]
+  kw: [vSAN]
+  example: 8.0 U3
+  hint: nocpe
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: citrix-storefront
+  label: Citrix StoreFront
+  vendor: Cloud Software Group
+  cpes: [a:citrix:storefront_server, a:cloud:citrix_storefront]
+  cna: [[Citrix, StoreFront], [Citrix, Citrix StoreFront]]
+  kw: [StoreFront]
+  aliases: [Citrix StoreFront Server]
+  example: "2402"
+  hint: citrix
+  where: client_about

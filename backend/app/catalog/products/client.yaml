@@ -1,0 +1,111 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'client' (Browsers & client software). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- browsers, clients
+- key: chrome
+- key: edge
+  label: Microsoft Edge (Chromium)
+  vendor: Microsoft
+  cpes: [a:microsoft:edge_chromium]
+  cna: [[Microsoft, Microsoft Edge (Chromium-based)]]
+  kw: [Microsoft Edge]
+  example: 131.0.2903.86
+- key: firefox  # the release channel (endoflife.date's product); Firefox ESR is its own product
+  cpes: [a:mozilla:firefox]
+  cpe_editions: [[a:mozilla:firefox, "*"], [a:mozilla:firefox, "-"]]  # the release channel; "esr" is Firefox ESR
+  belongs: [{pattern: '(?i)esr\s*$', to: firefox-esr}]
+- key: firefox-esr
+  label: Mozilla Firefox ESR
+  vendor: Mozilla
+  cpes: [a:mozilla:firefox_esr, a:mozilla:firefox]
+  eol: firefox
+  cpe_editions: [[a:mozilla:firefox, esr]]  # NVD: firefox with sw_edition esr (older records: firefox_esr)
+  cna: [[Mozilla, Firefox ESR], [Mozilla, Firefox]]
+  kw: [Firefox ESR]
+  aliases: [Firefox Extended Support Release]
+  example: 140.4.0esr
+- key: thunderbird
+  label: Mozilla Thunderbird
+  vendor: Mozilla
+  cpes: [a:mozilla:thunderbird]
+  cna: [[Mozilla, Thunderbird]]
+  kw: [Thunderbird]
+  aliases: [Thunderbird ESR, Mozilla Thunderbird ESR]
+  example: 128.5.2
+- key: adobe-acrobat
+  label: Adobe Acrobat / Acrobat Reader
+  vendor: Adobe
+  cpes: [a:adobe:acrobat_dc, a:adobe:acrobat_reader_dc, a:adobe:acrobat, a:adobe:acrobat_reader]
+  cna: [[Adobe, Acrobat Reader], [Adobe, Acrobat]]
+  kw: [Acrobat]
+  example: 24.005.20320
+  normalize: [two_digit_year]  # About may show 2024.005.20320 – advisories write 24.005.20320
+- key: 7-zip
+  label: 7-Zip
+  vendor: Igor Pavlov
+  cpes: [a:7-zip:7-zip]
+  kw: [7-Zip]
+  example: "24.09"
+- key: winrar
+  label: WinRAR
+  vendor: RARLAB
+  cpes: [a:rarlab:winrar]
+  kw: [WinRAR]
+  example: "7.01"
+- key: office
+  label: Microsoft Office / Microsoft 365 Apps
+  vendor: Microsoft
+  cpes: [a:microsoft:365_apps, a:microsoft:office_long_term_servicing_channel]
+  cna: [[Microsoft, Microsoft 365 Apps for Enterprise], [Microsoft, Microsoft Office LTSC 2021], [Microsoft, Microsoft Office 2019]]
+  kw: [Microsoft Office, Outlook]
+  aliases: [M365 Apps, Microsoft 365 Apps, Office 365, Click-to-Run, Office LTSC]
+  example: 16.0.18227.20162
+  normalize: [office_build]
+  where: office
+  pattern: '16\.0\.\d{4,5}\.\d{4,5}'
+  pattern_hint: office_build
+- key: libreoffice
+- key: notepad-plus-plus
+  label: Notepad++
+  vendor: Notepad++
+  cpes: [a:notepad-plus-plus:notepad\+\+]
+  kw: [Notepad++]
+  example: 8.7.4
+- key: putty
+  label: PuTTY
+  vendor: Simon Tatham
+  cpes: [a:putty:putty]
+  kw: [PuTTY]
+  example: "0.82"
+- key: winscp
+  label: WinSCP
+  vendor: WinSCP
+  cpes: [a:winscp:winscp]
+  kw: [WinSCP]
+  example: 6.3.6
+- key: vlc
+  label: VLC media player
+  vendor: VideoLAN
+  cpes: [a:videolan:vlc_media_player]
+  kw: [VLC]
+  example: 3.0.21
+- key: outlook
+  label: Microsoft Outlook (classic)
+  vendor: Microsoft
+  cpes: [a:microsoft:outlook]
+  kw: [Outlook]
+  example: 16.0.18227.20162
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: citrix-workspace-app
+  label: "Citrix Workspace app (Receiver)"
+  vendor: Cloud Software Group
+  cpes: [a:citrix:workspace, a:citrix:workspace_app]
+  cna: [[Citrix, Workspace app], [Citrix, Citrix Workspace app]]
+  kw: [Citrix Workspace app, Citrix Receiver]
+  aliases: [Citrix Receiver, Workspace app]
+  example: "2409"
+  hint: citrix
+  where: client_about
