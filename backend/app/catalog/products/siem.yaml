@@ -1,0 +1,201 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'siem' (SIEM & logging). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Palo Alto Networks
+- key: cortex-xsoar
+  label: Cortex XSOAR
+  vendor: Palo Alto Networks
+  cpes: [a:paloaltonetworks:cortex_xsoar]
+  adv: paloalto
+  names: [Cortex XSOAR]
+  kw: [Cortex XSOAR]
+  example: "8.9"
+- key: cortex-xsiam
+  label: Cortex XSIAM
+  vendor: Palo Alto Networks
+  cpes: []
+  scheme: cloud
+  adv: paloalto
+  cloud: true
+  names: [Cortex XSIAM]
+  kw: [Cortex XSIAM]
+
+# ---------------------------------------------------------------- Fortinet
+- key: fortisiem
+  label: FortiSIEM
+  vendor: Fortinet
+  cpes: [a:fortinet:fortisiem]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiSIEM]
+  cna: [[Fortinet, FortiSIEM]]
+  kw: [FortiSIEM]
+  example: 7.2.5
+
+# ---------------------------------------------------------------- databases
+- key: elasticsearch
+  osv: [[Maven, org.elasticsearch:elasticsearch]]
+
+# ---------------------------------------------------------------- SIEM, logging
+- key: wazuh
+  label: Wazuh Manager (Server)
+  vendor: Wazuh
+  cpes: [a:wazuh:wazuh]
+  cna: [[wazuh, wazuh]]
+  kw: [Wazuh]
+  aliases: [Wazuh Server, Wazuh Indexer, Wazuh Dashboard]
+  example: 4.12.0
+- key: wazuh-agent
+  label: Wazuh Agent
+  vendor: Wazuh
+  cpes: [a:wazuh:wazuh]
+  cna: [[wazuh, wazuh]]
+  kw: [Wazuh]
+  example: 4.12.0
+  version_cmd: /var/ossec/bin/wazuh-control info
+- key: kibana
+  cpes: [a:elastic:kibana]
+- key: logstash
+  cpes: [a:elastic:logstash]
+- key: beats
+- key: elastic-agent
+  label: Elastic Agent & Fleet Server (Elastic Security)
+  vendor: Elastic
+  cpes: [a:elastic:elastic_agent, a:elastic:fleet_server, a:elastic:endpoint_security]
+  kw: [Elastic Agent, Fleet Server, Elastic Defend, Elastic Security]
+  aliases: [Elastic Defend, Elastic Endpoint, Fleet]
+  example: 8.18.2
+- key: opensearch
+  cpes: [a:amazon:opensearch]
+- key: splunk
+  label: Splunk Enterprise
+  vendor: Splunk (Cisco)
+  cpes: [a:splunk:splunk]
+  cna: [[Splunk, Splunk Enterprise]]
+  kw: [Splunk Enterprise, Splunk]
+  example: 9.4.3
+- key: splunk-uf
+  label: Splunk Universal Forwarder
+  vendor: Splunk (Cisco)
+  cpes: [a:splunk:universal_forwarder]
+  cna: [[Splunk, Splunk Universal Forwarder]]
+  kw: [Universal Forwarder]
+  example: 9.4.3
+- key: splunk-soar
+  label: Splunk SOAR
+  vendor: Splunk (Cisco)
+  cpes: [a:splunk:soar]
+  cna: [[Splunk, Splunk SOAR]]
+  kw: [Splunk SOAR, Phantom]
+  aliases: [Splunk Phantom]
+  example: 6.4.1
+- key: graylog
+  cpes: [a:graylog:graylog]
+- key: ibm-qradar
+  label: IBM QRadar SIEM
+  vendor: IBM
+  cpes: [a:ibm:qradar_security_information_and_event_manager]
+  cna: [[IBM, QRadar SIEM]]
+  kw: [QRadar]
+  example: 7.5.0 UP12
+- key: ms-sentinel
+  label: Microsoft Sentinel
+  vendor: Microsoft
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Microsoft Sentinel, Azure Sentinel]
+  aliases: [Azure Sentinel]
+- key: logrhythm
+  label: LogRhythm SIEM
+  vendor: Exabeam (LogRhythm)
+  cpes: [a:logrhythm:logrhythm]
+  kw: [LogRhythm]
+  example: "7.20"
+- key: arcsight
+  label: OpenText ArcSight (ESM, Logger)
+  vendor: OpenText
+  cpes: [a:microfocus:arcsight_enterprise_security_manager, a:microfocus:arcsight_logger]
+  kw: [ArcSight]
+  aliases: [Micro Focus ArcSight]
+  example: "7.8"
+- key: securonix
+  label: Securonix Unified Defense SIEM
+  vendor: Securonix
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Securonix]
+- key: sumo-logic
+  label: Sumo Logic
+  vendor: Sumo Logic
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Sumo Logic]
+- key: exabeam
+  label: Exabeam (New-Scale SIEM, Advanced Analytics)
+  vendor: Exabeam
+  cpes: []
+  kw: [Exabeam]
+  hint: nocpe
+- key: rapid7-insightidr
+  label: Rapid7 InsightIDR
+  vendor: Rapid7
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [InsightIDR]
+- key: rapid7-insight-agent
+  label: Rapid7 Insight Agent
+  vendor: Rapid7
+  cpes: [a:rapid7:insight_agent]
+  kw: [Insight Agent]
+  example: 4.0.13.32
+- key: grafana-loki
+  cpes: [a:grafana:loki]
+- key: fluentd
+  label: Fluentd
+  vendor: Fluentd Project (CNCF)
+  cpes: [a:fluentd:fluentd]
+  kw: [Fluentd]
+  example: 1.18.0
+  version_cmd: fluentd --version
+- key: fluent-bit
+  cpes: [a:treasuredata:fluent_bit]
+- key: security-onion
+  label: Security Onion
+  vendor: Security Onion Solutions
+  cpes: [a:securityonionsolutions:security_onion]
+  kw: [Security Onion]
+  example: 2.4.150
+- key: trend-vision-one
+  label: Trend Vision One (platform)
+  vendor: Trend Micro
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Vision One]
+  aliases: [Trend Micro Vision One XDR]
+- key: sysmon
+  label: Microsoft Sysmon
+  vendor: Microsoft
+  cpes: [a:microsoft:windows_sysmon]
+  kw: [Sysmon]
+  aliases: [Sysinternals Sysmon, System Monitor]
+  example: "15.15"
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: fortisoar
+  label: FortiSOAR
+  vendor: Fortinet
+  cpes: [a:fortinet:fortisoar]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiSOAR]
+  cna: [[Fortinet, FortiSOAR]]
+  kw: [FortiSOAR]
+  example: "7.6.1"
+  where: web_about

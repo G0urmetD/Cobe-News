@@ -1,0 +1,174 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'mail' (Mail & mail security). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Fortinet
+- key: fortimail
+  label: FortiMail
+  vendor: Fortinet
+  cpes: [a:fortinet:fortimail]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiMail]
+  cna: [[Fortinet, FortiMail]]
+  kw: [FortiMail]
+  example: 7.6.2
+
+# ---------------------------------------------------------------- Cisco
+- key: cisco-esa
+  label: Cisco Secure Email Gateway (ESA)
+  vendor: Cisco
+  cpes: [a:cisco:secure_email_gateway, o:cisco:secure_email_gateway_firmware, o:cisco:email_security_appliance_firmware, a:cisco:email_security_appliance, a:cisco:email_security_virtual_appliance]
+  cna: [[Cisco, Cisco Secure Email], [Cisco, Cisco Secure Email Gateway]]
+  kw: [Secure Email Gateway, Email Security Appliance, IronPort]
+  aliases: [ESA, IronPort, Cisco Email Security Appliance, AsyncOS for Secure Email]
+  example: 15.0.1
+  where: web_about
+  replaces: [cisco-sma]  # the key said SMA (the management appliance) while the product was ESA; a:cisco:asyncos was too broad (ESA, WSA and SMA) – migration 0025
+
+# ---------------------------------------------------------------- collaboration, DevOps
+- key: zimbra
+  label: Zimbra Collaboration
+  vendor: Synacor
+  cpes: [a:zimbra:collaboration, a:synacor:zimbra_collaboration_suite]
+  kw: [Zimbra]
+  example: 10.1.4
+- key: roundcube
+  label: Roundcube Webmail
+  vendor: Roundcube
+  cpes: [a:roundcube:webmail]
+  kw: [Roundcube]
+  example: 1.6.10
+  osv: [[Packagist, roundcube/roundcubemail]]
+
+# ---------------------------------------------------------------- mail, mail security
+- key: postfix
+  cpes: [a:postfix:postfix]
+- key: dovecot
+  cpes: [a:dovecot:dovecot]
+- key: pigeonhole
+- key: exim
+  cpes: [a:exim:exim]
+- key: proxmox-mail-gateway
+- key: seppmail
+  label: SEPPmail Secure E-Mail Gateway
+  vendor: SEPPmail
+  cpes: [a:seppmail:seppmail]
+  kw: [SEPPmail]
+  example: 14.0.6
+- key: nospamproxy
+  label: NoSpamProxy
+  vendor: Net at Work
+  cpes: []
+  kw: [NoSpamProxy]
+  example: "15.2"
+  hint: nocpe
+- key: proofpoint
+  label: Proofpoint Email Protection
+  vendor: Proofpoint
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Proofpoint]
+- key: trendmicro-email
+  label: Trend Micro Email Security
+  vendor: Trend Micro
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Trend Micro Email Security]
+- key: hornetsecurity
+  label: Hornetsecurity 365 Total Protection
+  vendor: Hornetsecurity (Proofpoint)
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Hornetsecurity]
+- key: mimecast
+  label: Mimecast Email Security
+  vendor: Mimecast
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Mimecast]
+- key: rspamd
+  label: Rspamd
+  vendor: Rspamd Project
+  cpes: [a:rspamd_project:rspamd]
+  kw: [Rspamd]
+  example: 3.12.0
+  version_cmd: rspamd --version
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: open-xchange
+  label: "Open-Xchange App Suite (OX)"
+  vendor: Open-Xchange
+  cpes: [a:open-xchange:ox_app_suite, a:open-xchange:open-xchange_appsuite_frontend, a:open-xchange:app_suite]
+  cna: [[Open-Xchange GmbH, OX App Suite]]
+  kw: [OX App Suite, Open-Xchange]
+  aliases: [OX, OX App Suite]
+  example: "7.10.6"
+  where: web_about
+- key: grommunio
+  label: "grommunio (gromox)"
+  vendor: grommunio
+  cpes: [a:grommunio:gromox]
+  kw: [grommunio, gromox]
+  example: "2.34"
+  where: linux_package
+- key: mailcow
+  label: "mailcow: dockerized"
+  vendor: "mailcow (The Infrastructure Company)"
+  cpes: ["a:mailcow:mailcow\\:_dockerized"]
+  kw: [mailcow]
+  example: "2025-01a"
+  where: web_about
+- key: cryptshare
+  label: Cryptshare Server
+  vendor: "Pointsharp (Cryptshare)"
+  cpes: [a:cryptshare:cryptshare_server]
+  kw: [Cryptshare]
+  example: "7.3.0"
+  where: web_about
+- key: kiteworks
+  label: "Kiteworks (Accellion)"
+  vendor: Kiteworks
+  cpes: [a:accellion:kiteworks, a:accellion:kiteworks_managed_file_transfer, a:accellion:kiteworks_appliance]
+  kw: [Kiteworks]
+  aliases: [Accellion Kiteworks]
+  example: "8.5.0"
+  where: web_about
+- key: totemomail
+  label: "totemomail Encryption Gateway (Kiteworks)"
+  vendor: "Kiteworks (totemo)"
+  cpes: [a:totemo:totemomail, a:totemo:totemomail_encryption_gateway, a:totemo:encryption_gateway]
+  kw: [totemomail, totemo]
+  example: "8.0.0"
+  where: web_about
+- key: barracuda-esg
+  label: "Barracuda Email Security Gateway (ESG)"
+  vendor: Barracuda
+  cpes: [o:barracuda:email_security_gateway_300_firmware, o:barracuda:email_security_gateway_400_firmware, o:barracuda:email_security_gateway_600_firmware, o:barracuda:email_security_gateway_800_firmware, o:barracuda:email_security_gateway_900_firmware]
+  kw: [Barracuda Email Security Gateway, Barracuda ESG]
+  aliases: [Barracuda ESG, Barracuda Spam Firewall]
+  example: "9.2.0.007"
+  hint: per_model
+  where: firmware_dashboard
+- key: sonicwall-email-security
+  label: SonicWall Email Security
+  vendor: SonicWall
+  cpes: [a:sonicwall:email_security, a:sonicwall:email_security_appliance, a:sonicwall:email_security_virtual_appliance, a:sonicwall:hosted_email_security]
+  cna: [[SonicWall, Email Security]]
+  kw: [SonicWall Email Security]
+  example: "10.0.19"
+  where: web_about
+- key: cisco-sewm
+  label: "Cisco Secure Email and Web Manager (SMA)"
+  vendor: Cisco
+  cpes: [a:cisco:secure_email_and_web_manager, o:cisco:secure_email_and_web_manager_firmware, a:cisco:content_security_management_appliance]
+  cna: [[Cisco, Cisco Secure Email and Web Manager]]
+  kw: [Secure Email and Web Manager, Content Security Management Appliance]
+  aliases: [SMA, Cisco SMA, Content Security Management Appliance]
+  example: "15.0.1"
+  where: web_about

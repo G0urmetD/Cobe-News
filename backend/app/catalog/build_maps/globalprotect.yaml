@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../schema/build_map_names.schema.json
+# GlobalProtect App: Palo Alto Networks names a hotfix 6.2.8-h10 in its advisories, the release notes add the build
+# (6.2.8-c948) next to it, and the app shows the build. A build typed for pangp is looked up here and stored as the
+# hotfix (app/build_maps.py) – compared as a build number, c948 would be "newer" than every hotfix h1…h15.
+#
+# Source (fetched 2026-11-02): Palo Alto Networks TechDocs "GlobalProtect App 6.2 Release Notes" → Addressed Issues,
+#   the headings "GlobalProtect App 6.2.8-hN (6.2.8-cNNN) …", e.g.
+#   https://docs.paloaltonetworks.com/globalprotect/6-2/globalprotect-app-release-notes
+# Only the 6.2.8 hotfixes name their builds there (h8 and h14 have no page of their own); a build of another release
+# (6.3.3-c1199) is refused with a hint to enter the hotfix (6.3.3-hN) – never guessed.
+# A new hotfix: add its row from the release notes and raise catalog_version in catalog.yaml.
+kind: names
+fetched: "2026-11-02"
+sources:
+  - "https://docs.paloaltonetworks.com/globalprotect/6-2/globalprotect-app-release-notes"
+products: [pangp]
+strip: [globalprotect, app, version]
+claims: '^\s*v?\d+\.\d+\.\d+\s*-\s*c?\d{3,5}\s*$|^\s*v?\d+\.\d+\.\d+\s*-?\s*c\d+\s*$'
+hint: globalprotect_names
+rows:
+  - {value: "6.2.8-h1", names: ["6.2.8-c223", "6.2.8-223"]}
+  - {value: "6.2.8-h2", names: ["6.2.8-c243", "6.2.8-243"]}
+  - {value: "6.2.8-h3", names: ["6.2.8-c263", "6.2.8-263"]}
+  - {value: "6.2.8-h4", names: ["6.2.8-c317", "6.2.8-317"]}
+  - {value: "6.2.8-h5", names: ["6.2.8-c416", "6.2.8-416"]}
+  - {value: "6.2.8-h6", names: ["6.2.8-c431", "6.2.8-431"]}
+  - {value: "6.2.8-h7", names: ["6.2.8-c471", "6.2.8-471"]}
+  - {value: "6.2.8-h9", names: ["6.2.8-c910", "6.2.8-910"]}
+  - {value: "6.2.8-h10", names: ["6.2.8-c948", "6.2.8-948"]}
+  - {value: "6.2.8-h11", names: ["6.2.8-c982", "6.2.8-982"]}
+  - {value: "6.2.8-h12", names: ["6.2.8-c1032", "6.2.8-1032"]}
+  - {value: "6.2.8-h13", names: ["6.2.8-c1045", "6.2.8-1045"]}
+  - {value: "6.2.8-h15", names: ["6.2.8-c1084", "6.2.8-1084"]}

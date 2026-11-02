@@ -1,0 +1,215 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'remote' (Remote access & IT management). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- other firewalls / VPN
+- key: ivanti-epm
+  label: Ivanti Endpoint Manager
+  vendor: Ivanti
+  cpes: [a:ivanti:endpoint_manager]
+  cna: [[Ivanti, Endpoint Manager]]
+  kw: [Ivanti Endpoint Manager]
+  example: 2024 SU1
+- key: ivanti-csa
+  label: Ivanti Cloud Services Appliance
+  vendor: Ivanti
+  cpes: [a:ivanti:cloud_services_appliance]
+  cna: [[Ivanti, Cloud Services Application]]
+  kw: [Cloud Services Appliance]
+  example: 5.0.2
+
+# ---------------------------------------------------------------- remote access, IT management
+- key: teamviewer
+  label: TeamViewer
+  vendor: TeamViewer
+  cpes: [a:teamviewer:teamviewer]
+  cna: [[TeamViewer, Remote], [TeamViewer, Full Client]]
+  kw: [TeamViewer]
+  example: 15.61.3
+- key: anydesk
+  label: AnyDesk
+  vendor: AnyDesk
+  cpes: [a:anydesk:anydesk]
+  kw: [AnyDesk]
+  example: 9.0.1
+- key: connectwise-screenconnect
+  label: ConnectWise ScreenConnect
+  vendor: ConnectWise
+  cpes: [a:connectwise:screenconnect]
+  cna: [[ConnectWise, ScreenConnect]]
+  kw: [ScreenConnect, ConnectWise Control]
+  aliases: [ConnectWise Control, ScreenConnect]
+  example: 24.4.4
+- key: connectwise-automate
+  label: ConnectWise Automate
+  vendor: ConnectWise
+  cpes: [a:connectwise:automate]
+  kw: [ConnectWise Automate]
+  example: "2024.11"
+- key: solarwinds-servu
+  label: SolarWinds Serv-U
+  vendor: SolarWinds
+  cpes: [a:solarwinds:serv-u]
+  kw: [Serv-U]
+  example: 15.5.0
+- key: manageengine-endpoint-central
+  label: ManageEngine Endpoint Central
+  vendor: Zoho ManageEngine
+  cpes: [a:zohocorp:manageengine_endpoint_central]
+  kw: [Endpoint Central]
+  example: 11.3.2416.10
+- key: moveit-transfer
+  label: Progress MOVEit Transfer
+  vendor: Progress
+  cpes: [a:progress:moveit_transfer]
+  cna: [[Progress Software Corporation, MOVEit Transfer]]
+  kw: [MOVEit]
+  example: 2024.0.5
+- key: goanywhere-mft
+  label: Fortra GoAnywhere MFT
+  vendor: Fortra
+  cpes: [a:fortra:goanywhere_managed_file_transfer]
+  kw: [GoAnywhere]
+  example: 7.7.0
+- key: kaseya-vsa
+  label: Kaseya VSA
+  vendor: Kaseya
+  cpes: [a:kaseya:vsa]
+  kw: [Kaseya]
+  example: 9.5.20
+- key: citrix-sharefile
+  label: Citrix ShareFile Storage Zones Controller
+  vendor: Progress
+  cpes: [a:citrix:sharefile_storage_zones_controller]
+  kw: [ShareFile]
+  example: 5.12.4
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: teleport
+- key: boundary
+
+# ---------------------------------------------------------------- Windows Server roles (0.1.45) – the Windows Server CPEs, a filter word picks the role
+- key: windows-rds
+  label: Remote Desktop Services / RD Gateway
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [Remote Desktop Gateway, Remote Desktop Services, RD Gateway]
+  aliases: [RDS, RD Gateway, RDGW, Terminal Server, Remote Desktop Session Host, RD Licensing]
+  example: 10.0.20348.2762
+  hint: windows_role
+  where: windows_build
+  filter: "Remote Desktop Gateway|Remote Desktop Services|Remote Desktop Licensing|RD Gateway"
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: beyondtrust-remote-support
+  label: "BeyondTrust Remote Support (Bomgar)"
+  vendor: BeyondTrust
+  cpes: [a:beyondtrust:remote_support, a:bomgar:remote_support]
+  cna: [[BeyondTrust, Remote Support]]
+  kw: [BeyondTrust Remote Support, Bomgar]
+  aliases: [Bomgar, BeyondTrust RS]
+  example: "24.3.1"
+  where: beyondtrust
+- key: beyondtrust-pra
+  label: "BeyondTrust Privileged Remote Access (PRA)"
+  vendor: BeyondTrust
+  cpes: [a:beyondtrust:privileged_remote_access]
+  cna: [[BeyondTrust, Privileged Remote Access]]
+  kw: [Privileged Remote Access, BeyondTrust PRA]
+  aliases: [PRA, BeyondTrust PRA]
+  example: "24.3.1"
+  where: beyondtrust
+- key: baramundi
+  label: baramundi Management Suite
+  vendor: baramundi software
+  cpes: [a:baramundi:management_suite]
+  kw: [baramundi]
+  aliases: [bMS, baramundi Management Server]
+  example: "2024 R1"
+  where: client_about
+- key: matrix42-empirum  # no CPE in NVD (checked 2026-11-02)
+  label: Matrix42 Empirum
+  vendor: Matrix42
+  cpes: []
+  kw: [Empirum, Matrix42]
+  aliases: [Empirum]
+  hint: nocpe
+  where: client_about
+- key: aagon-acmp  # no CPE in NVD (checked 2026-11-02)
+  label: Aagon ACMP
+  vendor: Aagon
+  cpes: []
+  kw: [ACMP, Aagon]
+  aliases: [ACMP]
+  hint: nocpe
+  where: client_about
+- key: ivanti-dsm  # NVD knows only the netinst component
+  label: "Ivanti DSM (Desktop and Server Management)"
+  vendor: Ivanti
+  cpes: [a:ivanti:dsm_netinst]
+  kw: [Ivanti DSM, NetInstall]
+  aliases: [DSM, Frontrange DSM, Enteo]
+  example: "2024.1"
+  where: client_about
+- key: omnissa-workspace-one-uem
+  label: "Omnissa Workspace ONE UEM (AirWatch)"
+  vendor: Omnissa
+  cpes: [a:omnissa:workspace_one_uem, a:vmware:workspace_one_uem, a:vmware:workspace_one_uem_console]
+  cna: [[Omnissa, Omnissa Workspace ONE UEM], [VMware, VMware Workspace ONE UEM]]
+  kw: [Workspace ONE UEM, AirWatch]
+  aliases: [AirWatch, WS1 UEM, VMware Workspace ONE UEM]
+  example: "24.10.0.10"
+  where: web_about
+- key: ivanti-avalanche
+  label: "Ivanti Avalanche (Wavelink)"
+  vendor: Ivanti
+  cpes: [a:ivanti:avalanche]
+  cna: [[Ivanti, Avalanche]]
+  kw: [Ivanti Avalanche, Wavelink Avalanche]
+  aliases: [Wavelink Avalanche]
+  example: "6.4.4"
+  where: web_about
+- key: n-able-n-central
+  label: N-able N-central
+  vendor: N-able
+  cpes: [a:n-able:n-central]
+  cna: [[N-able, N-central]]
+  kw: [N-central, N-able]
+  aliases: [N-able RMM, SolarWinds N-central]
+  example: "2025.3.1"
+  where: web_about
+- key: simplehelp
+  label: SimpleHelp
+  vendor: SimpleHelp
+  cpes: [a:simple-help:simplehelp]
+  kw: [SimpleHelp]
+  example: "5.5.8"
+  where: web_about
+- key: splashtop
+  label: Splashtop Streamer / Remote Access
+  vendor: Splashtop
+  cpes: [a:splashtop:streamer, a:splashtop:splashtop, a:splashtop:splashtop_for_rmm]
+  kw: [Splashtop]
+  aliases: [Splashtop Streamer, Splashtop Business Access]
+  example: "3.7.2.4"
+  where: client_about
+- key: ninjaone
+  label: "NinjaOne (NinjaRMM) Agent"
+  vendor: NinjaOne
+  cpes: [a:ninjarmm:ninjarmm]
+  kw: [NinjaOne, NinjaRMM]
+  aliases: [NinjaRMM]
+  example: "5.9.1158"
+  where: client_about
+- key: datto-rmm  # no CPE in NVD (checked 2026-11-02)
+  label: "Datto RMM (Kaseya)"
+  vendor: "Kaseya (Datto)"
+  cpes: []
+  kw: [Datto RMM]
+  aliases: [Autotask Endpoint Management, CentraStage]
+  hint: nocpe
+  where: client_about

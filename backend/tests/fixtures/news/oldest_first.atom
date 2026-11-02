@@ -1,0 +1,33 @@
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>https://cert-portal.example.org/productcert/rss/advisories.atom</id>
+  <title>ProductCERT Security Advisories (trimmed: the whole history, oldest first)</title>
+  <updated>2026-10-27T00:00:00+00:00</updated>
+  <entry>
+    <id>https://cert-portal.example.org/productcert/html/ssa-000001.html</id>
+    <title>SSA-000001 V1.0: Denial of Service Vulnerability in an Old Product</title>
+    <updated>2018-01-18T00:00:00+00:00</updated>
+    <link href="https://cert-portal.example.org/productcert/html/ssa-000001.html" rel="alternate"/>
+    <summary>&lt;p&gt;An old advisory.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <id>https://cert-portal.example.org/productcert/html/ssa-000002.html</id>
+    <title>SSA-000002 V1.0: Information Disclosure in an Old Product</title>
+    <updated>2019-05-14T00:00:00+00:00</updated>
+    <link href="https://cert-portal.example.org/productcert/html/ssa-000002.html" rel="alternate"/>
+    <summary>&lt;p&gt;Another old advisory.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <id>https://cert-portal.example.org/productcert/html/ssa-566435.html</id>
+    <title>SSA-566435 V1.0: PHP2Shell Vulnerabilities in Software Products</title>
+    <updated>2026-10-23T00:00:00+00:00</updated>
+    <link href="https://cert-portal.example.org/productcert/html/ssa-566435.html" rel="alternate"/>
+    <summary>&lt;p&gt;Two critical, unauthenticated remote code execution vulnerabilities in PHP.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <id>https://cert-portal.example.org/productcert/html/ssa-137528.html</id>
+    <title>SSA-137528 V1.0: Authentication Bypass Vulnerability in a SAML module</title>
+    <updated>2026-10-26T00:00:00+00:00</updated>
+    <link href="https://cert-portal.example.org/productcert/html/ssa-137528.html" rel="alternate"/>
+    <summary>&lt;p&gt;A SAML module contains a vulnerability that could allow unauthenticated remote attackers to bypass authentication.&lt;/p&gt;</summary>
+  </entry>
+</feed>

@@ -1,0 +1,165 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'collaboration' (Collaboration & DevOps). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Fortinet
+- key: fortivoice
+  label: FortiVoice
+  vendor: Fortinet
+  cpes: [a:fortinet:fortivoice]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiVoice]
+  cna: [[Fortinet, FortiVoice]]
+  kw: [FortiVoice]
+  example: 7.0.6
+
+# ---------------------------------------------------------------- Cisco
+- key: cisco-webex
+  label: Cisco Webex App / Meetings
+  vendor: Cisco
+  cpes: [a:cisco:webex_app, a:cisco:webex_meetings]
+  cna: [[Cisco, Cisco Webex Meetings], [Cisco, Cisco Webex App]]
+  kw: [Webex]
+  example: 45.6.1
+- key: cisco-ucm
+  label: Cisco Unified Communications Manager
+  vendor: Cisco
+  cpes: [a:cisco:unified_communications_manager]
+  cna: [[Cisco, Cisco Unified Communications Manager]]
+  kw: [Unified Communications Manager, CUCM]
+  example: 14.0.1.13900
+
+# ---------------------------------------------------------------- collaboration, DevOps
+- key: confluence
+  label: Atlassian Confluence (Server/Data Center)
+  vendor: Atlassian
+  cpes: [a:atlassian:confluence_data_center, a:atlassian:confluence_server]
+  cna: [[Atlassian, Confluence Data Center], [Atlassian, Confluence Server]]
+  kw: [Confluence]
+  example: 8.5.16
+- key: jira-software
+  label: Atlassian Jira Software (Server/Data Center)
+  vendor: Atlassian
+  cpes: [a:atlassian:jira_data_center, a:atlassian:jira_software_data_center, a:atlassian:jira_server]
+  cna: [[Atlassian, Jira Software Data Center], [Atlassian, Jira Data Center]]
+  kw: [Jira]
+  example: 9.12.15
+- key: bitbucket
+  cpes: [a:atlassian:bitbucket_data_center]
+- key: gitlab
+- key: nextcloud
+- key: mattermost
+  cpes: [a:mattermost:mattermost_server]
+  osv: [[Go, github.com/mattermost/mattermost/server/v8], [Go, github.com/mattermost/mattermost-server/v6]]
+- key: jenkins
+  label: Jenkins LTS
+  vendor: Jenkins Project
+  cpes: [a:jenkins:jenkins]
+  cpe_editions: [[a:jenkins:jenkins, lts], [a:jenkins:jenkins, "*"]]  # NVD: lts; "-" is the weekly line
+  cna: [[Jenkins Project, Jenkins]]
+  osv: [[Maven, org.jenkins-ci.main:jenkins-core]]
+  kw: [Jenkins]
+  example: 2.492.2
+  belongs: [{pattern: '^\s*v?2\.\d+\s*$', to: jenkins-weekly}]  # 2.499: a weekly release
+- key: jenkins-weekly
+  label: Jenkins (weekly)
+  vendor: Jenkins Project
+  cpes: [a:jenkins:jenkins]
+  eol: jenkins
+  cpe_editions: [[a:jenkins:jenkins, "-"], [a:jenkins:jenkins, "*"]]  # NVD: "-" is weekly, lts the LTS line
+  cna: [[Jenkins Project, Jenkins]]
+  osv: [[Maven, org.jenkins-ci.main:jenkins-core]]
+  kw: [Jenkins weekly]
+  example: "2.499"
+  depth: 2  # 2.499 is a whole weekly release
+  belongs: [{pattern: '^\s*v?2\.\d+\.\d+\s*$', to: jenkins}]  # 2.492.2: an LTS release
+- key: sonarqube-server
+- key: teams
+  label: Microsoft Teams
+  vendor: Microsoft
+  cpes: [a:microsoft:teams]
+  kw: [Microsoft Teams]
+  example: 24335.206.3315.1658
+- key: zoom
+  label: Zoom Workplace
+  vendor: Zoom
+  cpes: [a:zoom:workplace, a:zoom:meetings]
+  kw: [Zoom]
+  example: 6.3.5
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: bigbluebutton
+- key: greenlight
+- key: rocket-chat
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: "3cx"
+  label: "3CX Phone System"
+  vendor: "3CX"
+  cpes: [a:3cx:3cx, a:3cx:phone_system]
+  kw: ["3CX"]
+  example: "20.0.4"
+  where: web_about
+- key: starface
+  label: STARFACE
+  vendor: STARFACE
+  cpes: [a:starface:starface]
+  kw: [STARFACE]
+  example: "8.0"
+  where: web_about
+- key: innovaphone
+  label: innovaphone PBX / Firmware
+  vendor: innovaphone
+  cpes: [o:innovaphone:innovaphone_firmware, a:innovaphone:innovaphone_pbx]
+  kw: [innovaphone]
+  example: "14r2"
+  where: firmware_dashboard
+- key: swyx  # no CPE in NVD (checked 2026-11-02)
+  label: "Swyx (Enreach) SwyxWare"
+  vendor: "Enreach (Swyx)"
+  cpes: []
+  kw: [SwyxWare, Swyx]
+  aliases: [SwyxWare, Enreach]
+  hint: nocpe
+  where: client_about
+- key: auerswald
+  label: Auerswald COMpact / COMmander
+  vendor: Auerswald
+  cpes: [o:auerswald:compact_5500r_firmware, o:auerswald:comfortel_1200_ip_firmware]
+  kw: [Auerswald, COMpact, COMmander]
+  example: "8.6"
+  hint: per_model
+  where: firmware_dashboard
+- key: unify-openscape
+  label: "Unify OpenScape (Voice, Branch, SBC)"
+  vendor: "Mitel (Unify)"
+  cpes: [a:unify:openscape_voice, a:atos:unify_openscape_session_border_controller, a:atos:unify_openscape_branch, a:atos:unify_openscape_bcf, a:atos:unify_openscape_4000, a:siemens:openscape_session_border_controller]
+  kw: [OpenScape, Unify]
+  aliases: [Atos Unify, OpenScape Voice, OpenScape SBC]
+  example: "10.3.6"
+  where: web_about
+- key: mitel-mivoice
+  label: "Mitel MiVoice (Connect, MX-ONE, Office 400, Business)"
+  vendor: Mitel
+  cpes: [a:mitel:mivoice_connect, a:mitel:mivoice_mx-one, a:mitel:mivoice_office_400, a:mitel:mivoice_business_express, a:mitel:mivoice, a:mitel:mivoice_border_gateway]
+  kw: [MiVoice, Mitel]
+  aliases: [MiVoice Connect, MiVoice Business, MX-ONE]
+  example: "19.3 SP3"
+  where: web_about
+- key: owncloud
+  label: ownCloud Server
+  vendor: "ownCloud (Kiteworks)"
+  cpes: [a:owncloud:owncloud_server, a:owncloud:owncloud]
+  kw: [ownCloud]
+  example: "10.15.0"
+  version_cmd: occ -V
+  where: web_about
+- key: seafile
+  label: Seafile Server
+  vendor: Seafile
+  cpes: [a:seafile:seafile_server, a:seafile:seafile]
+  kw: [Seafile]
+  example: "11.0.12"
+  where: web_about

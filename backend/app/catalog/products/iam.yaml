@@ -1,0 +1,175 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'iam' (Identity & access (IAM/SSO)). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Microsoft servers
+- key: entra-connect
+  label: Microsoft Entra Connect / Cloud Sync
+  vendor: Microsoft
+  cpes: [a:microsoft:entra_connect]
+  kw: [Entra Connect, Azure AD Connect, Cloud Sync]
+  aliases: [Azure AD Connect, AAD Connect, Entra Cloud Sync]
+  example: 2.4.27.0
+
+# ---------------------------------------------------------------- security, endpoint
+- key: keycloak
+  osv: [[Maven, org.keycloak:keycloak-services], [Maven, org.keycloak:keycloak-core]]
+
+# ---------------------------------------------------------------- remote access, IT management
+- key: manageengine-adselfservice
+  label: ManageEngine ADSelfService Plus
+  vendor: Zoho ManageEngine
+  cpes: [a:zohocorp:manageengine_adselfservice_plus]
+  kw: [ADSelfService Plus]
+  example: 6.4 build 6402
+
+# ---------------------------------------------------------------- identity & access (IAM/SSO)
+- key: adfs
+  label: Active Directory Federation Services (AD FS)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [AD FS, ADFS, Federation Services]
+  aliases: [ADFS]
+  example: 10.0.20348.2762
+  hint: windows_role
+  where: windows_build
+  filter: Federation Services
+- key: okta
+  label: Okta (Workforce Identity)
+  vendor: Okta
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Okta]
+- key: okta-verify
+  label: Okta Verify (App)
+  vendor: Okta
+  cpes: [a:okta:verify]
+  kw: [Okta Verify]
+  example: 9.40.0
+- key: authentik
+  cpes: [a:goauthentik:authentik]
+- key: pingfederate
+  label: PingFederate
+  vendor: Ping Identity
+  cpes: [a:pingidentity:pingfederate]
+  kw: [PingFederate]
+  example: 12.2.2
+- key: duo
+  label: Cisco Duo (Authentication Proxy, Windows Logon)
+  vendor: Cisco (Duo)
+  cpes: [a:duo:authentication_proxy, a:cisco:duo_authentication_for_windows_logon_and_rdp, a:cisco:duo]
+  kw: [Duo]
+  aliases: [Duo Security, Duo MFA]
+  example: 6.5.0
+- key: privacyidea
+  label: privacyIDEA
+  vendor: NetKnights
+  cpes: [a:privacyidea:privacyidea]
+  kw: [privacyIDEA]
+  example: 3.11.2
+- key: freeipa
+  label: FreeIPA
+  vendor: Red Hat
+  cpes: [a:freeipa:freeipa, a:redhat:freeipa]
+  kw: [FreeIPA]
+  aliases: [IdM, Red Hat Identity Management]
+  example: 4.12.3
+- key: fortiauthenticator
+  label: FortiAuthenticator
+  vendor: Fortinet
+  cpes: [a:fortinet:fortiauthenticator]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiAuthenticator]
+  cna: [[Fortinet, FortiAuthenticator]]
+  kw: [FortiAuthenticator]
+  example: 6.6.4
+- key: watchguard-authpoint
+  label: WatchGuard AuthPoint
+  vendor: WatchGuard
+  cpes: []
+  kw: [AuthPoint]
+  aliases: [AuthPoint Agent]
+  example: 2.6.4
+  hint: nocpe
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: ldap-account-manager
+
+# ---------------------------------------------------------------- Windows Server roles (0.1.45) – the Windows Server CPEs, a filter word picks the role
+- key: windows-ad-ds
+  label: Active Directory Domain Services (Domain Controller)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [Active Directory Domain Services, Domain Controller, Netlogon]
+  aliases: [AD DS, ADDS, Domain Controller, DC, Active Directory]
+  example: 10.0.20348.2762
+  hint: ad_ds
+  where: windows_build
+  filter: "Active Directory Domain Services|Kerberos|Netlogon|Lightweight Directory Access Protocol|LDAP"
+- key: windows-nps
+  label: Network Policy Server (NPS, RADIUS)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [Network Policy Server]
+  aliases: [NPS, Microsoft RADIUS, IAS]
+  example: 10.0.20348.2762
+  hint: windows_role
+  where: windows_build
+  filter: "Network Policy Server"
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: univention-ucs
+  label: "Univention Corporate Server (UCS)"
+  vendor: Univention
+  cpes: [a:univention:univention_corporate_server]
+  kw: [Univention, UCS]
+  aliases: [UCS]
+  example: "5.0-9"
+  version_cmd: "ucr search --brief ^version/"
+  where: web_about
+- key: openldap
+  label: OpenLDAP
+  vendor: OpenLDAP Foundation
+  cpes: [a:openldap:openldap]
+  kw: [OpenLDAP]
+  example: "2.6.9"
+  version_cmd: slapd -VV
+  where: linux_package
+- key: rsa-securid-am
+  label: RSA SecurID Authentication Manager
+  vendor: RSA
+  cpes: [a:emc:rsa_authentication_manager, a:rsa:authentication_manager]
+  kw: [RSA Authentication Manager, SecurID]
+  aliases: [RSA AM, SecurID AM, RSA SecurID]
+  example: "8.7 SP2"
+  where: web_about
+- key: sailpoint-identityiq
+  label: SailPoint IdentityIQ
+  vendor: SailPoint
+  cpes: [a:sailpoint:identityiq]
+  cna: [[SailPoint Technologies, IdentityIQ]]
+  kw: [IdentityIQ, SailPoint]
+  aliases: [IIQ, SailPoint IIQ]
+  example: "8.4p2"
+  where: web_about
+- key: omnissa-workspace-one-access
+  label: "Omnissa Workspace ONE Access (VMware Identity Manager)"
+  vendor: Omnissa
+  cpes: [a:vmware:workspace_one_access, a:vmware:identity_manager, a:vmware:identity_manager_connector]
+  cna: [[VMware, VMware Workspace ONE Access], [Omnissa, Omnissa Workspace ONE Access]]
+  kw: [Workspace ONE Access, VMware Identity Manager]
+  aliases: [vIDM, VMware Identity Manager, WS1 Access]
+  example: "22.09.1.0"
+  where: web_about

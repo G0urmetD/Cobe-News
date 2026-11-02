@@ -1,0 +1,272 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'backup' (Backup & recovery). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- virtualisation, containers
+- key: proxmox-backup-server
+  cpes: [a:proxmox:backup_server]
+
+# ---------------------------------------------------------------- storage, backup
+- key: veeam-backup-and-replication
+  label: Veeam Backup & Replication
+  vendor: Veeam
+  cpes: [a:veeam:veeam_backup_\&_replication, a:veeam:backup_\&_replication, a:veeam:backup_and_replication]
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Backup & Replication, Veeam Backup Enterprise Manager]
+  cna: [[Veeam, Backup and Replication], [Veeam, Veeam Backup & Replication]]
+  kw: [Veeam Backup]
+  aliases: [VBR, Veeam B&R]
+  example: 12.3.2.4934
+  where: veeam_br
+- key: veeam-one
+  label: Veeam ONE
+  vendor: Veeam
+  cpes: [a:veeam:one, a:veeam:one_reporter]
+  scheme: veeam
+  adv: veeam
+  names: [Veeam ONE]
+  kw: [Veeam ONE]
+  example: 13.1.0.7940
+  where: veeam_console
+- key: veeam-backup-for-microsoft-365
+  label: Veeam Backup for Microsoft 365
+  vendor: Veeam
+  cpes: []
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Backup for Microsoft 365, Veeam Backup for Microsoft Office 365]
+  kw: [Veeam Backup for Microsoft 365]
+  aliases: [VB365, Veeam Backup for Office 365]
+  example: 8.6.0.5011
+  where: veeam_console
+- key: commvault
+- key: veritas-netbackup
+  label: Veritas NetBackup
+  vendor: Cohesity (Veritas)
+  cpes: [a:veritas:netbackup]
+  kw: [NetBackup]
+  example: 10.4.0.1
+- key: netbackup-appliance-os
+- key: zerto
+
+# ---------------------------------------------------------------- backup, recovery
+# Windows and Linux agents have builds of their own (13.1.0.544 / 13.1.2.11): two products, the key stays Windows'
+# (its CPE always was the Windows agent's)
+- key: veeam-agent
+  label: Veeam Agent for Microsoft Windows
+  vendor: Veeam
+  cpes: [a:veeam:veeam_agent_for_windows]
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Agent for Microsoft Windows, Veeam Agent for Windows]
+  kw: [Veeam Agent for Microsoft Windows, Veeam Agent for Windows]
+  aliases: [Veeam Agent, Veeam Agent for Windows]
+  example: 13.1.0.544
+  where: veeam_agent_windows
+# NVD has no CPE for the Linux agent (verified: no entry in the CPE dictionary): the Veeam KB feed and the names decide
+- key: veeam-agent-linux
+  label: Veeam Agent for Linux
+  vendor: Veeam
+  cpes: []
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Agent for Linux]
+  kw: [Veeam Agent for Linux]
+  aliases: [Veeam Agent]
+  example: 13.1.2.11
+  where: veeam_agent_linux
+  hint: nocpe
+- key: veeam-spc
+  label: Veeam Service Provider Console
+  vendor: Veeam
+  cpes: [a:veeam:veeam_service_provider_console]
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Service Provider Console, Veeam Availability Console]
+  kw: [Service Provider Console]
+  example: 9.3.0.35057
+  where: veeam_console
+- key: veeam-vro
+  label: Veeam Recovery Orchestrator
+  vendor: Veeam
+  cpes: [a:veeam:recovery_orchestrator, a:veeam:availability_orchestrator]
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Recovery Orchestrator, Veeam Availability Orchestrator]
+  kw: [Recovery Orchestrator]
+  example: 7.2.0.203
+  where: veeam_console
+- key: veeam-backup-azure
+  label: Veeam Backup for Microsoft Azure
+  vendor: Veeam
+  cpes: [a:veeam:backup]
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Backup for Microsoft Azure]
+  kw: [Veeam Backup for Microsoft Azure]
+  example: 9.0.0.444  # appliance build of 9.2 (KB4360: Plug-In 13.9.2.449, Appliance 9.0.0.444)
+  where: veeam_appliance
+- key: veeam-backup-gcp
+  label: Veeam Backup for Google Cloud
+  vendor: Veeam
+  cpes: [a:veeam:veeam_backup_for_google_cloud]
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Backup for Google Cloud]
+  kw: [Veeam Backup for Google Cloud]
+  example: 8.0.1.256  # appliance build of 8.1 (KB4359: Plug-In 13.8.1.186, Appliance 8.0.1.256)
+  where: veeam_appliance
+- key: veeam-management-pack
+  label: Veeam Management Pack for System Center
+  vendor: Veeam
+  cpes: [a:veeam:management_pack]
+  scheme: veeam
+  adv: veeam
+  names: [Veeam Management Pack for System Center, Veeam Management Pack]
+  kw: [Veeam Management Pack]
+  example: 9.0.0.2861  # the build of 9 (KB3219)
+  where: veeam_console
+- key: veeam-kasten
+  label: Veeam Kasten (K10)
+  vendor: Veeam
+  cpes: []
+  adv: veeam
+  names: [Veeam Kasten for Kubernetes, Veeam Kasten, Kasten K10, Kasten]
+  kw: [Kasten]
+  aliases: [Kasten K10]
+  example: 8.0.4
+  where: veeam_kasten
+  hint: nocpe
+- key: acronis-cyber-protect
+  label: Acronis Cyber Protect (Agent, Management Server)
+  vendor: Acronis
+  cpes: [a:acronis:cyber_protect, a:acronis:agent, a:acronis:cyber_backup, a:acronis:cyber_protect_cloud_agent]
+  kw: [Acronis]
+  aliases: [Acronis Backup, Acronis Cyber Backup, Acronis Cyber Protect Cloud]
+  example: 16 (build 39938)
+- key: rubrik
+  label: Rubrik (Security Cloud, CDM)
+  vendor: Rubrik
+  cpes: [a:rubrik:cloud_data_management, a:rubrik:cdm]
+  kw: [Rubrik]
+  aliases: [Rubrik CDM]
+  example: 9.2.3
+- key: cohesity-dataprotect
+  label: Cohesity DataProtect
+  vendor: Cohesity
+  cpes: [a:cohesity:dataplatform, a:cohesity:cohesity_dataplatform, a:cohesity:linux_agent]
+  kw: [Cohesity]
+  example: 7.2.2
+- key: arcserve-udp
+  label: Arcserve UDP
+  vendor: Arcserve
+  cpes: [a:arcserve:udp]
+  kw: [Arcserve]
+  example: "10.0"
+- key: nakivo
+  label: NAKIVO Backup & Replication
+  vendor: NAKIVO
+  cpes: [a:nakivo:backup_\&_replication_director, a:nakivo:backup_\&_replication_transporter]
+  kw: [NAKIVO]
+  example: 11.0.1
+- key: dell-powerprotect-dm
+  label: Dell PowerProtect Data Manager
+  vendor: Dell
+  cpes: [a:dell:powerprotect_data_manager]
+  kw: [PowerProtect Data Manager]
+  example: "19.19"
+- key: dell-data-domain
+  label: Dell PowerProtect DD (Data Domain OS)
+  vendor: Dell
+  cpes: [o:dell:emc_data_domain_os, o:dell:data_domain_operating_system, a:dell:powerprotect_data_domain, o:emc:data_domain]
+  kw: [Data Domain, DD OS]
+  aliases: [DD OS, DDOS]
+  example: 8.3.0.10
+- key: dell-avamar
+  label: Dell Avamar
+  vendor: Dell
+  cpes: [a:dell:avamar_server, a:dell:emc_avamar]
+  kw: [Avamar]
+  example: "19.12"
+- key: dell-networker
+  label: Dell NetWorker
+  vendor: Dell
+  cpes: [a:dell:networker, a:dell:emc_networker]
+  kw: [NetWorker]
+  example: "19.12"
+- key: ibm-storage-protect
+  label: IBM Storage Protect (Spectrum Protect, TSM)
+  vendor: IBM
+  cpes: [a:ibm:spectrum_protect, a:ibm:tivoli_storage_manager, a:ibm:spectrum_protect_server]
+  kw: [Storage Protect, Spectrum Protect]
+  aliases: [TSM, Spectrum Protect]
+  example: 8.1.25
+- key: hycu
+  label: HYCU
+  vendor: HYCU
+  cpes: []
+  kw: [HYCU]
+  hint: nocpe
+- key: bacula
+  label: Bacula / Bareos
+  vendor: Bacula Systems / Bareos
+  cpes: [a:bacula:bacula, a:bareos:bareos]
+  kw: [Bacula, Bareos]
+  aliases: [Bareos]
+  example: 15.0.3
+- key: synology-abb
+  label: Synology Active Backup for Business
+  vendor: Synology
+  cpes: [a:synology:active_backup_for_business]
+  kw: [Active Backup for Business]
+  example: 2.7.1
+- key: druva
+  label: Druva (inSync, Phoenix)
+  vendor: Druva
+  cpes: [a:druva:insync]
+  scheme: cloud
+  cloud: true
+  kw: [Druva]
+  aliases: [Druva inSync]
+- key: datto
+  label: Datto (SIRIS, ALTO, BCDR)
+  vendor: Datto (Kaseya)
+  cpes: [a:datto:windows_agent, a:datto:backup_agent]
+  kw: [Datto]
+  aliases: [Datto SIRIS]
+- key: backup-exec
+  label: Veritas Backup Exec
+  vendor: Arctera (Veritas)
+  cpes: [a:veritas:backup_exec]
+  kw: [Backup Exec]
+  example: "23.0"
+- key: sep-sesam
+  label: SEP sesam
+  vendor: SEP
+  cpes: []
+  kw: [SEP sesam]
+  example: 5.2.0
+  hint: nocpe
+- key: altaro
+  label: Hornetsecurity VM Backup (Altaro)
+  vendor: Hornetsecurity
+  cpes: []
+  kw: [Altaro, VM Backup]
+  aliases: [Altaro VM Backup]
+  example: "9.1"
+  hint: nocpe
+- key: barracuda-backup
+  label: Barracuda Backup
+  vendor: Barracuda
+  cpes: []
+  kw: [Barracuda Backup]
+  hint: nocpe
+- key: redstor
+  label: Redstor Backup
+  vendor: Redstor
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Redstor]

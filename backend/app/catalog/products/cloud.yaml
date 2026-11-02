@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'cloud' (Cloud services). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Palo Alto Networks
+- key: prisma-access
+  label: Prisma Access
+  vendor: Palo Alto Networks
+  cpes: [a:paloaltonetworks:prisma_access]
+  scheme: cloud
+  adv: paloalto
+  cloud: true
+  names: [Prisma Access]
+  kw: [Prisma Access]
+- key: prisma-cloud
+  label: Prisma Cloud
+  vendor: Palo Alto Networks
+  cpes: [a:paloaltonetworks:prisma_cloud]
+  scheme: cloud
+  adv: paloalto
+  cloud: true
+  names: [Prisma Cloud]
+  kw: [Prisma Cloud]
+- key: strata-cloud-manager
+  label: Strata Cloud Manager
+  vendor: Palo Alto Networks
+  cpes: []
+  scheme: cloud
+  adv: paloalto
+  cloud: true
+  names: [Strata Cloud Manager]
+  kw: [Strata Cloud Manager]
+- key: cloud-ngfw
+  label: Cloud NGFW
+  vendor: Palo Alto Networks
+  cpes: []
+  scheme: cloud
+  adv: paloalto
+  cloud: true
+  names: [Cloud NGFW]
+  kw: [Cloud NGFW]
+
+# ---------------------------------------------------------------- cloud services (more)
+- key: securepoint-usc
+  label: Securepoint Unified Security Cloud
+  vendor: Securepoint
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Unified Security Cloud, Securepoint]
+- key: sophos-central
+  label: Sophos Central
+  vendor: Sophos
+  cpes: []
+  scheme: cloud
+  cloud: true
+  kw: [Sophos Central]

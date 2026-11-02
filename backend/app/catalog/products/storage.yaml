@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'storage' (Storage & NAS). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- storage, backup
+- key: netapp-ontap
+  cpes: [o:netapp:ontap, a:netapp:ontap]
+- key: synology-dsm
+  label: Synology DiskStation Manager (DSM)
+  vendor: Synology
+  cpes: [o:synology:diskstation_manager]
+  cna: [[Synology, DiskStation Manager (DSM)]]
+  kw: [Synology, DiskStation]
+  example: 7.2.2-72806
+  where: synology_qnap
+- key: qnap-qts
+  label: QNAP QTS
+  vendor: QNAP
+  cpes: [o:qnap:qts]
+  cna: [[QNAP Systems Inc., QTS]]
+  kw: [QNAP, QTS]
+  example: 5.2.3.3006
+  where: synology_qnap
+- key: qnap-quts-hero
+  label: QNAP QuTS hero
+  vendor: QNAP
+  cpes: [o:qnap:quts_hero]
+  cna: [[QNAP Systems Inc., QuTS hero]]
+  kw: [QuTS hero]
+  example: h5.2.3.3006
+- key: dell-powerscale
+  label: Dell PowerScale OneFS
+  vendor: Dell
+  cpes: [o:dell:powerscale_onefs]
+  cna: [[Dell, PowerScale OneFS]]
+  kw: [PowerScale, OneFS]
+  example: 9.7.1.0
+- key: dell-unity
+  label: Dell Unity
+  vendor: Dell
+  cpes: [o:dell:unity_operating_environment]
+  cna: [[Dell, Dell Unity]]
+  kw: [Dell Unity]
+  example: 5.4.0
+- key: truenas
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: samba
+- key: openzfs
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: hpe-storeonce
+  label: HPE StoreOnce
+  vendor: HPE
+  cpes: [a:hpe:storeonce_system, o:hpe:storeonce_3620_firmware, o:hpe:storeonce_3640_firmware, o:hpe:storeonce_5200_firmware, o:hpe:storeonce_5250_firmware, o:hpe:storeonce_5650_firmware, o:hpe:storeonce_vsa_4tb_firmware, a:hp:storeonce_d2d]
+  kw: [StoreOnce]
+  example: "4.3.6"
+  hint: per_model
+  where: web_about
+- key: dell-powerstore
+  label: "Dell PowerStore (PowerStoreOS)"
+  vendor: Dell
+  cpes: [o:dell:powerstoreos]
+  kw: [PowerStore]
+  aliases: [PowerStoreOS]
+  example: "4.0.0.0"
+  where: web_about
+- key: fujitsu-eternus
+  label: "Fujitsu ETERNUS (DX/AF, CS8000)"
+  vendor: "Fsas Technologies (Fujitsu)"
+  cpes: [o:fujitsu:eternus_storage_dx200_s4_firmware, o:fujitsu:eternus_cs8000_firmware]
+  kw: [ETERNUS]
+  aliases: [ETERNUS DX, ETERNUS AF]
+  hint: per_model
+  where: web_about
+- key: pure-purity
+  label: "Pure Storage Purity (//FA, //FB)"
+  vendor: Pure Storage
+  cpes: ["a:purestorage:purity\\/\\/fa", "a:purestorage:purity\\/\\/fb", a:purestorage:purity]
+  kw: [Purity, Pure Storage, FlashArray]
+  aliases: [Purity//FA, FlashArray, FlashBlade]
+  example: "6.5.8"
+  where: web_about

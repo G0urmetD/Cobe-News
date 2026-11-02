@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'lb' (Load balancers & reverse proxies). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Fortinet
+- key: fortiadc
+  label: FortiADC
+  vendor: Fortinet
+  cpes: [a:fortinet:fortiadc]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiADC]
+  cna: [[Fortinet, FortiADC]]
+  kw: [FortiADC]
+  example: 7.4.4
+
+# ---------------------------------------------------------------- other firewalls / VPN
+- key: netscaler-adc
+  label: NetScaler ADC (Citrix ADC)
+  vendor: Cloud Software Group
+  cpes: [a:citrix:netscaler_application_delivery_controller, a:citrix:application_delivery_controller]
+  cna: [[Citrix, NetScaler ADC], [NetScaler, NetScaler ADC]]
+  kw: [NetScaler, Citrix ADC]
+  aliases: [Citrix ADC]
+  example: 14.1-29.72
+  hint: citrix
+  normalize: [netscaler]
+  where: netscaler
+- key: big-ip
+  label: F5 BIG-IP
+  vendor: F5
+  cpes: [a:f5:big-ip_local_traffic_manager, a:f5:big-ip_access_policy_manager]
+  cna: [[F5, BIG-IP]]
+  kw: [BIG-IP]
+  example: 17.1.1.3
+
+# ---------------------------------------------------------------- web/app servers, runtimes
+- key: nginx
+  label: nginx (Open Source)
+  vendor: F5
+  cpes: [a:nginx:nginx, a:f5:nginx, a:f5:nginx_open_source]
+  cna: [[F5, NGINX Open Source]]
+  kw: [nginx]
+  example: 1.26.2
+  belongs: [{pattern: '(?i)^\s*r\d+|nginx-plus', to: nginx-plus}]  # R33, nginx-plus-r33: NGINX Plus
+- key: nginx-plus
+  label: NGINX Plus
+  vendor: F5
+  cpes: [a:f5:nginx_plus]
+  cna: [[F5, NGINX Plus]]
+  kw: [NGINX Plus]
+  example: R33 P1
+  normalize: [nginx_plus]  # nginx -v: "nginx/1.27.2 (nginx-plus-r33)" → R33
+  belongs: [{pattern: '^\s*v?1\.\d+\.\d+\s*$', to: nginx}]  # 1.27.2 alone: nginx open source
+- key: haproxy
+  cpes: [a:haproxy:haproxy]
+
+# ---------------------------------------------------------------- load balancers, reverse proxies
+- key: traefik
+  cpes: [a:traefik:traefik]
+  osv: [[Go, github.com/traefik/traefik/v2], [Go, github.com/traefik/traefik/v3]]
+- key: kemp-loadmaster
+  label: Progress Kemp LoadMaster
+  vendor: Progress (Kemp)
+  cpes: [a:kemptechnologies:loadmaster, a:progress:loadmaster, o:progress:loadmaster]
+  kw: [LoadMaster, Kemp]
+  example: 7.2.61.0
+- key: envoy
+  cpes: [a:envoyproxy:envoy]
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: squid

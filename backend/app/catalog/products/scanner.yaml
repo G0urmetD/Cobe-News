@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'scanner' (Vulnerability scanners). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- vulnerability scanners
+- key: nessus
+  label: Tenable Nessus
+  vendor: Tenable
+  cpes: [a:tenable:nessus]
+  kw: [Nessus]
+  example: 10.8.4
+- key: tenable-agent
+  label: Tenable Nessus Agent
+  vendor: Tenable
+  cpes: [a:tenable:nessus_agent]
+  kw: [Nessus Agent]
+  example: 10.8.2
+- key: greenbone
+  label: Greenbone / OpenVAS
+  vendor: Greenbone
+  cpes: [a:openvas:openvas_scanner, a:greenbone:greenbone_security_assistant, o:greenbone:greenbone_os]
+  kw: [Greenbone, OpenVAS]
+  aliases: [OpenVAS, GVM]
+  example: "22.4"
+- key: qualys-agent
+  label: Qualys Cloud Agent
+  vendor: Qualys
+  cpes: [a:qualys:cloud_agent]
+  kw: [Qualys Cloud Agent, Qualys]
+  example: 6.1.0

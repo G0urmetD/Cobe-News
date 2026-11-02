@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'database' (Databases). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- databases
+- key: oracle-database
+  label: Oracle Database
+  vendor: Oracle
+  cpes: [a:oracle:database_server]
+  cna: [[Oracle Corporation, Oracle Database Server]]
+  kw: [Oracle Database]
+  example: "19.25"
+  depth: 2  # a Release Update (19.25) is how versions are named; endoflife.date gives no latest release
+- key: postgresql
+- key: mysql
+  cpes: [a:oracle:mysql_server]
+- key: mariadb
+- key: mongodb
+- key: redis
+- key: sqlite
+- key: ibm-db2
+  label: IBM Db2
+  vendor: IBM
+  cpes: [a:ibm:db2]
+  cna: [[IBM, "Db2 for Linux, UNIX and Windows"]]
+  kw: [Db2]
+  aliases: [Db2, DB2 LUW]
+  example: 11.5.9
+  version_cmd: db2level
+  replaces: [db2]  # the curated entry had its own key next to endoflife.date's ibm-db2 (migration 0025 moved follows)
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: pgadmin
+- key: phpmyadmin
+  osv: [[Packagist, phpmyadmin/phpmyadmin]]
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: sap-hana
+  label: "SAP HANA (Database)"
+  vendor: SAP
+  cpes: [a:sap:hana, a:sap:hana_database, a:sap:hana_db]
+  kw: [SAP HANA]
+  aliases: [HANA, HANA DB]
+  example: "2.00.079.00"
+  hint: sap
+  where: sap_kernel

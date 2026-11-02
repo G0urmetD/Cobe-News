@@ -1,0 +1,361 @@
+# yaml-language-server: $schema=../schema/build_map_names.schema.json
+# Microsoft SQL Server: which build a cumulative update (CU), a GDR security update or a KB number is. Admins often say
+# "2022 CU16"; Microsoft's CVE records compare builds (16.0.4165.4). A name typed for mssqlserver is looked up here and
+# stored as the build (app/build_maps.py) – never guessed. SELECT @@VERSION's whole line is taken too: the build in it
+# counts ("Microsoft SQL Server 2022 (RTM-CU16) (KB5048033) - 16.0.4165.4 (X64) …").
+#
+# Sources (fetched 2026-11-02): Microsoft Support "SQL Server <year> build versions" (one page per release)
+#   https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2025/build-versions  (→ KB5005684)
+#   https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2022/build-versions  (→ KB5023451)
+#   https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2019/build-versions  (→ KB4518398)
+#   https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2017/build-versions  (→ KB4047329)
+#   https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2016/build-versions  (→ KB3177312)
+# A name Microsoft gives to more than one build ("2022 GDR", "2022 CU24 + GDR" twice, SQL Server 2016's CUs of each
+# service pack) is left out – the build or the KB number says it. A CU is its own build: "2022 CU16" is 16.0.4165.4,
+# "2022 CU16 GDR" the GDR on top of it.
+# A new update: add its row from the pages above and raise catalog_version in catalog.yaml.
+kind: names
+fetched: "2026-11-02"
+sources:
+  - "https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2025/build-versions"
+  - "https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2022/build-versions"
+  - "https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2019/build-versions"
+  - "https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2017/build-versions"
+  - "https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2016/build-versions"
+products: [mssqlserver]
+strip: [microsoft, sql, server]
+extract: '(?<![\d.])((?:[6-9]|1\d)\.\d{1,2}\.\d{3,4}(?:\.\d{1,4})?)(?![\d.])'
+claims: '(?i)\b(?:rtm|cu\s*\d+|gdr|sp\s*\d|kb\s*\d{6,8})\b|^(?:(?:microsoft\s+)?sql(?:\s+server)?\s+)?20(?:0\d|1\d|2\d)\b'
+hint: sqlserver_names
+rows:
+  - {value: "17.0.5035.5", names: ["2025 CU10", "KB5125471"], date: "2026-10-22"}
+  - {value: "17.0.5005.3", names: ["2025 CU9", "KB5122048"], date: "2026-09-15"}
+  - {value: "17.0.4075.5", names: ["2025 CU8", "KB5104822"], date: "2026-08-13"}
+  - {value: "17.0.4065.4", names: ["2025 CU7", "KB5096981"], date: "2026-07-16"}
+  - {value: "17.0.4055.5", names: ["2025 CU6", "KB5093421"], date: "2026-06-17"}
+  - {value: "17.0.4045.5", names: ["2025 CU5", "KB5084896"], date: "2026-05-20"}
+  - {value: "17.0.4035.5", names: ["2025 CU4", "KB5081495"], date: "2026-04-16"}
+  - {value: "17.0.4025.3", names: ["2025 CU3", "KB5077896"], date: "2026-03-12"}
+  - {value: "17.0.4015.4", names: ["2025 CU2", "KB5075211"], date: "2026-02-12"}
+  - {value: "17.0.4006.2", names: ["2025 CU1", "KB5078298"], date: "2026-01-29"}
+  - {value: "17.0.5015.4", names: ["2025 CU9 GDR", "KB5126967"], date: "2026-10-13"}
+  - {value: "17.0.1145.4", names: ["KB5128492"], date: "2026-10-13"}
+  - {value: "17.0.4085.5", names: ["2025 CU8 GDR", "KB5122769"], date: "2026-09-08"}
+  - {value: "17.0.1135.8", names: ["KB5122770"], date: "2026-09-08"}
+  - {value: "17.0.4060.2", names: ["2025 CU6 GDR", "KB5101346"], date: "2026-07-14"}
+  - {value: "17.0.1125.2", names: ["KB5102333"], date: "2026-07-14"}
+  - {value: "17.0.4040.1", names: ["2025 CU4 GDR", "KB5089899"], date: "2026-05-12"}
+  - {value: "17.0.1115.1", names: ["KB5091223"], date: "2026-05-12"}
+  - {value: "17.0.4030.1", names: ["2025 CU3 GDR", "KB5083245"], date: "2026-04-14"}
+  - {value: "17.0.1110.1", names: ["KB5084814"], date: "2026-04-14"}
+  - {value: "17.0.4020.2", names: ["2025 CU2 GDR", "KB5077466"], date: "2026-03-10"}
+  - {value: "17.0.1105.2", names: ["KB5077468"], date: "2026-03-10"}
+  - {value: "17.0.1050.2", names: ["KB5073177"], date: "2026-01-13"}
+  - {value: "16.0.4295.3", names: ["2022 CU27", "KB5104824"], date: "2026-09-15"}
+  - {value: "16.0.4265.3", names: ["2022 CU26", "KB5093420"], date: "2026-07-16"}
+  - {value: "16.0.4255.1", names: ["2022 CU25", "KB5081477"], date: "2026-05-20"}
+  - {value: "16.0.4245.2", names: ["2022 CU24", "KB5080999"], date: "2026-03-12"}
+  - {value: "16.0.4236.2", names: ["2022 CU23", "KB5078297"], date: "2026-01-29"}
+  - {value: "16.0.4225.2", names: ["2022 CU22", "KB5068450"], date: "2025-11-13"}
+  - {value: "16.0.4215.2", names: ["2022 CU21", "KB5065865"], date: "2025-09-11"}
+  - {value: "16.0.4205.1", names: ["2022 CU20", "KB5059390"], date: "2025-07-10"}
+  - {value: "16.0.4195.2", names: ["2022 CU19", "KB5054531"], date: "2025-05-15"}
+  - {value: "16.0.4185.3", names: ["2022 CU18", "KB5050771"], date: "2025-03-13"}
+  - {value: "16.0.4175.1", names: ["2022 CU17", "KB5048038"], date: "2025-01-16"}
+  - {value: "16.0.4165.4", names: ["2022 CU16", "KB5048033"], date: "2024-11-14"}
+  - {value: "16.0.4145.4", names: ["2022 CU15", "KB5041321"], date: "2024-09-25"}
+  - {value: "16.0.4135.4", names: ["2022 CU14", "KB5038325"], date: "2024-07-23"}
+  - {value: "16.0.4125.3", names: ["2022 CU13", "KB5036432"], date: "2024-05-16"}
+  - {value: "16.0.4115.5", names: ["2022 CU12", "KB5033663"], date: "2024-03-14"}
+  - {value: "16.0.4105.2", names: ["2022 CU11", "KB5032679"], date: "2024-01-11"}
+  - {value: "16.0.4095.4", names: ["2022 CU10", "KB5031778"], date: "2023-11-16"}
+  - {value: "16.0.4085.2", names: ["2022 CU9", "KB5030731"], date: "2023-10-12"}
+  - {value: "16.0.4075.1", names: ["2022 CU8", "KB5029666"], date: "2023-09-14"}
+  - {value: "16.0.4065.3", names: ["2022 CU7", "KB5028743"], date: "2023-08-10"}
+  - {value: "16.0.4055.4", names: ["2022 CU6", "KB5027505"], date: "2023-07-13"}
+  - {value: "16.0.4045.3", names: ["2022 CU5", "KB5026806"], date: "2023-06-15"}
+  - {value: "16.0.4035.4", names: ["2022 CU4", "KB5026717"], date: "2023-05-11"}
+  - {value: "16.0.4025.1", names: ["2022 CU3", "KB5024396"], date: "2023-04-13"}
+  - {value: "16.0.4015.1", names: ["2022 CU2", "KB5023127"], date: "2023-03-15"}
+  - {value: "16.0.4003.1", names: ["2022 CU1", "KB5022375"], date: "2023-02-16"}
+  - {value: "16.0.1000.6", names: ["2022 RTM"], date: "2022-11-16"}
+  - {value: "16.0.4305.5", names: ["2022 CU27 GDR", "KB5126934"], date: "2026-10-13"}
+  - {value: "16.0.1210.3", names: ["KB5128493"], date: "2026-10-13"}
+  - {value: "16.0.4275.2", names: ["2022 CU26 GDR", "KB5122768"], date: "2026-09-08"}
+  - {value: "16.0.1200.5", names: ["KB5122771"], date: "2026-09-08"}
+  - {value: "16.0.4262.2", names: ["2022 CU25 GDR", "KB5101347"], date: "2026-07-14"}
+  - {value: "16.0.1190.2", names: ["KB5102334"], date: "2026-07-14"}
+  - {value: "16.0.4252.3", names: ["KB5089900"], date: "2026-05-12"}
+  - {value: "16.0.1180.1", names: ["KB5091158"], date: "2026-05-12"}
+  - {value: "16.0.4250.1", names: ["KB5083252"], date: "2026-04-14"}
+  - {value: "16.0.1175.1", names: ["KB5084815"], date: "2026-04-14"}
+  - {value: "16.0.4240.4", names: ["2022 CU23 GDR", "KB5077464"], date: "2026-03-10"}
+  - {value: "16.0.1170.5", names: ["KB5077465"], date: "2026-03-10"}
+  - {value: "16.0.4230.2", names: ["2022 CU22 GDR", "KB5072936"], date: "2026-01-13"}
+  - {value: "16.0.1165.1", names: ["KB5073031"], date: "2026-01-13"}
+  - {value: "16.0.4222.2", names: ["2022 CU21 GDR", "KB5068406"], date: "2025-11-11"}
+  - {value: "16.0.1160.1", names: ["KB5068407"], date: "2025-11-11"}
+  - {value: "16.0.4212.1", names: ["KB5065220"], date: "2025-09-09"}
+  - {value: "16.0.1150.1", names: ["KB5065221"], date: "2025-09-09"}
+  - {value: "16.0.4210.1", names: ["KB5063814"], date: "2025-08-12"}
+  - {value: "16.0.1145.1", names: ["KB5063756"], date: "2025-08-12"}
+  - {value: "16.0.4200.1", names: ["2022 CU19 GDR", "KB5058721"], date: "2025-07-08"}
+  - {value: "16.0.1140.6", names: ["KB5058712"], date: "2025-07-08"}
+  - {value: "16.0.4155.4", names: ["KB5046862"], date: "2024-11-12"}
+  - {value: "16.0.1135.2", names: ["KB5046861"], date: "2024-11-12"}
+  - {value: "16.0.4150.1", names: ["KB5046059"], date: "2024-10-08"}
+  - {value: "16.0.1130.5", names: ["KB5046057"], date: "2024-10-08"}
+  - {value: "16.0.4140.3", names: ["2022 CU14 GDR", "KB5042578"], date: "2024-09-10"}
+  - {value: "16.0.1125.1", names: ["KB5042211"], date: "2024-09-10"}
+  - {value: "16.0.4131.2", names: ["2022 CU13 GDR", "KB5040939"], date: "2024-07-09"}
+  - {value: "16.0.1121.4", names: ["KB5040936"], date: "2024-07-09"}
+  - {value: "16.0.4120.1", names: ["2022 CU12 GDR", "KB5036343"], date: "2024-04-09"}
+  - {value: "16.0.1115.1", names: ["KB5035432"], date: "2024-04-09"}
+  - {value: "16.0.4100.1", names: ["2022 CU10 GDR", "KB5033592"], date: "2024-01-09"}
+  - {value: "16.0.1110.1", names: ["KB5032968"], date: "2024-01-09"}
+  - {value: "16.0.4080.1", names: ["2022 CU8 GDR", "KB5029503"], date: "2023-10-10"}
+  - {value: "16.0.1105.1", names: ["KB5029379"], date: "2023-10-10"}
+  - {value: "16.0.1050.5", names: ["KB5021522"], date: "2023-02-14"}
+  - {value: "15.0.4430.1", names: ["2019 CU32", "KB5054833"], date: "2025-02-27"}
+  - {value: "15.0.4420.2", names: ["2019 CU31", "KB5049296"], date: "2025-02-13"}
+  - {value: "15.0.4415.2", names: ["2019 CU30", "KB5049235"], date: "2024-12-12"}
+  - {value: "15.0.4405.4", names: ["2019 CU29", "KB5046365"], date: "2024-10-31"}
+  - {value: "15.0.4385.2", names: ["2019 CU28", "KB5039747"], date: "2024-08-01"}
+  - {value: "15.0.4375.4", names: ["2019 CU27", "KB5037331"], date: "2024-06-13"}
+  - {value: "15.0.4365.2", names: ["2019 CU26", "KB5035123"], date: "2024-04-11"}
+  - {value: "15.0.4355.3", names: ["2019 CU25", "KB5033688"], date: "2024-02-15"}
+  - {value: "15.0.4345.5", names: ["2019 CU24", "KB5031908"], date: "2023-12-14"}
+  - {value: "15.0.4335.1", names: ["2019 CU23", "KB5030333"], date: "2023-10-12"}
+  - {value: "15.0.4322.2", names: ["2019 CU22", "KB5027702"], date: "2023-08-14"}
+  - {value: "15.0.4316.3", names: ["2019 CU21", "KB5025808"], date: "2023-06-15"}
+  - {value: "15.0.4312.2", names: ["2019 CU20", "KB5024276"], date: "2023-04-13"}
+  - {value: "15.0.4298.1", names: ["2019 CU19", "KB5023049"], date: "2023-02-16"}
+  - {value: "15.0.4261.1", names: ["2019 CU18", "KB5017593"], date: "2022-09-28"}
+  - {value: "15.0.4249.2", names: ["2019 CU17", "KB5016394"], date: "2022-08-11"}
+  - {value: "15.0.4223.1", names: ["2019 CU16", "KB5011644"], date: "2022-04-18"}
+  - {value: "15.0.4198.2", names: ["2019 CU15", "KB5008996"], date: "2022-01-27"}
+  - {value: "15.0.4188.2", names: ["2019 CU14", "KB5007182"], date: "2021-11-22"}
+  - {value: "15.0.4178.1", names: ["2019 CU13", "KB5005679"], date: "2021-10-05"}
+  - {value: "15.0.4153.1", names: ["2019 CU12", "KB5004524"], date: "2021-08-04"}
+  - {value: "15.0.4138.2", names: ["2019 CU11", "KB5003249"], date: "2021-06-10"}
+  - {value: "15.0.4123.1", names: ["2019 CU10", "KB5001090"], date: "2021-04-06"}
+  - {value: "15.0.4102.2", names: ["2019 CU9", "KB5000642"], date: "2021-02-11"}
+  - {value: "15.0.4073.23", names: ["2019 CU8", "KB4577194"], date: "2020-10-01"}
+  - {value: "15.0.4063.15", names: ["2019 CU7", "KB4570012"], date: "2020-09-02"}
+  - {value: "15.0.4053.23", names: ["2019 CU6", "KB4563110"], date: "2020-08-04"}
+  - {value: "15.0.4043.16", names: ["2019 CU5", "KB4552255"], date: "2020-06-22"}
+  - {value: "15.0.4033.1", names: ["2019 CU4", "KB4548597"], date: "2020-03-31"}
+  - {value: "15.0.4023.6", names: ["2019 CU3", "KB4538853"], date: "2020-03-12"}
+  - {value: "15.0.4013.40", names: ["2019 CU2", "KB4536075"], date: "2020-02-13"}
+  - {value: "15.0.4003.23", names: ["2019 CU1", "KB4527376"], date: "2020-01-07"}
+  - {value: "15.0.2000.5", names: ["2019 RTM"], date: "2019-11-04"}
+  - {value: "15.0.4500.2", names: ["KB5128494"], date: "2026-10-13"}
+  - {value: "15.0.2200.2", names: ["KB5128495"], date: "2026-10-13"}
+  - {value: "15.0.4490.9", names: ["KB5122772"], date: "2026-09-08"}
+  - {value: "15.0.2190.7", names: ["KB5122773"], date: "2026-09-08"}
+  - {value: "15.0.4480.2", names: ["KB5102335"], date: "2026-07-14"}
+  - {value: "15.0.2180.2", names: ["KB5102336"], date: "2026-07-14"}
+  - {value: "15.0.4470.1", names: ["KB5090407"], date: "2026-05-12"}
+  - {value: "15.0.2170.1", names: ["KB5090408"], date: "2026-05-12"}
+  - {value: "15.0.4465.1", names: ["KB5084816"], date: "2026-04-14"}
+  - {value: "15.0.2165.1", names: ["KB5084817"], date: "2026-04-14"}
+  - {value: "15.0.4460.4", names: ["KB5077469"], date: "2026-03-10"}
+  - {value: "15.0.2160.4", names: ["KB5077470"], date: "2026-03-10"}
+  - {value: "15.0.4455.2", names: ["KB5068404"], date: "2025-11-11"}
+  - {value: "15.0.2155.2", names: ["KB5068405"], date: "2025-11-11"}
+  - {value: "15.0.4445.1", names: ["KB5065222"], date: "2025-09-09"}
+  - {value: "15.0.2145.1", names: ["KB5065223"], date: "2025-09-09"}
+  - {value: "15.0.4440.1", names: ["KB5063757"], date: "2025-08-12"}
+  - {value: "15.0.2140.1", names: ["KB5063758"], date: "2025-08-12"}
+  - {value: "15.0.4435.7", names: ["KB5058722"], date: "2025-07-08"}
+  - {value: "15.0.2135.5", names: ["KB5058713"], date: "2025-07-08"}
+  - {value: "15.0.4410.1", names: ["2019 CU29 GDR", "KB5046860"], date: "2024-11-12"}
+  - {value: "15.0.2130.3", names: ["KB5046859"], date: "2024-11-12"}
+  - {value: "15.0.4395.2", names: ["KB5046060"], date: "2024-10-08"}
+  - {value: "15.0.2125.1", names: ["KB5046056"], date: "2024-10-08"}
+  - {value: "15.0.4390.2", names: ["KB5042749"], date: "2024-09-10"}
+  - {value: "15.0.2120.1", names: ["KB5042214"], date: "2024-09-10"}
+  - {value: "15.0.4382.1", names: ["2019 CU27 GDR", "KB5040948"], date: "2024-07-09"}
+  - {value: "15.0.2116.2", names: ["KB5040986"], date: "2024-07-09"}
+  - {value: "15.0.4360.2", names: ["2019 CU25 GDR", "KB5036335"], date: "2024-04-09"}
+  - {value: "15.0.2110.4", names: ["KB5035434"], date: "2024-04-09"}
+  - {value: "15.0.4326.1", names: ["2019 CU22 GDR", "KB5029378"], date: "2023-10-10"}
+  - {value: "15.0.2104.1", names: ["KB5029377"], date: "2023-10-10"}
+  - {value: "15.0.4280.7", names: ["2019 CU18 GDR", "KB5021124"], date: "2023-02-14"}
+  - {value: "15.0.2101.7", names: ["KB5021125"], date: "2023-02-14"}
+  - {value: "15.0.4236.7", names: ["2019 CU16 GDR", "KB5014353"], date: "2022-06-14"}
+  - {value: "15.0.2095.3", names: ["KB5014356"], date: "2022-06-14"}
+  - {value: "15.0.4083.2", names: ["2019 CU8 GDR", "KB4583459"], date: "2021-01-12"}
+  - {value: "15.0.2080.9", names: ["KB4583458"], date: "2021-01-12"}
+  - {value: "15.0.2070.41", names: ["KB4517790"], date: "2019-11-04"}
+  - {value: "14.0.3490.10", names: ["KB5050533"], date: "2025-03-06"}
+  - {value: "14.0.3456.2", names: ["2017 CU31", "KB5016884"], date: "2022-09-20"}
+  - {value: "14.0.3451.2", names: ["2017 CU30", "KB5013756"], date: "2022-07-13"}
+  - {value: "14.0.3436.1", names: ["2017 CU29", "KB5010786"], date: "2022-03-30"}
+  - {value: "14.0.3430.2", names: ["2017 CU28", "KB5008084"], date: "2022-01-13"}
+  - {value: "14.0.3421.10", names: ["2017 CU27", "KB5006944"], date: "2021-10-27"}
+  - {value: "14.0.3411.3", names: ["2017 CU26", "KB5005226"], date: "2021-09-14"}
+  - {value: "14.0.3401.7", names: ["2017 CU25", "KB5003830"], date: "2021-07-12"}
+  - {value: "14.0.3391.2", names: ["2017 CU24", "KB5001228"], date: "2021-05-10"}
+  - {value: "14.0.3381.3", names: ["2017 CU23", "KB5000685"], date: "2021-02-24"}
+  - {value: "14.0.3356.20", names: ["2017 CU22", "KB4577467"], date: "2020-09-10"}
+  - {value: "14.0.3335.7", names: ["2017 CU21", "KB4557397"], date: "2020-07-01"}
+  - {value: "14.0.3294.2", names: ["2017 CU20", "KB4541283"], date: "2020-04-07"}
+  - {value: "14.0.3281.6", names: ["2017 CU19", "KB4535007"], date: "2020-02-05"}
+  - {value: "14.0.3257.3", names: ["2017 CU18", "KB4527377"], date: "2019-12-09"}
+  - {value: "14.0.3238.1", names: ["2017 CU17", "KB4515579"], date: "2019-10-08"}
+  - {value: "14.0.3223.3", names: ["2017 CU16", "KB4508218"], date: "2019-08-01"}
+  - {value: "14.0.3162.1", names: ["2017 CU15", "KB4498951"], date: "2019-05-23"}
+  - {value: "14.0.3076.1", names: ["2017 CU14", "KB4484710"], date: "2019-03-25"}
+  - {value: "14.0.3048.4", names: ["2017 CU13", "KB4466404"], date: "2018-12-18"}
+  - {value: "14.0.3045.24", names: ["2017 CU12", "KB4464082"], date: "2018-10-24"}
+  - {value: "14.0.3038.14", names: ["2017 CU11", "KB4462262"], date: "2018-09-20"}
+  - {value: "14.0.3037.1", names: ["2017 CU10", "KB4342123"], date: "2018-08-27"}
+  - {value: "14.0.3030.27", names: ["2017 CU9", "KB4341265"], date: "2018-07-18"}
+  - {value: "14.0.3029.16", names: ["2017 CU8", "KB4338363"], date: "2018-06-21"}
+  - {value: "14.0.3026.27", names: ["2017 CU7", "KB4229789"], date: "2018-05-23"}
+  - {value: "14.0.3025.34", names: ["2017 CU6", "KB4101464"], date: "2018-04-17"}
+  - {value: "14.0.3023.8", names: ["2017 CU5", "KB4092643"], date: "2018-03-20"}
+  - {value: "14.0.3022.28", names: ["2017 CU4", "KB4056498"], date: "2018-02-20"}
+  - {value: "14.0.3015.40", names: ["2017 CU3", "KB4052987", "2017 CU3 GDR", "KB4058562"], date: "2018-01-04"}
+  - {value: "14.0.3008.27", names: ["2017 CU2", "KB4052574"], date: "2017-11-28"}
+  - {value: "14.0.3006.16", names: ["2017 CU1", "KB4038634"], date: "2017-10-24"}
+  - {value: "14.0.1000.169", names: ["2017 RTM"], date: "2017-09-29"}
+  - {value: "14.0.3560.2", names: ["KB5128496"], date: "2026-10-13"}
+  - {value: "14.0.2140.2", names: ["KB5128497"], date: "2026-10-13"}
+  - {value: "14.0.3550.4", names: ["KB5122774"], date: "2026-09-08"}
+  - {value: "14.0.2130.4", names: ["KB5122775"], date: "2026-09-08"}
+  - {value: "14.0.3540.1", names: ["KB5102337"], date: "2026-07-14"}
+  - {value: "14.0.2120.1", names: ["KB5102338"], date: "2026-07-14"}
+  - {value: "14.0.3530.2", names: ["KB5090354"], date: "2026-05-12"}
+  - {value: "14.0.2110.2", names: ["KB5090347"], date: "2026-05-12"}
+  - {value: "14.0.3525.1", names: ["KB5084818"], date: "2026-04-14"}
+  - {value: "14.0.2105.1", names: ["KB5084819"], date: "2026-04-14"}
+  - {value: "14.0.3520.4", names: ["KB5077471"], date: "2026-03-10"}
+  - {value: "14.0.2100.4", names: ["KB5077472"], date: "2026-03-10"}
+  - {value: "14.0.3515.1", names: ["KB5068402"], date: "2025-11-11"}
+  - {value: "14.0.2095.1", names: ["KB5068403"], date: "2025-11-11"}
+  - {value: "14.0.3505.1", names: ["KB5065225"], date: "2025-09-09"}
+  - {value: "14.0.2085.1", names: ["KB5065224"], date: "2025-09-09"}
+  - {value: "14.0.3500.1", names: ["KB5063759"], date: "2025-08-12"}
+  - {value: "14.0.2080.1", names: ["KB5063760"], date: "2025-08-12"}
+  - {value: "14.0.3495.9", names: ["KB5058714"], date: "2025-07-08"}
+  - {value: "14.0.2075.8", names: ["KB5058716"], date: "2025-07-08"}
+  - {value: "14.0.3485.1", names: ["KB5046858"], date: "2024-11-12"}
+  - {value: "14.0.2070.1", names: ["KB5046857"], date: "2024-11-12"}
+  - {value: "14.0.3480.1", names: ["KB5046061"], date: "2024-10-08"}
+  - {value: "14.0.2065.1", names: ["KB5046058"], date: "2024-10-08"}
+  - {value: "14.0.3475.1", names: ["KB5042215"], date: "2024-09-10"}
+  - {value: "14.0.2060.1", names: ["KB5042217"], date: "2024-09-10"}
+  - {value: "14.0.3471.2", names: ["KB5040940"], date: "2024-07-09"}
+  - {value: "14.0.2056.2", names: ["KB5040942"], date: "2024-07-09"}
+  - {value: "14.0.3465.1", names: ["KB5029376"], date: "2023-10-10"}
+  - {value: "14.0.2052.1", names: ["KB5029375"], date: "2023-10-10"}
+  - {value: "14.0.3460.9", names: ["KB5021126"], date: "2023-02-14"}
+  - {value: "14.0.2047.8", names: ["KB5021127"], date: "2023-02-14"}
+  - {value: "14.0.3445.2", names: ["2017 CU29 GDR", "KB5014553"], date: "2022-06-14"}
+  - {value: "14.0.2042.3", names: ["KB5014354"], date: "2022-06-14"}
+  - {value: "14.0.3370.1", names: ["2017 CU22 GDR", "KB4583457"], date: "2021-01-21"}
+  - {value: "14.0.2037.2", names: ["KB4583456"], date: "2021-01-21"}
+  - {value: "14.0.3192.2", names: ["2017 CU15 GDR", "KB4505225"], date: "2019-07-09"}
+  - {value: "14.0.2027.2", names: ["KB4505224"], date: "2019-07-09"}
+  - {value: "14.0.3103.1", names: ["2017 CU14 GDR", "KB4494352"], date: "2019-05-14"}
+  - {value: "14.0.2014.14", names: ["KB4494351"], date: "2019-05-14"}
+  - {value: "14.0.3035.2", names: ["2017 CU9 GDR", "KB4293805"], date: "2018-08-14"}
+  - {value: "14.0.2002.14", names: ["KB4293803"], date: "2018-08-14"}
+  - {value: "14.0.2000.63", names: ["KB4057122"], date: "2018-01-03"}
+  - {value: "13.0.7095.1", names: ["KB5102339"], date: "2026-07-14"}
+  - {value: "13.0.7085.1", names: ["KB5089270"], date: "2026-05-12"}
+  - {value: "13.0.7080.1", names: ["KB5084820"], date: "2026-04-14"}
+  - {value: "13.0.7075.5", names: ["KB5077473"], date: "2026-03-10"}
+  - {value: "13.0.7070.1", names: ["KB5068400"], date: "2025-11-11"}
+  - {value: "13.0.7065.1", names: ["KB5065227"], date: "2025-09-09"}
+  - {value: "13.0.7060.1", names: ["KB5063761"], date: "2025-08-12"}
+  - {value: "13.0.7055.9", names: ["KB5058717"], date: "2025-07-08"}
+  - {value: "13.0.7050.2", names: ["KB5046856"], date: "2024-11-12"}
+  - {value: "13.0.7045.2", names: ["KB5046062"], date: "2024-10-08"}
+  - {value: "13.0.7040.1", names: ["KB5042209"], date: "2024-09-10"}
+  - {value: "13.0.7037.1", names: ["KB5040944"], date: "2024-07-09"}
+  - {value: "13.0.7029.3", names: ["KB5029187"], date: "2023-10-10"}
+  - {value: "13.0.7024.30", names: ["KB5021128"], date: "2023-02-14"}
+  - {value: "13.0.7016.1", names: ["KB5015371"], date: "2022-06-14"}
+  - {value: "13.0.7000.253", names: ["KB5014242"], date: "2022-05-19"}
+  - {value: "13.0.6500.1", names: ["KB5102340"], date: "2026-07-14"}
+  - {value: "13.0.6490.1", names: ["KB5089271"], date: "2026-05-12"}
+  - {value: "13.0.6485.1", names: ["KB5084821"], date: "2026-04-14"}
+  - {value: "13.0.6480.4", names: ["KB5077474"], date: "2026-03-10"}
+  - {value: "13.0.6475.1", names: ["KB5068401"], date: "2025-11-11"}
+  - {value: "13.0.6470.1", names: ["KB5065226"], date: "2025-09-09"}
+  - {value: "13.0.6465.1", names: ["KB5063762"], date: "2025-08-12"}
+  - {value: "13.0.6460.7", names: ["KB5058718"], date: "2025-07-08"}
+  - {value: "13.0.6455.2", names: ["KB5046855"], date: "2024-11-12"}
+  - {value: "13.0.6450.1", names: ["KB5046063"], date: "2024-10-08"}
+  - {value: "13.0.6445.1", names: ["KB5042207"], date: "2024-09-10"}
+  - {value: "13.0.6441.1", names: ["KB5040946"], date: "2024-07-09"}
+  - {value: "13.0.6435.1", names: ["KB5029186"], date: "2023-10-10"}
+  - {value: "13.0.6430.49", names: ["KB5021129"], date: "2023-02-14"}
+  - {value: "13.0.6419.1", names: ["KB5014355"], date: "2022-06-14"}
+  - {value: "13.0.6300.2", names: ["2016 SP3", "KB5003279"], date: "2021-09-15"}
+  - {value: "13.0.5108.50", names: ["2016 SP2 GDR", "KB5014365"], date: "2022-06-14"}
+  - {value: "13.0.5893.48", names: ["KB5014351"], date: "2022-06-14"}
+  - {value: "13.0.5888.11", names: ["KB5001092"], date: "2021-03-29"}
+  - {value: "13.0.5882.1", names: ["KB5000645"], date: "2021-02-11"}
+  - {value: "13.0.5865.1", names: ["KB4583461"], date: "2021-01-12"}
+  - {value: "13.0.5103.6", names: ["KB4583460"], date: "2021-01-12"}
+  - {value: "13.0.5850.14", names: ["KB4577775"], date: "2020-09-28"}
+  - {value: "13.0.5830.85", names: ["KB4564903"], date: "2020-08-06"}
+  - {value: "13.0.5820.21", names: ["KB4549825"], date: "2020-05-28"}
+  - {value: "13.0.5698.0", names: ["KB4536648"], date: "2020-02-24"}
+  - {value: "13.0.5622.0", names: ["KB4535706"], date: "2020-02-11"}
+  - {value: "13.0.5102.14", names: ["KB4532097"], date: "2020-02-11"}
+  - {value: "13.0.5598.27", names: ["KB4527378"], date: "2019-12-09"}
+  - {value: "13.0.5492.2", names: ["KB4524334"], date: "2019-10-08"}
+  - {value: "13.0.5426.0", names: ["KB4505830"], date: "2019-07-31"}
+  - {value: "13.0.5366.0", names: ["KB4505222"], date: "2019-07-09"}
+  - {value: "13.0.5101.9", names: ["KB4505220"], date: "2019-07-09"}
+  - {value: "13.0.5337.0", names: ["KB4495256"], date: "2019-05-22"}
+  - {value: "13.0.5292.0", names: ["KB4488536"], date: "2019-03-19"}
+  - {value: "13.0.5264.1", names: ["KB4475776"], date: "2019-01-23"}
+  - {value: "13.0.5233.0", names: ["KB4464106"], date: "2018-11-13"}
+  - {value: "13.0.5216.0", names: ["KB4458871"], date: "2018-09-20"}
+  - {value: "13.0.5201.2", names: ["KB4458621"], date: "2018-08-21"}
+  - {value: "13.0.5081.1", names: ["KB4293802"], date: "2018-08-04"}
+  - {value: "13.0.5153.0", names: ["KB4340355"], date: "2018-07-16"}
+  - {value: "13.0.5149.0", names: ["KB4135048"], date: "2018-05-30"}
+  - {value: "13.0.5026.0", names: ["2016 SP2", "KB4052908"], date: "2018-04-24"}
+  - {value: "13.0.4604.0", names: ["KB4505221"], date: "2019-07-09"}
+  - {value: "13.0.4259.0", names: ["KB4505219"], date: "2019-07-09"}
+  - {value: "13.0.4574.0", names: ["KB4495257"], date: "2019-05-16"}
+  - {value: "13.0.4560.0", names: ["KB4488535"], date: "2019-03-19"}
+  - {value: "13.0.4550.1", names: ["KB4475775"], date: "2019-01-23"}
+  - {value: "13.0.4541.0", names: ["KB4464343"], date: "2018-11-13"}
+  - {value: "13.0.4528.0", names: ["KB4459676"], date: "2018-09-17"}
+  - {value: "13.0.4224.16", names: ["KB4458842"], date: "2018-08-22"}
+  - {value: "13.0.4522.0", names: ["KB4293808"], date: "2018-08-14"}
+  - {value: "13.0.4514.0", names: ["KB4341569"], date: "2018-07-16"}
+  - {value: "13.0.4502.0", names: ["KB4100997"], date: "2018-05-30"}
+  - {value: "13.0.4474.0", names: ["KB4077064"], date: "2018-03-19"}
+  - {value: "13.0.4466.4", names: ["KB4057119"], date: "2018-01-04"}
+  - {value: "13.0.4210.6", names: ["KB4057118"], date: "2018-01-03"}
+  - {value: "13.0.4457.0", names: ["KB4037354"], date: "2017-11-21"}
+  - {value: "13.0.4451.0", names: ["KB4040714"], date: "2017-09-18"}
+  - {value: "13.0.4446.0", names: ["KB4024305"], date: "2017-08-08"}
+  - {value: "13.0.4206.0", names: ["KB4019089"], date: "2017-08-08"}
+  - {value: "13.0.4435.0", names: ["KB4019916"], date: "2017-05-15"}
+  - {value: "13.0.4422.0", names: ["KB4013106"], date: "2017-03-20"}
+  - {value: "13.0.4411.0", names: ["KB3208177"], date: "2017-01-18"}
+  - {value: "13.0.4001.0", names: ["2016 SP1", "KB3182545"], date: "2016-11-16"}
+  - {value: "13.0.1745.2", names: ["KB4058560"], date: "2018-01-06"}
+  - {value: "13.0.2218.0", names: ["KB4058559"], date: "2018-01-06"}
+  - {value: "13.0.2216.0", names: ["KB4037357"], date: "2017-11-20"}
+  - {value: "13.0.2213.0", names: ["KB4040713"], date: "2017-09-18"}
+  - {value: "13.0.2210.0", names: ["KB4024304"], date: "2017-08-08"}
+  - {value: "13.0.2204.0", names: ["KB4019914"], date: "2017-05-15"}
+  - {value: "13.0.2197.0", names: ["KB4013105"], date: "2017-03-20"}
+  - {value: "13.0.2193.0", names: ["KB3205052"], date: "2017-01-18"}
+  - {value: "13.0.4202.2", names: ["KB3210089"], date: "2016-12-16"}
+  - {value: "13.0.1728.2", names: ["KB3210111"], date: "2016-12-16"}
+  - {value: "13.0.2186.6", names: ["KB3205413", "KB3194717"], date: "2016-11-16"}
+  - {value: "13.0.1722.0", names: ["KB3194716"], date: "2016-11-08"}
+  - {value: "13.0.2164.0", names: ["KB3182270"], date: "2016-09-22"}
+  - {value: "13.0.2149.0", names: ["KB3164674"], date: "2016-07-25"}

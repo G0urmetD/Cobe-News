@@ -1,0 +1,17 @@
+# data (SQLite database) – stays local
+/data/*
+!/data/.gitkeep
+.env
+
+# build / tooling
+frontend/node_modules/
+frontend/dist/
+backend/.venv/
+backend/.pytest_cache/
+__pycache__/
+*.pyc
+*.tsbuildinfo
+.DS_Store
+
+# own certificates (TLS_MODE=own)
+/deploy/certs/

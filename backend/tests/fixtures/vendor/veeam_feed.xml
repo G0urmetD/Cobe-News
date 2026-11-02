@@ -1,0 +1,1754 @@
+<feed xmlns="http://www.w3.org/2005/Atom">
+ <title type="text">Veeam Security Advisory</title>
+ <id>https://www.veeam.com/services/open/kb/security-feed</id>
+ <link rel="alternate" type="text/html" href="https://www.veeam.com/knowledge-base.html"/>
+ <link rel="self" type="application/atom+xml" href="https://www.veeam.com/services/open/kb/security-feed"/>
+ <updated>2026-10-27T14:10:20Z</updated>
+ <author>
+     <name>Veeam Software</name>
+ </author>
+<entry>
+ <title><![CDATA[Vulnerabilities Resolved in Veeam Backup & Replication 13.1.2]]></title>
+ <link href="https://www.veeam.com/kb4948"/> 
+ <id>https://www.veeam.com/kb4948</id>
+ <updated>2026-10-27T00:00:00Z</updated>
+ <published>2026-10-27T00:00:00Z</published>
+ <author>
+     <name type="html"><![CDATA[Veeam Backup & Replication]]></name>
+ </author>
+ <summary><![CDATA[Veeam Support Knowledge Base answer to: Vulnerabilities Resolved in Veeam Backup & Replication 13.1.2]]></summary>
+ <content type="html"><![CDATA[<div class=" veeam-component__component-spacing-below--lgx">
+ <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+  <div class="bg-image-size-contain bg-image-position-left   ">
+   <div class="section__container--centered section__container-spacing--md " style="max-width: 1260px;">
+    <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+     <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+      <div class="section-title center 
+            section-title--only-title  ">
+       <div class="section-title__title-block">
+        <h1 class="section-title__title">Vulnerabilities Resolved in Veeam Backup &amp; Replication 13.1.2</h1>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class=" veeam-component__component-spacing-below--md">
+       <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+        <div class="bg-image-size-contain bg-image-position-left   ">
+         <div class="  " style="max-width: 100%;">
+          <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+           <div class="print-icon aem-GridColumn aem-GridColumn--default--12">
+            <div class="print-icon  " data-component="PrintIconComponent">
+             <a class="print-icon__button no-print" href="javascript:void(0);" title="Print page"> <i class="v-icon fa-solid fa-print" aria-hidden="true"></i> </a>
+            </div>
+           </div>
+           <div class="knowledge-base-details aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--6 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+            <div class="knowledge-base-details__container">
+             <table class="knowledge-base-details__table">
+              <tbody>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">KB ID:</td>
+                <td class="knowledge-base-details__value">4948</td>
+               </tr>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">Product:</td>
+                <td class="knowledge-base-details__value">Veeam Backup &amp; Replication | 13 | 13.1</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Published:</td>
+                <td class="knowledge-base-details__value">2026-10-27</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Last Modified:</td>
+                <td class="knowledge-base-details__value">2026-10-27</td>
+               </tr>
+              </tbody>
+             </table>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn--default--9 aem-GridColumn aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+       <div class="bg-image-size-contain bg-image-position-left   ">
+        <div class="section__container--centered  " style="max-width: 100%;">
+         <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+          <div class="experience-fragment experiencefragment aem-GridColumn aem-GridColumn--default--12">
+           <div id="experience-fragment-c9c89cd1b0" class="cmp-experiencefragment cmp-experiencefragment--_vulnstatement">
+            <div class="xf-content-height">
+             <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+              <div class="notice-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+               <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+                <div class="notice notice--success">
+                 <div class="notice__icon">
+                  <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+                 </div>
+                 <div class="notice__content">
+                  <div class="notice__title">
+                   Veeam Software Security Commitment
+                  </div>
+                  <div class="notice__text veeam-text">
+                   <span class="veeam-text__caption">Veeam®&nbsp;is committed to ensuring its products protect customers from potential risks. As part of that commitment, we operate a&nbsp;<a href="https://www.veeam.com/vulnerability-disclosure.html" target="_blank" rel="noopener">Vulnerability Disclosure Program (VDP)</a>&nbsp;for all Veeam products and perform extensive internal code audits. When a vulnerability is identified, our team promptly develops a patch to address and mitigate the risk. In line with our dedication to transparency, we publicly disclose the vulnerability and provide detailed mitigation information. This approach ensures that all potentially affected customers can quickly implement the necessary measures to safeguard their systems. It’s important to note that once a vulnerability and its associated patch are disclosed, attackers will likely attempt to reverse-engineer the patch to exploit unpatched deployments of Veeam software. This reality underscores the critical importance of ensuring that all customers use the latest versions of our software and install all updates and patches without delay.</span>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Issue Details</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-108142</b></h4>
+                   <p>A vulnerability allowing an unauthenticated attacker to bypass authorization on the CDP Coordinator Service.</p>
+                   <p><b>Severity:</b> Critical<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">9.1<span class="veeam-tooltip-text">CVSS: AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:H/VA:H/SC:N/SI:H/SA:H</span></span><br><b>Affected Deployment Type: </b>Windows-based Veeam Backup &amp; Replication | Veeam Software Appliance<br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup &amp; Replication 13.1.1.18 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 13.1 builds</a>.</li>
+                    <li>Veeam Backup &amp; Replication 13.0.2.29 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 13.0 builds</a>.<br><sub><b>Note:</b> Older versions (e.g., 12.x) are not affected.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following builds:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4738" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.1.2 (build 13.1.2.57)</a></li>
+                    <li><a href="https://www.veeam.com/kb4738#v1303" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.0.3 (build 13.0.3.63)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-108140</b></h4>
+                   <p>A vulnerability allowing an authenticated user with the Restore Operator role, who also controls the contents of a backed-up NAS share, to write attacker-controlled files to an arbitrary path on the backup server through relative path traversal.</p>
+                   <p><b>Severity:</b> Medium<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">5.9<span class="veeam-tooltip-text">CVSS: AV:N/AC:H/AT:P/PR:H/UI:N/VC:N/VI:H/VA:L/SC:N/SI:N/SA:N</span></span><br><b>Affected Deployment Type: </b>Windows-based Veeam Backup &amp; Replication | Veeam Software Appliance<br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup &amp; Replication 13.1.1.18 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 13.1 builds</a>.</li>
+                    <li>Veeam Backup &amp; Replication 13.0.2.29 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 13.0 builds</a>.<br><sub><b>Note:</b> Older versions (e.g., 12.x) are not affected.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following builds:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4738" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.1.2 (build 13.1.2.57)</a></li>
+                    <li><a href="https://www.veeam.com/kb4738#v1303" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.0.3 (build 13.0.3.63)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-108141</b></h4>
+                   <p>A vulnerability allowing an authenticated user with the Restore Operator role, who also controls the contents of a backed-up NAS share, to write attacker-controlled files to an arbitrary path on the backup server through relative path traversal.</p>
+                   <p><b>Severity:</b> Medium<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">5.9<span class="veeam-tooltip-text">CVSS: AV:N/AC:H/AT:P/PR:H/UI:N/VC:N/VI:H/VA:L/SC:N/SI:N/SA:N</span></span><br><b>Affected Deployment Type: </b>Windows-based Veeam Backup &amp; Replication | Veeam Software Appliance<br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup &amp; Replication 13.1.1.18 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 13.1 builds</a>.</li>
+                    <li>Veeam Backup &amp; Replication 13.0.2.29 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 13.0 builds</a>.<br><sub><b>Note:</b> Older versions (e.g., 12.x) are not affected.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following builds:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4738" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.1.2 (build 13.1.2.57)</a></li>
+                    <li><a href="https://www.veeam.com/kb4738#v1303" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.0.3 (build 13.0.3.63)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-105477</b></h4>
+                   <p>A vulnerability in Veeam Agent <i>for Linux</i> allows for local privilege escalation. Only installations that are managed by a Veeam Backup &amp; Replication instance are affected.</p>
+                   <p><b>Severity:</b> High<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">7.3<span class="veeam-tooltip-text">CVSS: AV:L/AC:L/AT:P/PR:L/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Agent <i>for Linux</i> 13.1.1.4 and all <a href="https://www.veeam.com/kb2681" target="_blank" rel="noopener">earlier version 13.1 builds</a>.<br><sub><b>Note:</b> Older versions (e.g., 13.0.x and 6.x) are not affected.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb2681" target="_blank" rel="noopener">Veeam Agent <i>for Linux</i> 13.1.2 (build 13.1.2.11)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="horizontal-delimiter no-print aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="delimiter  veeam-component__component-spacing-below--lgx">
+            <div style="width: 100%; border-color: #b0b0b0;; border-width: 1px;"></div>
+           </div>
+          </div>
+          <div class="veeam-text text no-print aem-GridColumn aem-GridColumn--default--12">
+           <div class="veeam-text  " data-component="VeeamTextComponent">
+            <p>If this KB article did not resolve your issue or you need further assistance with Veeam software, please create a <a href="/kb1771">Veeam Support Case.</a></p>
+            <p>To submit feedback regarding this article, please click this link: <span class="veeam-text__open-universal-form"><a href="?ad=in-text-link#kb_request_form">Send Article Feedback</a></span><br>
+              To report a typo on this page, highlight the typo with your mouse and press CTRL + Enter.</p>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>]]></content>
+</entry>
+<entry>
+ <title><![CDATA[Vulnerabilities Resolved in Veeam Backup for Microsoft 365 8.6]]></title>
+ <link href="https://www.veeam.com/kb4957"/> 
+ <id>https://www.veeam.com/kb4957</id>
+ <updated>2026-10-27T00:00:00Z</updated>
+ <published>2026-10-27T00:00:00Z</published>
+ <author>
+     <name type="html"><![CDATA[Veeam Backup for Microsoft 365]]></name>
+ </author>
+ <summary><![CDATA[Veeam Backup for Microsoft 365 8.6 resolves four vulnerabilities (CVE-2026-106078, CVE-2026-106077, CVE-2026-106076, and CVE-2025-64394) in the Windows-based server. This article lists the severity, CVSS score, affected builds, and fixed builds for each vulnerability.]]></summary>
+ <content type="html"><![CDATA[<div class=" veeam-component__component-spacing-below--lgx">
+ <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+  <div class="bg-image-size-contain bg-image-position-left   ">
+   <div class="section__container--centered section__container-spacing--md " style="max-width: 1260px;">
+    <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+     <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+      <div class="section-title section-title--alignment-left 
+            section-title--only-title  ">
+       <div class="section-title__title-block">
+        <h1 class="section-title__title">Vulnerabilities Resolved in Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.6</h1>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class=" veeam-component__component-spacing-below--md">
+       <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+        <div class="bg-image-size-contain bg-image-position-left   ">
+         <div class="  " style="max-width: 100%;">
+          <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+           <div class="print-icon aem-GridColumn aem-GridColumn--default--12">
+            <div class="print-icon  " data-component="PrintIconComponent">
+             <a class="print-icon__button no-print" href="javascript:void(0);" title="Print page"> <i class="v-icon fa-solid fa-print" aria-hidden="true"></i> </a>
+            </div>
+           </div>
+           <div class="knowledge-base-details aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--6 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+            <div class="knowledge-base-details__container">
+             <table class="knowledge-base-details__table">
+              <tbody>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">KB ID:</td>
+                <td class="knowledge-base-details__value">4957</td>
+               </tr>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">Product:</td>
+                <td class="knowledge-base-details__value">Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> | 8.6</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Published:</td>
+                <td class="knowledge-base-details__value">2026-10-27</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Last Modified:</td>
+                <td class="knowledge-base-details__value">2026-10-26</td>
+               </tr>
+              </tbody>
+             </table>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn--default--9 aem-GridColumn aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+       <div class="bg-image-size-contain bg-image-position-left   ">
+        <div class="section__container--centered  " style="max-width: 100%;">
+         <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+          <div class="experience-fragment experiencefragment aem-GridColumn aem-GridColumn--default--12">
+           <div id="experience-fragment-c49b6d3501" class="cmp-experiencefragment cmp-experiencefragment--_vulnstatement">
+            <div class="xf-content-height">
+             <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+              <div class="notice-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+               <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+                <div class="notice notice--success">
+                 <div class="notice__icon">
+                  <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+                 </div>
+                 <div class="notice__content">
+                  <div class="notice__title">
+                   Veeam Software Security Commitment
+                  </div>
+                  <div class="notice__text veeam-text">
+                   <span class="veeam-text__caption">Veeam®&nbsp;is committed to ensuring its products protect customers from potential risks. As part of that commitment, we operate a&nbsp;<a href="https://www.veeam.com/vulnerability-disclosure.html" target="_blank" rel="noopener">Vulnerability Disclosure Program (VDP)</a>&nbsp;for all Veeam products and perform extensive internal code audits. When a vulnerability is identified, our team promptly develops a patch to address and mitigate the risk. In line with our dedication to transparency, we publicly disclose the vulnerability and provide detailed mitigation information. This approach ensures that all potentially affected customers can quickly implement the necessary measures to safeguard their systems. It’s important to note that once a vulnerability and its associated patch are disclosed, attackers will likely attempt to reverse-engineer the patch to exploit unpatched deployments of Veeam software. This reality underscores the critical importance of ensuring that all customers use the latest versions of our software and install all updates and patches without delay.</span>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Issue Details</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-106076</b></h4>
+                   <p>A vulnerability allowing an authenticated organization-transfer peer to inject SQL into the configuration database of the source Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> server, leading to cross-tenant read and write of configuration data and remote code execution as the PostgreSQL service account.</p>
+                   <p><b>Severity:</b> Critical<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">9.0<span class="veeam-tooltip-text">CVSS: AV:N/AC:L/AT:P/PR:L/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.5.0.1014 and all <a href="https://www.veeam.com/kb4106" target="_blank" rel="noopener">earlier version 8 builds</a>.<br><sub><b>Note:</b> <a href="https://www.veeam.com/product-lifecycle.html" target="_blank" rel="noopener">Unsupported product versions</a> were not tested, but are likely affected and should be considered vulnerable.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4913" target="_blank" rel="noopener">Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.6 (build 8.6.0.1102)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-106077</b></h4>
+                   <p>A vulnerability allowing a user with the Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> Administrator role to read arbitrary files on the backup server with LocalSystem privileges.</p>
+                   <p><b>Severity:</b> High<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">8.3<span class="veeam-tooltip-text">CVSS: AV:N/AC:L/AT:N/PR:H/UI:N/VC:H/VI:N/VA:N/SC:H/SI:H/SA:N</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.5.0.1014 and all <a href="https://www.veeam.com/kb4106" target="_blank" rel="noopener">earlier version 8 builds</a>.<br><sub><b>Note:</b> <a href="https://www.veeam.com/product-lifecycle.html" target="_blank" rel="noopener">Unsupported product versions</a> were not tested, but are likely affected and should be considered vulnerable.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4913" target="_blank" rel="noopener">Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.6 (build 8.6.0.1102)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-106078</b></h4>
+                   <p>A vulnerability allowing an unauthenticated attacker to bypass REST API authentication with a forged federation token and receive responses from REST API endpoints that do not call the Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> backup service.</p>
+                   <p><b>Severity:</b> Medium<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">6.9<span class="veeam-tooltip-text">CVSS: AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:N/VA:N/SC:N/SI:N/SA:N</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.6.0.1102 and all <a href="https://www.veeam.com/kb4106" target="_blank" rel="noopener">earlier version 8 builds</a>.<br><sub><b>Note:</b> <a href="https://www.veeam.com/product-lifecycle.html" target="_blank" rel="noopener">Unsupported product versions</a> were not tested, but are likely affected and should be considered vulnerable.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4913" target="_blank" rel="noopener">Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.6 Patch 1 (build 8.6.0.5011)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b>CVE-2025-64394</b></h4>
+                   <p>A vulnerability allowing a low-privileged local user to write arbitrary files with SYSTEM privileges during the installation of Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i>, which can lead to privilege escalation or denial of service.</p>
+                   <p><b>Severity:</b> Medium<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">4.3<span class="veeam-tooltip-text">CVSS: AV:L/AC:L/AT:P/PR:L/UI:A/VC:N/VI:L/VA:H/SC:N/SI:N/SA:N</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.6.0.1102 and all <a href="https://www.veeam.com/kb4106" target="_blank" rel="noopener">earlier version 8 builds</a>.<br><sub><b>Note:</b> <a href="https://www.veeam.com/product-lifecycle.html" target="_blank" rel="noopener">Unsupported product versions</a> were not tested, but are likely affected and should be considered vulnerable.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4913" target="_blank" rel="noopener">Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> 8.6 Patch 1 (build 8.6.0.5011)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="horizontal-delimiter no-print aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="delimiter  veeam-component__component-spacing-below--lgx">
+            <div style="width: 100%; border-color: #b0b0b0;; border-width: 1px;"></div>
+           </div>
+          </div>
+          <div class="veeam-text text no-print aem-GridColumn aem-GridColumn--default--12">
+           <div class="veeam-text  " data-component="VeeamTextComponent">
+            <p>If this KB article did not resolve your issue or you need further assistance with Veeam software, please create a <a href="/kb1771">Veeam Support Case.</a></p>
+            <p>To submit feedback regarding this article, please click this link: <span class="veeam-text__open-universal-form"><a href="?ad=in-text-link#kb_request_form">Send Article Feedback</a></span><br>
+              To report a typo on this page, highlight the typo with your mouse and press CTRL + Enter.</p>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>]]></content>
+</entry>
+<entry>
+ <title><![CDATA[PHP2Shell Vulnerability (CVE-2026-109618/CVE-2026-109619)]]></title>
+ <link href="https://www.veeam.com/kb4953"/> 
+ <id>https://www.veeam.com/kb4953</id>
+ <updated>2026-10-22T00:00:00Z</updated>
+ <published>2026-10-22T00:00:00Z</published>
+ <author>
+     <name type="html"><![CDATA[]]></name>
+ </author>
+ <summary><![CDATA[Veeam products and Veeam SaaS solutions are not affected by this vulnerability. PHP is not in use by any Veeam products or Veeam SaaS solutions.]]></summary>
+ <content type="html"><![CDATA[<div class=" veeam-component__component-spacing-below--lgx">
+ <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+  <div class="bg-image-size-contain bg-image-position-left   ">
+   <div class="section__container--centered section__container-spacing--md " style="max-width: 1260px;">
+    <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+     <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+      <div class="section-title section-title--alignment-left 
+            section-title--only-title  ">
+       <div class="section-title__title-block">
+        <h1 class="section-title__title">PHP2Shell Vulnerability<br><sub>CVE-2026-109618 | CVE-2026-109619</sub></h1>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class=" veeam-component__component-spacing-below--md">
+       <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+        <div class="bg-image-size-contain bg-image-position-left   ">
+         <div class="  " style="max-width: 100%;">
+          <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+           <div class="print-icon aem-GridColumn aem-GridColumn--default--12">
+            <div class="print-icon  " data-component="PrintIconComponent">
+             <a class="print-icon__button no-print" href="javascript:void(0);" title="Print page"> <i class="v-icon fa-solid fa-print" aria-hidden="true"></i> </a>
+            </div>
+           </div>
+           <div class="knowledge-base-details aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--6 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+            <div class="knowledge-base-details__container">
+             <table class="knowledge-base-details__table">
+              <tbody>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">KB ID:</td>
+                <td class="knowledge-base-details__value">4953</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Published:</td>
+                <td class="knowledge-base-details__value">2026-10-22</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Last Modified:</td>
+                <td class="knowledge-base-details__value">2026-10-22</td>
+               </tr>
+              </tbody>
+             </table>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn--default--9 aem-GridColumn aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+       <div class="bg-image-size-contain bg-image-position-left   ">
+        <div class="section__container--centered  " style="max-width: 100%;">
+         <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title section-title--alignment-left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Impact on Veeam Software</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--md">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <p>Veeam products and Veeam SaaS solutions are <b>not </b>affected by this vulnerability.</p>
+                   <p>PHP is <b>not </b>in use by any Veeam products or Veeam SaaS solutions.</p>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title section-title--alignment-left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">General Vulnerability Details</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="resource-list-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="resource-list ">
+                   <ul class="resource-list__container resource-list__container--column ">
+                    <li class="resource-list__item"><a class="resource-list__link" href="https://nvd.nist.gov/vuln/detail/cve-2026-109618" target="_blank" rel="noopener"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>CVE-2026-109618 </a></li>
+                    <li class="resource-list__item"><a class="resource-list__link" href="https://nvd.nist.gov/vuln/detail/cve-2026-109619" target="_blank" rel="noopener"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>CVE-2026-109619 </a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title section-title--alignment-left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">More Information</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="resource-list-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="resource-list ">
+                   <ul class="resource-list__container resource-list__container--column ">
+                    <li class="resource-list__item"><a class="resource-list__link" href="https://en.wikipedia.org/wiki/PHP2Shell" target="_blank" rel="noopener"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>Wikipedia: PHP2Shell </a></li>
+                    <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/legal/eula-oss.html" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>Veeam EULA |&nbsp;Open Source Software Components </a></li>
+                    <li class="resource-list__item"><a class="resource-list__link" href="https://repository.veeam.com/vsa/9.6/external-mandatory/x86_64/" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>Veeam Software Appliance Repository / Mandatory External Packages </a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="horizontal-delimiter no-print aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="delimiter  veeam-component__component-spacing-below--lgx">
+            <div style="width: 100%; border-color: #b0b0b0;; border-width: 1px;"></div>
+           </div>
+          </div>
+          <div class="veeam-text text no-print aem-GridColumn aem-GridColumn--default--12">
+           <div class="veeam-text  " data-component="VeeamTextComponent">
+            <p>If this KB article did not resolve your issue or you need further assistance with Veeam software, please create a <a href="/kb1771">Veeam Support Case.</a></p>
+            <p>To submit feedback regarding this article, please click this link: <span class="veeam-text__open-universal-form"><a href="?ad=in-text-link#kb_request_form">Send Article Feedback</a></span><br>
+              To report a typo on this page, highlight the typo with your mouse and press CTRL + Enter.</p>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>]]></content>
+</entry>
+<entry>
+ <title><![CDATA[Vulnerabilities Resolved in Veeam Backup & Replication 12.3.2 P4]]></title>
+ <link href="https://www.veeam.com/kb4934"/> 
+ <id>https://www.veeam.com/kb4934</id>
+ <updated>2026-10-06T00:00:00Z</updated>
+ <published>2026-10-06T00:00:00Z</published>
+ <author>
+     <name type="html"><![CDATA[Veeam Backup & Replication]]></name>
+ </author>
+ <summary><![CDATA[Vulnerabilities Resolved in Veeam Backup & Replication 12.3.2 P4]]></summary>
+ <content type="html"><![CDATA[<div class=" veeam-component__component-spacing-below--lgx">
+ <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+  <div class="bg-image-size-contain bg-image-position-left   ">
+   <div class="section__container--centered section__container-spacing--md " style="max-width: 1260px;">
+    <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+     <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+      <div class="section-title left 
+            section-title--only-title  ">
+       <div class="section-title__title-block">
+        <h1 class="section-title__title">Vulnerabilities Resolved in Veeam Backup &amp; Replication 12.3.2 P4</h1>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class=" veeam-component__component-spacing-below--md">
+       <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+        <div class="bg-image-size-contain bg-image-position-left   ">
+         <div class="  " style="max-width: 100%;">
+          <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+           <div class="print-icon aem-GridColumn aem-GridColumn--default--12">
+            <div class="print-icon  " data-component="PrintIconComponent">
+             <a class="print-icon__button no-print" href="javascript:void(0);" title="Print page"> <i class="v-icon fa-solid fa-print" aria-hidden="true"></i> </a>
+            </div>
+           </div>
+           <div class="knowledge-base-details aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--6 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+            <div class="knowledge-base-details__container">
+             <table class="knowledge-base-details__table">
+              <tbody>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">KB ID:</td>
+                <td class="knowledge-base-details__value">4934</td>
+               </tr>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">Product:</td>
+                <td class="knowledge-base-details__value">Veeam Backup &amp; Replication | 12 | 12.1 | 12.2 | 12.3 | 12.3.1 | 12.3.2</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Published:</td>
+                <td class="knowledge-base-details__value">2026-10-06</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Last Modified:</td>
+                <td class="knowledge-base-details__value">2026-10-06</td>
+               </tr>
+              </tbody>
+             </table>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn--default--9 aem-GridColumn aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+       <div class="bg-image-size-contain bg-image-position-left   ">
+        <div class="section__container--centered  " style="max-width: 100%;">
+         <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+          <div class="notice-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+            <div class="notice notice--success">
+             <div class="notice__icon">
+              <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+             </div>
+             <div class="notice__content">
+              <div class="notice__title">
+               Article Applicability
+              </div>
+              <div class="notice__text veeam-text">
+               <p>All vulnerabilities listed in this article:</p>
+               <ul>
+                <li>Affect <b>only </b>Veeam Backup &amp; Replication 12.3.2 P3 (build&nbsp;12.3.2.4854) and older builds.</li>
+                <li>Are resolved in <a href="https://www.veeam.com/kb4696" target="_blank" rel="noopener">Veeam Backup &amp; Replication 12.3.2 P4</a>&nbsp;(build 12.3.2.4934).</li>
+                <li>Do <b>not </b>affect any Veeam Backup &amp; Replication version 13 builds.</li>
+               </ul>
+               <p>Customers are reminded that Veeam Backup &amp; Replication version 12 will reach <a href="https://www.veeam.com/product-lifecycle.html" target="_blank" rel="noopener">End of Support</a> on 2027-02-28.</p>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="experience-fragment experiencefragment aem-GridColumn aem-GridColumn--default--12">
+           <div id="experience-fragment-499adbda64" class="cmp-experiencefragment cmp-experiencefragment--_vulnstatement">
+            <div class="xf-content-height">
+             <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+              <div class="notice-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+               <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+                <div class="notice notice--success">
+                 <div class="notice__icon">
+                  <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+                 </div>
+                 <div class="notice__content">
+                  <div class="notice__title">
+                   Veeam Software Security Commitment
+                  </div>
+                  <div class="notice__text veeam-text">
+                   <span class="veeam-text__caption">Veeam®&nbsp;is committed to ensuring its products protect customers from potential risks. As part of that commitment, we operate a&nbsp;<a href="https://www.veeam.com/vulnerability-disclosure.html" target="_blank" rel="noopener">Vulnerability Disclosure Program (VDP)</a>&nbsp;for all Veeam products and perform extensive internal code audits. When a vulnerability is identified, our team promptly develops a patch to address and mitigate the risk. In line with our dedication to transparency, we publicly disclose the vulnerability and provide detailed mitigation information. This approach ensures that all potentially affected customers can quickly implement the necessary measures to safeguard their systems. It’s important to note that once a vulnerability and its associated patch are disclosed, attackers will likely attempt to reverse-engineer the patch to exploit unpatched deployments of Veeam software. This reality underscores the critical importance of ensuring that all customers use the latest versions of our software and install all updates and patches without delay.</span>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Issue Details</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2025-64393</b></h4>
+                   <p>A vulnerability allowing a low-privileged user with the Backup Viewer role to perform remote code execution (RCE) on the Veeam Backup Server through insecure deserialization of untrusted data received via the Mount Service.</p>
+                   <p><b>Severity:</b>&nbsp;Critical<br><b>CVSS v4.0 Score:</b>&nbsp;<span class="veeam-tooltip">9.4<span class="veeam-tooltip-text">CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup &amp; Replication&nbsp;12.3.2.4854 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 12 builds</a>.<br><sub><b>Note: </b>Version 13 is not affected.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4696" target="_blank" rel="noopener">Veeam Backup &amp; Replication 12.3.2 P4 (build 12.3.2.4934)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-93026</b></h4>
+                   <p>A vulnerability allowing an authenticated user with the Backup Viewer role to modify or delete the Enterprise Manager master key and read or overwrite stored antivirus update credentials on the Veeam Backup Server.</p>
+                   <p><b>Severity:</b>&nbsp;Medium<br><b>CVSS v4.0 Score:</b>&nbsp;<span class="veeam-tooltip">6.1<span class="veeam-tooltip-text">CVSS:4.0/AV:N/AC:L/AT:P/PR:L/UI:N/VC:L/VI:H/VA:L/SC:N/SI:N/SA:N</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup &amp; Replication&nbsp;12.3.2.4854 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 12 builds</a>.<br><sub><b>Note: </b>Version 13 is not affected.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4696" target="_blank" rel="noopener">Veeam Backup &amp; Replication 12.3.2 P4 (build 12.3.2.4934)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b>CVE-2025-64392</b></h4>
+                   <p>A reflected cross-site scripting vulnerability in Veeam Backup Enterprise Manager allows an attacker to execute script in the browser of an authenticated portal user who opens a crafted link.</p>
+                   <p><b>Severity:</b>&nbsp;Medium<br><b>CVSS v4.0 Score:</b>&nbsp;<span class="veeam-tooltip">4.8<span class="veeam-tooltip-text">CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:A/VC:N/VI:N/VA:N/SC:L/SI:L/SA:N</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup Enterprise Manager (Veeam Backup &amp; Replication)&nbsp;12.3.2.4854 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 12 builds</a>.<br><sub><b>Note: </b>Version 13 is not affected.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4696" target="_blank" rel="noopener">Veeam Backup &amp; Replication 12.3.2 P4 (build 12.3.2.4934)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="horizontal-delimiter no-print aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="delimiter  veeam-component__component-spacing-below--lgx">
+            <div style="width: 100%; border-color: #b0b0b0;; border-width: 1px;"></div>
+           </div>
+          </div>
+          <div class="veeam-text text no-print aem-GridColumn aem-GridColumn--default--12">
+           <div class="veeam-text  " data-component="VeeamTextComponent">
+            <p>If this KB article did not resolve your issue or you need further assistance with Veeam software, please create a <a href="/kb1771">Veeam Support Case.</a></p>
+            <p>To submit feedback regarding this article, please click this link: <span class="veeam-text__open-universal-form"><a href="?ad=in-text-link#kb_request_form">Send Article Feedback</a></span><br>
+              To report a typo on this page, highlight the typo with your mouse and press CTRL + Enter.</p>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>]]></content>
+</entry>
+<entry>
+ <title><![CDATA[Vulnerabilities Resolved in Veeam Backup & Replication 13.1]]></title>
+ <link href="https://www.veeam.com/kb4902"/> 
+ <id>https://www.veeam.com/kb4902</id>
+ <updated>2026-10-06T00:00:00Z</updated>
+ <published>2026-10-06T00:00:00Z</published>
+ <author>
+     <name type="html"><![CDATA[Veeam Backup & Replication]]></name>
+ </author>
+ <summary><![CDATA[Vulnerabilities Resolved in Veeam Backup & Replication 13.1]]></summary>
+ <content type="html"><![CDATA[<div class=" veeam-component__component-spacing-below--lgx">
+ <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+  <div class="bg-image-size-contain bg-image-position-left   ">
+   <div class="section__container--centered section__container-spacing--md " style="max-width: 1260px;">
+    <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+     <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+      <div class="section-title section-title--alignment-left 
+            section-title--only-title  ">
+       <div class="section-title__title-block">
+        <h1 class="section-title__title">Vulnerabilities Resolved in Veeam Backup &amp; Replication 13.1</h1>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class=" veeam-component__component-spacing-below--md">
+       <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+        <div class="bg-image-size-contain bg-image-position-left   ">
+         <div class="  " style="max-width: 100%;">
+          <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+           <div class="print-icon aem-GridColumn aem-GridColumn--default--12">
+            <div class="print-icon  " data-component="PrintIconComponent">
+             <a class="print-icon__button no-print" href="javascript:void(0);" title="Print page"> <i class="v-icon fa-solid fa-print" aria-hidden="true"></i> </a>
+            </div>
+           </div>
+           <div class="knowledge-base-details aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--6 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+            <div class="knowledge-base-details__container">
+             <table class="knowledge-base-details__table">
+              <tbody>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">KB ID:</td>
+                <td class="knowledge-base-details__value">4902</td>
+               </tr>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">Product:</td>
+                <td class="knowledge-base-details__value">Veeam Backup &amp; Replication | 12 | 13</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Published:</td>
+                <td class="knowledge-base-details__value">2026-08-25</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Last Modified:</td>
+                <td class="knowledge-base-details__value">2026-10-05</td>
+               </tr>
+              </tbody>
+             </table>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn--default--9 aem-GridColumn aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+       <div class="bg-image-size-contain bg-image-position-left   ">
+        <div class="section__container--centered  " style="max-width: 100%;">
+         <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+          <div class="experience-fragment experiencefragment aem-GridColumn aem-GridColumn--default--12">
+           <div id="experience-fragment-9bccbc5912" class="cmp-experiencefragment cmp-experiencefragment--_vulnstatement">
+            <div class="xf-content-height">
+             <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+              <div class="notice-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+               <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+                <div class="notice notice--success">
+                 <div class="notice__icon">
+                  <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+                 </div>
+                 <div class="notice__content">
+                  <div class="notice__title">
+                   Veeam Software Security Commitment
+                  </div>
+                  <div class="notice__text veeam-text">
+                   <span class="veeam-text__caption">Veeam®&nbsp;is committed to ensuring its products protect customers from potential risks. As part of that commitment, we operate a&nbsp;<a href="https://www.veeam.com/vulnerability-disclosure.html" target="_blank" rel="noopener">Vulnerability Disclosure Program (VDP)</a>&nbsp;for all Veeam products and perform extensive internal code audits. When a vulnerability is identified, our team promptly develops a patch to address and mitigate the risk. In line with our dedication to transparency, we publicly disclose the vulnerability and provide detailed mitigation information. This approach ensures that all potentially affected customers can quickly implement the necessary measures to safeguard their systems. It’s important to note that once a vulnerability and its associated patch are disclosed, attackers will likely attempt to reverse-engineer the patch to exploit unpatched deployments of Veeam software. This reality underscores the critical importance of ensuring that all customers use the latest versions of our software and install all updates and patches without delay.</span>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Issue Details</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-58070</b></h4>
+                   <p>A vulnerability that causes guest OS credentials used for&nbsp;Application Aware processing to be recorded in cleartext in logs on the guest machine.</p>
+                   <p><b>Severity:</b>&nbsp;Medium<br><b>CVSS v4.0 Score:</b>&nbsp;<span class="veeam-tooltip">6.8<span class="veeam-tooltip-text">CVSS: AV:L/AC:L/AT:N/PR:L/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N</span></span><br><b>Affected Deployment Type: </b>Windows-based Veeam Backup &amp; Replication | Veeam Software Appliance<br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup &amp; Replication&nbsp;13.0.2.29 and all&nbsp;<a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 13 builds</a>.<br><sub><b>Note: </b>Older versions (e.g., 12.x) are not affected.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following builds:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4738" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.1 (build 13.1.0.411)</a></li>
+                    <li><a href="https://www.veeam.com/kb4738" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.0.3 (build 13.0.3.63)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="notice-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+                 <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+                  <div class="notice notice--success">
+                   <div class="notice__icon">
+                    <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+                   </div>
+                   <div class="notice__content">
+                    <div class="notice__title">
+                     CVE-2026-58070 Impact Mitigation
+                    </div>
+                    <div class="notice__text veeam-text">
+                     The fix that addresses CVE-2026-58070&nbsp;prevents future incidences of passwords being written to the log files. The log files that have already been written will not be removed. Customers are therefore advised to change the password(s) associated with the credentials used for <a href="https://helpcenter.veeam.com/docs/vbr/userguide/guest_processing.html?ver=13" target="_blank" rel="noopener">Application-Aware Processing</a>.
+                    </div>
+                   </div>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-58069</b></h4>
+                   <p>A vulnerability allowing an authenticated Veeam Cloud Connect tenant to read arbitrary files on the service provider host.</p>
+                   <p><b>Severity:</b> High<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">8.3<span class="veeam-tooltip-text">CVSS: AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:N/VA:N/SC:H/SI:N/SA:N</span></span><br><b>Affected Deployment Type: </b>Windows-based Veeam Backup &amp; Replication<br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Backup &amp; Replication&nbsp;13.0.2.29 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier version 13 builds</a>.</li>
+                    <li>Veeam Backup &amp; Replication&nbsp;12.3.2.4854 and all <a href="https://www.veeam.com/kb2680" target="_blank" rel="noopener">earlier versions of 12 builds</a>.<br><sub><b>Note:</b> <a href="https://www.veeam.com/product-lifecycle.html" target="_blank" rel="noopener">Unsupported product versions</a> were not tested, but are likely affected and should be considered vulnerable.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following builds:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4738#v131" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.1 (build 13.1.0.411)</a></li>
+                    <li><a href="https://www.veeam.com/kb4738#v1303" target="_blank" rel="noopener">Veeam Backup &amp; Replication 13.0.3 (build 13.0.3.63)</a></li>
+                    <li><a href="https://www.veeam.com/kb4696" target="_blank" rel="noopener">Veeam Backup &amp; Replication 12.3.2 P4 (build 12.3.2.4934)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-58068</b></h4>
+                   <p>A vulnerability that allows an attacker to trigger a denial-of-service condition affecting processes on the affected system.</p>
+                   <p><b>Severity:</b> Medium<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">6.8<span class="veeam-tooltip-text">CVSS: AV:L/AC:L/AT:N/PR:L/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Agent&nbsp;<i>for Microsoft Windows</i>&nbsp;13.0.4.1341 and all <a href="https://www.veeam.com/kb2683" target="_blank" rel="noopener">earlier version 13 and 6 builds</a>.<br><sub><b>Note:</b> <a href="https://www.veeam.com/product-lifecycle.html" target="_blank" rel="noopener">Unsupported product versions</a> were not tested, but are likely affected and should be considered vulnerable.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb2683" target="_blank" rel="noopener">Veeam Agent&nbsp;<i>for Microsoft Windows</i> 13.1 (build 13.1.0.544)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2025-64391</b></h4>
+                   <p>A vulnerability allowing a local user to write arbitrary files as SYSTEM by manipulating mount points and symbolic links during installation.</p>
+                   <p><b>Severity:</b> Medium<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">4.1<span class="veeam-tooltip-text">CVSS: AV:L/AC:L/AT:P/PR:L/UI:P/VC:N/VI:H/VA:N/SC:N/SI:N/SA:N</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                   <h5><b>Affected Product</b></h5>
+                   <ul>
+                    <li>Veeam Agent&nbsp;<i>for Microsoft Windows</i>&nbsp;13.0.4.1341 and all <a href="https://www.veeam.com/kb2683" target="_blank" rel="noopener">earlier version 13 and 6 builds</a>.<br><sub><b>Note:</b> <a href="https://www.veeam.com/product-lifecycle.html" target="_blank" rel="noopener">Unsupported product versions</a> were not tested, but are likely affected and should be considered vulnerable.</sub></li>
+                   </ul>
+                   <h5><b>Solution</b></h5>
+                   <p>This vulnerability was fixed starting in the following builds:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb2683" target="_blank" rel="noopener">Veeam Agent&nbsp;<i>for Microsoft Windows</i> 13.1 (build 13.1.0.544)</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="horizontal-delimiter no-print aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="delimiter  veeam-component__component-spacing-below--lgx">
+            <div style="width: 100%; border-color: #b0b0b0;; border-width: 1px;"></div>
+           </div>
+          </div>
+          <div class="veeam-text text no-print aem-GridColumn aem-GridColumn--default--12">
+           <div class="veeam-text  " data-component="VeeamTextComponent">
+            <p>If this KB article did not resolve your issue or you need further assistance with Veeam software, please create a <a href="/kb1771">Veeam Support Case.</a></p>
+            <p>To submit feedback regarding this article, please click this link: <span class="veeam-text__open-universal-form"><a href="?ad=in-text-link#kb_request_form">Send Article Feedback</a></span><br>
+              To report a typo on this page, highlight the typo with your mouse and press CTRL + Enter.</p>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>]]></content>
+</entry>
+<entry>
+ <title><![CDATA[Vulnerabilities Resolved in Veeam Service Provider Console 9.3]]></title>
+ <link href="https://www.veeam.com/kb4893"/> 
+ <id>https://www.veeam.com/kb4893</id>
+ <updated>2026-08-04T00:00:00Z</updated>
+ <published>2026-08-04T00:00:00Z</published>
+ <author>
+     <name type="html"><![CDATA[Veeam Service Provider Console]]></name>
+ </author>
+ <summary><![CDATA[Veeam has resolved four security vulnerabilities in Veeam Service Provider Console, two rated Critical and two rated High, all affecting version 9.2 and earlier. This article documents each CVE with its severity, CVSS v4.0 score, and the build in which it was fixed.]]></summary>
+ <content type="html"><![CDATA[<div class=" veeam-component__component-spacing-below--lgx">
+ <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+  <div class="bg-image-size-contain bg-image-position-left   ">
+   <div class="section__container--centered section__container-spacing--md " style="max-width: 1260px;">
+    <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+     <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+      <div class="section-title center 
+            section-title--only-title  ">
+       <div class="section-title__title-block">
+        <h1 class="section-title__title">Vulnerabilities Resolved in Veeam Service Provider Console 9.3</h1>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class=" veeam-component__component-spacing-below--md">
+       <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+        <div class="bg-image-size-contain bg-image-position-left   ">
+         <div class="  " style="max-width: 100%;">
+          <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+           <div class="print-icon aem-GridColumn aem-GridColumn--default--12">
+            <div class="print-icon  " data-component="PrintIconComponent">
+             <a class="print-icon__button no-print" href="javascript:void(0);" title="Print page"> <i class="v-icon fa-solid fa-print" aria-hidden="true"></i> </a>
+            </div>
+           </div>
+           <div class="knowledge-base-details aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--6 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+            <div class="knowledge-base-details__container">
+             <table class="knowledge-base-details__table">
+              <tbody>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">KB ID:</td>
+                <td class="knowledge-base-details__value">4893</td>
+               </tr>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">Product:</td>
+                <td class="knowledge-base-details__value">Veeam Service Provider Console | 9 | 9.1 | 9.2</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Published:</td>
+                <td class="knowledge-base-details__value">2026-08-04</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Last Modified:</td>
+                <td class="knowledge-base-details__value">2026-08-05</td>
+               </tr>
+              </tbody>
+             </table>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn--default--9 aem-GridColumn aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+       <div class="bg-image-size-contain bg-image-position-left   ">
+        <div class="section__container--centered  " style="max-width: 100%;">
+         <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+          <div class="notice-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+            <div class="notice notice--success">
+             <div class="notice__icon">
+              <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+             </div>
+             <div class="notice__content">
+              <div class="notice__text veeam-text">
+               All vulnerabilities documented in this article were resolved in <a href="https://www.veeam.com/kb4788" target="_blank" rel="noopener">Veeam Service Provider Console 9.3.0.35057</a>.
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="experience-fragment experiencefragment aem-GridColumn aem-GridColumn--default--12">
+           <div id="experience-fragment-9225050620" class="cmp-experiencefragment cmp-experiencefragment--_vulnstatement">
+            <div class="xf-content-height">
+             <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+              <div class="notice-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+               <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+                <div class="notice notice--success">
+                 <div class="notice__icon">
+                  <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+                 </div>
+                 <div class="notice__content">
+                  <div class="notice__title">
+                   Veeam Software Security Commitment
+                  </div>
+                  <div class="notice__text veeam-text">
+                   <span class="veeam-text__caption">Veeam®&nbsp;is committed to ensuring its products protect customers from potential risks. As part of that commitment, we operate a&nbsp;<a href="https://www.veeam.com/vulnerability-disclosure.html" target="_blank" rel="noopener">Vulnerability Disclosure Program (VDP)</a>&nbsp;for all Veeam products and perform extensive internal code audits. When a vulnerability is identified, our team promptly develops a patch to address and mitigate the risk. In line with our dedication to transparency, we publicly disclose the vulnerability and provide detailed mitigation information. This approach ensures that all potentially affected customers can quickly implement the necessary measures to safeguard their systems. It’s important to note that once a vulnerability and its associated patch are disclosed, attackers will likely attempt to reverse-engineer the patch to exploit unpatched deployments of Veeam software. This reality underscores the critical importance of ensuring that all customers use the latest versions of our software and install all updates and patches without delay.</span>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title section-title--alignment-left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Issue Details</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--md">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   All vulnerabilities disclosed in this article affect <b>Veeam Service Provider Console&nbsp;9.2.1.33875</b>&nbsp;and all&nbsp;<a href="https://www.veeam.com/kb4464" target="_blank" rel="noopener">earlier version 9 builds</a>. 
+                   <br>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--ss">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-58073</b></h4>
+                   <p>A vulnerability in Veeam Service Provider Console allowing an unauthenticated attacker to impersonate a managed agent and obtain that agent's credentials.</p>
+                   <p><b>Severity:</b> Critical<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">9.5<span class="veeam-tooltip-text">CVSS:4.0/AV:N/AC:H/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--ss">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-58072</b></h4>
+                   <p>A vulnerability in Veeam Service Provider Console allowing arbitrary file write on the management server, which can lead to remote code execution.</p>
+                   <p><b>Severity:</b> Critical<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">9.0<span class="veeam-tooltip-text">CVSS:4.0/AV:N/AC:L/AT:P/PR:L/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H</span></span><br><b>Source:</b> Reported through HackerOne.</p>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--ss">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-58067</b></h4>
+                   <p>A vulnerability in Veeam Service Provider Console allowing an unauthenticated attacker to exhaust host memory and cause a denial of service.</p>
+                   <p><b>Severity:</b> High<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">8.7<span class="veeam-tooltip-text">CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N</span></span><br><b>Source:</b> Discovered during internal testing.</p>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--ss">
+                  <div class="veeam-text  " data-component="VeeamTextComponent">
+                   <h4><b>CVE-2026-58071</b></h4>
+                   <p>A vulnerability in Veeam Service Provider Console allowing an unauthenticated attacker to access the proxied appliance API as Portal Administrator during a short window after an administrator session begins.</p>
+                   <p><b>Severity:</b> High<br><b>CVSS v4.0 Score:</b> <span class="veeam-tooltip">8.2<span class="veeam-tooltip-text">CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N</span></span><br><b>Source:</b> Discovered during internal testing.</p>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Solution</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <p>These vulnerabilities were fixed starting with the following build:</p>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4788" target="_blank" rel="noopener">Veeam Service Provider Console 9.3.0.35057</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="horizontal-delimiter no-print aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="delimiter  veeam-component__component-spacing-below--lgx">
+            <div style="width: 100%; border-color: #b0b0b0;; border-width: 1px;"></div>
+           </div>
+          </div>
+          <div class="veeam-text text no-print aem-GridColumn aem-GridColumn--default--12">
+           <div class="veeam-text  " data-component="VeeamTextComponent">
+            <p>If this KB article did not resolve your issue or you need further assistance with Veeam software, please create a <a href="/kb1771">Veeam Support Case.</a></p>
+            <p>To submit feedback regarding this article, please click this link: <span class="veeam-text__open-universal-form"><a href="?ad=in-text-link#kb_request_form">Send Article Feedback</a></span><br>
+              To report a typo on this page, highlight the typo with your mouse and press CTRL + Enter.</p>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>]]></content>
+</entry>
+<entry>
+ <title><![CDATA[List of Security Fixes and Improvements in Veeam Service Provider Console]]></title>
+ <link href="https://www.veeam.com/kb4856"/> 
+ <id>https://www.veeam.com/kb4856</id>
+ <updated>2026-08-04T00:00:00Z</updated>
+ <published>2026-08-04T00:00:00Z</published>
+ <author>
+     <name type="html"><![CDATA[Veeam Service Provider Console]]></name>
+ </author>
+ <summary><![CDATA[This article describes all security-related fixes and improvements introduced in each release or update of Veeam Service Provider Console.]]></summary>
+ <content type="html"><![CDATA[<div class=" veeam-component__component-spacing-below--lgx">
+ <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+  <div class="bg-image-size-contain bg-image-position-left   ">
+   <div class="section__container--centered section__container-spacing--md " style="max-width: 1260px;">
+    <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+     <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+      <div class="section-title center 
+            section-title--only-title  ">
+       <div class="section-title__title-block">
+        <h1 class="section-title__title">List of Security Fixes and Improvements in Veeam Service Provider Console</h1>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class=" veeam-component__component-spacing-below--md">
+       <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+        <div class="bg-image-size-contain bg-image-position-left   ">
+         <div class="  " style="max-width: 100%;">
+          <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+           <div class="print-icon aem-GridColumn aem-GridColumn--default--12">
+            <div class="print-icon  " data-component="PrintIconComponent">
+             <a class="print-icon__button no-print" href="javascript:void(0);" title="Print page"> <i class="v-icon fa-solid fa-print" aria-hidden="true"></i> </a>
+            </div>
+           </div>
+           <div class="knowledge-base-details aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--6 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+            <div class="knowledge-base-details__container">
+             <table class="knowledge-base-details__table">
+              <tbody>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">KB ID:</td>
+                <td class="knowledge-base-details__value">4856</td>
+               </tr>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">Product:</td>
+                <td class="knowledge-base-details__value">Veeam Service Provider Console | 9.2 | 9.3</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Published:</td>
+                <td class="knowledge-base-details__value">2026-05-27</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Last Modified:</td>
+                <td class="knowledge-base-details__value">2026-09-09</td>
+               </tr>
+              </tbody>
+             </table>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn--default--9 aem-GridColumn aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+       <div class="bg-image-size-contain bg-image-position-left   ">
+        <div class="section__container--centered  " style="max-width: 100%;">
+         <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Purpose</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                  <p>This article describes all security-related fixes and improvements introduced in each release or update of <a href="https://www.veeam.com/kb4464" target="_blank" rel="noopener">Veeam Service Provider Console</a>.</p>
+                  <p>This article aims to provide our customers' security and compliance teams with detailed information on security improvements between releases to help them make an informed decision on whether it is critical to upgrade from their current Veeam Service Provider Console version to a later one.</p>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Security Fixes and Improvements</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b><a href="https://www.veeam.com/kb4788" target="_blank" rel="noopener">9.3.0.35057</a></b></h4>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4893" target="_blank" rel="noopener">CVE-2026-58073</a>&nbsp;vulnerability was fixed.</li>
+                    <li><a href="https://www.veeam.com/kb4893" target="_blank" rel="noopener">CVE-2026-58072</a>&nbsp;vulnerability was fixed.</li>
+                    <li><a href="https://www.veeam.com/kb4893" target="_blank" rel="noopener">CVE-2026-58067</a>&nbsp;vulnerability was fixed.</li>
+                    <li><a href="https://www.veeam.com/kb4893" target="_blank" rel="noopener">CVE-2026-58071</a>&nbsp;vulnerability was fixed.</li>
+                    <li>@babel/runtime upgraded to version 7.29.7</li>
+                    <li>axios upgraded to version 1.16.1</li>
+                    <li>axios-cache-interceptor upgraded to version 1.12.0</li>
+                    <li>dompurify upgraded to version 3.4.11</li>
+                    <li>follow-redirects upgraded to version 1.16.0</li>
+                    <li>form-data upgraded to version 4.0.6</li>
+                    <li>happy-dom upgraded to version 20.9.0</li>
+                    <li>i18next-http-backend upgraded to version 4.0.0</li>
+                    <li>linkify-it upgraded to version 5.0.2</li>
+                    <li>lodash upgraded to version 4.18.1</li>
+                    <li>MailKit upgraded to version 4.16.0</li>
+                    <li>MimeKit upgraded to version 4.16.0</li>
+                    <li>OpenTelemetry.Api upgraded to version 1.16.0</li>
+                    <li>picomatch upgraded to version 4.0.4</li>
+                    <li>SkiaSharp upgraded to version 3.119.4</li>
+                    <li>System.Security.Cryptography.Xml upgraded to version 10.0.10</li>
+                    <li>uuid upgraded to version 14.0.0</li>
+                    <li>vite upgraded to version 8.0.15</li>
+                    <li>ws upgraded to version 8.21.1</li>
+                    <li>yaml upgraded to version 2.9.0</li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b><a href="https://www.veeam.com/kb4788" target="_blank" rel="noopener">9.2.1.33875</a></b></h4>
+                   <ul>
+                    <li><a href="https://www.veeam.com/kb4853" target="_blank" rel="noopener">CVE-2026-32998</a>&nbsp;vulnerability was fixed.</li>
+                    <li><a href="https://www.veeam.com/kb4853" target="_blank" rel="noopener">CVE-2026-64635</a>&nbsp;vulnerability was fixed.</li>
+                    <li>AutoMapper was replaced with MagicMapper 14.0.1.</li>
+                    <li>axios upgraded to version 1.15.2</li>
+                    <li>happy-dom upgraded to version 20.9.0</li>
+                    <li>lodash upgraded to version 4.17.24</li>
+                    <li>picomatch upgraded to version 4.0.4</li>
+                    <li>System.Security.Cryptography.Xml upgraded to version 8.0.3</li>
+                    <li>System.Text.RegularExpressions upgraded to version 4.3.1</li>
+                    <li>uuid upgraded to version 14.0.0</li>
+                    <li>vite upgraded to version 7.3.2<br><br></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">More Information</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="experience-fragment experiencefragment aem-GridColumn aem-GridColumn--default--12">
+                 <div id="experience-fragment-1ac497a977" class="cmp-experiencefragment cmp-experiencefragment--related-security-and-improvement-articles">
+                  <div class="xf-content-height">
+                   <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                    <div class="resource-list-component parbase aem-GridColumn aem-GridColumn--default--12">
+                     <div class=" veeam-component__component-spacing-below--sm">
+                      <div class="resource-list ">
+                       <h3 class="resource-list__title"></h3>
+                       <h4><b>Related Articles</b></h4>
+                       <ul class="resource-list__container resource-list__container--column ">
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb3103" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam Backup &amp; Replication </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4236" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>├ List of Security Fixes and Improvements in Veeam Plug-In for Nutanix AHV </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4920" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>├ List of Security Fixes and Improvements in Veeam Plug-In for Proxmox VE </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4919" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>├ List of Security Fixes and Improvements in Veeam Plug-In for oVirt KVM </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4921" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>├ List of Security Fixes and Improvements in Veeam Plug-In for Scale Computing HyperCore </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4917" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>├ List of Security Fixes and Improvements in Veeam Plug-In for HPE Morpheus VM Essentials </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4923" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>├ List of Security Fixes and Improvements in Veeam Plug-In for Xen </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4922" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>├ List of Security Fixes and Improvements in Veeam Plug-In for KubeVirt </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4924" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>├ List of Security Fixes and Improvements in Veeam Plug-In for AWS </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4925" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>└ List of Security Fixes and Improvements in Veeam Plug-In for Microsoft Azure </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4858" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam ONE </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4857" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam Recovery Orchestrator </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4856" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam Service Provider Console </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb3108" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam Agent&nbsp;<i>for Microsoft Windows</i> </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb3109" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam Agent <i>for Linux</i> </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4926" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam Backup <i>for Salesforce</i> </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4825" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam Kasten <i>for Kubernetes</i> </a></li>
+                        <li class="resource-list__item"><a class="resource-list__link" href="https://www.veeam.com/kb4962" target="_self"> <i class="resource-list__icon fa-solid fa-up-right-from-square"></i>List of Security Fixes and Improvements in Veeam Backup&nbsp;<i>for Microsoft&nbsp;365</i> </a></li>
+                       </ul>
+                      </div>
+                     </div>
+                    </div>
+                   </div>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="horizontal-delimiter no-print aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="delimiter  veeam-component__component-spacing-below--lgx">
+            <div style="width: 100%; border-color: #b0b0b0;; border-width: 1px;"></div>
+           </div>
+          </div>
+          <div class="veeam-text text no-print aem-GridColumn aem-GridColumn--default--12">
+           <div class="veeam-text  " data-component="VeeamTextComponent">
+            <p>If this KB article did not resolve your issue or you need further assistance with Veeam software, please create a <a href="/kb1771">Veeam Support Case.</a></p>
+            <p>To submit feedback regarding this article, please click this link: <span class="veeam-text__open-universal-form"><a href="?ad=in-text-link#kb_request_form">Send Article Feedback</a></span><br>
+              To report a typo on this page, highlight the typo with your mouse and press CTRL + Enter.</p>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>]]></content>
+</entry>
+<entry>
+ <title><![CDATA[Veeam Software Appliance/Veeam Infrastructure Appliance — Updater Component Vulnerability]]></title>
+ <link href="https://www.veeam.com/kb4879"/> 
+ <id>https://www.veeam.com/kb4879</id>
+ <updated>2026-07-14T00:00:00Z</updated>
+ <published>2026-07-14T00:00:00Z</published>
+ <author>
+     <name type="html"><![CDATA[Veeam Backup & Replication]]></name>
+ </author>
+ <summary><![CDATA[Veeam Software Appliance/Veeam Infrastructure Appliance — Updater Component Vulnerability]]></summary>
+ <content type="html"><![CDATA[<div class=" veeam-component__component-spacing-below--lgx">
+ <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+  <div class="bg-image-size-contain bg-image-position-left   ">
+   <div class="section__container--centered section__container-spacing--md " style="max-width: 1260px;">
+    <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+     <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+      <div class="section-title section-title--alignment-left 
+            section-title--only-title  ">
+       <div class="section-title__title-block">
+        <h1 class="section-title__title">Veeam Software Appliance/Veeam Infrastructure Appliance — Updater Component Vulnerability</h1>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class=" veeam-component__component-spacing-below--md">
+       <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+        <div class="bg-image-size-contain bg-image-position-left   ">
+         <div class="  " style="max-width: 100%;">
+          <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+           <div class="print-icon aem-GridColumn aem-GridColumn--default--12">
+            <div class="print-icon  " data-component="PrintIconComponent">
+             <a class="print-icon__button no-print" href="javascript:void(0);" title="Print page"> <i class="v-icon fa-solid fa-print" aria-hidden="true"></i> </a>
+            </div>
+           </div>
+           <div class="knowledge-base-details aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--6 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+            <div class="knowledge-base-details__container">
+             <table class="knowledge-base-details__table">
+              <tbody>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">KB ID:</td>
+                <td class="knowledge-base-details__value">4879</td>
+               </tr>
+               <tr class="knowledge-base-details__row">
+                <td class="knowledge-base-details__label">Product:</td>
+                <td class="knowledge-base-details__value">Veeam Backup &amp; Replication | 13</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Published:</td>
+                <td class="knowledge-base-details__value">2026-07-14</td>
+               </tr>
+               <tr class="knowledge-base-details__row rss-feed-remove__row">
+                <td class="knowledge-base-details__label">Last Modified:</td>
+                <td class="knowledge-base-details__value">2026-07-14</td>
+               </tr>
+              </tbody>
+             </table>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="section-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn--default--9 aem-GridColumn aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+      <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+       <div class="bg-image-size-contain bg-image-position-left   ">
+        <div class="section__container--centered  " style="max-width: 100%;">
+         <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+          <div class="experience-fragment experiencefragment aem-GridColumn aem-GridColumn--default--12">
+           <div id="experience-fragment-4268c70774" class="cmp-experiencefragment cmp-experiencefragment--_vulnstatement">
+            <div class="xf-content-height">
+             <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+              <div class="notice-component parbase aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+               <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+                <div class="notice notice--success">
+                 <div class="notice__icon">
+                  <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+                 </div>
+                 <div class="notice__content">
+                  <div class="notice__title">
+                   Veeam Software Security Commitment
+                  </div>
+                  <div class="notice__text veeam-text">
+                   <span class="veeam-text__caption">Veeam®&nbsp;is committed to ensuring its products protect customers from potential risks. As part of that commitment, we operate a&nbsp;<a href="https://www.veeam.com/vulnerability-disclosure.html" target="_blank" rel="noopener">Vulnerability Disclosure Program (VDP)</a>&nbsp;for all Veeam products and perform extensive internal code audits. When a vulnerability is identified, our team promptly develops a patch to address and mitigate the risk. In line with our dedication to transparency, we publicly disclose the vulnerability and provide detailed mitigation information. This approach ensures that all potentially affected customers can quickly implement the necessary measures to safeguard their systems. It’s important to note that once a vulnerability and its associated patch are disclosed, attackers will likely attempt to reverse-engineer the patch to exploit unpatched deployments of Veeam software. This reality underscores the critical importance of ensuring that all customers use the latest versions of our software and install all updates and patches without delay.</span>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Vulnerability Details</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <p>A vulnerability in the <b><a href="https://helpcenter.veeam.com/docs/vbr/userguide/update_appliance_hiw.html" target="_blank" rel="noopener">Veeam Updater</a></b> component allows a local user to elevate their privileges and gain root-level access to the underlying operating system.</p>
+                   <p><b>Severity:</b>&nbsp;High<br><b>CVSS Score:</b>&nbsp;<span class="veeam-tooltip">8.4<span class="veeam-tooltip-text">CVSS:4.0/AV:L/AC:L/AT:N/PR:H/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N</span></span><br><b>Source:</b>&nbsp;Reported through&nbsp;HackerOne by skydesperados.</p>
+                   <p><b>Impacted Components:</b></p>
+                   <ul>
+                    <li><a href="https://helpcenter.veeam.com/docs/vbr/userguide/system_requirements_backup_server.html?zoom_highlight=%22Veeam%20Software%20Appliance%22&amp;ver=13" target="_blank" rel="noopener">Veeam Software Appliance</a> (Linux-based Veeam Backup &amp; Replication Server)</li>
+                    <li><a href="https://helpcenter.veeam.com/docs/vbr/userguide/linux_infrastructure_appliance_byb.html?zoom_highlight=%22You%20can%20assign%20the%20following%20roles%20to%20a%20machine%20deployed%20with%20Veeam%20Infrastructure%20Appliance%22&amp;ver=13#:~:text=You%20can%20assign%20the%20following%20roles%C2%A0to%20a%20machine%20deployed%20with%20Veeam%20Infrastructure%20Appliance" target="_blank" rel="noopener">Veeam Infrastructure Appliance</a></li>
+                   </ul>
+                  </div>
+                 </div>
+                </div>
+                <div class="notice-component parbase aem-GridColumn aem-GridColumn--default--12">
+                 <div class="notice-component--spacing  veeam-component__component-spacing-below--lg" data-component="NoticeComponent">
+                  <div class="notice notice--success">
+                   <div class="notice__icon">
+                    <i class="v-icon fa-solid fa-circle-info"></i> <i class="v-icon fa-solid fa-bell"></i> <i class="v-icon fa-solid fa-triangle-exclamation"></i>
+                   </div>
+                   <div class="notice__content">
+                    <div class="notice__text veeam-text">
+                     This vulnerability <b>does not</b> affect Windows-based Veeam Backup &amp; Replication backup servers, but may affect remote <a href="https://helpcenter.veeam.com/docs/vbr/userguide/linux_infrastructure_appliance_byb.html?zoom_highlight=%22You%20can%20assign%20the%20following%20roles%20to%20a%20machine%20deployed%20with%20Veeam%20Infrastructure%20Appliance%22&amp;ver=13#:~:text=You%20can%20assign%20the%20following%20roles%C2%A0to%20a%20machine%20deployed%20with%20Veeam%20Infrastructure%20Appliance" target="_blank" rel="noopener">components that utilize the Veeam Infrastructure Appliance</a>.
+                    </div>
+                   </div>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="section-component parbase aem-GridColumn aem-GridColumn--default--12">
+           <div class=" veeam-component__component-spacing-below--sm">
+            <div class="section    " style="background-image: linear-gradient(180deg, transparent 0.0%, transparent 100.0%); border-color: #b0b0b0;">
+             <div class="bg-image-size-contain bg-image-position-left      ">
+              <div class="  " style="max-width: 100%;">
+               <div class="aem-Grid aem-Grid--12 aem-Grid--tablet--12 aem-Grid--default--12 aem-Grid--phone--12 ">
+                <div class="section-title-component aem-GridColumn aem-GridColumn--default--12">
+                 <div class="section-title left 
+            section-title--only-title  ">
+                  <div class="section-title__title-block">
+                   <h2 class="section-title__title">Solution</h2>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--lg">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <p>This vulnerability is resolved starting in the <b>Veeam Updater</b> component version <b>12.3.0.65</b>.</p>
+                   <ul>
+                    <li><b>Automatic Update Deployment — For most users, no action is needed</b>, as <a href="https://helpcenter.veeam.com/docs/vbr/userguide/update_appliance_hiw.html?zoom_highlight=%22If%20there%20are%20updates%20for%20Veeam%20Updater%20itself,%20the%20service%20automatically%20updates%20and%20restarts.%22&amp;ver=13" target="_blank" rel="noopener">the Veeam Updater component installs the fix automatically during its automatic update check</a>.</li>
+                    <li><b>Manual Update Deployment — </b>If the Veeam Software Appliance or any Veeam Infrastructure Appliance is unable to reach either&nbsp;<a href="https://repository.veeam.com/vsa/" target="_blank" rel="noopener">repository.veeam.com</a>&nbsp;or <a href="https://helpcenter.veeam.com/docs/vbr/userguide/update_appliance_configure_updates.html?zoom_highlight=%22local%20mirror%22&amp;ver=13" target="_blank" rel="noopener">a local mirror repository</a>, the fix must be applied manually with <a href="https://www.veeam.com/kb1771" target="_blank" rel="noopener">assistance from Veeam Support</a>, or temporary internet <a href="https://helpcenter.veeam.com/docs/vbr/userguide/used_ports.html?zoom_highlight=%22repository.veeam.com%22&amp;ver=13#veeam-servers-and-services" target="_blank" rel="noopener">access to the update server</a> must be configured.</li>
+                   </ul>
+                   <p>For more information about Veeam Appliance Update configuration, review the product user guide:<br><a href="https://helpcenter.veeam.com/docs/vbr/userguide/update_appliances.html" target="_blank" rel="noopener">Veeam Backup &amp; Replication User Guide:&nbsp;Updating Veeam Appliances</a></p>
+                  </div>
+                 </div>
+                </div>
+                <div class="veeam-text text aem-GridColumn aem-GridColumn--default--12">
+                 <div class=" veeam-component__component-spacing-below--ss">
+                  <div class="veeam-text  veeam-text--adaptive-mode" data-component="VeeamTextComponent">
+                   <h4><b>Deployment Verification</b></h4>
+                   <p>To verify that the Veeam Updater component has been updated, review the component versions on the&nbsp;<b>Veeam Software Appliance</b>&nbsp;or <b>Veeam Infrastructure Appliance</b> using its&nbsp;<a href="https://helpcenter.veeam.com/docs/vbr/userguide/hmc_access.html?ver=13#logging-in-to-web-ui" target="_blank" rel="noopener">Host Management Console</a>:</p>
+                   <ol>
+                    <li>Open the appliance's&nbsp;<a href="https://helpcenter.veeam.com/docs/vbr/userguide/hmc_access.html?ver=13#logging-in-to-web-ui" target="_blank" rel="noopener">Host Management Console Web UI</a>.</li>
+                    <li>In the left-side navigation list, select the <b><a href="https://helpcenter.veeam.com/docs/vbr/userguide/hmc_perform_maintenance_tasks.html?ver=13#managing-veeam-components" target="_blank" rel="noopener">Logs and Services</a></b> section under the Support heading.</li>
+                    <li>Within the <b>Logs and Services </b>view, select the <b>Components</b> tab.</li>
+                    <li>Review the list of installed components and their respective versions&nbsp;<i>(optionally use the filter)</i>.</li>
+                    <li>Verify that the&nbsp;<b>Veeam Updater</b> component version listed is <b>12.3.0.65</b> or higher.</li>
+                   </ol>
+                  </div>
+                 </div>
+                </div>
+                <div class="image aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+                 <div class="veeam-image veeam-image--align-center     veeam-component__component-spacing-below--lg" data-component="VeeamImageComponent">
+                  <div class="veeam-image__view" itemscope itemtype="http://schema.org/ImageObject">
+                   <link itemprop="license acquireLicensePage" href="https://www.veeam.com/privacy-notice.html">
+                   <meta itemprop="copyrightNotice" content="© Veeam® Software">
+                   <meta itemprop="description" content="Veeam Host Management Console showing Logs and Services on the Components tab, filtered for &quot;Updater&quot;, with Veeam Updater listed as version 12.3.0.65.">
+                   <meta itemprop="creditText" content="Veeam Software"><span itemscope itemprop="creator" itemtype="https://schema.org/organization">
+                    <meta itemprop="name" content="Veeam Software"></span> <picture>
+                    <source media="(max-width: 480px)" srcset="https://cdn.veeam.com/content/veeam/en/knowledge-base/kb4879/_jcr_content/content-parsys/section-main/section-with-background-content/section-sections/section-with-background-content/section_with_backgro_solution/section-with-background-content/image/file.web.ntfile.png/VeeamUpdaterVersion.png?ck=1783953746736">
+                    <source media="(max-width: 960px)" srcset="https://cdn.veeam.com/content/veeam/en/knowledge-base/kb4879/_jcr_content/content-parsys/section-main/section-with-background-content/section-sections/section-with-background-content/section_with_backgro_solution/section-with-background-content/image/file.web.ntfile.png/VeeamUpdaterVersion.png?ck=1783953746736">
+                    <img class="veeam-image__image" src="https://cdn.veeam.com/content/veeam/en/knowledge-base/kb4879/_jcr_content/content-parsys/section-main/section-with-background-content/section-sections/section-with-background-content/section_with_backgro_solution/section-with-background-content/image/file.web.ntfile.png/VeeamUpdaterVersion.png?ck=1783953746736" loading="lazy" itemprop="contentUrl" style="aspect-ratio:auto;" alt="Veeam Host Management Console showing Logs and Services on the Components tab, filtered for &quot;Updater&quot;, with Veeam Updater listed as version 12.3.0.65.">
+                   </picture>
+                  </div>
+                 </div>
+                </div>
+               </div>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+          <div class="horizontal-delimiter no-print aem-GridColumn--tablet--12 aem-GridColumn--offset--tablet--0 aem-GridColumn--default--none aem-GridColumn--phone--none aem-GridColumn--phone--12 aem-GridColumn--tablet--none aem-GridColumn aem-GridColumn--default--12 aem-GridColumn--offset--phone--0 aem-GridColumn--offset--default--0">
+           <div class="delimiter  veeam-component__component-spacing-below--lgx">
+            <div style="width: 100%; border-color: #b0b0b0;; border-width: 1px;"></div>
+           </div>
+          </div>
+          <div class="veeam-text text no-print aem-GridColumn aem-GridColumn--default--12">
+           <div class="veeam-text  " data-component="VeeamTextComponent">
+            <p>If this KB article did not resolve your issue or you need further assistance with Veeam software, please create a <a href="/kb1771">Veeam Support Case.</a></p>
+            <p>To submit feedback regarding this article, please click this link: <span class="veeam-text__open-universal-form"><a href="?ad=in-text-link#kb_request_form">Send Article Feedback</a></span><br>
+              To report a typo on this page, highlight the typo with your mouse and press CTRL + Enter.</p>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>]]></content>
+</entry>
+
+</feed>

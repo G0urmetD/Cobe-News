@@ -1,0 +1,272 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'security' (Security & endpoint). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Palo Alto Networks
+- key: prisma-access-agent
+  label: Prisma Access Agent
+  vendor: Palo Alto Networks
+  cpes: []
+  adv: paloalto
+  names: [Prisma Access Agent]
+  kw: [Prisma Access Agent]
+- key: cortex-xdr
+  label: Cortex XDR Agent
+  vendor: Palo Alto Networks
+  cpes: [a:paloaltonetworks:cortex_xdr_agent]
+  adv: paloalto
+  names: [Cortex XDR Agent]
+  cna: [[Palo Alto Networks, Cortex XDR Agent]]
+  kw: [Cortex XDR]
+  example: 8.5.0
+
+# ---------------------------------------------------------------- Fortinet
+- key: forticlientems
+  label: FortiClient EMS
+  vendor: Fortinet
+  cpes: [a:fortinet:forticlient_enterprise_management_server]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiClientEMS, FortiClient EMS]
+  cna: [[Fortinet, FortiClientEMS]]
+  kw: [FortiClient EMS, FortiClientEMS]
+  example: 7.4.1
+- key: forticlient
+  label: FortiClient
+  vendor: Fortinet
+  cpes: [a:fortinet:forticlient]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiClientWindows, FortiClientMac, FortiClientLinux, FortiClient]
+  cna: [[Fortinet, FortiClient]]
+  kw: [FortiClient]
+  example: 7.4.2
+- key: fortisandbox
+  label: FortiSandbox
+  vendor: Fortinet
+  cpes: [a:fortinet:fortisandbox]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiSandbox]
+  cna: [[Fortinet, FortiSandbox]]
+  kw: [FortiSandbox]
+  example: 4.4.6
+- key: fortinac
+  label: FortiNAC
+  vendor: Fortinet
+  cpes: [a:fortinet:fortinac]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiNAC, FortiNAC-F]
+  cna: [[Fortinet, FortiNAC]]
+  kw: [FortiNAC]
+  example: 9.4.6
+
+# ---------------------------------------------------------------- Cisco
+- key: cisco-ise
+  label: Cisco Identity Services Engine (ISE)
+  vendor: Cisco
+  cpes: [a:cisco:identity_services_engine]
+  scheme: generic
+  cna: [[Cisco, Cisco Identity Services Engine Software]]
+  kw: [Identity Services Engine, Cisco ISE]
+  example: 3.3 Patch 4
+  normalize: [ise_patch]
+- key: cisco-secure-client
+  label: Cisco Secure Client (AnyConnect)
+  vendor: Cisco
+  cpes: [a:cisco:secure_client, a:cisco:anyconnect_secure_mobility_client]
+  cna: [[Cisco, Cisco Secure Client], [Cisco, Cisco AnyConnect Secure Mobility Client]]
+  kw: [AnyConnect, Secure Client]
+  aliases: [AnyConnect]
+  example: 5.1.4.74
+
+# ---------------------------------------------------------------- other firewalls / VPN
+- key: ivanti-policy-secure
+  label: Ivanti Policy Secure
+  vendor: Ivanti
+  cpes: [a:ivanti:policy_secure]
+  scheme: ivanti
+  cna: [[Ivanti, Policy Secure]]
+  kw: [Ivanti Policy Secure]
+  example: 22.7R1.2
+- key: ivanti-epmm
+  label: Ivanti Endpoint Manager Mobile (EPMM)
+  vendor: Ivanti
+  cpes: [a:ivanti:endpoint_manager_mobile]
+  cna: [[Ivanti, Endpoint Manager Mobile]]
+  kw: [Endpoint Manager Mobile, EPMM, MobileIron]
+  example: 12.5.0.0
+
+# ---------------------------------------------------------------- switches, routers, WLAN
+- key: aruba-clearpass
+  label: HPE Aruba ClearPass Policy Manager
+  vendor: HPE Aruba Networking
+  cpes: [a:arubanetworks:clearpass_policy_manager]
+  cna: [[Hewlett Packard Enterprise (HPE), ClearPass Policy Manager]]
+  kw: [ClearPass]
+  example: 6.12.2
+
+# ---------------------------------------------------------------- security, endpoint
+- key: trendmicro-apex-one
+  label: Trend Micro Apex One
+  vendor: Trend Micro
+  cpes: [a:trendmicro:apex_one]
+  cna: [["Trend Micro, Inc.", Trend Micro Apex One]]
+  kw: [Apex One]
+  aliases: [OfficeScan, Trend Micro OfficeScan]
+  example: 14.0.0.13030
+- key: trendmicro-vision-one
+  label: Trend Micro Vision One Endpoint Security Agent
+  vendor: Trend Micro
+  cpes: [a:trendmicro:vision_one_endpoint_security_agent]
+  kw: [Vision One]
+  example: 14.0.14492
+- key: trendmicro-deep-security
+  label: Trend Micro Deep Security Agent
+  vendor: Trend Micro
+  cpes: [a:trendmicro:deep_security_agent]
+  kw: [Deep Security]
+  aliases: [Server & Workload Protection, Deep Security Agent, Cloud One Workload Security]
+  example: 20.0.1-21510
+- key: defender
+  label: Microsoft Defender (Antimalware)
+  vendor: Microsoft
+  cpes: [a:microsoft:malware_protection_engine, a:microsoft:defender]
+  kw: [Microsoft Defender]
+  aliases: [Windows Defender, Defender Antivirus, Malware Protection Engine]
+  example: 1.1.24090.11
+- key: defender-endpoint
+  label: Microsoft Defender for Endpoint
+  vendor: Microsoft
+  cpes: [a:microsoft:defender_for_endpoint]
+  kw: [Defender for Endpoint]
+  aliases: [MDE, MDATP, Defender ATP]
+  example: "10.8760"
+- key: crowdstrike-falcon
+  label: CrowdStrike Falcon Sensor
+  vendor: CrowdStrike
+  cpes: [a:crowdstrike:falcon]
+  kw: [CrowdStrike, Falcon]
+  example: 7.20.18908
+- key: sophos-endpoint
+  label: Sophos Intercept X / Endpoint
+  vendor: Sophos
+  cpes: [a:sophos:intercept_x_for_endpoint, a:sophos:endpoint_protection]
+  kw: [Intercept X, Sophos Endpoint]
+  example: 2024.3.1
+- key: eset-endpoint
+  label: ESET Endpoint Security / Antivirus
+  vendor: ESET
+  cpes: [a:eset:endpoint_security, a:eset:endpoint_antivirus]
+  kw: [ESET]
+  example: 11.1.2039.2
+- key: symantec-endpoint
+  label: Symantec Endpoint Protection
+  vendor: Broadcom
+  cpes: [a:broadcom:symantec_endpoint_protection, a:symantec:endpoint_protection]
+  kw: [Symantec Endpoint]
+  aliases: [SEP, Symantec Endpoint Security]
+  example: 14.3 RU9
+- key: kaspersky-endpoint
+  label: Kaspersky Endpoint Security
+  vendor: Kaspersky
+  cpes: [a:kaspersky:endpoint_security]
+  kw: [Kaspersky Endpoint]
+  aliases: [KES, Kaspersky Endpoint Security for Windows]
+  example: "12.7"
+- key: bitdefender-gravityzone
+  label: Bitdefender GravityZone
+  vendor: Bitdefender
+  cpes: [a:bitdefender:gravityzone]
+  kw: [GravityZone]
+  example: "6.38"
+- key: sentinelone-agent
+  label: SentinelOne Agent
+  vendor: SentinelOne
+  cpes: [a:sentinelone:singularity_agent]
+  kw: [SentinelOne]
+  example: 24.1.2
+
+# ---------------------------------------------------------------- security, endpoint (more)
+- key: checkpoint-harmony-endpoint
+  label: Check Point Harmony Endpoint
+  vendor: Check Point
+  cpes: [a:checkpoint:endpoint_security, a:checkpoint:harmony_endpoint]
+  kw: [Harmony Endpoint]
+  example: E88.70
+- key: fortiedr
+  label: FortiEDR
+  vendor: Fortinet
+  cpes: [a:fortinet:fortiedr]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiEDR]
+  cna: [[Fortinet, FortiEDR]]
+  kw: [FortiEDR]
+  example: 7.0.2
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: clamav
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: trellix-epo
+  label: "Trellix ePolicy Orchestrator (ePO)"
+  vendor: Trellix
+  cpes: [a:mcafee:epolicy_orchestrator]
+  kw: [ePolicy Orchestrator, Trellix ePO, McAfee ePO]
+  aliases: [ePO, McAfee ePO, McAfee ePolicy Orchestrator]
+  example: "5.10.0 Update 16"
+  where: web_about
+- key: trellix-ens
+  label: "Trellix Endpoint Security (ENS)"
+  vendor: Trellix
+  cpes: [a:mcafee:endpoint_security, a:trellix:endpoint_security]
+  kw: [Trellix Endpoint Security, McAfee Endpoint Security]
+  aliases: [ENS, McAfee ENS, McAfee Endpoint Security]
+  example: "10.7.0"
+  where: client_about
+- key: withsecure-elements
+  label: "WithSecure Elements / Policy Manager (F-Secure)"
+  vendor: WithSecure
+  cpes: [a:withsecure:elements_endpoint_protection, a:withsecure:f-secure_policy_manager, a:withsecure:client_security, a:withsecure:server_security, a:withsecure:policy_manager_proxy]
+  kw: [WithSecure, F-Secure]
+  aliases: [F-Secure, F-Secure Policy Manager, WithSecure Client Security]
+  example: "16.0"
+  where: client_about
+- key: gdata-business  # no CPE in NVD (checked 2026-11-02): news and vendor data only
+  label: G DATA Business / Endpoint Protection
+  vendor: G DATA
+  cpes: []
+  kw: [G DATA]
+  aliases: [GDATA]
+  example: "15.0"
+  hint: nocpe
+  where: client_about
+- key: kaspersky-security-center
+  label: Kaspersky Security Center
+  vendor: Kaspersky
+  cpes: [a:kaspersky:security_center, a:kaspersky:security_center_web_console]
+  kw: [Kaspersky Security Center]
+  aliases: [KSC, Kaspersky Administration Server]
+  example: "14.2"
+  where: web_about
+- key: ivanti-sentry
+  label: "Ivanti Sentry (MobileIron Sentry)"
+  vendor: Ivanti
+  cpes: [a:ivanti:standalone_sentry, a:mobileiron:sentry, a:ivanti:mobileiron_sentry]
+  cna: [[Ivanti, Sentry], [Ivanti, MobileIron Sentry], [Ivanti, Standalone Sentry], [Ivanti, Ivanti Sentry]]
+  kw: [Ivanti Sentry, MobileIron Sentry]
+  aliases: [MobileIron Sentry, Standalone Sentry]
+  example: "9.18.0"
+  where: web_about
+- key: eset-protect  # no CPE in NVD (checked 2026-11-02)
+  label: "ESET PROTECT (On-Prem)"
+  vendor: ESET
+  cpes: []
+  kw: [ESET PROTECT, ESET Security Management Center]
+  aliases: [ESMC, ESET Remote Administrator, ERA]
+  example: "11.1"
+  hint: nocpe
+  where: web_about

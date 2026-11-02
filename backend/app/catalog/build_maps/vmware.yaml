@@ -1,0 +1,148 @@
+# yaml-language-server: $schema=../schema/build_map_vmware.schema.json
+# VMware vCenter Server and ESXi: which release a version or build number is. Admins see vCenter's four-part version
+# (VAMI → Summary, vSphere Client → About: 8.0.3.00400) and build numbers (24322831, ESXi: vmware -v → "VMware ESXi
+# 8.0.3 build-24022510"); advisories name the release (8.0 U3d). A version entered for vcenter or esxi in one of these
+# forms is looked up here and stored as the release (app/vmware_builds.py, the generic part app/build_maps.py) – unknown ones are refused, never guessed:
+# the four-part suffixes follow no formula (vCenter 8.0 U3f and 7.0.3.00200/00400 do not exist).
+#
+# Sources (fetched 2026-11-02):
+#   vCenter: Broadcom KB 326316 "Build numbers and versions of VMware vCenter Server"
+#   ESXi:    Broadcom KB 316595 "Build numbers and versions of VMware ESXi/ESX"
+# vCenter and ESXi have builds of their own (8.0 U3: vCenter 24022515, ESXi 24022510) – one table per product.
+#
+# release: as the vmware version scheme writes it (app/vendor_versions.py): "8.0 U3d" for 8.0 Update 3d, "8.0c" for a
+# patch of the GA release (vCenter also writes "7.0.0d"), "8.0" for GA. Order: 8.0 < 8.0a < 8.0c < 8.0 U1 < 8.0 U1a.
+# version: vCenter's four-part version (VAMI); build: the build number; date: release date. In the KB articles' order.
+# A new release: add its row from the KB articles and raise catalog_version in catalog.yaml.
+kind: vmware
+fetched: "2026-11-02"
+sources:
+  - "Broadcom KB 326316: Build numbers and versions of VMware vCenter Server"
+  - "Broadcom KB 316595: Build numbers and versions of VMware ESXi/ESX"
+vcenter:
+  - {release: "8.0 U3k", version: "8.0.3.01000", build: 25600417, date: "2026-07-29"}
+  - {release: "8.0 U3j", version: "8.0.3.00900", build: 25413364, date: "2026-05-27"}
+  - {release: "8.0 U3i", version: "8.0.3.00800", build: 25197330, date: "2026-02-24"}
+  - {release: "8.0 U3h", version: "8.0.3.00700", build: 25092719, date: "2025-12-15"}
+  - {release: "8.0 U3g", version: "8.0.3.00600", build: 24853646, date: "2025-07-29"}
+  - {release: "8.0 U3e", version: "8.0.3.00500", build: 24674346, date: "2025-04-11"}
+  - {release: "8.0 U3d", version: "8.0.3.00400", build: 24322831, date: "2024-10-21"}
+  - {release: "8.0 U3c", version: "8.0.3.00300", build: 24305161, date: "2024-10-09"}
+  - {release: "8.0 U3b", version: "8.0.3.00200", build: 24262322, date: "2024-09-17"}
+  - {release: "8.0 U3a", version: "8.0.3.00100", build: 24091160, date: "2024-07-18"}
+  - {release: "8.0 U3", version: "8.0.3.00000", build: 24022515, date: "2024-06-25"}
+  - {release: "8.0 U2f", version: "8.0.2.00600", build: 25624321, date: "2026-08-03"}
+  - {release: "8.0 U2e", version: "8.0.2.00500", build: 24321653, date: "2024-10-21"}
+  - {release: "8.0 U2d", version: "8.0.2.00400", build: 23929136, date: "2024-06-17"}
+  - {release: "8.0 U2c", version: "8.0.2.00300", build: 23504390, date: "2024-03-26"}
+  - {release: "8.0 U2b", version: "8.0.2.00200", build: 23319993, date: "2024-03-04"}
+  - {release: "8.0 U2a", version: "8.0.2.00100", build: 22617221, date: "2023-10-26"}
+  - {release: "8.0 U2", version: "8.0.2.00000", build: 22385739, date: "2023-09-21"}
+  - {release: "8.0 U1e", version: "8.0.1.00500", build: 24005165, date: "2024-06-12"}
+  - {release: "8.0 U1d", version: "8.0.1.00400", build: 22368047, date: "2023-10-24"}
+  - {release: "8.0 U1c", version: "8.0.1.00300", build: 22088981, date: "2023-07-27"}
+  - {release: "8.0 U1b", version: "8.0.1.00200", build: 21860503, date: "2023-06-22"}
+  - {release: "8.0 U1a", version: "8.0.1.00100", build: 21815093, date: "2023-06-01"}
+  - {release: "8.0 U1", version: "8.0.1.00000", build: 21560480, date: "2023-04-18"}
+  - {release: "8.0c", version: "8.0.0.10300", build: 21457384, date: "2023-03-30"}
+  - {release: "8.0b", version: "8.0.0.10200", build: 21216066, date: "2023-02-14"}
+  - {release: "8.0a", version: "8.0.0.10100", build: 20920323, date: "2022-12-16"}
+  - {release: "8.0", version: "8.0.0.10000", build: 20519528, date: "2022-10-11"}
+  - {release: "7.0 U3w", version: "7.0.3.02500", build: 24927011, date: "2025-09-29"}
+  - {release: "7.0 U3v", version: "7.0.3.02400", build: 24730281, date: "2025-05-20"}
+  - {release: "7.0 U3u", version: "7.0.3.02300", build: 24614210, date: "2025-04-01"}
+  - {release: "7.0 U3t", version: "7.0.3.02200", build: 24322018, date: "2024-10-21"}
+  - {release: "7.0 U3s", version: "7.0.3.02100", build: 24201990, date: "2024-09-17"}
+  - {release: "7.0 U3r", version: "7.0.3.02000", build: 24026615, date: "2024-06-17"}
+  - {release: "7.0 U3q", version: "7.0.3.01900", build: 23788036, date: "2024-05-21"}
+  - {release: "7.0 U3p", version: "7.0.3.01800", build: 22837322, date: "2023-12-07"}
+  - {release: "7.0 U3o", version: "7.0.3.01700", build: 22357613, date: "2023-09-28"}
+  - {release: "7.0 U3n", version: "7.0.3.01600", build: 21958406, date: "2023-07-07"}
+  - {release: "7.0 U3m", version: "7.0.3.01500", build: 21784236, date: "2023-06-22"}
+  - {release: "7.0 U3l", version: "7.0.3.01400", build: 21477706, date: "2023-03-30"}
+  - {release: "7.0 U3k", version: "7.0.3.01300", build: 21290409, date: "2023-02-23"}
+  - {release: "7.0 U3j", version: "7.0.3.01200", build: 20990077, date: "2022-12-22"}
+  - {release: "7.0 U3i", version: "7.0.3.01100", build: 20845200, date: "2022-12-08"}
+  - {release: "7.0 U3h", version: "7.0.3.01000", build: 20395099, date: "2022-09-13"}
+  - {release: "7.0 U3g", version: "7.0.3.00800", build: 20150588, date: "2022-07-23"}
+  - {release: "7.0 U3f", version: "7.0.3.00700", build: 20051473, date: "2022-07-12"}
+  - {release: "7.0 U3e", version: "7.0.3.00600", build: 19717403, date: "2022-05-12"}
+  - {release: "7.0 U3d", version: "7.0.3.00500", build: 19480866, date: "2022-03-29"}
+  - {release: "7.0 U3c", version: "7.0.3.00300", build: 19234570, date: "2022-01-27"}
+  - {release: "7.0 U3a", version: "7.0.3.00100", build: 18778458, date: "2021-10-21"}
+  - {release: "7.0 U3", version: "7.0.3.00000", build: 18700403, date: "2021-10-05"}
+  - {release: "7.0 U2d", version: "7.0.2.00500", build: 18455184, date: "2021-09-21"}
+  - {release: "7.0 U2c", version: "7.0.2.00400", build: 18356314, date: "2021-08-24"}
+  - {release: "7.0 U2b", version: "7.0.2.00200", build: 17958471, date: "2021-05-25"}
+  - {release: "7.0 U2a", version: "7.0.2.00100", build: 17920168, date: "2021-04-27"}
+  - {release: "7.0 U2", version: "7.0.2.00000", build: 17694817, date: "2021-03-09"}
+  - {release: "7.0 U1d", version: "7.0.1.00300", build: 17491101, date: "2021-02-02"}
+  - {release: "7.0 U1c", version: "7.0.1.00200", build: 17327517, date: "2020-12-17"}
+  - {release: "7.0 U1a", version: "7.0.1.00100", build: 17004997, date: "2020-10-22"}
+  - {release: "7.0 U1", version: "7.0.1.00000", build: 16860138, date: "2020-10-06"}
+  - {release: "7.0.0d", version: "7.0.0.10700", build: 16749653, date: "2020-08-25"}
+  - {release: "7.0.0c", version: "7.0.0.10600", build: 16620007, date: "2020-07-30"}
+  - {release: "7.0.0b", version: "7.0.0.10400", build: 16386292, date: "2020-06-23"}
+  - {release: "7.0.0a", version: "7.0.0.10300", build: 16189094, date: "2020-05-19"}
+  - {release: "7.0", version: "7.0.0.10100", build: 15952498, date: "2020-04-02"}
+esxi:
+  - {release: "8.0 U3k", build: 25595708, date: "2026-07-29"}
+  - {release: "8.0 U3j", build: 25429389, date: "2026-05-27"}
+  - {release: "8.0 U3i", build: 25205845, date: "2026-02-24"}
+  - {release: "8.0 U3h", build: 25067014, date: "2025-12-15"}
+  - {release: "8.0 U3g", build: 24859861, date: "2025-07-29"}
+  - {release: "8.0 U3f", build: 24784735, date: "2025-07-15"}
+  - {release: "8.0 U3e", build: 24674464, date: "2025-04-10"}
+  - {release: "8.0 U3d", build: 24585383, date: "2025-03-04"}
+  - {release: "8.0 U3c", build: 24414501, date: "2024-12-12"}
+  - {release: "8.0 U3b", build: 24280767, date: "2024-09-17"}
+  - {release: "8.0 U3", build: 24022510, date: "2024-06-25"}
+  - {release: "8.0 U2f", build: 25626445, date: "2026-08-03"}
+  - {release: "8.0 U2e", build: 24789317, date: "2025-07-15"}
+  - {release: "8.0 U2d", build: 24585300, date: "2025-03-04"}
+  - {release: "8.0 U2c", build: 23825572, date: "2024-05-21"}
+  - {release: "8.0 U2b", build: 23305546, date: "2024-02-29"}
+  - {release: "8.0 U2", build: 22380479, date: "2023-09-21"}
+  - {release: "8.0 U1d", build: 23299997, date: "2024-03-05"}
+  - {release: "8.0 U1c", build: 22088125, date: "2023-07-27"}
+  - {release: "8.0 U1a", build: 21813344, date: "2023-06-01"}
+  - {release: "8.0 U1", build: 21495797, date: "2023-04-18"}
+  - {release: "8.0g", build: 25191479, date: "2026-02-13"}
+  - {release: "8.0f", build: 24814147, date: "2025-07-15"}
+  - {release: "8.0e", build: 24569005, date: "2025-03-11"}
+  - {release: "8.0d", build: 24118393, date: "2024-10-07"}
+  - {release: "8.0c", build: 21493926, date: "2023-03-30"}
+  - {release: "8.0b", build: 21203435, date: "2023-02-14"}
+  - {release: "8.0a", build: 20842819, date: "2022-12-08"}
+  - {release: "8.0", build: 20513097, date: "2022-10-11"}
+  - {release: "7.0 U3w", build: 24784741, date: "2025-07-15"}
+  - {release: "7.0 U3v", build: 24723872, date: "2025-05-20"}
+  - {release: "7.0 U3s", build: 24585291, date: "2025-03-04"}
+  - {release: "7.0 U3r", build: 24411414, date: "2024-12-12"}
+  - {release: "7.0 U3q", build: 23794027, date: "2024-05-21"}
+  - {release: "7.0 U3p", build: 23307199, date: "2024-04-11"}
+  - {release: "7.0 U3o", build: 22348816, date: "2023-09-28"}
+  - {release: "7.0 U3n", build: 21930508, date: "2023-07-07"}
+  - {release: "7.0 U3m", build: 21686933, date: "2023-05-03"}
+  - {release: "7.0 U3l", build: 21424296, date: "2023-03-30"}
+  - {release: "7.0 U3k", build: 21313628, date: "2023-02-21"}
+  - {release: "7.0 U3j", build: 21053776, date: "2023-01-31"}
+  - {release: "7.0 U3i", build: 20842708, date: "2022-12-08"}
+  - {release: "7.0 U3g", build: 20328353, date: "2022-09-01"}
+  - {release: "7.0 U3f", build: 20036589, date: "2022-07-12"}
+  - {release: "7.0 U3e", build: 19898904, date: "2022-06-14"}
+  - {release: "7.0 U3d", build: 19482537, date: "2022-03-29"}
+  - {release: "7.0 U2e", build: 19290878, date: "2022-02-15"}
+  - {release: "7.0 U1e", build: 19324898, date: "2022-02-15"}
+  - {release: "7.0 U3c", build: 19193900, date: "2022-01-27"}
+  - {release: "7.0 U2d", build: 18538813, date: "2021-09-14"}
+  - {release: "7.0 U2c", build: 18426014, date: "2021-08-24"}
+  - {release: "7.0 U2a", build: 17867351, date: "2021-04-29"}
+  - {release: "7.0 U2", build: 17630552, date: "2021-03-09"}
+  - {release: "7.0 U1d", build: 17551050, date: "2021-02-02"}
+  - {release: "7.0 U1c", build: 17325551, date: "2020-12-17"}
+  - {release: "7.0 U1b", build: 17168206, date: "2020-11-19"}
+  - {release: "7.0 U1a", build: 17119627, date: "2020-11-04"}
+  - {release: "7.0 U1", build: 16850804, date: "2020-10-06"}
+  - {release: "7.0b", build: 16324942, date: "2020-06-23"}
+  - {release: "7.0", build: 15843807, date: "2020-04-02"}

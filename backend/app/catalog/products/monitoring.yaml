@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'monitoring' (Monitoring & observability). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- remote access, IT management
+- key: solarwinds-orion
+  label: SolarWinds Platform (Orion)
+  vendor: SolarWinds
+  cpes: [a:solarwinds:orion_platform, a:solarwinds:solarwinds_platform]
+  kw: [SolarWinds Platform, Orion]
+  example: "2024.4"
+- key: prtg
+  label: Paessler PRTG Network Monitor
+  vendor: Paessler
+  cpes: [a:paessler:prtg_network_monitor]
+  kw: [PRTG]
+  example: 24.4.102.1351
+- key: zabbix
+- key: checkmk
+  cpes: [a:checkmk:checkmk]
+  aliases: [Check_MK, Check MK]
+- key: icinga
+- key: nagios-xi
+  label: Nagios XI
+  vendor: Nagios
+  cpes: [a:nagios:nagios_xi]
+  kw: [Nagios XI]
+  example: 2024R1.3
+
+# ---------------------------------------------------------------- monitoring, observability
+- key: nagios
+  label: Nagios Core
+  vendor: Nagios Enterprises
+  cpes: [a:nagios:nagios]
+  kw: [Nagios]
+  example: 4.5.9
+  version_cmd: nagios --version
+- key: icinga-web
+- key: grafana
+  cpes: [a:grafana:grafana]
+  osv: [[Go, github.com/grafana/grafana]]
+- key: prometheus
+  cpes: [a:prometheus:prometheus]
+- key: datadog-agent
+  label: Datadog Agent
+  vendor: Datadog
+  cpes: []
+  kw: [Datadog]
+  example: 7.66.1
+  version_cmd: datadog-agent version
+  hint: nocpe
+- key: uptime-kuma
+  label: Uptime Kuma
+  vendor: Louis Lam
+  cpes: [a:uptime.kuma:uptime_kuma]
+  kw: [Uptime Kuma]
+  example: 1.23.16
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: centreon
+- key: telegraf
+- key: jaeger
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: manageengine-opmanager
+  label: ManageEngine OpManager
+  vendor: Zoho ManageEngine
+  cpes: [a:zohocorp:manageengine_opmanager, a:zohocorp:manageengine_opmanager_plus, a:zohocorp:manageengine_opmanager_msp, a:manageengine:opmanager]
+  kw: [OpManager]
+  aliases: [OpManager Plus, OpManager MSP]
+  example: "12.8"
+  where: web_about
+- key: whatsup-gold
+  label: Progress WhatsUp Gold
+  vendor: Progress
+  cpes: [a:progress:whatsup_gold, a:ipswitch:whatsup_gold]
+  cna: [[Progress Software Corporation, WhatsUp Gold]]
+  kw: [WhatsUp Gold]
+  aliases: [Ipswitch WhatsUp Gold]
+  example: "2024.0.0"
+  where: web_about
+- key: librenms
+  label: LibreNMS
+  vendor: LibreNMS
+  cpes: [a:librenms:librenms]
+  kw: [LibreNMS]
+  example: "24.12.0"
+  where: web_about

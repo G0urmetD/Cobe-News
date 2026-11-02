@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Cobe News: tilted blue card behind a news card with a headline and two lines of text -->
+  <path d="M8.4 4.6 L30.2 10.4 L27.4 22.6 L5.6 16.8 Z" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2" stroke-linejoin="round"/>
+  <rect x="1.8" y="10.2" width="25.2" height="14.4" rx="2" fill="#ffffff" stroke="#2c2c2a" stroke-width="1.2"/>
+  <rect x="4.2" y="13" width="13" height="2.2" rx="1" fill="#2c2c2a"/>
+  <rect x="4.2" y="17.4" width="18" height="1.2" rx="0.6" fill="#888780"/>
+  <rect x="4.2" y="20.2" width="14" height="1.2" rx="0.6" fill="#888780"/>
+</svg>

@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=../schema/build_map_names.schema.json
+# VMware Tools: the vSphere Client shows an internal version code (12416), the guest's About page the version (12.4.0).
+# Advisories name the version. A code (or a Tools build number) typed for vmware-tools is looked up here and stored as
+# the version (app/build_maps.py) – an unknown five-digit code is refused, never decoded by guess.
+#
+# Source (fetched 2026-11-02): VMware's version-mapping file https://packages.vmware.com/tools/versions
+#   column 1 (Tools version on NGC/VI Client) and column 5 (Tools build number) → column 4 (Tools version on guest
+#   Setup/About page). Rows of the same version are one row here.
+# A new version: add its row from the file above and raise catalog_version in catalog.yaml.
+kind: names
+fetched: "2026-11-02"
+sources:
+  - "https://packages.vmware.com/tools/versions"
+products: [vmware-tools]
+strip: [vmware, tools, version, build]
+claims: '^\s*(?:(?:vmware\s+)?tools\s+)?(?:version\s*:?\s*)?\d{4,5}\s*$|^\s*\d{8}\s*$'
+hint: vmware_tools_names
+rows:
+  - {value: "13.1.6", names: ["13350", "25833820"]}
+  - {value: "13.1.5", names: ["13349", "25544008"]}
+  - {value: "13.1.0", names: ["13344", "25218885"]}
+  - {value: "13.0.10", names: ["13322", "25056151"]}
+  - {value: "13.0.5", names: ["13317", "24915695"]}
+  - {value: "13.0.1", names: ["13313", "24843032"]}
+  - {value: "13.0.0", names: ["13312", "24696409"]}
+  - {value: "12.5.4", names: ["12452", "24964629"]}
+  - {value: "12.5.3", names: ["12451", "24819442"]}
+  - {value: "12.5.2", names: ["12450", "24697584"]}
+  - {value: "12.5.1", names: ["12449", "24649672"]}
+  - {value: "12.5.0", names: ["12448", "24276846"]}
+  - {value: "12.4.9", names: ["12425", "24964244"]}
+  - {value: "12.4.8", names: ["12424", "24817777"]}
+  - {value: "12.4.7", names: ["12423", "24697291"]}
+  - {value: "12.4.6", names: ["12422", "24648518"]}
+  - {value: "12.4.5", names: ["12421", "23787635"]}
+  - {value: "12.4.0", names: ["12416", "23259341"]}
+  - {value: "12.3.5", names: ["12389", "22544099"]}
+  - {value: "12.3.0", names: ["12384", "22234872"]}
+  - {value: "12.2.6", names: ["12358", "22229486"]}
+  - {value: "12.2.5", names: ["12357", "21855600"]}
+  - {value: "12.2.0", names: ["12352", "21223074"]}
+  - {value: "12.1.5", names: ["12325", "20735119"]}
+  - {value: "12.1.0", names: ["12320", "20219665"]}
+  - {value: "12.0.6", names: ["12294", "20104755"]}
+  - {value: "12.0.5", names: ["12293", "19716617"]}
+  - {value: "12.0.0", names: ["12288", "19345655"]}
+  - {value: "11.3.5", names: ["11365", "18557794"]}
+  - {value: "11.3.0", names: ["11360", "18090558"]}
+  - {value: "11.2.6", names: ["11334", "17901274"]}
+  - {value: "11.2.5", names: ["11333", "17337674"]}
+  - {value: "11.2.1", names: ["11329", "17243207"]}
+  - {value: "11.2.0", names: ["11328", "16938113"]}
+  - {value: "11.1.5", names: ["11301", "16724464"]}
+  - {value: "11.1.1", names: ["11297", "16303738"]}
+  - {value: "11.1.0", names: ["11296", "16036546"]}
+  - {value: "11.0.6", names: ["11270", "15940789"]}
+  - {value: "11.0.5", names: ["11269", "15389592"]}
+  - {value: "11.0.1", names: ["11265", "14773994"]}
+  - {value: "11.0.0", names: ["11264", "14549434"]}
+  - {value: "10.3.26", names: ["10362", "22085142"]}
+  - {value: "10.3.25", names: ["10361", "20206839"]}
+  - {value: "10.3.24", names: ["10360", "18733423"]}
+  - {value: "10.3.23", names: ["10359", "17030940"]}
+  - {value: "10.3.22", names: ["10358", "15902021"]}
+  - {value: "10.3.21", names: ["10357", "14772444"]}
+  - {value: "10.3.20", names: ["10356", "14389227"]}
+  - {value: "10.3.10", names: ["10346", "12406962"]}
+  - {value: "10.3.5", names: ["10341", "10430147"]}
+  - {value: "10.3.2", names: ["10338", "9925305"]}
+  - {value: "10.2.5", names: ["10309", "8068406"]}
+  - {value: "10.2.1", names: ["10305", "8267844"]}
+  - {value: "10.2.0", names: ["10304", "7253323"]}
+  - {value: "10.1.15", names: ["10287", "6677369"]}
+  - {value: "10.1.10", names: ["10282", "6082533"]}
+  - {value: "10.1.7", names: ["10279", "5541682"]}
+  - {value: "10.1.5", names: ["10277", "5055683"]}
+  - {value: "10.1.0", names: ["10272", "4449150"]}
+  - {value: "10.0.12", names: ["10252", "4448496"]}

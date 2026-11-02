@@ -1,0 +1,68 @@
+{
+ "aggregator": {
+  "category": "lister",
+  "contact_details": "csaf-lister@cert-bund.de",
+  "issuing_authority": "The content you have accessed or received is provided \"as is\" for informational ",
+  "name": "CSAF Lister des Bundesamts für Sicherheit in der Informationstechnik",
+  "namespace": "https://www.bsi.bund.de"
+ },
+ "aggregator_version": "2.0",
+ "canonical_url": "https://wid.cert-bund.de/.well-known/csaf-aggregator/aggregator.json",
+ "csaf_providers": [
+  {
+   "metadata": {
+    "last_updated": "2024-02-29T15:42:48.541+00:00",
+    "publisher": {
+     "category": "coordinator",
+     "name": "Bundesamt für Sicherheit in der Informationstechnik",
+     "namespace": "https://www.bsi.bund.de"
+    },
+    "role": "csaf_trusted_provider",
+    "url": "https://wid.cert-bund.de/.well-known/csaf/provider-metadata.json"
+   }
+  },
+  {
+   "metadata": {
+    "last_updated": "2025-12-23T20:52:40.183+00:00",
+    "publisher": {
+     "category": "vendor",
+     "name": "Schneider Electric CPCERT",
+     "namespace": "https://www.se.com/ww/en"
+    },
+    "role": "csaf_trusted_provider",
+    "url": "https://www.se.com/.well-known/csaf/provider-metadata.json"
+   }
+  },
+  {
+   "metadata": {
+    "last_updated": "2025-02-14T23:02:13.529+00:00",
+    "publisher": {
+     "category": "vendor",
+     "name": "Siemens ProductCERT",
+     "namespace": "https://www.siemens.com"
+    },
+    "role": "csaf_trusted_provider",
+    "url": "https://cert-portal.siemens.com/productcert/csaf/provider-metadata.json"
+   }
+  }
+ ],
+ "csaf_publishers": [
+  {
+   "metadata": {
+    "last_updated": "2024-08-21T13:53:55.177+00:00",
+    "publisher": {
+     "category": "vendor",
+     "name": "Hitachi Energy PSIRT",
+     "namespace": "https://www.hitachienergy.com/cybersecurity/alerts-and-notifications"
+    },
+    "role": "csaf_publisher",
+    "url": "https://aggregator.cert-bund.de/.well-known/csaf-aggregator/www_hitachienergy_com_cybersecurity_alerts-and-notifications/provider-metadata.json"
+   },
+   "mirrors": [
+    "https://aggregator.cert-bund.de/.well-known/csaf-aggregator/www_hitachienergy_com_cybersecurity_alerts-and-notifications/provider-metadata.json"
+   ],
+   "update_interval": "best effort"
+  }
+ ],
+ "last_updated": "2026-10-30T07:44:07.165+00:00"
+}

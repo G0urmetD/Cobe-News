@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'dev' (Frameworks & development). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme, a hint or its OSV packages).
+
+# ---------------------------------------------------------------- open-source frameworks: their packages in OSV
+- key: django
+  osv: [[PyPI, django]]
+- key: apache-struts
+  osv: [[Maven, org.apache.struts:struts2-core]]
+- key: symfony
+  osv: [[Packagist, symfony/http-kernel], [Packagist, symfony/symfony]]
+- key: laravel
+  osv: [[Packagist, laravel/framework]]
+- key: rails
+  osv: [[RubyGems, actionpack], [RubyGems, activerecord], [RubyGems, rails]]
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: artifactory
+- key: nexus
+- key: gerrit
+- key: forgejo
+- key: gitlab-runner
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: teamcity
+  label: JetBrains TeamCity
+  vendor: JetBrains
+  cpes: [a:jetbrains:teamcity]
+  cna: [[JetBrains, TeamCity]]
+  kw: [TeamCity]
+  example: "2024.12.1"
+  where: web_about
+- key: gitea
+  label: Gitea
+  vendor: Gitea
+  cpes: [a:gitea:gitea]
+  kw: [Gitea]
+  example: "1.23.1"
+  version_cmd: gitea --version
+  where: web_about

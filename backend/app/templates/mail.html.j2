@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>{{ subject }}</title>
+</head>
+{#- The mail style. Mail clients (Outlook!) ignore <style> blocks: tables, inline styles, web-safe fonts only. -#}
+<body style="margin:0;padding:0;background:#f3f4f7;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2330;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ preheader }}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f7;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+
+<tr><td style="padding:0 4px 14px;">
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td style="width:30px;height:30px;background:#3d55d4;border-radius:8px;color:#ffffff;font-weight:700;font-size:15px;text-align:center;vertical-align:middle;">C</td>
+    <td style="padding-left:10px;font-size:15px;font-weight:600;color:#1f2330;">Cobe News <span style="color:#7a8094;font-weight:400;">· {{ rule }}</span></td>
+  </tr></table>
+</td></tr>
+
+<tr><td style="background:#ffffff;border:1px solid #e3e5ec;border-radius:12px;overflow:hidden;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr><td style="height:4px;background:{{ accent }};font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:26px 28px 6px;">
+      <p style="margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:{{ accent }};font-weight:600;">{{ eyebrow }}</p>
+      <h1 style="margin:0;font-size:21px;line-height:1.3;font-weight:650;color:#1f2330;">{{ heading }}</h1>
+    </td></tr>
+
+    {% for s in stories %}
+    <tr><td style="padding:{% if loop.first %}14{% else %}6{% endif %}px 28px 8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e5ec;border-radius:10px;">
+        <tr><td style="padding:14px 16px 4px;">
+          <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:{{ s.sev_bg }};color:{{ s.sev_color }};font-size:11px;font-weight:600;">{{ s.sev_label }}</span>
+          &nbsp;<span style="font-size:12px;color:#5b6175;">{{ s.source }} · {{ s.date }}</span>
+        </td></tr>
+        <tr><td style="padding:4px 16px 2px;font-size:16px;font-weight:600;line-height:1.35;">{% if s.url %}<a href="{{ s.url }}" style="color:#1f2330;text-decoration:none;">{{ s.title }}</a>{% else %}{{ s.title }}{% endif %}</td></tr>
+        {% if s.summary %}<tr><td style="padding:6px 16px 4px;font-size:14px;line-height:1.55;color:#4a5066;">{{ s.summary }}</td></tr>{% endif %}
+        <tr><td style="padding:6px 16px 14px;font-size:13px;">{% if s.url %}<a href="{{ s.url }}" style="color:#3d55d4;">{{ labels.article }}</a> &nbsp;·&nbsp; {% endif %}<a href="{{ s.link }}" style="color:#3d55d4;">{{ labels.open }}</a></td></tr>
+      </table>
+    </td></tr>
+    {% endfor %}
+    {% if more %}<tr><td style="padding:4px 28px 4px;font-size:14px;color:#4a5066;">{{ more }}</td></tr>{% endif %}
+
+    <tr><td style="padding:16px 28px 28px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td style="background:#3d55d4;border-radius:8px;"><a href="{{ app_url }}" style="display:inline-block;padding:11px 20px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">{{ labels.button }}</a></td>
+      </tr></table>
+    </td></tr>
+  </table>
+</td></tr>
+
+<tr><td style="padding:16px 8px 0;font-size:12px;line-height:1.5;color:#7a8094;text-align:center;">
+  {% for f in footer %}<p style="margin:0 0 4px;">{{ f }}</p>{% endfor %}
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

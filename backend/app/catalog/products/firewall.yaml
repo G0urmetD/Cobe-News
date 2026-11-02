@@ -1,0 +1,430 @@
+# yaml-language-server: $schema=../schema/products.schema.json
+# Vendor News catalogue – category 'firewall' (Firewalls & VPN). How to add a product: docs/BETRIEB.md, section „Katalog pflegen“.
+# An entry whose key is an endoflife.date product and that has no label only moves that product into this category
+# (and may add CPEs, a version scheme or a hint).
+
+# ---------------------------------------------------------------- Palo Alto Networks
+- key: panos
+  label: PAN-OS (Firewalls)
+  vendor: Palo Alto Networks
+  cpes: [o:paloaltonetworks:pan-os]
+  scheme: panos
+  adv: paloalto
+  names: [PAN-OS]
+  cna: [[Palo Alto Networks, PAN-OS]]
+  kw: [PAN-OS, GlobalProtect]
+  aliases: [Palo Alto Firewall, NGFW, PA-Series]
+  example: 11.2.4-h23
+  where: panos
+- key: panorama
+  label: Panorama
+  vendor: Palo Alto Networks
+  cpes: [o:paloaltonetworks:pan-os]
+  eol: panos
+  scheme: panos
+  adv: paloalto
+  names: [Panorama, PAN-OS]
+  cna: [[Palo Alto Networks, PAN-OS]]
+  kw: [Panorama]
+  example: 11.2.4-h23
+  hint: panorama
+- key: pangp
+  label: GlobalProtect App
+  vendor: Palo Alto Networks
+  cpes: [a:paloaltonetworks:globalprotect]
+  adv: paloalto
+  names: [GlobalProtect App]
+  cna: [[Palo Alto Networks, GlobalProtect App]]
+  kw: [GlobalProtect]
+  example: 6.2.8
+  where: globalprotect
+- key: expedition
+  label: Expedition
+  vendor: Palo Alto Networks
+  cpes: [a:paloaltonetworks:expedition]
+  adv: paloalto
+  names: [Expedition]
+  kw: [Expedition]
+  example: 1.2.96
+
+# ---------------------------------------------------------------- Fortinet
+- key: fortios
+  label: FortiOS (FortiGate)
+  vendor: Fortinet
+  cpes: [o:fortinet:fortios]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiOS]
+  cna: [[Fortinet, FortiOS]]
+  kw: [FortiOS, FortiGate]
+  aliases: [FortiGate]
+  example: 7.4.8
+  where: fortinet
+- key: fortiproxy
+  label: FortiProxy
+  vendor: Fortinet
+  cpes: [a:fortinet:fortiproxy]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiProxy]
+  cna: [[Fortinet, FortiProxy]]
+  kw: [FortiProxy]
+  example: 7.4.5
+- key: fortimanager
+  label: FortiManager
+  vendor: Fortinet
+  cpes: [a:fortinet:fortimanager]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiManager]
+  cna: [[Fortinet, FortiManager]]
+  kw: [FortiManager]
+  example: 7.4.6
+- key: fortianalyzer
+  label: FortiAnalyzer
+  vendor: Fortinet
+  cpes: [a:fortinet:fortianalyzer]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiAnalyzer]
+  cna: [[Fortinet, FortiAnalyzer]]
+  kw: [FortiAnalyzer]
+  example: 7.4.6
+- key: fortiweb
+  label: FortiWeb
+  vendor: Fortinet
+  cpes: [a:fortinet:fortiweb]
+  scheme: fortios
+  adv: fortinet
+  names: [FortiWeb]
+  cna: [[Fortinet, FortiWeb]]
+  kw: [FortiWeb]
+  example: 7.6.4
+
+# ---------------------------------------------------------------- Cisco
+- key: cisco-asa
+  label: Cisco ASA Software
+  vendor: Cisco
+  cpes: [a:cisco:adaptive_security_appliance_software]
+  scheme: cisco
+  cna: [[Cisco, Cisco Adaptive Security Appliance (ASA) Software], [Cisco, Cisco Secure Firewall Adaptive Security Appliance (ASA) Software]]
+  kw: [Cisco ASA, Adaptive Security Appliance]
+  aliases: [ASA]
+  example: 9.18(4)22
+  where: cisco_asa
+- key: cisco-ftd
+  label: Cisco Secure Firewall Threat Defense (FTD)
+  vendor: Cisco
+  cpes: [a:cisco:firepower_threat_defense]
+  scheme: cisco
+  cna: [[Cisco, Cisco Firepower Threat Defense Software], [Cisco, Cisco Secure Firewall Threat Defense (FTD) Software]]
+  kw: [Firepower Threat Defense, Cisco FTD, Secure Firewall Threat Defense]
+  aliases: [Firepower]
+  example: 7.2.5.1
+  where: cisco_asa
+- key: cisco-fmc
+  label: Cisco Secure Firewall Management Center (FMC)
+  vendor: Cisco
+  cpes: [a:cisco:firepower_management_center]
+  scheme: cisco
+  cna: [[Cisco, Cisco Firepower Management Center]]
+  kw: [Firepower Management Center, Secure Firewall Management Center]
+  example: 7.4.2
+  where: cisco_asa
+
+# ---------------------------------------------------------------- other firewalls / VPN
+- key: checkpoint-gaia
+  label: Check Point Quantum / Gaia
+  vendor: Check Point
+  cpes: [o:checkpoint:gaia_os, o:checkpoint:quantum_security_gateway_firmware]
+  cna: [[Check Point, Quantum Security Gateways]]
+  kw: [Check Point]
+  aliases: [Quantum, Gaia]
+  example: R81.20 Take 99
+  hint: checkpoint
+  normalize: [checkpoint]
+  where: checkpoint
+- key: sophos-firewall
+  label: Sophos Firewall (SFOS)
+  vendor: Sophos
+  cpes: [o:sophos:sfos, a:sophos:firewall]
+  cna: [[Sophos, Sophos Firewall]]
+  kw: [Sophos Firewall, SFOS]
+  aliases: [XG, XGS, XG Firewall, Sophos XGS, Sophos Firewall OS]
+  example: 21.0.1.272
+  scheme: sfos
+  where: sophos
+- key: watchguard-fireware
+  label: WatchGuard Fireware OS
+  vendor: WatchGuard
+  cpes: [o:watchguard:fireware]
+  cna: [[WatchGuard, Fireware OS]]
+  kw: [WatchGuard, Fireware]
+  example: 12.11.1
+- key: sonicwall-sonicos
+  label: SonicWall SonicOS
+  vendor: SonicWall
+  cpes: [o:sonicwall:sonicos]
+  cna: [[SonicWall, SonicOS]]
+  kw: [SonicOS, SonicWall]
+  example: 7.1.2-7019
+- key: sonicwall-sma
+  label: SonicWall SMA 100 / 1000
+  vendor: SonicWall
+  cpes: [o:sonicwall:sma_100_firmware, a:sonicwall:sma1000_firmware]
+  cna: [[SonicWall, SMA100], [SonicWall, SMA1000]]
+  kw: [SonicWall SMA, SMA 100, SMA1000]
+  example: 10.2.1.15-81sv
+- key: pfsense
+  label: pfSense CE
+  vendor: Netgate
+  cpes: [a:pfsense:pfsense]
+  cna: [[Netgate, pfSense CE], [Netgate, pfSense]]
+  kw: [pfSense CE, pfSense Community Edition]
+  example: 2.8.0
+  aliases: [pfSense, pfSense Community Edition]
+  belongs: [{pattern: '^\s*v?(?:2[0-9])\.\d{2}(?:\.\d+)?(?:-p\d+)?\s*$', to: pfsense-plus}]  # 24.11: pfSense Plus
+- key: pfsense-plus
+  label: pfSense Plus
+  vendor: Netgate
+  cpes: [a:netgate:pfsense_plus]
+  cna: [[Netgate, pfSense Plus]]
+  kw: [pfSense Plus]
+  example: "24.11"
+  belongs: [{pattern: '^\s*v?2\.\d+\.\d+', to: pfsense}]  # 2.8.0: pfSense CE
+- key: opnsense
+  label: OPNsense
+  vendor: Deciso
+  cpes: [a:opnsense:opnsense]
+  kw: [OPNsense]
+  example: 26.7.7
+  where: web_about
+- key: ivanti-connect-secure
+  label: Ivanti Connect Secure
+  vendor: Ivanti
+  cpes: [a:ivanti:connect_secure, a:pulsesecure:pulse_connect_secure]
+  scheme: ivanti
+  cna: [[Ivanti, Connect Secure]]
+  kw: [Ivanti Connect Secure, Pulse Connect Secure]
+  aliases: [Pulse Secure]
+  example: 22.7R2.3
+  where: ivanti
+- key: netscaler-gateway
+  label: NetScaler Gateway (Citrix Gateway)
+  vendor: Cloud Software Group
+  cpes: [a:citrix:netscaler_gateway, a:citrix:gateway]
+  cna: [[Citrix, NetScaler Gateway], [NetScaler, NetScaler Gateway]]
+  kw: [NetScaler Gateway, Citrix Gateway]
+  example: 14.1-29.72
+  hint: citrix
+  normalize: [netscaler]
+  where: netscaler
+- key: zyxel-firewall
+  label: Zyxel Firewalls (ATP/USG FLEX)
+  vendor: Zyxel
+  # NVD names the firmware per model (checked 2026-11-02): the common ones; Zyxel is a CNA and names the series
+  cpes: [o:zyxel:usg_flex_100_firmware, o:zyxel:usg_flex_200_firmware, o:zyxel:usg_flex_500_firmware, o:zyxel:usg_flex_700_firmware, o:zyxel:atp100_firmware, o:zyxel:atp200_firmware, o:zyxel:atp500_firmware, o:zyxel:atp800_firmware]
+  cna: [[Zyxel, ATP series firmware], [Zyxel, USG FLEX series firmware], [Zyxel, USG FLEX 50(W) series firmware], [Zyxel, "USG20(W)-VPN series firmware"], [Zyxel, USG FLEX H series firmware]]
+  kw: [Zyxel ATP, USG FLEX, Zyxel]
+  aliases: [USG FLEX, ZyWALL ATP, Zyxel ATP, ZLD]
+  example: "5.38"
+  hint: per_model
+  where: zyxel
+- key: barracuda-cloudgen
+  label: Barracuda CloudGen Firewall
+  vendor: Barracuda
+  cpes: []
+  kw: [Barracuda]
+  hint: nocpe
+- key: sns-firmware
+  label: Stormshield Network Security (SNS)
+  vendor: Stormshield
+  cpes: [a:stormshield:stormshield_network_security, a:stormshield:network_security]
+  kw: [Stormshield]
+  aliases: [Stormshield SNS, Stormshield Firewall, SN Series]
+  example: 4.8.9
+  where: stormshield
+  replaces: [sns-hardware]  # endoflife.date's appliance models (SN210, SN310 …) – the firmware is what is compared (migration 0025)
+
+# ---------------------------------------------------------------- firewalls, VPN (more)
+- key: securepoint-utm
+  label: Securepoint UTM (NextGen Firewall)
+  vendor: Securepoint
+  cpes: [o:securepoint:unified_threat_management]
+  kw: [Securepoint]
+  aliases: [Securepoint NextGen UTM, Black Dwarf, Terra Firewall]
+  example: 14.0.4
+  version_cmd: "CLI: system info get · Web-UI: Dashboard → Firmware"
+- key: securepoint-vpn
+  label: Securepoint VPN Client
+  vendor: Securepoint
+  cpes: [a:securepoint:openvpn-client]
+  kw: [Securepoint VPN]
+  example: 2.0.42
+- key: sophos-utm
+  label: Sophos UTM (SG)
+  vendor: Sophos
+  cpes: [a:sophos:unified_threat_management, a:sophos:unified_threat_management_software]
+  kw: [Sophos UTM]
+  aliases: [Sophos SG, Astaro]
+  example: 9.720-3
+  hint: sophos_utm
+- key: sophos-connect
+  label: Sophos Connect (VPN-Client)
+  vendor: Sophos
+  cpes: []
+  kw: [Sophos Connect]
+  example: 2.4.0
+  hint: nocpe
+- key: sophos-ztna
+  label: Sophos ZTNA
+  vendor: Sophos
+  cpes: []
+  kw: [Sophos ZTNA]
+  hint: nocpe
+- key: lancom-lcos-fx
+  label: LANCOM R&S Unified Firewalls (LCOS FX)
+  vendor: LANCOM
+  cpes: [o:lancom-systems:lcos_fx]
+  kw: [LCOS FX, Unified Firewall]
+  aliases: [R&S Unified Firewalls, Rohde & Schwarz Unified Firewall]
+  example: 10.13 RU5
+- key: genugate
+  label: genua genugate
+  vendor: genua
+  cpes: [a:genua:genuagate, o:genua:genuagate_firmware, o:genua:genuagate]
+  kw: [genugate]
+  example: 10.5 p9
+- key: genucenter
+  label: genua genucenter
+  vendor: genua
+  cpes: []
+  kw: [genucenter]
+  hint: nocpe
+- key: clavister
+  label: Clavister NetShield / cOS
+  vendor: Clavister
+  cpes: [a:clavister:cos_core]
+  kw: [Clavister]
+  aliases: [cOS Core, NetWall]
+  example: 14.00.17
+- key: forcepoint-ngfw
+  label: Forcepoint NGFW
+  vendor: Forcepoint
+  cpes: [a:forcepoint:next_generation_firewall, a:forcepoint:next_generation_firewall_security_management_center]
+  kw: [Forcepoint NGFW, Forcepoint]
+  example: 7.2.2
+- key: hillstone
+  label: Hillstone Networks (StoneOS)
+  vendor: Hillstone Networks
+  cpes: []
+  kw: [Hillstone, StoneOS]
+  example: 5.5R10
+  hint: nocpe
+- key: huawei-usg
+  label: Huawei USG / HiSecEngine
+  vendor: Huawei
+  cpes: [o:huawei:usg6000v_firmware, o:huawei:usg9500_firmware, o:huawei:secospace_usg6600_firmware, o:huawei:secospace_usg6300_firmware, o:huawei:secospace_usg6500_firmware]
+  kw: [Huawei USG]
+  aliases: [HiSecEngine]
+  example: V600R007C20
+- key: checkpoint-vpn-client
+  label: Check Point Remote Access VPN Client
+  vendor: Check Point
+  cpes: [a:checkpoint:endpoint_security_vpn]
+  kw: [Remote Access VPN, Endpoint Security VPN]
+  example: E88.70
+- key: checkpoint-management
+  label: Check Point Security Management / Smart-1
+  vendor: Check Point
+  cpes: [a:checkpoint:quantum_security_management, a:checkpoint:multi-domain_security_management]
+  kw: [Security Management, Smart-1, SmartConsole]
+  aliases: [Smart-1, SmartCenter, MDS]
+  example: R81.20
+  hint: checkpoint
+  normalize: [checkpoint]
+  where: checkpoint
+- key: watchguard-vpn
+  label: WatchGuard Mobile VPN with SSL / IKEv2
+  vendor: WatchGuard
+  cpes: []
+  kw: [WatchGuard Mobile VPN]
+  example: "12.11"
+  hint: nocpe
+- key: endian
+  label: Endian Firewall
+  vendor: Endian
+  cpes: [a:endian:firewall, a:endian:firewall_community]
+  kw: [Endian]
+  example: 3.3.25
+- key: ipfire
+  label: IPFire
+  vendor: IPFire Project
+  cpes: [a:ipfire:ipfire]
+  kw: [IPFire]
+  example: 2.29 Core 195
+- key: untangle
+  label: Arista NG Firewall (Untangle)
+  vendor: Arista (Untangle)
+  cpes: [a:untangle:ng_firewall, a:arista:ng_firewall, a:untangle:untangle_firewall_ng]
+  kw: [NG Firewall, Untangle]
+  aliases: [Untangle]
+  example: "17.3"
+- key: kerio-control
+  label: Kerio Control
+  vendor: GFI (Kerio)
+  cpes: [a:gfi:kerio_control, a:kerio:control]
+  kw: [Kerio Control]
+  example: 9.4.5
+- key: juniper-secure-connect
+  label: Juniper Secure Connect
+  vendor: Juniper Networks
+  cpes: []
+  kw: [Juniper Secure Connect]
+  example: 25.4.13.31
+  hint: nocpe
+
+# ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
+- key: sns-smc
+
+# ---------------------------------------------------------------- Windows Server roles (0.1.45) – the Windows Server CPEs, a filter word picks the role
+- key: windows-rras
+  label: Routing and Remote Access (RRAS)
+  vendor: Microsoft
+  cpes: [o:microsoft:windows_server_2016, o:microsoft:windows_server_2019, o:microsoft:windows_server_2022, o:microsoft:windows_server_2025]
+  eol: windows-server
+  scheme: windows
+  cna: [[Microsoft, Windows Server]]
+  kw: [Routing and Remote Access, RRAS]
+  aliases: [RRAS, Microsoft VPN Server, DirectAccess]
+  example: 10.0.20348.2762
+  hint: windows_role
+  where: windows_build
+  filter: "Routing and Remote Access"
+
+# ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
+- key: ncp-secure-client
+  label: NCP Secure Enterprise Client
+  vendor: NCP engineering
+  cpes: [a:ncp-e:secure_enterprise_client, a:ncp:vpn_universal_secure_enterprise_client, a:ncp-e:vpn_universal_secure_enterprise_client, a:ncp-e:ncp_secure_entry_client]
+  kw: [NCP Secure Enterprise Client, NCP Secure Entry Client]
+  aliases: [NCP Client, NCP Secure Entry Client]
+  example: "13.18"
+  where: client_about
+- key: ncp-vpn-server  # no CPE in NVD (checked 2026-11-02)
+  label: NCP Secure Enterprise VPN Server / Management
+  vendor: NCP engineering
+  cpes: []
+  kw: [NCP Secure Enterprise VPN Server, NCP Secure Enterprise Management, NCP VPN Gateway]
+  aliases: [NCP VPN Server, NCP SEM, NCP Gateway]
+  example: "13.10"
+  hint: nocpe
+  where: web_about
+- key: sonicwall-netextender
+  label: SonicWall NetExtender
+  vendor: SonicWall
+  cpes: [a:sonicwall:netextender, o:sonicwall:netextender_firmware]
+  cna: [[SonicWall, NetExtender]]
+  kw: [NetExtender]
+  example: "10.3.0"
+  where: client_about

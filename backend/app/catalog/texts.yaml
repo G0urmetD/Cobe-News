@@ -1,0 +1,219 @@
+# yaml-language-server: $schema=schema/texts.schema.json
+# Texts the catalogue refers to, in German and English:
+#   hints – shown with a product (`hint: <key>`; `cloud` for every cloud service),
+#   where – where the version of a product is read, shown with the version form (`where: <key>`).
+hints:
+  cloud:
+    de: "Ein Cloud-Dienst des Herstellers: es gibt keine Version auf eurer Seite. Hinweise erscheinen als „Cloud-Dienst betroffen“ – beheben muss es der Hersteller; ob ihr etwas tun müsst, steht im Hinweis."
+    en: "A cloud service of the vendor: there is no version on your side. Advisories show as “cloud service affected” – the vendor has to fix it; whether you need to act is in the advisory."
+  panorama:
+    de: Panorama läuft mit PAN-OS. Ein PAN-OS-Hinweis, der Panorama nicht ausdrücklich nennt, erscheint als „möglicherweise betroffen“ – ob Panorama betroffen ist, steht im Text des Hinweises.
+    en: Panorama runs PAN-OS. A PAN-OS advisory that does not name Panorama shows as “possibly affected” – whether Panorama is affected is in the advisory's text.
+  cisco_ios:
+    de: "Klassisches IOS hat viele Züge (M, T, S, E …), z. B. 15.9(3)M9 (show version). Verglichen wird nur innerhalb des Zugs: eine gelistete Version ist „betroffen“, sonst steht „möglicherweise betroffen“ – nie „nicht betroffen“."
+    en: "Classic IOS has many trains (M, T, S, E …), e.g. 15.9(3)M9 (show version). It is compared within its train only: a listed version is “affected”, otherwise it says “possibly affected” – never “not affected”."
+  checkpoint:
+    de: Check Point nennt Versionen wie R81.20 mit Jumbo Hotfix Takes; die NVD-Daten kennen meist nur die Hauptversion. Jumbo-Stand im Hinweis prüfen.
+    en: Check Point names versions like R81.20 with Jumbo Hotfix Takes; NVD's data mostly knows only the main version. Check the Jumbo take in the advisory.
+  junos:
+    de: "Junos-Versionen wie 22.4R3-S5: die Service-Releases (S…) bildet die NVD oft nicht ab – im Zweifel „möglicherweise betroffen“."
+    en: "Junos versions like 22.4R3-S5: NVD often does not map service releases (S…) – when in doubt “possibly affected”."
+  windows:
+    de: Build-Nummer angeben (winver oder [Environment]::OSVersion, z. B. 10.0.20348.2762). Eine KB-Nummer lässt sich nicht vergleichen – welche KB welchem Build entspricht, steht im Update-Verlauf von Microsoft.
+    en: Enter the build number (winver or [Environment]::OSVersion, e.g. 10.0.20348.2762). A KB number cannot be compared – which KB is which build is in Microsoft's update history.
+  exchange:
+    de: "Build-Nummer angeben – aus ExSetup.exe, nicht aus AdminDisplayVersion (die zeigt keine Security Updates). Microsoft nennt die betroffenen Builds bis zum Security Update genau; „2019 CU15 Apr25HU“ geht auch und wird als Build gespeichert."
+    en: "Enter the build number – from ExSetup.exe, not from AdminDisplayVersion (which does not show security updates). Microsoft names the affected builds exactly, down to the security update; “2019 CU15 Apr25HU” works too and is stored as the build."
+  exchange_names:
+    de: "Diesen Exchange-Stand kennt die Tabelle nicht. Bitte den Build eintragen: Get-Command ExSetup.exe | % {$_.FileVersionInfo} (z. B. 15.2.1748.24) – oder den Namen, wie Microsoft ihn schreibt: „2019 CU15 Apr25HU“, „SE RTM Oct26SU“. AdminDisplayVersion („Version 15.2 (Build 1748.10)“) zeigt keine Security Updates und wird deshalb nicht genommen."
+    en: "The table does not know this Exchange level. Please enter the build: Get-Command ExSetup.exe | % {$_.FileVersionInfo} (e.g. 15.2.1748.24) – or the name as Microsoft writes it: “2019 CU15 Apr25HU”, “SE RTM Oct26SU”. AdminDisplayVersion (“Version 15.2 (Build 1748.10)”) does not show security updates and is therefore not taken."
+  sqlserver_names:
+    de: "Diesen SQL-Server-Stand kennt die Tabelle nicht. SELECT @@VERSION nennt den Build (z. B. 16.0.4165.4) – die ganze Zeile geht auch. Oder „2022 CU16“, „2022 CU16 GDR“ bzw. die KB-Nummer (KB5048033). Namen, die Microsoft mehreren Builds gibt („2022 GDR“), gehen nicht – dann bitte den Build."
+    en: "The table does not know this SQL Server level. SELECT @@VERSION names the build (e.g. 16.0.4165.4) – the whole line works too. Or “2022 CU16”, “2022 CU16 GDR” or the KB number (KB5048033). Names Microsoft gives to several builds (“2022 GDR”) do not work – then please the build."
+  vmware_tools_names:
+    de: "Diesen Code kennt die Tabelle nicht. Der vSphere Client zeigt einen internen Code (z. B. 12416) – die Version steht im Gast: vmware-toolbox-cmd -v (Linux) bzw. „Info zu VMware Tools“ (Windows), z. B. 12.4.0."
+    en: "The table does not know this code. The vSphere Client shows an internal code (e.g. 12416) – the version is shown in the guest: vmware-toolbox-cmd -v (Linux) or “About VMware Tools” (Windows), e.g. 12.4.0."
+  globalprotect_names:
+    de: "Diesen Build kennt die Tabelle nicht. Bitte den Hotfix eintragen, wie Palo Alto ihn in den Hinweisen nennt (z. B. 6.2.8-h10) – welcher Hotfix zu einem Build (6.2.8-c948) gehört, steht in den Release Notes der App. Als Build verglichen wäre c948 „neuer“ als jeder Hotfix."
+    en: "The table does not know this build. Please enter the hotfix as Palo Alto names it in its advisories (e.g. 6.2.8-h10) – which hotfix a build (6.2.8-c948) is, the app's release notes say. Compared as a build, c948 would be “newer” than every hotfix."
+  dotnet_runtime:
+    de: "Die Runtime-Version eintragen (dotnet --list-runtimes: Microsoft.NETCore.App bzw. Microsoft.AspNetCore.App, z. B. 8.0.11) – nicht die SDK-Version aus dotnet --version (8.0.403): die Hinweise nennen die Runtime."
+    en: "Enter the runtime version (dotnet --list-runtimes: Microsoft.NETCore.App or Microsoft.AspNetCore.App, e.g. 8.0.11) – not the SDK version from dotnet --version (8.0.403): advisories name the runtime."
+  office_build:
+    de: "Die Build-Nummer eintragen: Datei → Konto → Info zu … zeigt „Version 2411 (Build 18227.20162 Klick-und-Ausführen)“ – eingetragen wird 16.0.18227.20162. Die Versionsnummer (2411) allein lässt sich nicht vergleichen."
+    en: "Enter the build number: File → Account → About … shows “Version 2411 (Build 18227.20162 Click-to-Run)” – enter 16.0.18227.20162. The version number (2411) alone cannot be compared."
+  sap_component:
+    de: "SAP nennt in seinen Hinweisen Komponenten-Releases: für S/4HANA die Version von S4CORE (z. B. S4CORE 108), für NetWeaver die von SAP_BASIS (z. B. SAP_BASIS 758). Abzulesen unter System → Status → Komponenteninformationen (oder Transaktion SPAM). Der Produkt-Release („2023“) lässt sich nicht vergleichen."
+    en: "SAP's advisories name component releases: for S/4HANA the version of S4CORE (e.g. S4CORE 108), for NetWeaver that of SAP_BASIS (e.g. SAP_BASIS 758). Read it under System → Status → component information (or transaction SPAM). The product release (“2023”) cannot be compared."
+  sharepoint:
+    de: "Build-Nummer angeben (Zentraladministration → Upgrade und Migration → Produkt- und Patchinstallationsstatus, oder (Get-SPFarm).BuildVersion, z. B. 16.0.17928.20238). SharePoint 2016, 2019 und Subscription Edition haben alle 16.0.x – am Build erkennt Vendor News die Edition (2016: 16.0.4xxx–5xxx, 2019: 16.0.10xxx, SE: ab 16.0.14xxx)."
+    en: "Enter the build number (Central Administration → Upgrade and Migration → Check product and patch installation status, or (Get-SPFarm).BuildVersion, e.g. 16.0.17928.20238). SharePoint 2016, 2019 and Subscription Edition are all 16.0.x – Vendor News tells the edition by the build (2016: 16.0.4xxx–5xxx, 2019: 16.0.10xxx, SE: from 16.0.14xxx)."
+  kernel:
+    de: Distributionen patchen den Kernel selbst – die Upstream-Version allein sagt oft nicht, ob eine Lücke geschlossen ist. Bei Distributions-Kerneln zählt das Advisory der Distribution.
+    en: Distributions patch the kernel themselves – the upstream version alone often does not tell whether a hole is closed. For distribution kernels the distribution's advisory counts.
+  distro:
+    de: Bei Linux-Distributionen zeigt Vendor News Release-Linie und Support-Ende. Ob eine Lücke geschlossen ist, hängt am Paketstand – nur über die Advisories der Distribution (RHSA, DSA, USN …) eindeutig.
+    en: For Linux distributions Vendor News shows the release line and end of support. Whether a hole is closed depends on the package versions – only the distribution's advisories (RHSA, DSA, USN …) decide it.
+  sap:
+    de: SAP veröffentlicht seine Security Notes nur für Kunden. Die NVD-Daten nennen meist Komponenten-Releases (z. B. 7.50); den Patch-Stand per Security Note prüfen – Treffer sind oft „möglicherweise betroffen“.
+    en: SAP publishes its security notes for customers only. NVD's data mostly names component releases (e.g. 7.50); check the patch level by security note – matches are often “possibly affected”.
+  nocpe:
+    de: Für dieses Produkt gibt es keine CPE-Kennung in der NVD. Es erscheinen News, die das Produkt nennen, und CVEs, deren Hersteller-Daten es nennen.
+    en: There is no CPE identifier for this product in NVD. Stories naming the product and CVEs whose vendor data names it are shown.
+  windows_component:
+    de: "Teil von Windows: Lücken in IIS werden mit dem Windows-Build geschlossen – zusätzlich Windows Server folgen."
+    en: "Part of Windows: IIS holes are closed with the Windows build – follow Windows Server as well."
+  windows_role:
+    de: "Eine Rolle von Windows Server: Lücken schließt das kumulative Windows-Update. Die Build-Nummer des Servers angeben (winver oder [Environment]::OSVersion, z. B. 10.0.20348.2762) – zusätzlich Windows Server folgen."
+    en: "A Windows Server role: vulnerabilities are fixed by the cumulative Windows update. Enter the server's build number (winver or [Environment]::OSVersion, e.g. 10.0.20348.2762) – and follow Windows Server as well."
+  hyperv:
+    de: "Hyper-V ist eine Rolle von Windows Server (bzw. Windows 11): die Build-Nummer des Hosts angeben (winver oder [Environment]::OSVersion, z. B. 10.0.20348.2762 bei Server 2022, 10.0.26100.… bei Server 2025) – nicht die Version der Integrationsdienste und keine KB-Nummer. Gezeigt werden die CVEs, die Hyper-V nennen; geschlossen werden sie mit dem kumulativen Windows-Update."
+    en: "Hyper-V is a role of Windows Server (or Windows 11): enter the host's build number (winver or [Environment]::OSVersion, e.g. 10.0.20348.2762 for Server 2022, 10.0.26100.… for Server 2025) – not the integration services version and not a KB number. Shown are the CVEs that name Hyper-V; the cumulative Windows update fixes them."
+  hyperv_server:
+    de: Der eigenständige Hyper-V Server 2019 (ohne grafische Oberfläche) hat keinen Nachfolger; Updates gibt es so lange wie für Windows Server 2019. Die Build-Nummer angeben (sconfig oder [Environment]::OSVersion, z. B. 10.0.17763.6893).
+    en: The standalone Hyper-V Server 2019 (no GUI) has no successor; it gets updates as long as Windows Server 2019. Enter its build number (sconfig or [Environment]::OSVersion, e.g. 10.0.17763.6893).
+  ot:
+    de: "OT-Firmware: Die Hersteller veröffentlichen eigene Advisories (Siemens ProductCERT als CSAF – erscheint unter „Details aus der Quelle“, dazu die ICS-Advisories der CISA). Die NVD-Daten nennen oft einzelne Gerätemodelle – Treffer sind häufig „möglicherweise betroffen“; Modell und Firmware-Stand im Hinweis prüfen."
+    en: "OT firmware: the vendors publish their own advisories (Siemens ProductCERT as CSAF – shown under “details from the source”, plus CISA's ICS advisories). NVD data often names single device models – matches are often “possibly affected”; check model and firmware level in the advisory."
+  sophos_utm:
+    de: Sophos UTM (SG) wird seit dem 30.07.2026 nicht mehr unterstützt – es kommen keine Updates mehr, auch nicht für Sicherheitslücken. Nachfolger ist Sophos Firewall (SFOS).
+    en: Sophos UTM (SG) is no longer supported since 30 July 2026 – there are no more updates, not even for vulnerabilities. Its successor is Sophos Firewall (SFOS).
+  meraki:
+    de: "Meraki-Geräte werden aus der Cloud verwaltet: die Firmware steht im Dashboard (z. B. MX 18.211.5) und wird dort geplant. Der Hinweis nennt die Version, die die Lücke schließt."
+    en: "Meraki devices are managed from the cloud: the firmware is shown in the dashboard (e.g. MX 18.211.5) and scheduled there. The advisory names the version that fixes it."
+  per_model:
+    de: "Die NVD führt die Firmware je Gerätemodell. Der Katalog nennt die verbreiteten Modelle – fehlt eures, erscheinen News und die CVEs, deren Hersteller-Daten das Produkt nennen; Modell und Firmware-Stand im Hinweis prüfen."
+    en: "NVD lists the firmware per device model. The catalogue names the common models – if yours is missing, stories and the CVEs whose vendor data names the product are shown; check model and firmware level in the advisory."
+  mfp:
+    de: "Druckerfirmware führt die NVD je Gerätemodell (Hunderte) – der Katalog vergleicht hier keine Version. Es erscheinen News und Hinweise, die den Hersteller nennen; welche Modelle betroffen sind, steht im Hinweis des Herstellers."
+    en: "NVD lists printer firmware per device model (hundreds) – the catalogue compares no version here. Stories and advisories naming the vendor are shown; which models are affected is in the vendor's advisory."
+  ad_ds:
+    de: "Domain Controller: Lücken in AD DS, Kerberos, Netlogon und LDAP schließt das kumulative Windows-Update. Die Build-Nummer des DCs angeben (winver oder [Environment]::OSVersion, z. B. 10.0.20348.2762) – zusätzlich Windows Server folgen."
+    en: "Domain controllers: holes in AD DS, Kerberos, Netlogon and LDAP are fixed by the cumulative Windows update. Enter the DC's build number (winver or [Environment]::OSVersion, e.g. 10.0.20348.2762) – and follow Windows Server as well."
+  citrix:
+    de: "Citrix (Cloud Software Group) veröffentlicht seine Security Bulletins (CTX…) nur als Webseite – ohne CSAF und ohne Feed. Vendor News liest sie über die CVE-Daten (NVD/CVE-Liste, Citrix ist CNA) und die CSAF-Warnungen des BSI; der Workaround steht im Bulletin."
+    en: "Citrix (Cloud Software Group) publishes its security bulletins (CTX…) as web pages only – no CSAF, no feed. Vendor News reads them through the CVE data (NVD/CVE list, Citrix is a CNA) and the BSI's CSAF warnings; the workaround is in the bulletin."
+where:
+  veeam_br:
+    de: "In der Konsole von Veeam Backup & Replication: Hauptmenü (☰) → Help → About. Dort steht der Build, z. B. 12.3.2.4934 – bitte den ganzen Build eintragen; „12.3.2 P4“ lässt sich nicht vergleichen. Mit nur 12.3.2 prüfen wir, was für jeden Build von 12.3.2 gilt, sonst steht „möglicherweise betroffen“. Nicht aus der Systemsteuerung („Programme und Features“) ablesen – die zeigt nach Updates teils den alten Build."
+    en: "In the Veeam Backup & Replication console: main menu (☰) → Help → About. It shows the build, e.g. 12.3.2.4934 – please enter the whole build; “12.3.2 P4” cannot be compared. With just 12.3.2 we check what holds for every build of 12.3.2, otherwise it says “possibly affected”. Don't read it from the Control Panel (“Programs and Features”) – after updates it sometimes shows the old build."
+  veeam_console:
+    de: In der Konsole des Produkts unter Help → About (je nach Produkt im Hauptmenü ☰ oder oben rechts) steht der Build, z. B. 13.1.0.7940. Bitte den ganzen Build eintragen – „13.1 P1“ lässt sich nicht vergleichen; welcher Build zu einem Patch gehört, steht im KB-Artikel.
+    en: The product's console shows the build under Help → About (in the main menu ☰ or top right, depending on the product), e.g. 13.1.0.7940. Please enter the whole build – “13.1 P1” cannot be compared; the KB article says which build a patch is.
+  veeam_appliance:
+    de: "Zwei Build-Nummern: die des Plug-ins in Veeam Backup & Replication (z. B. 13.9.2.449) und die des Backup-Appliance (z. B. 9.0.0.444). Bitte den Build des Appliance eintragen – Veeams KB-Artikel mit den Build-Nummern (KB4360 für Azure, KB4359 für Google Cloud) nennen beide nebeneinander."
+    en: "Two build numbers: the plug-in's in Veeam Backup & Replication (e.g. 13.9.2.449) and the backup appliance's (e.g. 9.0.0.444). Please enter the appliance build – Veeam's KB articles with the build numbers (KB4360 for Azure, KB4359 for Google Cloud) list both side by side."
+  veeam_agent_windows:
+    de: "Im Control Panel des Agents (Symbol im Infobereich): Hauptmenü (☰) → About. Dort steht der Build, z. B. 13.1.0.544 – die Agents für Windows und Linux haben eigene Build-Nummern."
+    en: "In the agent's Control Panel (icon in the notification area): main menu (☰) → About. It shows the build, e.g. 13.1.0.544 – the Windows and Linux agents have build numbers of their own."
+  veeam_agent_linux:
+    de: "Auf dem Linux-Server: veeamconfig version – oder die Paketversion: rpm -q veeam veeam-nosnap (RHEL, SUSE) bzw. dpkg -s veeam / veeam-nosnap (Debian, Ubuntu), z. B. 13.1.2.11. Die Agents für Linux und Windows haben eigene Build-Nummern."
+    en: "On the Linux server: veeamconfig version – or the package version: rpm -q veeam veeam-nosnap (RHEL, SUSE) or dpkg -s veeam / veeam-nosnap (Debian, Ubuntu), e.g. 13.1.2.11. The Linux and Windows agents have build numbers of their own."
+  veeam_kasten:
+    de: "Die Version der Helm-Installation: helm list -n kasten-io (Spalte APP VERSION, z. B. 8.0.4)."
+    en: "The version of the Helm release: helm list -n kasten-io (column APP VERSION, e.g. 8.0.4)."
+  vmware_vcenter:
+    de: "In der VAMI des vCenter (https://<vcenter>:5480 → Übersicht) oder im vSphere Client unter Hilfe → Info zu VMware vSphere: Version 8.0.3.00400 und Build 24322831. Beides wird genommen und als Release gespeichert (8.0.3.00400 → 8.0 U3d) – die Hinweise nennen die Releases. Auch „8.0 U3d“ direkt geht. vCenter und ESXi haben eigene Builds: ESXi-Hosts gehören zu VMware ESXi."
+    en: "In the vCenter's VAMI (https://<vcenter>:5480 → Summary) or in the vSphere Client under Help → About VMware vSphere: version 8.0.3.00400 and build 24322831. Both are taken and stored as the release (8.0.3.00400 → 8.0 U3d) – advisories name releases. “8.0 U3d” directly works too. vCenter and ESXi have builds of their own: ESXi hosts belong to VMware ESXi."
+  vmware_esxi:
+    de: "Auf dem Host: vmware -v zeigt „VMware ESXi 8.0.3 build-24022510“, der Host Client unter Hilfe → Info Version und Build. Der Build wird genommen und als Release gespeichert (build-24674464 → 8.0 U3e) – vmware -l nennt den Patch-Buchstaben nicht. Auch „8.0 U3e“ direkt geht."
+    en: "On the host: vmware -v shows “VMware ESXi 8.0.3 build-24022510”, the Host Client shows version and build under Help → About. The build is taken and stored as the release (build-24674464 → 8.0 U3e) – vmware -l does not name the patch letter. “8.0 U3e” directly works too."
+  fortinet:
+    de: "Im GUI oben rechts bzw. Dashboard → Status („v7.4.3 build2573 (GA.F)“), auf der CLI: get system status („FortiGate-60F v7.4.3,build2573,240201 (GA.F)“). Beides geht – gespeichert wird 7.4.3; der Build folgt der Version."
+    en: "In the GUI top right or Dashboard → Status (“v7.4.3 build2573 (GA.F)”), on the CLI: get system status (“FortiGate-60F v7.4.3,build2573,240201 (GA.F)”). Both work – 7.4.3 is stored; the build follows the version."
+  panos:
+    de: "Dashboard → General Information → Software Version, oder CLI: show system info (sw-version), z. B. 11.2.4-h23 – der Hotfix (-h23) gehört dazu."
+    en: "Dashboard → General Information → Software Version, or CLI: show system info (sw-version), e.g. 11.2.4-h23 – the hotfix (-h23) belongs to it."
+  cisco_asa:
+    de: "CLI: show version – ASA z. B. 9.18(4)22, FTD/FMC z. B. 7.2.5 (build 208) bzw. 7.2.5.1. „(build …)“ wird ignoriert."
+    en: "CLI: show version – ASA e.g. 9.18(4)22, FTD/FMC e.g. 7.2.5 (build 208) or 7.2.5.1. “(build …)” is ignored."
+  netscaler:
+    de: "GUI oben rechts bzw. CLI: show version („NetScaler NS14.1: Build 29.72.nc“) – beides geht und wird als 14.1-29.72 gespeichert, wie die Hinweise es schreiben. FIPS- und NDcPP-Builds sind eigene Linien: dann „14.1-29.72 FIPS“ eintragen."
+    en: "GUI top right or CLI: show version (“NetScaler NS14.1: Build 29.72.nc”) – both work and are stored as 14.1-29.72, as advisories write it. FIPS and NDcPP builds are lines of their own: then enter “14.1-29.72 FIPS”."
+  ivanti:
+    de: "Admin-Oberfläche → System → Maintenance → Platform bzw. die Fußzeile, z. B. 22.7R2.3 (build 3431) – der Build in Klammern wird ignoriert."
+    en: "Admin console → System → Maintenance → Platform or the footer, e.g. 22.7R2.3 (build 3431) – the build in brackets is ignored."
+  checkpoint:
+    de: "CLI: fw ver bzw. cpinfo -y all, oder SmartConsole → Gateway → Version: R81.20 mit Jumbo Hotfix Take, z. B. „R81.20 Take 99“. „R81.20 - Build 012“ ist der Build des Releases, kein Take – gespeichert wird dann R81.20."
+    en: "CLI: fw ver or cpinfo -y all, or SmartConsole → gateway → version: R81.20 with its Jumbo Hotfix take, e.g. “R81.20 Take 99”. “R81.20 - Build 012” is the release's build, not a take – then R81.20 is stored."
+  junos:
+    de: "CLI: show version (Junos: 22.4R3-S5, Junos OS Evolved: 23.2R2-S1-EVO – „-EVO“ wird ignoriert)."
+    en: "CLI: show version (Junos: 22.4R3-S5, Junos OS Evolved: 23.2R2-S1-EVO – “-EVO” is ignored)."
+  exchange:
+    de: "In der Exchange Management Shell: Get-Command ExSetup.exe | % {$_.FileVersionInfo} – z. B. 15.02.1748.037. Nicht AdminDisplayVersion aus Get-ExchangeServer: sie zeigt keine Security Updates. „2019 CU15 Apr25HU“ oder „SE RTM Oct26SU“ (wie Microsoft sie nennt) gehen auch und werden als Build gespeichert; „2019 CU15“ ohne Update steht für jeden Build von CU15."
+    en: "In the Exchange Management Shell: Get-Command ExSetup.exe | % {$_.FileVersionInfo} – e.g. 15.02.1748.037. Not AdminDisplayVersion from Get-ExchangeServer: it does not show security updates. “2019 CU15 Apr25HU” or “SE RTM Oct26SU” (as Microsoft names them) work too and are stored as the build; “2019 CU15” without an update stands for every build of CU15."
+  sqlserver:
+    de: "SELECT @@VERSION (oder SERVERPROPERTY('ProductVersion')) – z. B. 16.0.4165.4; die ganze Zeile von @@VERSION geht auch. „2022 CU16“, „2022 CU16 GDR“ oder die KB-Nummer gehen ebenfalls und werden als Build gespeichert."
+    en: "SELECT @@VERSION (or SERVERPROPERTY('ProductVersion')) – e.g. 16.0.4165.4; the whole line of @@VERSION works too. “2022 CU16”, “2022 CU16 GDR” or the KB number work as well and are stored as the build."
+  sharepoint:
+    de: "Zentraladministration → Upgrade und Migration → Produkt- und Patchinstallationsstatus, oder PowerShell: (Get-SPFarm).BuildVersion – z. B. 16.0.17928.20238."
+    en: "Central Administration → Upgrade and Migration → Check product and patch installation status, or PowerShell: (Get-SPFarm).BuildVersion – e.g. 16.0.17928.20238."
+  office:
+    de: "In Word/Outlook: Datei → Konto → Info zu … – „Version 2411 (Build 18227.20162 Klick-und-Ausführen)“. Eintragen: 16.0.18227.20162 (16.0. vor den Build)."
+    en: "In Word/Outlook: File → Account → About … – “Version 2411 (Build 18227.20162 Click-to-Run)”. Enter: 16.0.18227.20162 (16.0. in front of the build)."
+  java:
+    de: "java -version („1.8.0_411“, „21.0.5“), unter Windows auch Systemsteuerung → Java → Info („Version 8 Update 411“). Java 8 wird in jeder Form genommen und als 8u411 gespeichert."
+    en: "java -version (“1.8.0_411”, “21.0.5”), on Windows also Control Panel → Java → About (“Version 8 Update 411”). Java 8 is taken in every form and stored as 8u411."
+  dotnet:
+    de: "dotnet --list-runtimes – die Zeile Microsoft.NETCore.App (bzw. Microsoft.AspNetCore.App) nennt die Runtime, z. B. 8.0.11. Nicht dotnet --version: das ist das SDK (8.0.403), die Hinweise nennen die Runtime."
+    en: "dotnet --list-runtimes – the line Microsoft.NETCore.App (or Microsoft.AspNetCore.App) names the runtime, e.g. 8.0.11. Not dotnet --version: that is the SDK (8.0.403), advisories name the runtime."
+  vmware_tools:
+    de: "Im Gast: vmware-toolbox-cmd -v (Linux) bzw. Infobereich → VMware Tools → Info (Windows), z. B. 12.4.0. Der vSphere Client zeigt einen internen Code (12416) – der geht auch und wird als Version gespeichert."
+    en: "In the guest: vmware-toolbox-cmd -v (Linux) or notification area → VMware Tools → About (Windows), e.g. 12.4.0. The vSphere Client shows an internal code (12416) – that works too and is stored as the version."
+  globalprotect:
+    de: "GlobalProtect-App → Einstellungen → Info, oder die Hinweise/Release Notes: den Hotfix eintragen, z. B. 6.2.8-h10. Ein Build wie 6.2.8-c948 wird für 6.2.8 nachgeschlagen (= 6.2.8-h10)."
+    en: "GlobalProtect app → Settings → About, or the advisories/release notes: enter the hotfix, e.g. 6.2.8-h10. A build like 6.2.8-c948 is looked up for 6.2.8 (= 6.2.8-h10)."
+  ilo:
+    de: "iLO-Weboberfläche → Information → Overview → iLO Firmware Version, z. B. „iLO 6 v1.62“ – eingetragen und gespeichert wird 1.62 (die Generation steckt im Produkt)."
+    en: "iLO web interface → Information → Overview → iLO Firmware Version, e.g. “iLO 6 v1.62” – 1.62 is entered and stored (the generation is in the product)."
+  synology_qnap:
+    de: "Synology: Systemsteuerung → Info-Center, z. B. „DSM 7.2.1-69057 Update 5“ (eintragen ohne „DSM“). QNAP: Systemsteuerung → Systemstatus, z. B. „QTS 5.2.3.3006 build 20250108“."
+    en: "Synology: Control Panel → Info Center, e.g. “DSM 7.2.1-69057 Update 5” (enter without “DSM”). QNAP: Control Panel → System Status, e.g. “QTS 5.2.3.3006 build 20250108”."
+  sap:
+    de: "System → Status → Komponenteninformationen (oder Transaktion SPAM): für S/4HANA die Zeile S4CORE (z. B. 108), für NetWeaver SAP_BASIS (z. B. 758). SAPs Hinweise nennen diese Komponenten-Releases, nicht den Produkt-Release („2023“)."
+    en: "System → Status → component information (or transaction SPAM): for S/4HANA the line S4CORE (e.g. 108), for NetWeaver SAP_BASIS (e.g. 758). SAP's advisories name these component releases, not the product release (“2023”)."
+  sophos:
+    de: "Web-Admin: Control Center → System (oder Konsole: system diagnostics show version-info), z. B. „SFOS 21.0.1 MR-1-Build272“ – so, als 21.0.1.272 oder als 21.0 MR1 eintragbar."
+    en: "Web admin: Control Center → System (or console: system diagnostics show version-info), e.g. “SFOS 21.0.1 MR-1-Build272” – can be entered like that, as 21.0.1.272 or as 21.0 MR1."
+  lancom:
+    de: "LANconfig/LANmonitor oder WEBconfig → Systeminformation: Firmware wie „10.80.0627RU5“ – eintragen als 10.80 RU5. Die Hinweise nennen Release Updates (RU) und Security Updates (SU) – ein SU ist kein RU: im Zweifel den Hinweis lesen."
+    en: "LANconfig/LANmonitor or WEBconfig → system information: firmware like “10.80.0627RU5” – enter as 10.80 RU5. Advisories name release updates (RU) and security updates (SU) – an SU is no RU: when in doubt read the advisory."
+  idrac:
+    de: "iDRAC-Weboberfläche → Dashboard bzw. System → Übersicht (Firmware-Version, z. B. 7.10.70.00), oder racadm getversion."
+    en: "iDRAC web interface → Dashboard or System → Overview (firmware version, e.g. 7.10.70.00), or racadm getversion."
+  windows_build:
+    de: "Auf dem Server mit der Rolle: winver oder in PowerShell [Environment]::OSVersion (bzw. Get-ComputerInfo OsBuildNumber) – z. B. 10.0.20348.2762. Die Rolle hat keine eigene Version: verglichen wird der Build von Windows Server."
+    en: "On the server holding the role: winver or in PowerShell [Environment]::OSVersion (or Get-ComputerInfo OsBuildNumber) – e.g. 10.0.20348.2762. The role has no version of its own: the Windows Server build is compared."
+  web_about:
+    de: "In der Weboberfläche bzw. Konsole des Produkts: Hilfe → Info (About), die Fußzeile oder das Dashboard nennen die Version. Bitte die ganze Versionsnummer eintragen, wie sie dort steht (mit Build oder Patch, wenn angezeigt) – die Hinweise des Herstellers nennen die Stände genau so."
+    en: "In the product's web interface or console: Help → About, the footer or the dashboard name the version. Please enter the whole version number as shown there (with build or patch where shown) – the vendor's advisories name the levels the same way."
+  client_about:
+    de: "In der Anwendung: Hilfe → Info (About) bzw. Einstellungen → Info. Unter Windows auch Einstellungen → Apps → Installierte Apps (Spalte Version), unter macOS Programm → Über …"
+    en: "In the application: Help → About or Settings → About. On Windows also Settings → Apps → Installed apps (column version), on macOS app menu → About …"
+  firmware_dashboard:
+    de: "Weboberfläche des Geräts: Startseite/Dashboard bzw. System → Status oder Systeminformation – dort steht die Firmware-Version. Nur die Versionsnummer eintragen, ohne Modellname."
+    en: "The device's web interface: home page/dashboard or System → Status or system information – the firmware version is shown there. Enter the version number only, without the model name."
+  bmc:
+    de: "Weboberfläche des Management-Controllers (Startseite bzw. Systeminformation → Firmware), oder per Redfish: GET /redfish/v1/Managers/<Id> – Feld FirmwareVersion. Die BMC-Firmware eintragen, nicht das BIOS."
+    en: "The management controller's web interface (home page or system information → firmware), or via Redfish: GET /redfish/v1/Managers/<Id> – field FirmwareVersion. Enter the BMC firmware, not the BIOS."
+  linux_package:
+    de: "Auf dem Server die Paketversion: dpkg -s <Paket> (Debian, Ubuntu) bzw. rpm -q <Paket> (RHEL, SUSE) – oder die Versionsausgabe des Programms (--version). Bei Docker-Installationen der Tag des Images."
+    en: "On the server the package version: dpkg -s <package> (Debian, Ubuntu) or rpm -q <package> (RHEL, SUSE) – or the program's version output (--version). For Docker installations the image tag."
+  sap_kernel:
+    de: "Kernel-Release und Patch-Stand des SAP-Programms (z. B. sapwebdisp -version, saprouter -v bzw. in der Transaktion SM51 → Release-Info): eintragen wie SAP es im Hinweis schreibt, z. B. 7.93. HANA: SELECT VERSION FROM SYS.M_DATABASE (z. B. 2.00.079.00)."
+    en: "Kernel release and patch level of the SAP program (e.g. sapwebdisp -version, saprouter -v or transaction SM51 → release info): enter it as SAP writes it in its note, e.g. 7.93. HANA: SELECT VERSION FROM SYS.M_DATABASE (e.g. 2.00.079.00)."
+  ot_firmware:
+    de: "Weboberfläche des Geräts (Information, Status oder Wartung → Firmware) oder das Engineering-/Management-Werkzeug des Herstellers nennen die Firmware-Version. Nur die Versionsnummer eintragen; welches Modell betroffen ist, steht im Hinweis."
+    en: "The device's web interface (information, status or maintenance → firmware) or the vendor's engineering/management tool name the firmware version. Enter the version number only; which model is affected is in the advisory."
+  stormshield:
+    de: "Administrationsoberfläche: Dashboard → Eigenschaften (Firmware-Version, z. B. 4.8.9) – oder auf der Konsole: getversion."
+    en: "Administration interface: dashboard → properties (firmware version, e.g. 4.8.9) – or on the console: getversion."
+  horizon:
+    de: "Horizon Console → Hilfe (?) → Info – Horizon 8 nennt seine Releases nach Jahr und Monat (z. B. 2412, 2412.1). „2412“ geht und wird als 8.2412 gespeichert – so schreibt endoflife.date die Linien und die NVD die Versionen 8.x. Der Horizon Client hat eigene Nummern und gehört nicht hierher."
+    en: "Horizon Console → Help (?) → About – Horizon 8 names its releases by year and month (e.g. 2412, 2412.1). “2412” works and is stored as 8.2412 – that is how endoflife.date writes the lines and NVD the 8.x versions. The Horizon Client has numbers of its own and does not belong here."
+  beyondtrust:
+    de: "In der Admin-Oberfläche /login → Status → Information steht die Software-Version des Site (z. B. 24.3.1); /appliance zeigt die Base-Software des Appliances – eingetragen wird die Version des Site."
+    en: "In the admin interface /login → Status → Information shows the site's software version (e.g. 24.3.1); /appliance shows the appliance's base software – enter the site's version."
+  zyxel:
+    de: "Weboberfläche: Dashboard bzw. Wartung → Firmware-Paket, oder CLI: show version – z. B. „V5.38(ABPS.0)“. Eintragen als 5.38 (ohne V und Modellcode); ein Patch („V5.38 Patch 1“) als 5.38 Patch 1."
+    en: "Web interface: dashboard or Maintenance → firmware package, or CLI: show version – e.g. “V5.38(ABPS.0)”. Enter it as 5.38 (without V and model code); a patch (“V5.38 Patch 1”) as 5.38 Patch 1."

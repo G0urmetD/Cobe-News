@@ -1,0 +1,114 @@
+{
+ "feed": {
+  "id": "siemens-security-advisories-csaf-feed-tlp-white",
+  "title": "Siemens Security Advisories CSAF feed (TLP:WHITE)",
+  "link": [
+   {
+    "rel": "self",
+    "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-feed-tlp-white.json"
+   }
+  ],
+  "category": [
+   {
+    "scheme": "urn:ietf:params:rolie:category:information-type",
+    "term": "csaf"
+   }
+  ],
+  "updated": "2026-10-29T00:00:00Z",
+  "entry": [
+   {
+    "id": "SSA-166980",
+    "title": "PHP2Shell Vulnerabilities in Siemens Products",
+    "link": [
+     {
+      "rel": "self",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-166980.json"
+     },
+     {
+      "rel": "hash",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-166980.json.sha512"
+     },
+     {
+      "rel": "signature",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-166980.json.asc"
+     }
+    ],
+    "published": "2026-10-26T00:00:00Z",
+    "updated": "2026-10-29T00:00:00Z",
+    "summary": {
+     "content": "On October 21, 2026, the PHP project and security researchers disclosed two critical, unauthenticated remote code execution vulnerabilities in the core PHP lang"
+    },
+    "content": {
+     "type": "application/json",
+     "src": "https://cert-portal.siemens.com/productcert/csaf/ssa-166980.json"
+    },
+    "format": {
+     "schema": "https://docs.oasis-open.org/csaf/csaf/v2.0/csaf_json_schema.json",
+     "version": "2.0"
+    }
+   },
+   {
+    "id": "SSA-566435",
+    "title": "PHP2Shell Vulnerabilities in Siemens Software Products",
+    "link": [
+     {
+      "rel": "self",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-566435.json"
+     },
+     {
+      "rel": "hash",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-566435.json.sha512"
+     },
+     {
+      "rel": "signature",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-566435.json.asc"
+     }
+    ],
+    "published": "2026-10-23T00:00:00Z",
+    "updated": "2026-10-28T00:00:00Z",
+    "summary": {
+     "content": "On October 21, 2026, the PHP project and security researchers disclosed two critical, unauthenticated remote code execution vulnerabilities in the core PHP lang"
+    },
+    "content": {
+     "type": "application/json",
+     "src": "https://cert-portal.siemens.com/productcert/csaf/ssa-566435.json"
+    },
+    "format": {
+     "schema": "https://docs.oasis-open.org/csaf/csaf/v2.0/csaf_json_schema.json",
+     "version": "2.0"
+    }
+   },
+   {
+    "id": "SSA-979775",
+    "title": "SSA-979775: Stack Overflow Vulnerability in SCALANCE and RUGGEDCOM Devices",
+    "link": [
+     {
+      "rel": "self",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-979775.json"
+     },
+     {
+      "rel": "hash",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-979775.json.sha512"
+     },
+     {
+      "rel": "signature",
+      "href": "https://cert-portal.siemens.com/productcert/csaf/ssa-979775.json.asc"
+     }
+    ],
+    "published": "2021-03-09T00:00:00Z",
+    "updated": "2021-04-13T00:00:00Z",
+    "summary": {
+     "content": "Several firmware versions of the SCALANCE and RUGGEDCOM devices listed below are affected by a vulnerability in the passive listening feature that could allow a"
+    },
+    "content": {
+     "type": "application/json",
+     "src": "https://cert-portal.siemens.com/productcert/csaf/ssa-979775.json"
+    },
+    "format": {
+     "schema": "https://docs.oasis-open.org/csaf/csaf/v2.0/csaf_json_schema.json",
+     "version": "2.0"
+    }
+   }
+  ]
+ }
+}
