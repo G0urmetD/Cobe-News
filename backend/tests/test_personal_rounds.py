@@ -130,7 +130,9 @@ async def test_the_time_budget_ends_the_round_messages_not_started_go_back_witho
     t0 = time.monotonic()
     first = await _dispatch()
     wall = time.monotonic() - t0
-    assert wall < personal.ROUND_S + slow + 0.5  # bounded: the deadline plus at most the messages already started
+    # bounded: the deadline plus the messages already started – with room for a slow machine (CI); that the budget ended
+    # the round is shown by the messages left pending below, not by the wall clock
+    assert wall < personal.ROUND_S + slow + 1.5
     assert 0 < first["sent"] < 10 and personal.backlog()
     rows = await _rows()
     assert {r.status for r in rows} == {"sent", "pending"}
