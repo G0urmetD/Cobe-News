@@ -84,16 +84,17 @@ export function DrawerSkeleton({ label }: { label: string }) {
  * A page that crashed while rendering shows this instead of a white screen – the sidebar, the other pages and the
  * open case stay usable. Reset when the address changes.
  */
-export class PageErrorBoundary extends Component<{ children: ReactNode; resetKey: string; full?: boolean }, { error: Error | null }> {
-  state = { error: null as Error | null }
+export class PageErrorBoundary extends Component<{ children: ReactNode; resetKey: string; full?: boolean }, { error: Error | null; resetKey: string }> {
+  state = { error: null as Error | null, resetKey: this.props.resetKey }
   static getDerivedStateFromError(error: Error) {
     return { error }
   }
+  // another address: the crash notice goes before that render (not in a second one after it)
+  static getDerivedStateFromProps(props: { resetKey: string }, state: { error: Error | null; resetKey: string }) {
+    return props.resetKey !== state.resetKey ? { error: null, resetKey: props.resetKey } : null
+  }
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("page crashed", error, info.componentStack)
-  }
-  componentDidUpdate(prev: { resetKey: string }) {
-    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null })
   }
   render() {
     if (!this.state.error) return this.props.children

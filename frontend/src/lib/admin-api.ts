@@ -293,8 +293,6 @@ export interface TlsStatus {
   system?: SystemWarning[]
 }
 
-export type SystemWarning =
-  | { code: "secret_key_short"; source: "env" | "file"; min: number }
-  | { code: "emergency_failures"; at: string; failures: number }
+export type SystemWarning = { code: "secret_key_short"; source: "env" | "file"; min: number } | { code: "emergency_failures"; at: string; failures: number }
 
 export const useTls = () => useQuery({ queryKey: ["admin", "tls"], queryFn: () => api.get<TlsStatus>("/api/admin/tls"), staleTime: 60_000 })
