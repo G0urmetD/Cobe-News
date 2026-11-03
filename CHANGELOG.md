@@ -2,6 +2,41 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.47 – Exploit-Hinweise, Themen in Regeln, Update-Hinweis und Härtung
+
+### Neu
+- **Exploit-Hinweise**: Plakette „Exploit-Code öffentlich“ mit Links an Befunden, Meldungen und beobachteten CVEs – aus den Listen von Metasploit und nuclei-templates (an) und Exploit-DB (aus, zuschaltbar); einmal täglich, nur CVE und Link, nie Exploit-Code.
+- **Neues Thema „Exploit veröffentlicht“** in News, aus CISA-Einstufung und den Exploit-Listen; beobachtete CVEs melden sich, wenn ein Exploit erscheint.
+- **Themen in Benachrichtigungsregeln** sowie für Desktop- und Push-Benachrichtigungen.
+- **„Betrifft unsere Produkte“** als Schnellfilter in News mit Anzahl und Plakette „Unser Produkt: …“ auf den Karten.
+- **Update-Hinweis für Admins**, wenn auf GitHub eine neuere Version erschienen ist (abschaltbar).
+- **TLP:GREEN je CSAF-Quelle zulassen** (aus ab Werk); solche Inhalte sind überall als „TLP:GREEN – nur intern weitergeben“ gekennzeichnet.
+- **Fertiges Image nutzen**: optional `docker-compose.image.yml` mit dem signierten Image von ghcr.io statt lokalem Bauen.
+
+### Verbessert
+- **Dringlichkeit**: ein öffentlicher Exploit zählt +10, nicht zusätzlich zu „aktiv ausgenutzt“.
+- **Versionsprüfung**: Firefox ESR und Jenkins LTS nehmen nur Versionen ihrer eigenen Linien an; Exchange-Versionen mit führenden Nullen werden vereinheitlicht; „Mozilla Firefox“ einheitlich benannt.
+- **Katalog-Änderungen verknüpfen gespeicherte Advisories neu** – angezeigt, aber nicht gemeldet.
+- **Dovecot** über die Open-Xchange-Angaben, **iDRAC10** mit CPE, Dells „… or later“-Angaben werden verstanden.
+- **Anmeldeseite und mobile Seitenleiste** ohne kurzes Flackern beim ersten Laden.
+
+### Fixes
+- **CPEs mit Doppelpunkt im Namen** (z. B. mailcow) werden beim Abgleich richtig erkannt.
+- **Meldungsdetails** nutzen nur noch frei weitergebbare Dokumente.
+
+### Sicherheit
+- **Startpasswörter laufen nach 7 Tagen ab** (einstellbar 1–30).
+- **Größenlimit für Anfragen auch in der App** (1 MiB, `MAX_BODY_BYTES`).
+- **Warnung bei kurzem `SECRET_KEY`** im Log und unter Einstellungen → HTTPS.
+- **Verdächtiges im Log**: CSRF-Fehler gedrosselt protokolliert; zu viele Fehlversuche am Notfall-Konto erzeugen Warnung, Protokolleintrag und Hinweis für Admins.
+- **Unsichtbare Richtungs- und Steuerzeichen** werden aus allen Benachrichtigungen entfernt.
+
+### Betrieb
+- **Bekannte Hostnamen**: Der Proxy antwortet nur noch auf die Namen aus `BASE_URL`, `NEWS_HOSTNAME`, `TLS_NAMES` sowie localhost; andere bekommen „Unbekannter Hostname“ (421). Wer Cobe News über eine weitere IP oder einen weiteren Namen aufruft, trägt sie in `TLS_NAMES` ein. Unverschlüsseltes http auf dem https-Port wird umgeleitet.
+- **Neue Variable `NEWS_BIND`** in der Compose-Datei (aus `BIND`) für die Warnung beim Start des Proxys.
+- **Neue ausgehende Verbindungen**: raw.githubusercontent.com (Exploit-Listen), gitlab.com (Exploit-DB, nur wenn an), api.github.com (Update-Hinweis).
+- **Migrationen 0026 bis 0029**.
+
 ## 0.1.46 – Themen-Filter, neues Nachrichtenformat und CVEs nach Produkt
 
 ### Neu

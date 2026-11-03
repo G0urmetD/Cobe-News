@@ -52,7 +52,7 @@ Datei `docker-compose.image.yml` zu – in `.env`:
 
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
-COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:0.1.46          # eine Version, nicht latest (oder …:0.1.46@sha256:<digest>)
+COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:0.1.47          # eine Version, nicht latest (oder …:0.1.46@sha256:<digest>)
 ```
 
 Die Datei ersetzt beim Dienst `app` nur das Image (`image: ${COBE_NEWS_IMAGE}`, der `build`-Teil fällt weg); alles
@@ -61,7 +61,7 @@ einem Hinweis ab, statt still etwas anderes zu starten. Vor dem Start die Signat
 Identität ist der Release-Workflow dieses Repositorys):
 
 ```bash
-cosign verify ghcr.io/g0urmetd/cobe-news:0.1.46 \
+cosign verify ghcr.io/g0urmetd/cobe-news:0.1.47 \
   --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 docker compose pull app          # holt das Image (pull_policy: missing – ein vorhandenes wird nicht neu geholt)

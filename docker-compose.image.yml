@@ -1,11 +1,11 @@
 # Optional: run the released image instead of building locally. Enable in .env with
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml
-#   COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:0.1.46      # a version (or …@sha256:<digest>), not latest
+#   COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:0.1.47      # a version (or …@sha256:<digest>), not latest
 # then `docker compose pull app && docker compose up -d` (no --build). Verify the signature first (cosign,
 # docs/BETRIEB.md „Veröffentlichtes Image statt lokalem Build“). Without COMPOSE_FILE nothing changes: docker-compose.yml
 # builds the image locally as before.
 services:
   app:
-    image: ${COBE_NEWS_IMAGE:?set COBE_NEWS_IMAGE in .env, e.g. ghcr.io/g0urmetd/cobe-news:0.1.46 (docs/BETRIEB.md)}
+    image: ${COBE_NEWS_IMAGE:?set COBE_NEWS_IMAGE in .env, e.g. ghcr.io/g0urmetd/cobe-news:0.1.47 (docs/BETRIEB.md)}
     build: !reset null
     pull_policy: missing
