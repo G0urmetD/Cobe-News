@@ -196,6 +196,40 @@ def test_forward_card_labels_green(lang):
     assert forward.render_webhook(forward.Forward(**{**f.__dict__, "tlp": ""}), "n8n", lang, "d1")["forward"]["tlp"] == ""
 
 
+@pytest.mark.parametrize("lang", ["de", "en"])
+def test_green_label_survives_the_neutral_text(lang):
+    """The feed's text loses its direction and control characters (app/plaintext.py) – the TLP:GREEN prefix and field stay."""
+    from tests.test_sec_hardening import EVIL, _clean
+
+    ev = _event("GREEN")
+    ev.data = {**ev.data, "headline": f"DoS {EVIL}", "summary": f"A flaw {EVIL}.", "product": f"Cisco ASA {EVIL}"}
+    green = notify.vendor_story(ev, lang)
+    assert green.title.startswith(notify.TLP_PREFIX) and green.tlp == "GREEN"
+    line = notify.tlp_line(lang)
+    assert (notify.CARD_LABELS[lang]["tlp"], line) in notify.card_fields(green, lang)
+    subject, text, html = notify.render_mail("Regel", [green], 1, lang)
+    for out in (subject, text, html):
+        _clean(out)
+    assert "[TLP:GREEN]" in subject and line in text and line in html
+    for out in (
+        notify.render_slack("Regel", [green], 1, lang),
+        notify.render_teams("Regel", [green], 1, lang),
+        notify.render_discord("Regel", [green], 1, lang),
+        notify.render_mattermost("Regel", [green], 1, lang),
+        notify.render_telegram("Regel", [green], 1, lang),
+        notify.render_webhook("n8n", ["Regel"], [green], 1, lang),
+        notify.render_push("Regel", [green], 1, lang)[:2],
+    ):
+        _clean(out)
+        assert "TLP:GREEN" in json.dumps(out, ensure_ascii=False).replace("\\", "")
+    f = forward.Forward(sender="Anna", team="SOC", comment="", title=f"[TLP:GREEN] Cisco ASA: {EVIL}", summary=f"A flaw {EVIL}.", url="https://sec.cloudapps.cisco.com/x", link="https://news.test/vendor",
+                        severity="high", source="Vendor News", published_at=datetime.now(UTC), kind="finding", product=f"Cisco ASA {EVIL}", source_kind="vendor_news", tlp="GREEN")  # fmt: skip
+    assert f.title.startswith("[TLP:GREEN] Cisco ASA: Update")
+    for out in (forward.render_mail(f, lang), forward.render_teams(f, lang), forward.render_slack(f, lang), forward.render_discord(f, lang), forward.render_telegram(f, lang), forward.render_webhook(f, "n8n", lang, "d1")):
+        _clean(out)
+        assert "TLP:GREEN" in json.dumps(out, ensure_ascii=False).replace("\\", "")
+
+
 # ---------------------------------------------------------------- the stories' details take public documents only
 
 

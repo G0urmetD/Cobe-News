@@ -276,6 +276,10 @@ class Story:
     # "GREEN": from a CSAF provider's TLP:GREEN document (allowed per provider) – every format labels it
     tlp: str = ""
 
+    def __post_init__(self) -> None:
+        # feed text: no direction or control characters in any channel (app/plaintext.py)
+        self.title, self.summary, self.source, self.product = (neutral(x) for x in (self.title, self.summary, self.source, self.product))
+
 
 TLP_PREFIX = "[TLP:GREEN] "
 
@@ -283,10 +287,6 @@ TLP_PREFIX = "[TLP:GREEN] "
 def tlp_line(lang: str) -> str:
     """The label of a TLP:GREEN item, as each channel shows it."""
     return CARD_LABELS.get(lang, CARD_LABELS["de"])["tlp_green"]
-
-    def __post_init__(self) -> None:
-        # feed text: no direction or control characters in any channel (app/plaintext.py)
-        self.title, self.summary, self.source, self.product = (neutral(x) for x in (self.title, self.summary, self.source, self.product))
 
 
 def _link(story_id: str) -> str:
