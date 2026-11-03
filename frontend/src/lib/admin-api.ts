@@ -289,6 +289,12 @@ export interface TlsStatus {
   days_left?: number
   fingerprint?: string
   renews_at?: string | null
+  /** what needs a look besides the certificate: a short master key, the emergency admin's failure budget exceeded */
+  system?: SystemWarning[]
 }
+
+export type SystemWarning =
+  | { code: "secret_key_short"; source: "env" | "file"; min: number }
+  | { code: "emergency_failures"; at: string; failures: number }
 
 export const useTls = () => useQuery({ queryKey: ["admin", "tls"], queryFn: () => api.get<TlsStatus>("/api/admin/tls"), staleTime: 60_000 })

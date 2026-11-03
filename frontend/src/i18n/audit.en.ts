@@ -86,6 +86,7 @@ const auditEn: Record<string, string> = {
   "audit.action.login.success": "Admin signed in",
   "audit.action.login.locked": "Account locked after failed attempts",
   "audit.action.login.ip_blocked": "Address blocked after failed attempts",
+  "audit.action.login.emergency_slowed": "Emergency admin: failure budget exceeded, sign-in slowed down",
   "audit.action.setup.completed": "Setup completed",
   "audit.action.token.created": "API token created",
   "audit.action.token.revoked": "API token revoked",

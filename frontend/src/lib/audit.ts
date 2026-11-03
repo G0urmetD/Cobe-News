@@ -27,7 +27,7 @@ export const AUDIT_GROUPS = {
     "passkey.sign_count_warning",
     "sessions.revoked",
   ],
-  signin: ["signin.config_changed", "role_mapping.created", "role_mapping.deleted", "login.success", "login.locked", "login.ip_blocked", "setup.completed"],
+  signin: ["signin.config_changed", "role_mapping.created", "role_mapping.deleted", "login.success", "login.locked", "login.ip_blocked", "login.emergency_slowed", "setup.completed"],
   tokens: ["token.created", "token.revoked"],
   notify: ["channel.created", "channel.changed", "channel.deleted", "rule.created", "rule.changed", "rule.deleted", "delivery.resent"],
   teams: [

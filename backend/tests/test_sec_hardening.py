@@ -173,3 +173,100 @@ def test_max_body_bytes_from_the_environment(monkeypatch):
         get_config.cache_clear()
         assert get_config().max_body_bytes == want
     get_config.cache_clear()
+
+
+# ---------------------------------------------------------------- 3. a short SECRET_KEY: a warning, never a refusal
+
+
+def test_short_master_key_is_a_warning_without_the_key(monkeypatch, caplog):
+    from types import SimpleNamespace
+
+    from app import crypto, main
+
+    for key, env, want in (
+        (b"kurz-aber-da", "kurz-aber-da", "env"),
+        (b"a" * 40, "a" * 40, "env"),  # long, but hardly any entropy
+        (b"x7Hq2pLm9VzK4wRt8sYn3bCd6fGj1kQe5u", "x7Hq2pLm9VzK4wRt8sYn3bCd6fGj1kQe5u", None),
+        (b"0123456789abcdefghij", "", "file"),  # a key file of 20 bytes (16 is the least it takes)
+        (b"A" * 44, "", "file"),
+    ):
+        monkeypatch.setattr(crypto, "master", lambda key=key: key)
+        monkeypatch.setattr(crypto, "get_config", lambda env=env: SimpleNamespace(secret_key=env))
+        assert crypto.key_weakness() == want, key
+        caplog.clear()
+        assert main.warn_weak_key() is bool(want)
+        lines = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+        assert len(lines) == (1 if want else 0)
+        if want:
+            assert key.decode() not in lines[0] and ("SECRET_KEY is short" in lines[0] if env else "secret.key in DATA_DIR is short" in lines[0])
+
+
+async def test_short_key_and_the_emergency_alert_show_in_the_https_pane(admin_client, monkeypatch):
+    from app import crypto
+
+    assert (await admin_client.get("/api/admin/tls")).json()["system"] == []  # the test key is fine
+    monkeypatch.setattr(crypto, "key_weakness", lambda: "env")
+    assert (await admin_client.get("/api/admin/tls")).json()["system"] == [{"code": "secret_key_short", "source": "env", "min": 32}]
+
+
+# ---------------------------------------------------------------- 5. suspicious events: throttled log lines
+
+
+async def test_csrf_failures_are_logged_throttled_per_source_never_the_token(client, caplog):
+    from app import suspicious
+
+    suspicious.reset()
+    caplog.set_level("WARNING", logger="cobe_news.security")
+    await client.get("/api/auth/config")  # the CSRF cookie
+    cookie = client.cookies.get("cobe_news_csrf")
+    for headers in ({"X-CSRF-Token": "falsch-" + "x" * 30}, {"X-CSRF-Token": ""}, {"X-CSRF-Token": "y" * 40}):
+        r = await client.post("/api/auth/logout", headers=headers)
+        assert r.status_code == 403 and r.json()["detail"]["code"] == "csrf_failed"
+    lines = [r.getMessage() for r in caplog.records if r.name == "cobe_news.security"]
+    assert len(lines) == 1 and "csrf check failed: POST /api/auth/logout from 127.0.0.1 (token mismatch)" in lines[0]
+    assert cookie not in lines[0] and "falsch" not in lines[0]
+    # a line feed in the path cannot start a forged line
+    suspicious.reset()
+    caplog.clear()
+    assert suspicious.csrf_failed("POST", "/api/x\nINFO forged", "2001:db8:1:2::7", cookie=False, header=True)
+    (line,) = [r.getMessage() for r in caplog.records if r.name == "cobe_news.security"]
+    assert "\n" not in line and "/api/x?INFO forged from 2001:db8:1:2::/64 (token cookie missing)" in line
+
+
+def test_throttle_one_line_per_source_and_minute_and_a_cap_for_all():
+    from app.suspicious import Throttle
+
+    t = Throttle(every=60, total=3, max_keys=5)
+    assert t.hit("a", 0) == 0
+    assert [t.hit("a", s) for s in (1, 2, 30)] == [None, None, None]
+    assert t.hit("a", 61) == 3  # the next line names what was held back
+    assert t.hit("b", 62) == 0 and t.hit("c", 63) == 0
+    assert t.hit("d", 64) is None  # three lines in the last minute already – across all sources
+    assert t.hit("d", 125) == 1
+    for k in "efghij":
+        t.hit(k, 200)
+    assert len(t._last) == 5  # bounded
+
+
+async def test_emergency_budget_exceeded_is_reported_once(client, admin_client, monkeypatch, caplog):
+    from app.auth import bruteforce
+
+    monkeypatch.setattr(bruteforce, "EMERGENCY_BUDGET", 4)
+    monkeypatch.setattr(bruteforce, "EMERGENCY_SLOW", 0.0)
+    await _setup_done()
+    await add_user("notfall", "admin", emergency=True, totp_secret=pyotp.random_base32())
+    caplog.set_level("WARNING", logger="cobe_news.auth")
+    for _ in range(9):
+        r = await client.post("/api/auth/login", json={"username": "notfall", "password": "falsch-falsch-falsch"})
+        assert r.status_code == 401
+    lines = [r.getMessage() for r in caplog.records if "emergency admin" in r.getMessage()]
+    assert len(lines) == 1 and "4 failed sign-in checks in the last hour (budget 4)" in lines[0] and "falsch" not in lines[0]
+    async with db.session() as s:
+        (e,) = list(await s.scalars(select(AuditEntry).where(AuditEntry.action == "login.emergency_slowed")))
+        assert e.actor_kind == "system" and e.target_label == "notfall" and e.details == {"failures_1h": 4, "budget": 4}
+    system = (await admin_client.get("/api/admin/tls")).json()["system"]
+    assert [w["code"] for w in system] == ["emergency_failures"] and system[0]["failures"] == 4
+    # an hour later (the throttle): reported again
+    monkeypatch.setattr(bruteforce, "_emergency_alerted", [bruteforce._emergency_alerted[0] - 3601])
+    f = bruteforce.register_failure("local:notfall", "127.0.0.1", lock_account=False, emergency=True)
+    assert f.emergency_alert >= 4

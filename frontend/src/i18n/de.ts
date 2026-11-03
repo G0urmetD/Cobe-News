@@ -799,6 +799,12 @@ const de: Record<string, string> = {
   "time.copyUtc": "UTC-Zeitstempel kopieren (ISO 8601)",
   "time.keyHint": "Tastatur: ⌘/Strg+C kopiert den UTC-Zeitstempel",
   "time.local": "Ortszeit",
+  "system.warning.secretKeyShort.env":
+    "SECRET_KEY ist kurz (unter {{min}} Zeichen oder nur wenige verschiedene) – ein längerer Zufallsschlüssel wird empfohlen. Ein neuer Schlüssel heißt: gespeicherte Geheimnisse neu eingeben (Betriebshandbuch).",
+  "system.warning.secretKeyShort.file":
+    "Der Schlüssel in DATA_DIR/secret.key ist kurz (unter {{min}} Zeichen oder nur wenige verschiedene) – ein längerer Zufallsschlüssel wird empfohlen. Ein neuer Schlüssel heißt: gespeicherte Geheimnisse neu eingeben (Betriebshandbuch).",
+  "system.warning.emergencyFailures_one": "Notfall-Admin: {{count}} Fehlversuch innerhalb einer Stunde – seine Anmeldung wird gebremst. Protokoll prüfen; zuletzt",
+  "system.warning.emergencyFailures_other": "Notfall-Admin: {{count}} Fehlversuche innerhalb einer Stunde – seine Anmeldung wird gebremst. Protokoll prüfen; zuletzt",
   "tls.daysLeft_one": "noch {{count}} Tag",
   "tls.daysLeft_other": "noch {{count}} Tage",
   "tls.download": "Zertifikat herunterladen",

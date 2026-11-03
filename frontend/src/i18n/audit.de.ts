@@ -87,6 +87,7 @@ const auditDe: Record<string, string> = {
   "audit.action.login.success": "Admin angemeldet",
   "audit.action.login.locked": "Konto nach Fehlversuchen gesperrt",
   "audit.action.login.ip_blocked": "Adresse nach Fehlversuchen gesperrt",
+  "audit.action.login.emergency_slowed": "Notfall-Admin: Fehlversuchs-Budget überschritten, Anmeldung gebremst",
   "audit.action.setup.completed": "Einrichtung abgeschlossen",
   "audit.action.token.created": "API-Token erstellt",
   "audit.action.token.revoked": "API-Token widerrufen",

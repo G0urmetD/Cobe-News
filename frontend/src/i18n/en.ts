@@ -791,6 +791,12 @@ const en: Record<string, string> = {
   "time.copyUtc": "Copy UTC timestamp (ISO 8601)",
   "time.keyHint": "Keyboard: ⌘/Ctrl+C copies the UTC time stamp",
   "time.local": "Local time",
+  "system.warning.secretKeyShort.env":
+    "SECRET_KEY is short (under {{min}} characters or only a few different ones) – a longer random key is advised. A new key means entering the stored secrets again (operations guide).",
+  "system.warning.secretKeyShort.file":
+    "The key in DATA_DIR/secret.key is short (under {{min}} characters or only a few different ones) – a longer random key is advised. A new key means entering the stored secrets again (operations guide).",
+  "system.warning.emergencyFailures_one": "Emergency admin: {{count}} failed attempt within an hour – its sign-in is slowed down. Check the audit log; last",
+  "system.warning.emergencyFailures_other": "Emergency admin: {{count}} failed attempts within an hour – its sign-in is slowed down. Check the audit log; last",
   "tls.daysLeft_one": "{{count}} day left",
   "tls.daysLeft_other": "{{count}} days left",
   "tls.download": "Download certificate",

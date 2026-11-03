@@ -69,6 +69,21 @@ def master() -> bytes:
         return key
 
 
+MIN_STRONG_KEY = 32  # bytes – below that (or with only a few different characters) a warning, never a refusal
+MIN_KEY_SYMBOLS = 8
+
+
+def key_weakness() -> str | None:
+    """Is the master key short? "env" (SECRET_KEY) or "file" (secret.key – the one this module writes is 44 characters)
+    when it has fewer than MIN_STRONG_KEY bytes or fewer than MIN_KEY_SYMBOLS different characters ("aaaa…"); None when
+    it is fine. Only a warning (log at the start, Einstellungen → HTTPS): an install with a short key keeps running –
+    changing the key means entering the stored secrets again. Never says anything about the key itself."""
+    key = master()
+    if len(key) >= MIN_STRONG_KEY and len(set(key)) >= MIN_KEY_SYMBOLS:
+        return None
+    return "env" if get_config().secret_key else "file"
+
+
 def _derive(info: bytes) -> bytes:
     return HKDF(algorithm=hashes.SHA256(), length=32, salt=b"cobe-news", info=info).derive(master())
 

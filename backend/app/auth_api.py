@@ -279,6 +279,18 @@ async def _fail(
     # not each failure (anyone can send them) – the lock it started, the block of the address (a few per address at most)
     if f.locked_for:
         audit.record(db, audit.SYSTEM, "login.locked", await _lock_target(db, key), {"locked_for_s": f.locked_for}, ip=ip)
+    if f.emergency_alert:
+        # the emergency admin is never locked – its checks are slowed down beyond the budget (bruteforce.emergency_brake);
+        # that somebody is guessing its password is worth a line and an entry (once an hour at most: bruteforce)
+        log.warning(
+            "emergency admin: %d failed sign-in checks in the last hour (budget %d) – its checks are slowed down now; last from %s",
+            f.emergency_alert,
+            bruteforce.EMERGENCY_BUDGET,
+            bruteforce.source_key(ip),
+        )
+        audit.record(
+            db, audit.SYSTEM, "login.emergency_slowed", await _lock_target(db, key), {"failures_1h": f.emergency_alert, "budget": bruteforce.EMERGENCY_BUDGET}, ip=ip
+        )
     if f.ip_blocked:
         audit.record(db, audit.SYSTEM, "login.ip_blocked", audit.target("ip", bruteforce.source_key(ip), bruteforce.source_key(ip)), {"blocked_for_s": bruteforce.IP_BLOCK}, ip=ip)
     revoked = False

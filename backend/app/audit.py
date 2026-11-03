@@ -69,6 +69,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "login.success",
         "login.locked",
         "login.ip_blocked",
+        "login.emergency_slowed",
         "setup.completed",
     ),
     "tokens": ("token.created", "token.revoked"),

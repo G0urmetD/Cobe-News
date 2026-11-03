@@ -21,7 +21,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from app import __version__, api_tokens, api_v1, audit, audit_api, bodylimit, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, reader, restore_test, sessions_api, source_health, sqlite_import, teams, tls, vendor, webpush
+from app import __version__, api_tokens, api_v1, audit, audit_api, bodylimit, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, reader, restore_test, sessions_api, source_health, sqlite_import, suspicious, teams, tls, vendor, webpush
 from app import news as news_svc
 from app.admin_api import router as admin_router
 from app.api import router
@@ -244,6 +244,19 @@ class FetchLoop:
                 pass
 
 
+def warn_weak_key() -> bool:
+    """At the start: a short master key (crypto.key_weakness) as a warning – the app starts anyway (an existing install
+    must keep running), and the key itself never goes into the log. Shown in Einstellungen → HTTPS as well."""
+    weak = crypto.key_weakness()
+    if weak:
+        log.warning(
+            "%s is short (under %d characters or only a few different ones) – a longer random key is advised (docs/BETRIEB.md, SECRET_KEY)",
+            "SECRET_KEY" if weak == "env" else f"{crypto.KEY_FILE} in DATA_DIR",
+            crypto.MIN_STRONG_KEY,
+        )
+    return bool(weak)
+
+
 def create_app() -> FastAPI:
     cfg = get_config()
     loop = FetchLoop()
@@ -261,6 +274,7 @@ def create_app() -> FastAPI:
                 f.chmod(0o600)
         # the master key now, not at the first secret: an unusable secret.key stops the start (crypto.KeyFileError)
         await asyncio.to_thread(crypto.master)
+        warn_weak_key()
         db.init(cfg.database_url)
         await db.wait_ready()
         await db.migrate()
@@ -377,6 +391,7 @@ def create_app() -> FastAPI:
         if api and request.method not in SAFE:
             sent = request.headers.get("x-csrf-token") or ""
             if not csrf or not sent or not hmac.compare_digest(csrf, sent):
+                suspicious.csrf_failed(request.method, request.url.path, client_ip(request), cookie=bool(csrf), header=bool(sent))  # throttled
                 return _secure_headers(request, JSONResponse({"detail": {"code": "csrf_failed"}}, status_code=403), api)
         t0 = time.monotonic()
         # the client address for the audit log (app/audit.py) – an account's actions record where they came from

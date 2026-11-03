@@ -53,6 +53,7 @@ _pair_fail: dict[str, list[float]] = {}
 _ip_block: dict[str, float] = {}
 _gates: dict[str, asyncio.Lock] = {}
 _emergency_fail: list[float] = []
+_emergency_alerted: list[float] = []  # when the budget was last reported exceeded (at most once per EMERGENCY_WINDOW)
 # locks and blocks set or lifted since the last lock_store.flush: "acct:<key>" / "ip:<source key>" → (until on the
 # monotonic clock, strikes) or None (lifted)
 _dirty: dict[str, tuple[float, int] | None] = {}
@@ -65,6 +66,9 @@ class Failure:
     locked_for: int  # s
     ip_blocked: bool
     delay: float
+    # the emergency admin's hourly failure budget was just exceeded: the failures of the last hour (0: nothing to report)
+    # – at most once per EMERGENCY_WINDOW, a flood cannot turn it into a flood of log lines (auth_api._fail reports it)
+    emergency_alert: int = 0
 
 
 def lock_key(user) -> str:  # noqa: ANN001 - a User (not imported: no cycle)
@@ -154,8 +158,13 @@ def _recent_list(v: list[float], window: float) -> list[float]:
 
 def register_failure(username: str, ip: str, *, lock_account: bool = True, emergency: bool = False) -> Failure:
     t = time.monotonic()
+    alert = 0
     if emergency:
-        _recent_list(_emergency_fail, EMERGENCY_WINDOW).append(t)
+        recent = _recent_list(_emergency_fail, EMERGENCY_WINDOW)
+        recent.append(t)
+        if len(recent) >= EMERGENCY_BUDGET and not (_emergency_alerted and t - _emergency_alerted[-1] < EMERGENCY_WINDOW):
+            _emergency_alerted[:] = [t]
+            alert = len(recent)
     k = _key(username)
     src = source_key(ip)
     # without a name (an attempt on a locked account, bruteforce._guard): only the address counts – a per-name list of
@@ -183,7 +192,7 @@ def register_failure(username: str, ip: str, *, lock_account: bool = True, emerg
             _dirty[f"ip:{src}"] = (t + IP_BLOCK, 1)
             blocked = True
     left = 0 if locked else max(ACCOUNT_MAX - len(fails), 1 if not lock_account else 0)
-    return Failure(attempts_left=left, locked_for=locked, ip_blocked=blocked, delay=delay)
+    return Failure(attempts_left=left, locked_for=locked, ip_blocked=blocked, delay=delay, emergency_alert=alert)
 
 
 def register_success(username: str) -> None:
@@ -241,6 +250,7 @@ def reset() -> None:
     for d in (_acct_fail, _acct_lock, _ip_fail, _pair_fail, _ip_block, _gates, _dirty):
         d.clear()
     _emergency_fail.clear()
+    _emergency_alerted.clear()
 
 
 @asynccontextmanager

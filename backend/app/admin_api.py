@@ -17,13 +17,13 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import set_committed_value
 
-from app import audit, passkeys_api, tls
+from app import audit, crypto, passkeys_api, tls
 from app import settings as settings_store
 from app.auth import bruteforce, directory, entra, ldap_dir, lock_store, passwords, sessions
 from app.auth_api import admins_count, user_out
 from app.crypto import encrypt_str
 from app.deps import ActiveSession, Admin, Db, NoNul, api_error, require_reauth
-from app.models import GroupMapping, Team, TeamMember, User, UserPasskey, UserSession
+from app.models import AuditEntry, GroupMapping, Team, TeamMember, User, UserPasskey, UserSession
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 Role = Literal["admin", "reader"]
@@ -610,9 +610,27 @@ async def delete_mapping(mid: uuid.UUID, admin: Admin, sess: ActiveSession, db: 
 # ---------------------------------------------------------------- HTTPS
 
 
+EMERGENCY_ALERT_SHOWN = timedelta(hours=24)
+
+
+async def system_warnings(db) -> list[dict]:  # noqa: ANN001
+    """What needs an admin's look besides the certificate (shown above it, Einstellungen → HTTPS): a short master key
+    (crypto.key_weakness – "env" SECRET_KEY / "file" secret.key) and, for 24 hours, that the emergency admin's failure
+    budget was exceeded (the audit entry login.emergency_slowed – it survives a restart)."""
+    out: list[dict] = []
+    if weak := await asyncio.to_thread(crypto.key_weakness):
+        out.append({"code": "secret_key_short", "source": weak, "min": crypto.MIN_STRONG_KEY})
+    since = datetime.now(UTC) - EMERGENCY_ALERT_SHOWN
+    last = await db.scalar(select(AuditEntry).where(AuditEntry.action == "login.emergency_slowed", AuditEntry.at >= since).order_by(AuditEntry.at.desc()).limit(1))
+    if last is not None:
+        out.append({"code": "emergency_failures", "at": last.at.isoformat(), "failures": int((last.details or {}).get("failures_1h") or 0)})
+    return out
+
+
 @router.get("/tls")
-async def tls_status(admin: Admin) -> dict:
-    return await asyncio.to_thread(tls.status)
+async def tls_status(admin: Admin, db: Db) -> dict:
+    out = await asyncio.to_thread(tls.status)
+    return {**out, "system": await system_warnings(db)}
 
 
 @router.get("/tls/cobe.crt")
