@@ -11,6 +11,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 - **„Betrifft unsere Produkte“** als Schnellfilter in News mit Anzahl und Plakette „Unser Produkt: …“ auf den Karten.
 - **Update-Hinweis für Admins**, wenn auf GitHub eine neuere Version erschienen ist (abschaltbar). Nur ein Hinweis – aktualisiert wird nichts von selbst. Läuft eine Version, die noch nicht veröffentlicht ist, steht das unter *Über Cobe News* so da.
 - **TLP:GREEN je CSAF-Quelle zulassen** (aus ab Werk); solche Inhalte sind überall als „TLP:GREEN – nur intern weitergeben“ gekennzeichnet.
+- **Katalog 2026.11.03-2 – 14 neue Produkte**: BookStack, BloodHound (Community Edition), Velociraptor, DFIR-IRIS, NetBox, Oxidized (Weboberfläche oxidized-web), Semaphore UI, Dockge, Wiki.js, Apache Guacamole sowie PingCastle, Purple Knight, GPOZaurr und ScubaGear (ohne CVE-Daten, nur News). Greenbone/OpenVAS deckt jetzt auch die Teile der Community Edition ab (gvmd, openvas-scanner).
 - **Fertiges Image nutzen**: optional `docker-compose.image.yml` mit dem signierten Image von ghcr.io statt lokalem Bauen.
 
 ### Verbessert

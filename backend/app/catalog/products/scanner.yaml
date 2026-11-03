@@ -19,9 +19,11 @@
 - key: greenbone
   label: Greenbone / OpenVAS
   vendor: Greenbone
-  cpes: [a:openvas:openvas_scanner, a:greenbone:greenbone_security_assistant, o:greenbone:greenbone_os]
+  # Community Edition: gvmd is OpenVAS Manager renamed (a:openvas:openvas_manager), GSA/gsad, openvas-scanner (NVD spells
+  # it both ways); ospd-openvas, notus-scanner, gvmd under its new name: no CPE, no CNA rows, no OSV package (checked 2026-11-03)
+  cpes: [a:openvas:openvas_scanner, a:openvas:openvas-scanner, a:openvas:openvas_manager, a:greenbone:greenbone_security_assistant, o:greenbone:greenbone_os]
   kw: [Greenbone, OpenVAS]
-  aliases: [OpenVAS, GVM]
+  aliases: [OpenVAS, GVM, gvmd, Greenbone Community Edition]
   example: "22.4"
 - key: qualys-agent
   label: Qualys Cloud Agent
@@ -29,3 +31,35 @@
   cpes: [a:qualys:cloud_agent]
   kw: [Qualys Cloud Agent, Qualys]
   example: 6.1.0
+
+# ---------------------------------------------------------------- added 0.1.47 – AD/M365 assessment tools: no CPE and no CVE in NVD (checked 2026-11-03), news only
+- key: pingcastle
+  label: PingCastle
+  vendor: Netwrix (PingCastle)
+  cpes: []
+  kw: [PingCastle]
+  example: "4.0.0.33"
+  hint: nocpe
+- key: purple-knight
+  label: Semperis Purple Knight
+  vendor: Semperis
+  cpes: []
+  kw: [Purple Knight]
+  hint: nocpe
+- key: gpozaurr
+  label: GPOZaurr
+  vendor: Evotec
+  cpes: []
+  kw: [GPOZaurr]
+  example: "1.1.11"
+  version_cmd: Get-Module -ListAvailable GPOZaurr
+  hint: nocpe
+- key: scubagear
+  label: ScubaGear (CISA SCuBA)
+  vendor: CISA
+  cpes: []
+  kw: [ScubaGear]
+  aliases: [SCuBA]
+  example: "2.0.0"
+  version_cmd: Get-Module -ListAvailable ScubaGear
+  hint: nocpe

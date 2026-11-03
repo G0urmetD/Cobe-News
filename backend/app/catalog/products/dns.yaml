@@ -55,3 +55,13 @@
   hint: windows_role
   where: windows_build
   filter: "DHCP Server"
+
+# ---------------------------------------------------------------- added 0.1.47
+- key: netbox
+  label: NetBox
+  vendor: NetBox Labs
+  cpes: [a:netbox:netbox]  # a:netbox_project:netbox is deprecated (into this one), a:netboxlabs:netbox-docker is the image's packaging
+  cna: [[netbox-community, netbox], [NetBox Labs, NetBox]]  # VulnCheck (checked 2026-11-03); LenelS2 NetBox (access control) is another product
+  kw: [NetBox]
+  example: "4.7.4"
+  where: web_about

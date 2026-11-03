@@ -164,3 +164,32 @@
   kw: [Seafile]
   example: "11.0.12"
   where: web_about
+# ---------------------------------------------------------------- added 0.1.47
+- key: bookstack
+  label: BookStack
+  vendor: BookStack
+  cpes: [a:bookstackapp:bookstack]
+  cna: [[BookStack, BookStack], [bookstackapp, bookstackapp/bookstack]]  # JPCERT/Fluid Attacks name it so, huntr.dev by its repository
+  osv: [[Packagist, ssddanbrown/bookstack]]  # GitHub's advisories
+  kw: [BookStack]
+  example: "26.09.2"  # tags v26.09.2, v26.09 – year.month(.patch)
+  where: web_about
+- key: semaphore-ui
+  label: Semaphore UI (Ansible Semaphore)
+  vendor: Semaphore UI
+  cpes: [a:ansible-semaphore:ansible_semaphore]
+  cna: [[semaphoreui, semaphore], [semaphoreui, Semaphore UI]]  # GitHub and VulnCheck (checked 2026-11-03)
+  # no osv: github.com/semaphoreui/semaphore has Go pseudo-versions as fixes (0.0.0-2026…), never a release number
+  kw: [Semaphore UI, Ansible Semaphore]
+  aliases: [Ansible Semaphore, Semaphore]
+  example: "2.19.18"
+  where: web_about
+- key: wikijs
+  label: Wiki.js
+  vendor: Requarks
+  cpes: [a:requarks:wiki.js]
+  cna: [[Requarks, wiki], [Requarks, Wiki.js]]  # GitHub names the repository, VulnCheck the product (checked 2026-11-03)
+  kw: [Wiki.js]
+  aliases: [WikiJS]
+  example: "2.5.315"
+  where: web_about

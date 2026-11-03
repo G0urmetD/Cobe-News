@@ -199,3 +199,14 @@
   kw: [FortiSOAR]
   example: "7.6.1"
   where: web_about
+
+# ---------------------------------------------------------------- added 0.1.47
+- key: dfir-iris
+  label: DFIR-IRIS
+  vendor: DFIR-IRIS
+  cpes: [a:dfir-iris:iris]
+  cna: [[dfir-iris, iris-web]]  # GitHub's advisories name the repository (checked 2026-11-03)
+  kw: [DFIR-IRIS, iris-web]
+  aliases: [IRIS, iris-web]
+  example: "2.4.29"
+  where: web_about

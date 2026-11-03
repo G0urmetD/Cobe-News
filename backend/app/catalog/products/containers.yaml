@@ -54,3 +54,13 @@
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: cert-manager
+
+# ---------------------------------------------------------------- added 0.1.47
+- key: dockge
+  label: Dockge
+  vendor: Louis Lam (Dockge)
+  cpes: [a:dockge.kuma:dockge]
+  cna: [[louislam, dockge]]  # VulnCheck (checked 2026-11-03); NVD's two CVEs of 2023 are Uptime Kuma's, with Dockge < 1.3.3 in the configuration
+  kw: [Dockge]
+  example: "1.5.0"
+  where: web_about
