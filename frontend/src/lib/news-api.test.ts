@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { InfiniteData } from "@tanstack/react-query"
 import {
   NEWS_TOPICS,
+  askedFilter,
   cardTopics,
   findStory,
   loadNewsFilter,
@@ -46,6 +47,18 @@ describe("paging", () => {
     expect(next.get("before")).toBe("2026-10-28T08:00:00+00:00|abc")
     expect(next.get("counts")).toBe("false")
     expect(next.getAll("source")).toEqual(["x"])
+  })
+
+  it("asks the scope only with Betrifft unsere Produkte on (one cache entry while it is off)", () => {
+    const off = { state: "new" as const, sources: [], severities: [], scope: "team" as const }
+    expect(askedFilter(off)).toEqual(askedFilter({ ...off, scope: "all" }))
+    expect(JSON.stringify(askedFilter(off))).not.toContain("scope")
+    expect(new URL(newsQuery(off, null), "https://n.example.com").searchParams.get("scope")).toBeNull()
+    const on = { ...off, ours: true }
+    expect(askedFilter(on)).toEqual(on)
+    const q = new URL(newsQuery(on, null), "https://n.example.com").searchParams
+    expect(q.get("ours")).toBe("true")
+    expect(q.get("scope")).toBe("team")
   })
 
   it("caps the search at 100 characters", () => {

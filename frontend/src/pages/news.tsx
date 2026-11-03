@@ -143,10 +143,11 @@ export function NewsPage() {
   const [shown, setShown] = useState<string | null>(open)
   if (open && open !== shown) setShown(open)
 
-  // "Betrifft unsere Produkte" in Vendor News' scope: under "Mein Team" the products of my teams (asked once the teams
-  // are known – the full list would flash first otherwise)
-  const vscope = useVendorScope(user?.id)
-  const scope = vscope.scope === "team" ? "team" : "all"
+  // "Betrifft unsere Produkte" in Vendor News' scope: under "Mein Team" the products of my teams – the teams asked only
+  // while the filter is on, and the list then waits for them (the full list would flash first otherwise); off, the
+  // scope is not part of the request (one first load, the chip's label and number do not change on their own)
+  const vscope = useVendorScope(user?.id, filter.ours)
+  const scope = filter.ours && vscope.scope === "team" ? "team" : "all"
   const waitScope = filter.ours && vscope.scope === null
   const list = useNews(
     { state, sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope },

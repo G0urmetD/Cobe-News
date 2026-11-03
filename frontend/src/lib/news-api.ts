@@ -223,9 +223,15 @@ export function newsQuery(f: NewsFilter, before: string | null) {
   if (f.q?.trim()) p.set("q", f.q.trim().slice(0, 100))
   if (f.muted) p.set("muted", "true")
   if (f.ours) p.set("ours", "true")
-  // the scope counts for "Betrifft unsere Produkte" (the filter and its number on the chip)
-  if (f.scope === "team") p.set("scope", "team")
+  // the scope counts for "Betrifft unsere Produkte" only while it is on (the filter and its number on the chip)
+  if (f.ours && f.scope === "team") p.set("scope", "team")
   return `/api/news?${p.toString()}`
+}
+
+/** The filter as asked and cached: the scope only while "Betrifft unsere Produkte" is on – off, it changes nothing
+ *  (one cache entry and one first load, also while the teams are still being read). */
+export function askedFilter(f: NewsFilter): NewsFilter {
+  return f.ours ? f : { ...f, scope: undefined }
 }
 
 /** All loaded pages as one list – a story is listed once, even if it moved from one page onto the next. */
@@ -241,8 +247,9 @@ export function mergePages(pages: NewsPage[] | undefined): NewsItem[] {
   return out
 }
 
-export const useNews = (f: NewsFilter, enabled = true) =>
-  useInfiniteQuery({
+export const useNews = (asked: NewsFilter, enabled = true) => {
+  const f = askedFilter(asked)
+  return useInfiniteQuery({
     queryKey: ["news", "list", f],
     enabled,
     queryFn: polledPages<NewsPage, string | null>((o, pageParam) => api.get(newsQuery(f, pageParam), o)),
@@ -256,6 +263,7 @@ export const useNews = (f: NewsFilter, enabled = true) =>
     // every page that was scrolled to, one after the other)
     refetchInterval: (q) => ((q.state.data?.pages.length ?? 0) > 1 ? false : 5 * 60_000),
   })
+}
 
 export const useNewsDetail = (id: string | null) =>
   useQuery({
