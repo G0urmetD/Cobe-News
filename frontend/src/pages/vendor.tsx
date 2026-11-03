@@ -1243,7 +1243,7 @@ const FindingRow = memo(function FindingRow({
         {f.epss && <EpssPill e={f.epss} />}
         {f.ssvc && <SsvcPill s={f.ssvc} />}
         {f.exploit && f.exploit.length > 0 && <ExploitHints hints={f.exploit} />}
-        {f.tlp === "GREEN" && <TlpPill hint={t("vendor.tlpGreenHint")} />}
+        {f.tlp === "GREEN" && <TlpPill />}
         {f.quiet && (
           <span title={t("vendor.quietHint")}>
             <Pill color="--muted-foreground">{t("vendor.quiet")}</Pill>

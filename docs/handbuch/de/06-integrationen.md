@@ -301,7 +301,7 @@ Nummern:
 ### Exploit-Hinweise {#exploit-hinweise}
 
 Drei öffentliche Sammlungen sagen, ob es für eine CVE **öffentlichen Exploit-Code** oder eine **fertige Prüfung** gibt,
-die die Lücke ausnutzt. Leser sehen das als „Exploit öffentlich“ an Befunden, in Meldungen und bei beobachteten CVEs
+die die Lücke ausnutzt. Leser sehen das als „Exploit-Code öffentlich“ an Befunden, in Meldungen und bei beobachteten CVEs
 ([Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)); in der [Dringlichkeit](/docs/vendor-news#dringlichkeit-formel)
 zählt es +10, solange die Lücke nicht schon als ausgenutzt bekannt ist.
 

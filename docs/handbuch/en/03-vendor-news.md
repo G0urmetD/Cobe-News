@@ -508,7 +508,7 @@ KEV entry is still shown as **KEV**.
 
 ### Public exploit {#oeffentlicher-exploit}
 
-**“Public exploit”** (orange) means: a public collection lists code that exploits the vulnerability, or a ready-made
+**“Public exploit code”** (orange) means: a public collection lists code that exploits the vulnerability, or a ready-made
 check that exploits it. Next to it, one link per collection opens its entry:
 
 | Collection | What it lists |
@@ -694,7 +694,7 @@ A suggestion is answered exactly once. Addresses are only shown as text and link
 | CVE list (cvelistV5) | the vendor's data on a CVE and CISA's assessment ([SSVC](term:ssvc)) – above all while the NVD has not analysed a CVE yet |
 | FIRST [EPSS](term:epss) | probability of exploitation within 30 days |
 | [OSV](term:osv) | fixed versions of open-source packages (Tomcat, Jenkins, Django …) |
-| Metasploit, Exploit-DB, nuclei-templates | “Public exploit” ([Public exploit](#oeffentlicher-exploit)) |
+| Metasploit, Exploit-DB, nuclei-templates | “Public exploit code” ([Public exploit](#oeffentlicher-exploit)) |
 
 Vendor advisories are only fetched when a product of that vendor is followed. An admin can switch off the last seven
 sources one by one ([More sources](/docs/integrationen#weitere-quellen)); only CVE numbers and public addresses leave

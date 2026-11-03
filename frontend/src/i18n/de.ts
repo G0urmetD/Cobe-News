@@ -369,6 +369,7 @@ const de: Record<string, string> = {
   "news.allSources": "Alle Quellen",
   "news.alsoIn": "auch bei {{list}}",
   "news.cveTitle": "Genannte CVEs",
+  "news.cveOfDetails": "CVEs aus „Betroffene Versionen“:",
   "news.cves_one": "{{count}} CVE",
   "news.cves_other": "{{count}} CVEs",
   "news.description": "Security-Nachrichten der eingeschalteten Quellen – jede Meldung einmal, mit Einschätzung der Schwere.",

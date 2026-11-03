@@ -26,6 +26,8 @@
   --color-actor-third: var(--actor-third);
   --color-actor-system: var(--actor-system);
   --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-sev-high-fg: var(--sev-high-fg);
   --color-warning: var(--warning);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -123,6 +125,9 @@
   /* Status */
   --success: oklch(0.56 0.14 150);
   --warning: oklch(0.7 0.15 70);
+  /* text on a pill's light tint of these (Pill fg – at least 4.5:1, AA): darker than the tint's own tone */
+  --sev-high-fg: oklch(0.52 0.17 42);
+  --success-fg: oklch(0.47 0.12 150);
 }
 
 .dark {
@@ -175,6 +180,9 @@
   --actor-system: oklch(0.68 0.02 260);
   --success: oklch(0.72 0.14 150);
   --warning: oklch(0.8 0.14 75);
+  /* dark: the tone itself reads well on its tint */
+  --sev-high-fg: var(--sev-high);
+  --success-fg: var(--success);
 }
 
 @layer base {

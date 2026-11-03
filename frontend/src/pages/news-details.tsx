@@ -226,28 +226,34 @@ export function StoryCves({ d }: { d: NewsDetail }) {
         {/* "Alle beobachten" once per drawer: above the details' CVEs when there are some, else here */}
         {!d.details?.cves.length && <WatchAllButton cves={watchAllOf(d)} origin={origin} order="epss" />}
       </div>
-      <ul className="flex flex-wrap gap-2">
-        {cves.map((c) => {
-          const e = scores.get(c)
-          return (
-            <li key={c} className="flex flex-wrap items-center gap-1.5">
-              <Mono value={c} />
-              <WatchStar cve={c} origin={origin} />
-              {e && <EpssPill e={e} />}
-              <ExploitHints hints={exploitsOf(d.exploits, c)} />
-            </li>
-          )
-        })}
-      </ul>
-      {others.length > 0 && (
-        <ul className="space-y-1">
-          {others.map((c) => (
-            <li key={c} className="flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="font-mono">{c}</span>
-              <ExploitHints hints={exploitsOf(d.exploits, c)} />
-            </li>
-          ))}
+      {cves.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {cves.map((c) => {
+            const e = scores.get(c)
+            return (
+              <li key={c} className="flex flex-wrap items-center gap-1.5">
+                <Mono value={c} />
+                <WatchStar cve={c} origin={origin} />
+                {e && <EpssPill e={e} />}
+                <ExploitHints hints={exploitsOf(d.exploits, c)} />
+              </li>
+            )
+          })}
         </ul>
+      )}
+      {/* the exploits of CVEs only the details name (Betroffene Versionen) – labelled as such */}
+      {others.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[11px] text-muted-foreground">{t("news.cveOfDetails")}</p>
+          <ul className="space-y-1">
+            {others.map((c) => (
+              <li key={c} className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-mono">{c}</span>
+                <ExploitHints hints={exploitsOf(d.exploits, c)} />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {scores.size > 0 && <p className="text-[11px] text-muted-foreground">{t("details.epss")}</p>}
     </section>

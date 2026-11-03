@@ -38,7 +38,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Pill } from "@/components/cobe/badges"
+import { Pill, TlpPill } from "@/components/cobe/badges"
 import { confirmAction } from "@/components/cobe/confirm"
 import { MuteItems, type MuteTarget, MuteUntilDialog } from "@/components/cobe/mute-menu"
 import { ViewsMenu } from "@/components/cobe/views-menu"
@@ -795,11 +795,7 @@ function FindingLine({ f, productKey, onOpen, prefix }: { f: OverviewItem["lates
         {f.unread && <span className="sr-only">{t("reader.unread")}: </span>}
         <span className={cn("font-mono text-foreground/80", f.unread && "font-semibold text-foreground")}>{f.ident}</span> {f.headline || f.title}
       </span>
-      {f.tlp === "GREEN" && (
-        <span className="shrink-0 rounded border border-success/40 px-1 font-mono text-[10px] font-semibold text-success" title={t("vendor.tlpGreenHint")}>
-          TLP:GREEN
-        </span>
-      )}
+      {f.tlp === "GREEN" && <TlpPill compact inButton />}
       {f.exploited && <AlertTriangle className="size-3 shrink-0 text-sev-critical" aria-label={t("vendor.exploited")} />}
     </button>
   )

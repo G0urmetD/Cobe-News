@@ -296,7 +296,7 @@ and are listed under “Added one by one”.
     the story or the finding. The group watched last comes first, *Added one by one* last. Older links with
     `?groups=1` open this grouping.
 - **Rows:** the CVE id (copyable) with its title, severity, KEV (since when; ransomware in the tooltip),
-  [EPSS](term:epss) (the percentile as a bar) and the first fixed version (“+2”: two more). “Public exploit” next to the
+  [EPSS](term:epss) (the percentile as a bar) and the first fixed version (“+2”: two more). “Public exploit code” next to the
   CVE id: a collection lists an exploit ([Public exploit](/docs/vendor-news#oeffentlicher-exploit)); the links are in the
   opened row. A CVE no source knows yet says “No source knows it yet”.
 - **Open a row** (click it or the arrow): the **history** since you started watching, newest first – a fixed version

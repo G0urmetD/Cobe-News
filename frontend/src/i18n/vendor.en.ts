@@ -531,6 +531,10 @@ const vendorEn: Record<string, string> = {
     "Marks who may share a piece of information. Cobe News reads TLP:CLEAR or TLP:WHITE (public); TLP:GREEN only where an admin allows it for a CSAF provider – such findings carry the mark “TLP:GREEN”. Never AMBER or RED.",
   "vendor.tlpGreenHint": "TLP:GREEN: share only within your organisation/community, not publicly.",
   "vendor.src.allowGreen": "Allow TLP:GREEN",
+  "vendor.src.greenOffTitle": "Stop allowing TLP:GREEN?",
+  "vendor.src.greenOffText":
+    "The stored TLP:GREEN advisories of {{names}} are deleted when you save – with the findings that rest on them alone. Notifications already sent stay in the history.",
+  "vendor.src.greenOffConfirm": "Save and delete",
   "glossary.ssvc": "SSVC (Stakeholder-Specific Vulnerability Categorization)",
   "glossary.ssvcText":
     "CISA's rating per CVE: whether the flaw is exploited (none / public exploit code / active), whether an attack can be automated and how severe the impact is.",
@@ -624,8 +628,9 @@ const vendorEn: Record<string, string> = {
   "vendor.src.leaves.exploitGitlab": "the download of a public file at GitLab (gitlab.com) – the same for every installation",
   "vendor.src.default.on": "Default: on",
   "vendor.src.default.off": "Default: off",
-  "exploit.pill": "Public exploit",
+  "exploit.pill": "Public exploit code",
   "exploit.open": "Open the {{source}} entry for {{cve}}",
+  "exploit.openNoCve": "Open the {{source}} entry",
   "exploit.source.metasploit": "Metasploit",
   "exploit.source.exploitdb": "Exploit-DB",
   "exploit.source.nuclei": "nuclei",

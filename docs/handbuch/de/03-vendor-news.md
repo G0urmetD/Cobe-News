@@ -526,7 +526,7 @@ KEV-Eintrag wird trotzdem als **KEV** gezeigt.
 
 ### Öffentlicher Exploit {#oeffentlicher-exploit}
 
-**„Exploit öffentlich“** (orange) heißt: Eine öffentliche Sammlung führt Code, der die Lücke ausnutzt, oder eine fertige
+**„Exploit-Code öffentlich“** (orange) heißt: Eine öffentliche Sammlung führt Code, der die Lücke ausnutzt, oder eine fertige
 Prüfung, die sie ausnutzt. Daneben steht je Sammlung ein Link zu ihrem Eintrag:
 
 | Sammlung | Was sie führt |
@@ -718,7 +718,7 @@ Ein Vorschlag wird genau einmal beantwortet. Adressen werden nur als Text und Li
 | CVE-Liste (cvelistV5) | die Angaben des Herstellers zu einer CVE und die Einstufung der CISA ([SSVC](term:ssvc)) – vor allem, solange die NVD eine CVE noch nicht analysiert hat |
 | FIRST [EPSS](term:epss) | Wahrscheinlichkeit der Ausnutzung in 30 Tagen |
 | [OSV](term:osv) | Fix-Versionen von Open-Source-Paketen (Tomcat, Jenkins, Django …) |
-| Metasploit, Exploit-DB, nuclei-templates | „Exploit öffentlich“ ([Öffentlicher Exploit](#oeffentlicher-exploit)) |
+| Metasploit, Exploit-DB, nuclei-templates | „Exploit-Code öffentlich“ ([Öffentlicher Exploit](#oeffentlicher-exploit)) |
 
 Hersteller-Hinweise werden nur geholt, wenn einem Produkt dieses Herstellers gefolgt wird. Die letzten sieben Quellen
 schaltet ein Admin einzeln ab ([Weitere Quellen](/docs/integrationen#weitere-quellen)); nach außen gehen dabei nur

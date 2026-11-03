@@ -306,7 +306,7 @@ vor Version 0.1.42 beobachtet hast, haben keine Herkunft und stehen bei „Einze
     Klick auf den Titel öffnet die Meldung bzw. den Befund. Die zuletzt beobachtete Gruppe steht oben, *Einzeln
     hinzugefügt* am Ende. Ältere Links mit `?groups=1` öffnen diese Gruppierung.
 - **Zeilen:** CVE-ID (kopierbar) mit Titel, Schwere, KEV (seit wann; Ransomware im Tooltip), [EPSS](term:epss)
-  (Perzentil als Balken) und die erste Fix-Version („+2“: zwei weitere). „Exploit öffentlich“ neben der CVE-ID: eine
+  (Perzentil als Balken) und die erste Fix-Version („+2“: zwei weitere). „Exploit-Code öffentlich“ neben der CVE-ID: eine
   Sammlung führt einen Exploit ([Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)); die Links stehen in
   der aufgeklappten Zeile. Eine CVE, die noch keine Quelle kennt, steht mit
   „Noch keine Quelle kennt sie“ da.

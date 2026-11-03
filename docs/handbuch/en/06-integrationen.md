@@ -287,7 +287,7 @@ next 30 days and gives its percentile among all CVEs. Readers see the value on e
 ### Exploit hints {#exploit-hinweise}
 
 Three public collections say whether **public exploit code** or a **ready-made check** that exploits the vulnerability
-exists for a CVE. Readers see it as “Public exploit” on findings, in stories and on watched CVEs
+exists for a CVE. Readers see it as “Public exploit code” on findings, in stories and on watched CVEs
 ([Public exploit](/docs/vendor-news#oeffentlicher-exploit)); in the [urgency](/docs/vendor-news#dringlichkeit-formel)
 it counts +10 as long as the vulnerability is not already known as exploited.
 

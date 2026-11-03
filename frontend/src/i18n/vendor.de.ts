@@ -534,6 +534,10 @@ const vendorDe: Record<string, string> = {
     "Kennzeichnung, wer eine Information weitergeben darf. Cobe News liest TLP:CLEAR bzw. TLP:WHITE (öffentlich); TLP:GREEN nur, wo ein Admin es für einen CSAF-Anbieter zulässt – solche Befunde tragen das Zeichen „TLP:GREEN“. AMBER und RED nie.",
   "vendor.tlpGreenHint": "TLP:GREEN: Weitergabe nur innerhalb eurer Organisation/Community, nicht öffentlich.",
   "vendor.src.allowGreen": "TLP:GREEN zulassen",
+  "vendor.src.greenOffTitle": "TLP:GREEN nicht mehr zulassen?",
+  "vendor.src.greenOffText":
+    "Die gespeicherten TLP:GREEN-Hinweise von {{names}} werden beim Speichern gelöscht – mit den Befunden, die nur auf ihnen beruhen. Bereits gesendete Benachrichtigungen bleiben im Verlauf.",
+  "vendor.src.greenOffConfirm": "Speichern und löschen",
   "glossary.ssvc": "SSVC (Stakeholder-Specific Vulnerability Categorization)",
   "glossary.ssvcText":
     "Einstufung der CISA je CVE: ob die Lücke ausgenutzt wird (keine / Exploit-Code öffentlich / aktiv), ob sich ein Angriff automatisieren lässt und wie schwer die Folgen sind.",
@@ -629,8 +633,9 @@ const vendorDe: Record<string, string> = {
   "vendor.src.leaves.exploitGitlab": "der Abruf einer öffentlichen Datei bei GitLab (gitlab.com) – für jede Installation dieselbe",
   "vendor.src.default.on": "Standard: an",
   "vendor.src.default.off": "Standard: aus",
-  "exploit.pill": "Exploit öffentlich",
+  "exploit.pill": "Exploit-Code öffentlich",
   "exploit.open": "{{source}}-Eintrag zu {{cve}} öffnen",
+  "exploit.openNoCve": "{{source}}-Eintrag öffnen",
   "exploit.source.metasploit": "Metasploit",
   "exploit.source.exploitdb": "Exploit-DB",
   "exploit.source.nuclei": "nuclei",

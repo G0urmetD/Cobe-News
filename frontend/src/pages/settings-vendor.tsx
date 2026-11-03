@@ -11,6 +11,7 @@ import { Sheet } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Pill } from "@/components/cobe/badges"
 import { EnableCard, Field, LockedFields, ToggleRow } from "@/components/cobe/form"
+import { confirmAction } from "@/components/cobe/confirm"
 import { Explained } from "@/components/cobe/explained"
 import { Term, type TermKey } from "@/components/cobe/glossary"
 import { EmptyState, MoreText } from "@/components/cobe/common"
@@ -517,6 +518,17 @@ function SourcesForm({ data }: { data: VendorAdmin }) {
   const dirty = JSON.stringify(v) !== JSON.stringify(initial) || JSON.stringify(green) !== JSON.stringify(initialGreen)
   const setProviderGreen = (key: string, on: boolean) => setGreen((g) => (on ? [...new Set([...g, key])].sort() : g.filter((x) => x !== key)))
   const save = async () => {
+    // a provider no longer allowed: its stored TLP:GREEN documents are deleted with the save – asked first
+    const dropped = initialGreen.filter((k) => !green.includes(k))
+    if (dropped.length > 0) {
+      const names = dropped.map((k) => (data.structured?.csaf_providers ?? []).find((p) => p.key === k)?.name ?? k).join(", ")
+      const ok = await confirmAction({
+        title: t("vendor.src.greenOffTitle"),
+        text: t("vendor.src.greenOffText", { names }),
+        confirm: t("vendor.src.greenOffConfirm"),
+      })
+      if (!ok) return
+    }
     setBusy(true)
     try {
       const st = data.settings
@@ -577,15 +589,24 @@ function SourcesForm({ data }: { data: VendorAdmin }) {
                           <Pill color={p.needed && v.csaf ? "--success" : "--muted-foreground"} dot>
                             {p.needed ? t("vendor.src.providerActive") : t("vendor.src.providerIdle")}
                           </Pill>
-                          <label className="ml-auto inline-flex items-center gap-1.5">
+                          {/* the label names the switch (htmlFor) – the ⓘ beside it only explains, a click on it never toggles */}
+                          <span className="ml-auto inline-flex items-center gap-1.5">
                             <Switch
+                              id={`green-${p.key}`}
                               size="sm"
                               checked={green.includes(p.key)}
                               onCheckedChange={(on) => setProviderGreen(p.key, on)}
                               aria-label={`${p.name}: ${t("vendor.src.allowGreen")}`}
                             />
-                            <Explained label={t("vendor.src.allowGreen")} text={t("vendor.tlpGreenHint")} />
-                          </label>
+                            <Explained
+                              label={
+                                <label htmlFor={`green-${p.key}`} className="cursor-pointer">
+                                  {t("vendor.src.allowGreen")}
+                                </label>
+                              }
+                              text={t("vendor.tlpGreenHint")}
+                            />
+                          </span>
                         </li>
                       ))}
                     </ul>
