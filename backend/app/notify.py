@@ -1555,6 +1555,8 @@ VENDOR_LABELS = {
         "watch_epss_jump": "Vorher {before}.",
         "watch_withdrawn": "{cve}: Advisory zurückgezogen",
         "watch_withdrawn_text": "{ident} ({source}) wurde von der Quelle zurückgezogen.",
+        "watch_exploit": "{cve}: Exploit veröffentlicht",
+        "watch_exploit_text": "Öffentlich verfügbar: {where}.",
         "watch_hint": "Du beobachtest diese CVE in Cobe News.",
     },
     "en": {
@@ -1585,6 +1587,8 @@ VENDOR_LABELS = {
         "watch_epss_jump": "Before: {before}.",
         "watch_withdrawn": "{cve}: advisory withdrawn",
         "watch_withdrawn_text": "{ident} ({source}) was withdrawn by its source.",
+        "watch_exploit": "{cve}: exploit published",
+        "watch_exploit_text": "Publicly available: {where}.",
         "watch_hint": "You watch this CVE in Cobe News.",
     },
 }
@@ -1681,6 +1685,12 @@ def watch_story(ev: VendorEvent, lang: str) -> Story:
         if d.get("from") is not None:
             parts.append(lb["watch_epss_jump"].format(before=_pct(d.get("from"), lang)))
         text = " ".join(parts)
+    elif what == "exploit":
+        from app.exploits import SOURCES
+
+        title = lb["watch_exploit"].format(cve=cve)
+        names = [f"{SOURCES[x['source']].name} ({x.get('url') or ''})" if x.get("url") else SOURCES[x["source"]].name for x in d.get("exploits") or [] if isinstance(x, dict) and x.get("source") in SOURCES]
+        text = lb["watch_exploit_text"].format(where="; ".join(names) or "?")
     else:
         title = lb["watch_withdrawn"].format(cve=cve)
         text = lb["watch_withdrawn_text"].format(ident=d.get("ident") or d.get("advisory") or "?", source=d.get("source") or "?")

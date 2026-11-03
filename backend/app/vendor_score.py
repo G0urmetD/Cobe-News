@@ -13,7 +13,10 @@ betroffen +25 …"), then kept between 0 and 100. The weights live here and nowh
   "unklare Altdaten" −50 · not affected −70 (whatever else it has, a not affected version stays below "Bald")
 - no_fix: affected or possibly affected, and no fixed version known → +5
 - age: published within 7 days → +10 · within 30 days → +5 · older 0
-- public_exploit: reserved (+15) – the data source is not approved yet, so it never counts
+- public_exploit: public exploit code or a ready-made exploit check is listed (Metasploit, Exploit-DB, nuclei –
+  app/exploits.py) and the CVE is not known as exploited → +10. The middle step between "nothing known" (0) and
+  "exploited" (25/30), as SSVC's "PoC" sits between "none" and "active": exploitation in the wild already says more, so
+  the two never add up. Findings without such a listing keep their number.
 
 Levels (the colours of the overview): ≥ 60 "now" (Sofort, red) · ≥ 35 "soon" (Bald, amber) · below "watch" (Beobachten).
 
@@ -31,8 +34,7 @@ EXPLOITED = 25  # known as exploited, but not (yet) in CISA KEV: the vendor's ad
 VERSION = {"affected": 25, "possible": 5, "unversioned": 5, "service": 0, "stale": -50, "not_affected": -70}
 NO_FIX = 5
 AGE = ((7, 10), (30, 5))  # published within days → points
-PUBLIC_EXPLOIT = 15  # reserved: "öffentlicher Exploit bekannt" – no approved source yet, never applied
-USE_PUBLIC_EXPLOIT = False
+PUBLIC_EXPLOIT = 10  # "öffentlicher Exploit bekannt" – only while not known as exploited (KEV, vendor, EUVD)
 LEVELS = ((60, "now"), (35, "soon"))  # from → level; below: "watch"
 MIN, MAX = 0, 100
 
@@ -111,7 +113,7 @@ def score(
         parts.append({"factor": "no_fix", "points": NO_FIX})
     days = _age_days(published, today)
     parts.append({"factor": "age", "points": _age_points(days), "days": days})
-    if USE_PUBLIC_EXPLOIT and public_exploit:  # pragma: no cover - the slot is reserved, never switched on yet
+    if public_exploit and not kev and not exploited:
         parts.append({"factor": "public_exploit", "points": PUBLIC_EXPLOIT})
     raw = sum(p["points"] for p in parts)
     value = max(MIN, min(MAX, raw))
@@ -129,6 +131,7 @@ def of_finding(f: dict, today: date) -> dict:
         "epss_percentile": epss.get("percentile"),
         "kev": bool(f.get("kev")),
         "exploited": bool(f.get("exploited")),
+        "public_exploit": bool(f.get("exploit")),
         "published": f.get("published_at"),
         "today": today,
     }

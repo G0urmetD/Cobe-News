@@ -12,7 +12,7 @@ from pydantic import ConfigDict, Field, field_validator
 from sqlalchemy import and_, select, update
 
 from app import advisory_changes as changes_svc
-from app import audit, catalog_check, reader, teams
+from app import audit, catalog_check, exploits, reader, teams
 from app import catalog_care as care
 from app import vendor as svc
 from app import vendor_catalog as catalog
@@ -602,6 +602,8 @@ def _settings_out(cfg: dict) -> dict:
         "eol_every_h": int(cfg.get("eol_every_h") or 24),
         "nvd_key_set": bool(cfg.get("nvd_key_enc")),
         **{k: bool(cfg.get(k, True)) for k in STRUCTURED},
+        # the exploit lists (app/exploits.py), each on or off
+        **{k: bool(cfg.get(k, d)) for k, d in exploits.SWITCHES.items()},
         # Versionen prüfen: a version not confirmed for longer than this is "bitte prüfen" (0: off)
         "review_days": care.review_days_of(cfg),
         "rev": int(cfg.get("rev") or 0),  # the saved state (409 stale when another admin saved in between)
@@ -619,6 +621,9 @@ class VendorSettingsIn(_M):
     cvelist: bool | None = None
     epss: bool | None = None
     osv: bool | None = None
+    exploit_metasploit: bool | None = None
+    exploit_exploitdb: bool | None = None
+    exploit_nuclei: bool | None = None
     review_days: int | None = None  # None: as it is
     rev: int | None = None  # the state the form was loaded with
 
@@ -644,6 +649,7 @@ async def admin_vendor(admin: Admin, db: Db) -> dict:
         "structured": {
             "csaf_providers": [{"key": x["key"], "name": x["name"], "domain": x["domain"], "vendors": x["vendors"], "needed": x["key"] in needed} for x in csaf_providers.providers()],
             "osv_products": sum(1 for p in products if p.get("osv")),
+            "exploit_sources": [{"key": x.key, "name": x.name, "url": x.url, "licence": x.licence, "default": x.default} for x in exploits.SOURCES.values()],
         },
         "settings": _settings_out(cfg),
         "catalog": {"catalog_version": catalog.catalog_version(), "generated_at": cat.get("generated_at"), "eol_generated_at": cat.get("eol_generated_at"), "products": len(cat["products"]), "counts": cat.get("counts")},
@@ -659,12 +665,13 @@ async def put_vendor(body: VendorSettingsIn, request: Request, admin: Admin, db:
     cur = await svc.config(db)
     enc = "" if body.clear_nvd_key else encrypt_str(body.nvd_key) if body.nvd_key else cur.get("nvd_key_enc", "")
     switches = {k: bool(cur.get(k, True)) if getattr(body, k) is None else getattr(body, k) for k in STRUCTURED}
+    switches |= {k: bool(cur.get(k, d)) if getattr(body, k) is None else getattr(body, k) for k, d in exploits.SWITCHES.items()}
     review_days = care.review_days_of(cur) if body.review_days is None else body.review_days
     value = {"enabled": body.enabled, "every_h": body.every_h, "eol_every_h": body.eol_every_h, "nvd_key_enc": enc, **switches, "review_days": review_days}
     if changes := audit.diff(cur, value, value.keys()):
         audit.record(db, admin, "settings.changed", audit.target("settings", "vendor", "vendor"), {"changes": changes})
     out = await settings_store.put_rev(db, "vendor", value, body.rev)
-    if any(bool(cur.get(k, True)) != switches[k] for k in STRUCTURED):
+    if any(bool(cur.get(k, True)) != switches[k] for k in STRUCTURED) or any(bool(cur.get(k, d)) != switches[k] for k, d in exploits.SWITCHES.items()):
         svc.bump()  # a source switched off (or on again): its stored records leave (or join) the verdicts – svc.counts
     _wake(request)
     return _settings_out(out)

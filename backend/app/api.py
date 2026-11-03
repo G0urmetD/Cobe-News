@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import __version__, advisory_changes, audit, epss, netaddr, reader, story_details
+from app import __version__, advisory_changes, audit, epss, exploits, netaddr, reader, story_details
 from app import settings as settings_store
 from app import news as news_svc
 from app.config import get_config, tls_verify
@@ -353,6 +353,9 @@ async def get_story(sid: uuid.UUID, user: Reader, db: Db) -> dict:
     out["affects"] = story_details.matches(data, await story_details.followed(db)) if data else []
     # FIRST EPSS of the story's CVEs (as far as asked – app/epss.py), the likeliest first
     out["epss"] = sorted((await epss.scores(db, [c.upper() for c in (i.cves or [])[:60]])).values(), key=lambda e: -e["score"])[:12]
+    # Exploit-Hinweise: the switched-on exploit lists naming the story's CVEs (its own and its details' – app/exploits.py)
+    named = list(dict.fromkeys(str(c).upper() for c in [*(i.cves or []), *((data or {}).get("cves") or [])] if isinstance(c, str)))[:60]
+    out["exploits"] = exploits.brief(await exploits.of_cves(db, named), named, 12)
     # the revisions of the advisory behind the story (Vendor News keeps them – app/advisory_changes.py)
     out["changes"] = await advisory_changes.of_advisories(db, story_details.advisory_ids(det.kind, det.ident, i.cves or [])) if det is not None else []
     return out

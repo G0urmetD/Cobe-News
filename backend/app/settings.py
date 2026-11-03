@@ -15,7 +15,9 @@ DEFAULTS: dict[str, dict] = {
     # Vendor News: on – but nothing is requested until somebody follows a product (docs/BETRIEB.md: Vendor News). The structured
     # sources (CSAF providers, cvelistV5, EPSS, OSV) are on as well: each asks only for what followed products (EPSS: also
     # the stories) need, and only public addresses or CVE ids leave the machine (docs/BETRIEB.md: Weitere Quellen)
-    "vendor": {"enabled": True, "nvd_key_enc": "", "every_h": 6, "eol_every_h": 24, "csaf": True, "cvelist": True, "epss": True, "osv": True, "review_days": 90},
+    # The exploit lists (app/exploits.py – the same public file for everyone, daily, conditional): Metasploit and the
+    # nuclei templates on (small, compressed), Exploit-DB off (~10 MB a day, uncompressed)
+    "vendor": {"enabled": True, "nvd_key_enc": "", "every_h": 6, "eol_every_h": 24, "csaf": True, "cvelist": True, "epss": True, "osv": True, "exploit_metasploit": True, "exploit_exploitdb": False, "exploit_nuclei": True, "review_days": 90},
     "sessions": {"idle_min": 60, "absolute_h": 12},
     # passkeys (WebAuthn) for local accounts: on – nobody has one until they register it themselves (after re-confirming
     # who they are), and only while BASE_URL is an https host name (app/auth/webauthn.availability)
@@ -55,6 +57,8 @@ DEFAULTS: dict[str, dict] = {
     # Teams (app/teams.py): off – while off nothing changes for anyone; the welcome e-mail to loaded members and the
     # personal notifications (e-mail, desktop, Microsoft Teams – app/personal.py) off as well
     "teams": {"enabled": False, "welcome_mail": False, "personal_email": False, "personal_desktop": False, "personal_teams": False},
+    # the update notice for admins (app/update_check.py): on – one request to GitHub's release API every 12 hours
+    "updates": {"check": True},
 }
 
 

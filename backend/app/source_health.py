@@ -1,6 +1,7 @@
 """Quellen-Gesundheit: how well every source is fetched – the news feeds (news_sources), the queries of Vendor News
 (vendor_fetch, grouped by family: nvd, paloalto, fortinet, veeam, kev, eol) and the structured sources (kind
-"structured", also in vendor_fetch: csaf – one query per CSAF provider and the BSI aggregator –, cvelist, epss, osv).
+"structured", also in vendor_fetch: csaf – one query per CSAF provider and the BSI aggregator –, cvelist, epss, osv,
+exploit – one query per exploit list, app/exploits.py).
 
 Recording (the hot path, kept cheap): a fetcher calls `start()` before its requests and `record(db, kind, key, …)` when
 the fetch is decided – one row in source_fetch_stats, written with the commit the fetcher makes anyway. The requests
@@ -91,8 +92,9 @@ FAMILY_NAMES = {
     "cvelist": "cvelistV5 (CVE-Liste)",
     "epss": "FIRST EPSS",
     "osv": "OSV.dev",
+    "exploit": "Exploit-Hinweise",
 }
-STRUCTURED_FAMILIES = frozenset({"csaf", "cvelist", "epss", "osv"})  # their own kind on the health page
+STRUCTURED_FAMILIES = frozenset({"csaf", "cvelist", "epss", "osv", "exploit"})  # their own kind on the health page
 NOT_SOURCES = ("nvdcve:", "cvelistcve:", "osvcve:")  # single lookups of one CVE each – no source
 
 

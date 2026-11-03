@@ -114,11 +114,13 @@ no CVE for a long time …). "Check now" checks the followed products immediatel
 ## More sources {#weitere-quellen}
 
 Four structured sources complement the vendors' advisories and the [NVD](term:nvd): the vendors'
-[CSAF](term:csaf) providers, the CVE list [cvelistV5](term:cvelist), [EPSS](term:epss) from FIRST and [OSV](term:osv). They are in
+[CSAF](term:csaf) providers, the CVE list [cvelistV5](term:cvelist), [EPSS](term:epss) from FIRST and [OSV](term:osv).
+Three collections of public exploits come on top ([Exploit hints](#exploit-hinweise)). They are in
 *Integrations → Vendor News → "Configure"*, sub-tab **More sources**
 ([open directly](/settings/integrations?vendor=sources)).
 
-- Each source has its own switch and is **on by default**. Saved with "Save" at the bottom of the drawer.
+- Each source has its own switch and is **on by default** – except Exploit-DB. Saved with "Save" at the bottom of the
+  drawer.
 - Each one asks only for what the followed products need (EPSS also for the CVEs of stories). As long as nobody
   follows a product, none of them asks anything. With Vendor News off, none asks.
 - Below each switch: what leaves the server and the state of its queries. "History under Health" leads to
@@ -130,6 +132,7 @@ Four structured sources complement the vendors' advisories and the [NVD](term:nv
 | **cvelistV5** | CVE records as the vendor (CNA) publishes them, and CISA's assessment (CVSS, [SSVC](term:ssvc), KEV) – above all for CVEs the NVD has not analysed yet | the day's changes three times a day, the end of day once a day; single records on demand |
 | **EPSS** | probability that a CVE is exploited in the next 30 days, with percentile | each CVE at most once a day |
 | **OSV** | affected and fixed versions of open-source packages (Tomcat, Jenkins, Django …) | each CVE daily while it is younger than 30 days, weekly after that |
+| **Exploit hints** (Metasploit, Exploit-DB, nuclei) | whether public exploit code or a ready-made check exists for a CVE | each collection at most once a day, conditional (unchanged: no data) |
 
 ### CSAF providers {#csaf-anbieter}
 
@@ -255,6 +258,39 @@ next 30 days and gives its percentile among all CVEs. Readers see the value on e
 - withdrawn OSV records are ignored,
 - each CVE once a day while it is younger than 30 days, once a week after that.
 
+### Exploit hints {#exploit-hinweise}
+
+Three public collections say whether **public exploit code** or a **ready-made check** that exploits the vulnerability
+exists for a CVE. Readers see it as “Public exploit” on findings, in stories and on watched CVEs
+([Public exploit](/docs/vendor-news#oeffentlicher-exploit)); in the [urgency](/docs/vendor-news#dringlichkeit-formel)
+it counts +10 as long as the vulnerability is not already known as exploited.
+
+| Collection | File | Size a day | Licence | Default |
+|---|---|---|---|---|
+| **Metasploit** (Rapid7) | `db/modules_metadata_base.json` from `raw.githubusercontent.com` – only modules of type “exploit” count | ~11 MB, ~1.4 MB compressed on the wire | BSD-3-Clause | **on** |
+| **nuclei-templates** (ProjectDiscovery) | `cves.json` from `raw.githubusercontent.com` | ~2.3 MB, ~0.5 MB compressed | MIT | **on** |
+| **Exploit-DB** (OffSec, GitLab mirror) | `files_exploits.csv` from `gitlab.com` | ~10 MB, uncompressed | GPL-2.0 (repository) | **off** |
+
+- **The same file for everyone:** each collection is a public file – Cobe News loads it whole and looks up locally. No
+  CVE number, no product, nothing about your installation leaves the server.
+- **At most once a day**, conditional (`ETag`/`If-Modified-Since`): an unchanged file answers just “not modified”. A
+  size limit per file (Metasploit and Exploit-DB 24 MB, nuclei 8 MB), the same hardening as every fetch
+  ([Outgoing data](#ausgehende-daten)).
+- **Only when needed:** like the KEV catalogue – with a followed product (Vendor News on) or with the news switched on,
+  and while somebody watches a CVE.
+- **Stored** per CVE and collection: only the link to the entry and when Cobe News first saw it – never the exploit
+  itself. When a collection no longer lists a CVE, the hint goes with the next load. An answer with fewer than half of
+  the entries so far counts as broken: an error, nothing is deleted.
+- **First load** (or after more than three days without a fetch, e.g. because the collection was off): what it brings is
+  shown but not notified as “Exploit published”.
+- **Exploit-DB is off by default:** the biggest file, uncompressed, and its daily changes are mostly old entries edited.
+  Switch it on if you want it.
+- **Not used:** unofficial collections of PoC repositories (lists that search GitHub for “CVE-…”): unchecked, partly
+  with malware, no stable licence. The GitHub Security Advisories say nothing about exploits.
+
+Under *Health* the three appear as the family **“Exploit-Hinweise”** (kind “More sources”), one query
+`exploit:<collection>` each.
+
 ### What leaves the server {#weitere-quellen-daten}
 
 Only requests to the public addresses of these services and CVE or vulnerability numbers – **never** product names,
@@ -266,6 +302,7 @@ versions, your inventory or host names.
 | cvelistV5 | `api.github.com`, `github.com` (and GitHub's download servers), `raw.githubusercontent.com` | fetches of public files without sign-in; for single records the CVE number in the path |
 | EPSS | `api.first.org` | CVE numbers |
 | OSV | `api.osv.dev` | CVE and advisory numbers in the path |
+| Exploit hints | `raw.githubusercontent.com` (Metasploit, nuclei), `gitlab.com` (Exploit-DB, when switched on) | nothing – a fetch of the same public file for everyone |
 
 ### Which source decides {#urteil-reihenfolge}
 
@@ -287,7 +324,7 @@ Switch off and "Save":
 
 Without cvelistV5, news of a new vulnerability only comes through the NVD and the vendors' advisories. Under *Health*
 the sources appear as the kind **"More sources (Vendor News)"** (internally `structured`): the CSAF providers one by
-one and the BSI's provider list, cvelistV5, EPSS and OSV.
+one and the BSI's provider list, cvelistV5, EPSS, OSV and the exploit hints.
 
 ## Web Push {#web-push}
 
@@ -357,6 +394,8 @@ Cobe News only fetches data – it reports no usage data anywhere. What does lea
 | **Vendor News** (only with a followed product; the KEV catalogue from `www.cisa.gov` or its mirror also without one while the news are on) | `services.nvd.nist.gov`, `endoflife.date`, `www.cisa.gov`; with products of these vendors also `security.paloaltonetworks.com`, `filestore.fortinet.com`, `www.veeam.com` | the CPE names and product names of the **followed** products (so the NVD learns which products you watch), the NVD key as a header. Your **versions** stay on the server – the comparison is local. The CPE search under "Not in the catalogue?" sends the search term to the NVD. |
 | **Catalogue care** | `services.nvd.nist.gov` | CPE names of the catalogue, at most 20 requests per hour – only with Vendor News on and a followed product |
 | **More sources** (CSAF providers, cvelistV5, EPSS, OSV) | `wid.cert-bund.de`, `cert-portal.siemens.com`, `www.cisco.com`, `www.se.com`, `api.github.com`, `github.com`, `raw.githubusercontent.com`, `api.first.org`, `api.osv.dev` | only fetches of public addresses and CVE or vulnerability numbers – never products, versions or host names ([What leaves the server](#weitere-quellen-daten)) |
+| **Exploit hints** (Metasploit and nuclei on by default, Exploit-DB off) | `raw.githubusercontent.com`, `gitlab.com` (Exploit-DB only) | nothing – at most once a day the same fetch of a public file for everyone, conditional ([Exploit hints](#exploit-hinweise)) |
+| **Update notice** (**on** by default, switch off under *Version & changelog*) | `api.github.com` (`/repos/G0urmetD/Cobe-News/releases/latest`) | one fetch without sign-in at most every 12 hours, conditional (`ETag`), with the user agent `Cobe/<version>` – nothing else about your installation ([Update notice](/docs/betrieb#update-hinweis)) |
 | **Notification channels** | the respective service (Teams, Slack, Discord, Telegram, your mail server, your own webhook) | title, summary, severity, source, CVEs and links of the stories, the channel's and rule's name; for Vendor News rules also **product and version** of your systems ([Channels](/docs/benachrichtigungen#kanaele)) |
 | **Personal notifications** (only once an admin allows the ways) | your mail server; for a person's own Teams webhook `*.logic.azure.com`, `*.powerplatform.com` or `*.webhook.office.com`; desktop through Web Push | the Vendor News messages of that person's products, as with the Vendor News rules with **product and version**; plus the weekly review and the welcome mail by e-mail ([Personal notifications](/docs/anmeldung#teams-persoenlich)) |
 | **Forwarding to the team** | the team's forward channel | who forwards, the comment, title and link, for a finding the urgency and your versions ([Forwarding](/docs/benachrichtigungen#weiterleiten)) |

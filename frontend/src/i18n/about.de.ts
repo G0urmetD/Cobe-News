@@ -42,6 +42,19 @@ const aboutDe: Record<string, string> = {
   "about.noChangelog": "Kein Changelog gefunden",
   "about.noChangelogText": "Dieser Build bringt keinen Changelog mit. Die Version oben stimmt trotzdem.",
   "about.notesLanguage": "Die Notizen sind auf Deutsch verfasst.",
+  "update.notice": "Version {{version}} verfügbar",
+  "update.changelog": "Changelog",
+  "update.dismiss": "Hinweis auf Version {{version}} schließen",
+  "update.title": "Neue Versionen",
+  "update.check": "Nach neuen Versionen suchen",
+  "update.checkHint":
+    "Fragt höchstens alle 12 Stunden die öffentliche Release-Schnittstelle von GitHub (api.github.com), ob eine neuere Cobe-News-Version veröffentlicht ist – nur Admins sehen den Hinweis. Über diese Installation geht nichts hinaus. Standard: an.",
+  "update.latest": "Neueste Version",
+  "update.none": "noch keine Antwort",
+  "update.checked": "Zuletzt geprüft",
+  "update.upToDate": "aktuell",
+  "update.available": "{{version}} verfügbar",
+  "update.error": "Letzte Prüfung fehlgeschlagen: {{error}}",
 }
 
 export default aboutDe

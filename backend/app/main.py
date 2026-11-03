@@ -21,7 +21,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from app import __version__, api_tokens, api_v1, audit, audit_api, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, reader, restore_test, sessions_api, source_health, sqlite_import, teams, tls, vendor, webpush
+from app import __version__, api_tokens, api_v1, audit, audit_api, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, reader, restore_test, sessions_api, source_health, sqlite_import, teams, tls, update_check, vendor, webpush
 from app import news as news_svc
 from app.admin_api import router as admin_router
 from app.api import router
@@ -293,6 +293,8 @@ def create_app() -> FastAPI:
         ctask = asyncio.create_task(cloop.run()) if cfg.run_loop else None
         # the restore test's schedule (app/restore_test.py): a look every ten minutes whether one is due
         rtask = asyncio.create_task(restore_test.Loop().run()) if cfg.run_loop else None
+        # the update notice for admins (app/update_check.py): one request to GitHub's release API every 12 hours at most
+        utask = asyncio.create_task(update_check.Loop().run()) if cfg.run_loop else None
         log.info("Cobe News %s – data in %s, %s", __version__, cfg.data_dir, cfg.base_url)
         try:
             yield
@@ -305,6 +307,8 @@ def create_app() -> FastAPI:
                 ctask.cancel()
             if rtask:
                 rtask.cancel()
+            if utask:
+                utask.cancel()
             for t in list(teams._tasks):
                 t.cancel()
             await db.dispose()
@@ -344,6 +348,7 @@ def create_app() -> FastAPI:
     # these two (api_tokens.precheck below), never the UI's endpoints; the restore test's page (app/restore_test.py)
     app.include_router(api_tokens.router)
     app.include_router(restore_test.router)
+    app.include_router(update_check.router)
     app.include_router(audit_api.router)
     app.include_router(api_v1.router)
     app.include_router(metrics.router)

@@ -92,6 +92,7 @@ GAPS = {
     "api.github.com": 5.0,  # unauthenticated: 60 requests an hour – cvelistV5 asks about one an hour
     "github.com": 2.0,
     "raw.githubusercontent.com": 1.0,
+    "gitlab.com": 2.0,  # the Exploit-DB list (app/exploits.py), daily
     "api.first.org": 2.0,
     "api.osv.dev": 1.0,
     "wid.cert-bund.de": 1.0,
@@ -134,6 +135,9 @@ def bump(products: "list[str] | set[str] | None" = None) -> None:
 
 def reset() -> None:
     """In-process state back to the start (tests: every test has its own database)."""
+    from app import exploits
+
+    exploits.reset()
     _last.clear()
     _blocked.clear()
     _locks.clear()
@@ -1194,7 +1198,10 @@ async def active_keys(db: AsyncSession) -> set[str]:
     """The queries the round asks now (the source health: anything else in vendor_fetch is switched off – a product no
     longer followed, Vendor News off). As run_round: nothing at all while nothing is followed."""
     cfg = await config(db)
+    from app import exploits
+
     kev = {"kev"} if await kev_wanted(db) else set()
+    kev |= await exploits.active_keys(db, cfg)  # the exploit lists: as the KEV, and for the watched CVEs
     if not cfg.get("enabled", True):
         return kev
     from app import epss
@@ -1235,6 +1242,14 @@ async def run_round(*, force: bool = False, only: str | None = None) -> dict:
         # the KEV also with nothing followed (or Vendor News off) while the news are on: their topics need it
         if await kev_wanted(db):
             await sync_kev(db, eol_every, force)
+        # the exploit lists (app/exploits.py): daily, for the findings, the news' topics and the watched CVEs
+        from app import exploits
+
+        try:
+            out |= await exploits.sync_all(db, force)
+        except Exception:  # noqa: BLE001 - the exploit lists never stop the round
+            await db.rollback()
+            log.exception("exploit lists failed")
         if not cfg.get("enabled", True):
             return out
         fs = await follows(db)
@@ -1871,6 +1886,7 @@ async def _compute_view(f: VendorFollow, vers: list[VendorVersion], kev: dict, e
     found, targets = await asyncio.to_thread(evaluate_all)
     if "epss" not in off:
         await _add_epss(found)
+    await _add_exploits(found)
     _stamp[0] += 1
     return {"product": p, "findings": found, "targets": targets, "stamp": _stamp[0]}
 
@@ -1890,6 +1906,20 @@ async def _add_epss(found: list[dict]) -> None:
         top = max((scores[c] for c in x["cves"] if c in scores), key=lambda e: e["score"], default=None)
         if top is not None:
             x["epss"] = top
+
+
+async def _add_exploits(found: list[dict]) -> None:
+    """Exploit-Hinweise on every finding with a CVE some switched-on list names (app/exploits.py – from memory)."""
+    from app import exploits
+
+    hits = [x for x in found if x["cves"]]
+    if not hits:
+        return
+    async with dbm.session() as db:
+        got = await exploits.of_cves(db, {c for x in hits for c in x["cves"]})
+    for x in hits:
+        if got and (e := exploits.brief(got, x["cves"], 4)):
+            x["exploit"] = e
 
 
 def summary(view: dict, vers: list[VendorVersion]) -> dict:

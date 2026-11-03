@@ -118,11 +118,11 @@ mehr, lange keine CVE …). „Jetzt prüfen“ prüft die gefolgten Produkte so
 
 Vier strukturierte Quellen ergänzen die Hinweise der Hersteller und die [NVD](term:nvd): die
 [CSAF](term:csaf)-Anbieter der Hersteller, die CVE-Liste [cvelistV5](term:cvelist), [EPSS](term:epss) von FIRST und
-[OSV](term:osv). Sie stehen in *Integrationen → Vendor News → „Einrichten“*, Unter-Reiter **Weitere Quellen**
+[OSV](term:osv). Dazu kommen drei Sammlungen öffentlicher Exploits ([Exploit-Hinweise](#exploit-hinweise)). Sie stehen in *Integrationen → Vendor News → „Einrichten“*, Unter-Reiter **Weitere Quellen**
 ([direkt öffnen](/settings/integrations?vendor=sources)).
 
-- Jede Quelle hat ihren eigenen Schalter und ist **ab Werk an**. Gespeichert wird mit „Speichern“ unten in der
-  Schublade.
+- Jede Quelle hat ihren eigenen Schalter und ist **ab Werk an** – außer Exploit-DB. Gespeichert wird mit „Speichern“
+  unten in der Schublade.
 - Jede fragt nur, was die gefolgten Produkte brauchen (EPSS auch für die CVEs der Meldungen). Solange niemand einem
   Produkt folgt, fragt keine etwas. Ist Vendor News aus, fragt keine.
 - Unter jedem Schalter steht, was nach außen geht, und der Zustand ihrer Abfragen. „Verlauf unter Gesundheit“ führt
@@ -134,6 +134,7 @@ Vier strukturierte Quellen ergänzen die Hinweise der Hersteller und die [NVD](t
 | **cvelistV5** | CVE-Einträge, wie der Hersteller (CNA) sie meldet, und die Einstufung der CISA (CVSS, [SSVC](term:ssvc), KEV) – vor allem für CVEs, die die NVD noch nicht analysiert hat | dreimal am Tag die Änderungen des Tages, einmal am Tag der Tagesabschluss; einzelne Einträge bei Bedarf |
 | **EPSS** | Wahrscheinlichkeit, dass eine CVE in den nächsten 30 Tagen ausgenutzt wird, mit Perzentil | je CVE höchstens einmal am Tag |
 | **OSV** | betroffene und behobene Versionen von Open-Source-Paketen (Tomcat, Jenkins, Django …) | je CVE täglich, solange sie jünger als 30 Tage ist, sonst wöchentlich |
+| **Exploit-Hinweise** (Metasploit, Exploit-DB, nuclei) | ob öffentlicher Exploit-Code oder eine fertige Prüfung für eine CVE existiert | je Sammlung höchstens einmal am Tag, bedingt (unverändert: keine Daten) |
 
 ### CSAF-Anbieter {#csaf-anbieter}
 
@@ -269,6 +270,40 @@ Nummern:
 - zurückgezogene OSV-Einträge (withdrawn) werden nicht beachtet,
 - je CVE einmal am Tag, solange sie jünger als 30 Tage ist, danach einmal pro Woche.
 
+### Exploit-Hinweise {#exploit-hinweise}
+
+Drei öffentliche Sammlungen sagen, ob es für eine CVE **öffentlichen Exploit-Code** oder eine **fertige Prüfung** gibt,
+die die Lücke ausnutzt. Leser sehen das als „Exploit öffentlich“ an Befunden, in Meldungen und bei beobachteten CVEs
+([Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)); in der [Dringlichkeit](/docs/vendor-news#dringlichkeit-formel)
+zählt es +10, solange die Lücke nicht schon als ausgenutzt bekannt ist.
+
+| Sammlung | Datei | Größe am Tag | Lizenz | ab Werk |
+|---|---|---|---|---|
+| **Metasploit** (Rapid7) | `db/modules_metadata_base.json` von `raw.githubusercontent.com` – es zählen nur Module vom Typ „exploit“ | ~11 MB, komprimiert übertragen ~1,4 MB | BSD-3-Clause | **an** |
+| **nuclei-templates** (ProjectDiscovery) | `cves.json` von `raw.githubusercontent.com` | ~2,3 MB, komprimiert ~0,5 MB | MIT | **an** |
+| **Exploit-DB** (OffSec, GitLab-Spiegel) | `files_exploits.csv` von `gitlab.com` | ~10 MB, unkomprimiert | GPL-2.0 (Repository) | **aus** |
+
+- **Dieselbe Datei für alle:** Jede Sammlung ist eine öffentliche Datei – Cobe News lädt sie ganz und sucht lokal. Nach
+  außen geht keine CVE-Nummer, kein Produkt, nichts über eure Installation.
+- **Höchstens einmal am Tag**, bedingt (`ETag`/`If-Modified-Since`): Hat sich die Datei nicht geändert, kommt nur
+  „unverändert“ zurück. Größenlimit je Datei (Metasploit und Exploit-DB 24 MB, nuclei 8 MB), dieselbe Härtung wie
+  jeder Abruf ([Ausgehende Daten](#ausgehende-daten)).
+- **Nur wenn gebraucht:** wie der KEV-Katalog – mit gefolgtem Produkt (Vendor News an) oder bei eingeschalteten News,
+  dazu, solange jemand eine CVE beobachtet.
+- **Gespeichert** wird je CVE und Sammlung nur der Link zum Eintrag und wann Cobe News ihn zuerst gesehen hat – nie
+  der Exploit selbst. Führt eine Sammlung eine CVE nicht mehr, verschwindet der Hinweis mit dem nächsten Laden. Bringt
+  eine Antwort weniger als die Hälfte der bisherigen Einträge, gilt sie als kaputt: Fehler, nichts wird gelöscht.
+- **Erstes Laden** (oder nach mehr als drei Tagen ohne Abruf, etwa weil die Sammlung aus war): Was dabei kommt, wird
+  gezeigt, aber nicht als „Exploit veröffentlicht“ gemeldet.
+- **Exploit-DB ist ab Werk aus:** die größte Datei, unkomprimiert, und ihre täglichen Änderungen sind meist
+  nachbearbeitete alte Einträge. Wer sie will, schaltet sie ein.
+- **Nicht genutzt** werden inoffizielle Sammlungen von PoC-Repositories (etwa Listen, die GitHub nach „CVE-…“
+  durchsuchen): ungeprüft, teils mit Schadcode, ohne stabile Lizenz. Die GitHub Security Advisories sagen nichts über
+  Exploits.
+
+Unter *Gesundheit* stehen die drei als Familie **„Exploit-Hinweise“** (Art „Weitere Quelle“), je Sammlung eine Abfrage
+`exploit:<sammlung>`.
+
 ### Was den Server verlässt {#weitere-quellen-daten}
 
 Nur Anfragen an die öffentlichen Adressen dieser Dienste und CVE- bzw. Schwachstellen-Nummern – **nie**
@@ -280,6 +315,7 @@ Produktnamen, Versionen, euer Inventar oder Hostnamen.
 | cvelistV5 | `api.github.com`, `github.com` (und die Download-Server von GitHub), `raw.githubusercontent.com` | Abrufe öffentlicher Dateien ohne Anmeldung; bei Einzelabrufen die CVE-Nummer im Pfad |
 | EPSS | `api.first.org` | CVE-Nummern |
 | OSV | `api.osv.dev` | CVE- und Advisory-Nummern im Pfad |
+| Exploit-Hinweise | `raw.githubusercontent.com` (Metasploit, nuclei), `gitlab.com` (Exploit-DB, wenn eingeschaltet) | nichts – Abruf derselben öffentlichen Datei für alle |
 
 ### Welche Quelle entscheidet {#urteil-reihenfolge}
 
@@ -303,7 +339,7 @@ Schalter aus und „Speichern“:
 
 Ohne cvelistV5 kommt der Hinweis auf eine neue Lücke nur noch über die NVD und die Hinweise der Hersteller. Unter
 *Gesundheit* stehen die Quellen als Art **„Weitere Quelle (Vendor News)“** (intern `structured`): die CSAF-Anbieter je
-Anbieter und die Anbieter-Liste des BSI, cvelistV5, EPSS und OSV.
+Anbieter und die Anbieter-Liste des BSI, cvelistV5, EPSS, OSV und die Exploit-Hinweise.
 
 ## Web Push {#web-push}
 
@@ -375,6 +411,8 @@ Cobe News holt nur Daten – es meldet keine Nutzungsdaten irgendwohin. Was trot
 | **Vendor News** (nur mit gefolgtem Produkt; den KEV-Katalog von `www.cisa.gov` bzw. dem Spiegel auch ohne, solange die News an sind) | `services.nvd.nist.gov`, `endoflife.date`, `www.cisa.gov`; mit Produkten dieser Hersteller auch `security.paloaltonetworks.com`, `filestore.fortinet.com`, `www.veeam.com` | die CPE-Namen und Produktnamen der **gefolgten** Produkte (die NVD erfährt so, welche Produkte ihr beobachtet), der NVD-Schlüssel als Header. Eure **Versionen** bleiben auf dem Server – verglichen wird lokal. Die CPE-Suche bei „Nicht im Katalog?“ schickt den Suchbegriff an die NVD. |
 | **Katalog-Pflege** | `services.nvd.nist.gov` | CPE-Namen des Katalogs, höchstens 20 Anfragen pro Stunde – nur bei eingeschalteter Vendor News mit gefolgtem Produkt |
 | **Weitere Quellen** (CSAF-Anbieter, cvelistV5, EPSS, OSV) | `wid.cert-bund.de`, `cert-portal.siemens.com`, `www.cisco.com`, `www.se.com`, `api.github.com`, `github.com`, `raw.githubusercontent.com`, `api.first.org`, `api.osv.dev` | nur Abrufe öffentlicher Adressen und CVE- bzw. Schwachstellen-Nummern – nie Produkte, Versionen oder Hostnamen ([Was den Server verlässt](#weitere-quellen-daten)) |
+| **Exploit-Hinweise** (Metasploit und nuclei ab Werk an, Exploit-DB aus) | `raw.githubusercontent.com`, `gitlab.com` (nur Exploit-DB) | nichts – höchstens einmal am Tag derselbe Abruf einer öffentlichen Datei für alle, bedingt ([Exploit-Hinweise](#exploit-hinweise)) |
+| **Update-Hinweis** (ab Werk **an**, abschaltbar unter *Version & Changelog*) | `api.github.com` (`/repos/G0urmetD/Cobe-News/releases/latest`) | ein Abruf ohne Anmeldung höchstens alle 12 Stunden, bedingt (`ETag`), mit der Kennung `Cobe/<Version>` – sonst nichts über eure Installation ([Update-Hinweis](/docs/betrieb#update-hinweis)) |
 | **Benachrichtigungskanäle** | der jeweilige Dienst (Teams, Slack, Discord, Telegram, euer Mailserver, eigener Webhook) | Titel, Zusammenfassung, Schwere, Quelle, CVEs und Links der Meldungen, Name von Kanal und Regel; bei Vendor-News-Regeln auch **Produkt und Version** eurer Systeme ([Kanäle](/docs/benachrichtigungen#kanaele)) |
 | **Persönliche Benachrichtigungen** (nur wenn ein Admin die Wege freigibt) | euer Mailserver; für den eigenen Teams-Webhook einer Person `*.logic.azure.com`, `*.powerplatform.com` oder `*.webhook.office.com`; Desktop über Web Push | die Vendor-News-Meldungen der Produkte dieser Person, wie bei den Vendor-News-Regeln mit **Produkt und Version**; dazu Wochenrückblick und Willkommens-Mail per E-Mail ([Persönliche Benachrichtigungen](/docs/anmeldung#teams-persoenlich)) |
 | **Weiterleiten ans Team** | der Weiterleitungs-Kanal des Teams | wer weiterleitet, der Kommentar, Titel und Link, bei einem Befund Dringlichkeit und eure Versionen ([Weiterleiten](/docs/benachrichtigungen#weiterleiten)) |

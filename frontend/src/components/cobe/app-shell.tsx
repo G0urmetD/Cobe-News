@@ -1,8 +1,25 @@
 import { useEffect } from "react"
 import { Link, useLocation, useMatch, useNavigate } from "react-router"
 import { useTranslation } from "react-i18next"
-import { useQuery } from "@tanstack/react-query"
-import { BookOpen, ChevronsUpDown, Info, Languages, LogOut, Monitor, Moon, Newspaper, Settings, ShieldAlert, Star, Sun, UserRound } from "lucide-react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  CircleArrowUp,
+  BookOpen,
+  ChevronsUpDown,
+  ExternalLink,
+  Info,
+  Languages,
+  LogOut,
+  Monitor,
+  Moon,
+  Newspaper,
+  Settings,
+  ShieldAlert,
+  Star,
+  Sun,
+  UserRound,
+  X,
+} from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -43,6 +60,7 @@ import { badgeText, useReaderCounts } from "@/lib/reader-api"
 import { readScope } from "@/lib/teams-api"
 import { useTheme } from "@/lib/theme"
 import { UnsavedGuard, clearDirty } from "@/lib/unsaved"
+import { UPDATE_KEY, dismissUpdate, showUpdateNotice, useUpdateStatus } from "@/lib/update-api"
 
 /** The user menu in the sidebar footer: profile, language, appearance, the handbook, the running version (→ changelog),
  * sign-out. */
@@ -118,6 +136,44 @@ function UserMenu() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** Admins only: a newer Cobe News release is out ("Version 0.1.48 verfügbar – Changelog", app/update_check.py) – closed
+ *  per admin and release; a newer release shows it again. Readers never ask for it. */
+function UpdateNotice() {
+  const { t } = useTranslation()
+  const { isAdmin } = useAuth()
+  const qc = useQueryClient()
+  const s = useUpdateStatus(isAdmin).data
+  if (!isAdmin || !showUpdateNotice(s)) return null
+  const close = () => {
+    qc.setQueryData(UPDATE_KEY, { ...s, dismissed: true })
+    void dismissUpdate(s.latest).then(
+      (next) => qc.setQueryData(UPDATE_KEY, next),
+      () => void qc.invalidateQueries({ queryKey: UPDATE_KEY }),
+    )
+  }
+  return (
+    <div role="status" className="ml-auto flex min-w-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 py-0.5 pr-0.5 pl-2.5 text-xs text-primary">
+      <CircleArrowUp className="size-3.5 shrink-0" aria-hidden />
+      {/* a phone: the version alone (the header also holds the menu button and the logo) */}
+      <span className="truncate sm:hidden">{s.latest}</span>
+      <span className="hidden truncate sm:inline">{t("update.notice", { version: s.latest })}</span>
+      <span aria-hidden>–</span>
+      <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-0.5 font-medium underline-offset-2 hover:underline">
+        {t("update.changelog")} <ExternalLink className="size-3" aria-hidden />
+      </a>
+      <button
+        type="button"
+        onClick={close}
+        aria-label={t("update.dismiss", { version: s.latest })}
+        title={t("update.dismiss", { version: s.latest })}
+        className="ml-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
   )
 }
 
@@ -240,6 +296,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link to="/" className="md:hidden">
             <Logo />
           </Link>
+          <UpdateNotice />
         </header>
         <main className="mx-auto w-full max-w-[1920px] flex-1 px-4 py-6 md:px-8 md:py-8">
           {/* a page that crashes shows a notice here – sidebar and the other pages keep working */}

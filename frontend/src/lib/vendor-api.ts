@@ -97,6 +97,18 @@ export interface Epss {
   date: string
 }
 
+/** The exploit lists (server: app/exploits.py) – public exploit code or a ready-made exploit check for a CVE */
+export const EXPLOIT_SOURCES = ["metasploit", "exploitdb", "nuclei"] as const
+export type ExploitSource = (typeof EXPLOIT_SOURCES)[number]
+
+/** One list naming a CVE: the entry's address and when Cobe News first saw it there */
+export interface ExploitHint {
+  cve?: string
+  source: ExploitSource
+  url: string
+  first_seen?: string | null
+}
+
 /** CISA's SSVC decision points (cvelistV5, ADP container) */
 export interface Ssvc {
   exploitation: "none" | "poc" | "active" | string
@@ -125,6 +137,8 @@ export interface Finding {
   euvd: boolean
   epss?: Epss | null
   ssvc?: Ssvc | null
+  /** public exploits for its CVEs (switched-on exploit lists) */
+  exploit?: ExploitHint[]
   /** brought by a CSAF provider's first fill: shown, never notified */
   quiet?: boolean
   /** the newest revision of the advisory (or one of its CVE records) within the last 30 days – "Geändert" */
@@ -355,7 +369,11 @@ export interface CatalogCheckVerdict {
 export const STRUCTURED_SOURCES = ["csaf", "cvelist", "epss", "osv"] as const
 export type StructuredSource = (typeof STRUCTURED_SOURCES)[number]
 
-export interface VendorSettings extends Record<StructuredSource, boolean> {
+/** The settings switch of an exploit list: exploit_<source> */
+export const exploitSwitch = (s: ExploitSource) => `exploit_${s}` as const
+export type ExploitSwitch = ReturnType<typeof exploitSwitch>
+
+export interface VendorSettings extends Record<StructuredSource, boolean>, Partial<Record<ExploitSwitch, boolean>> {
   enabled: boolean
   every_h: number
   eol_every_h: number
@@ -368,7 +386,11 @@ export interface VendorSettings extends Record<StructuredSource, boolean> {
 
 export interface VendorAdmin {
   settings: VendorSettings
-  structured?: { csaf_providers: { key: string; name: string; domain: string; vendors: string[]; needed: boolean }[]; osv_products: number }
+  structured?: {
+    csaf_providers: { key: string; name: string; domain: string; vendors: string[]; needed: boolean }[]
+    osv_products: number
+    exploit_sources?: { key: ExploitSource; name: string; url: string; licence: string; default: boolean }[]
+  }
   catalog: { generated_at: string; eol_generated_at: string | null; products: number; counts: Record<string, number> }
   sources: { key: string; last_ok_at: string | null; last_fetch_at: string | null; next_fetch_at: string | null; error: string | null; items: number }[]
 }
