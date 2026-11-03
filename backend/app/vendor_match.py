@@ -990,9 +990,10 @@ def eval_nvd(product: dict, data: dict, v: V | None) -> Verdict | None:
     if "adp" not in data and len(cna) > 1:
         cna, adp = cna[:1], cna[1:]  # stored before 0.1.47 (one list, the CNA's block first): the others are ADPs
     b = eval_cna(product, cna, v)
-    if a is None and b is None and adp and product.get("cpes"):
-        # CISA's ADP only where neither NVD's analysis nor the CNA names the product (as cvelistV5) – never over
-        # NVD's own ranges (VMware Cloud Foundation CVE-2022-22948: CISA "4.0 – < 5.0", NVD "< 4.4.1")
+    if b is None and (a is None or a.status == "possible") and adp and product.get("cpes"):
+        # CISA's ADP only where the CNA does not name the product and NVD's analysis decides nothing (none, or only
+        # "possibly": vCenter's exact update CPEs, CVE-2024-37080 – CISA's "8.0 < 8.0u2d" settles it) – never over a
+        # clear NVD verdict (VMware Cloud Foundation CVE-2022-22948: CISA "4.0 – < 5.0", NVD "< 4.4.1")
         b = eval_cna(_adp_product(product), _adp_rows(adp), v)
     if a is None or b is None:
         return a or b

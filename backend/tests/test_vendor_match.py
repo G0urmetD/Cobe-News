@@ -499,3 +499,15 @@ def test_nvd_records_stored_before_the_split(cat):
     old = {k: val for k, val in new.items() if k != "adp"} | {"cna": [*new["cna"], *[{"affectedData": [{k: val for k, val in r.items() if k != "cpes"} for r in b["affectedData"]]} for b in new["adp"]]]}
     gl = cat["gitlab"]
     assert evaluate(gl, "nvd", old, "19.5.3").status == "not_affected" and evaluate(gl, "nvd", old, "16.11.2").status == "affected"
+
+
+def test_cisa_adp_settles_a_possibly_of_nvds_analysis(cat):
+    """vCenter: NVD's configurations name exact update CPEs (only "possibly" for others), the CNA wrote "n/a" – CISA's
+    range then decides. Here: NVD lists only 17.0.0, CISA 15.11 – < 17.0.1."""
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    full, gl = advs[0]["data"], cat["gitlab"]
+    exact = [{"nodes": [{"operator": "OR", "cpeMatch": [{"vulnerable": True, "criteria": "cpe:2.3:a:gitlab:gitlab:17.0.0:*:*:*:community:*:*:*"}]}]}]
+    data = {**full, "cna": [], "configs": exact}
+    assert evaluate(gl, "nvd", {**data, "adp": []}, "16.0.0").status == "possible"  # NVD alone: not listed
+    assert evaluate(gl, "nvd", data, "16.0.0").status == "affected"
+    assert evaluate(gl, "nvd", data, "17.0.1").status == "not_affected"
