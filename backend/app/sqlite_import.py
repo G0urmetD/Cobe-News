@@ -86,10 +86,11 @@ COLUMNS_NOT_IN_SQLITE = frozenset(
         ("user_sessions", "passkey_id"),
         ("news_reads", "unread"),
         ("news_items", "topics"),
+        ("news_items", "quiet_topics"),  # 0.1.47: '[]' – the topics computed after the import are quiet (backfill)
         ("news_items", "products"),  # 0.1.47: '[]' – the background job computes them after the import (story_details, PRODUCTS_V)
         ("notify_rules", "topics"),  # 0.1.47: '[]' – a rule without topics, as before
         ("vendor_advisory_products", "quiet"),  # 0.1.47: links of the relink after a catalogue change – false
-        ("users", "temp_password_at"),  # NULL: a temporary password counts from the account's creation (passwords.temp_expires_at)
+        ("users", "temp_password_at"),  # the import's time for a temporary password brought along (run), else NULL
     }
 )
 
@@ -284,6 +285,9 @@ async def run(path: Path, *, progress=None) -> Report:  # noqa: ANN001
                     text(f"SELECT setval(pg_get_serial_sequence('{name}', '{col}'), coalesce((SELECT max({col}) FROM {name}), 0) + 1, false)")  # noqa: S608
                 )
             report.checked = await _verify(conn, src, counts)
+            # a temporary password brought along counts from the import: 0.1.15 kept no issue time – counted from the
+            # account's creation it would have run out the moment it arrived (passwords.temp_expires_at)
+            await conn.execute(text("UPDATE users SET temp_password_at = now() WHERE must_change_password AND auth_source = 'local' AND temp_password_at IS NULL"))
             from app.models import Setting
 
             report.seconds = round(time.monotonic() - t0, 1)
