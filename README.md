@@ -47,8 +47,10 @@ one-time setup token from the log (valid for 60 minutes) and create the first ad
 By default the app listens on this machine only. Address, port, certificate, reverse proxy and outbound proxy are set
 in `.env` – see [`.env.example`](.env.example).
 
-Instead of building locally you can use the prebuilt image `ghcr.io/g0urmetd/cobe-news` – tag it as `cobe-news:latest`
-and start with `docker compose up -d`.
+Instead of building locally you can run the released, signed image `ghcr.io/g0urmetd/cobe-news:<version>`: set
+`COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml` and `COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:<version>` in
+`.env`, then `docker compose pull app && docker compose up -d` – how to verify the signature with cosign:
+[`docs/BETRIEB.md`](docs/BETRIEB.md#veröffentlichtes-image-statt-lokalem-build). Without these two lines nothing changes.
 
 ## Documentation
 

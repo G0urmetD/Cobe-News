@@ -43,6 +43,38 @@ Zertifikat (siehe [HTTPS](#https)).
 | `cobe-news-app` | FastAPI + Web-UI + Hintergrundjobs (Feeds, Benachrichtigungen, Zertifikat, Verzeichnisabgleich) | `127.0.0.1:8096` (http, nur Health/Notfall) |
 | `cobe-news-db` | PostgreSQL 18 – alle Daten (siehe [PostgreSQL](#postgresql)) | keiner (internes Netz, nur die App) |
 
+### Veröffentlichtes Image statt lokalem Build
+
+Standard ist der lokale Build (`docker compose up -d --build`, Image `cobe-news:latest`) – daran ändert sich nichts.
+Wer stattdessen das veröffentlichte, signierte Image einer Version betreiben will
+(`ghcr.io/g0urmetd/cobe-news:<version>`, gebaut von der Release-Pipeline, siehe [Release](#release)), schaltet die
+Datei `docker-compose.image.yml` zu – in `.env`:
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
+COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:0.1.46          # eine Version, nicht latest (oder …:0.1.46@sha256:<digest>)
+```
+
+Die Datei ersetzt beim Dienst `app` nur das Image (`image: ${COBE_NEWS_IMAGE}`, der `build`-Teil fällt weg); alles
+andere – Datenbank, Proxy, Volumes, `.env` – bleibt, wie es ist. Ohne `COBE_NEWS_IMAGE` bricht `docker compose` mit
+einem Hinweis ab, statt still etwas anderes zu starten. Vor dem Start die Signatur prüfen (cosign ≥ 2, keyless – die
+Identität ist der Release-Workflow dieses Repositorys):
+
+```bash
+cosign verify ghcr.io/g0urmetd/cobe-news:0.1.46 \
+  --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+docker compose pull app          # holt das Image (pull_policy: missing – ein vorhandenes wird nicht neu geholt)
+docker compose up -d             # ohne --build
+docker compose config app | grep image:   # zeigt, welches Image Compose nimmt
+```
+
+`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn in `COBE_NEWS_IMAGE` übernimmt
+(`…:0.1.46@sha256:<digest>`), startet genau das geprüfte Image, auch wenn der Tag später anders zeigen sollte. Ein Update:
+`COBE_NEWS_IMAGE` auf die neue Version setzen, Signatur prüfen, `docker compose pull app && docker compose up -d` (die
+Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen aus `.env` nehmen und
+`docker compose up -d --build`.
+
 ## Erster Start: Setup-Token und Notfall-Admin
 
 Beim ersten Start schreibt die App ein **einmaliges Setup-Token** ins Log (60 Minuten gültig, bei jedem Neustart bis
@@ -1313,9 +1345,11 @@ Prüfen der Signatur:
 
 ```bash
 cosign verify ghcr.io/g0urmetd/cobe-news:0.1.47 \
-  --certificate-identity-regexp 'https://github.com/G0urmetD/Cobe-News/.github/workflows/release.yml@refs/tags/v.*' \
+  --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
+
+Das Image statt eines lokalen Builds betreiben: [Veröffentlichtes Image statt lokalem Build](#veröffentlichtes-image-statt-lokalem-build).
 
 ## Offene Punkte
 
