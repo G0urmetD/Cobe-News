@@ -86,6 +86,7 @@ COLUMNS_NOT_IN_SQLITE = frozenset(
         ("user_sessions", "passkey_id"),
         ("news_reads", "unread"),
         ("news_items", "topics"),
+        ("users", "temp_password_at"),  # NULL: a temporary password counts from the account's creation (passwords.temp_expires_at)
     }
 )
 
