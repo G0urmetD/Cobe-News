@@ -123,7 +123,8 @@ def _ours_filter(keys: set[str]):  # noqa: ANN202
 
 
 def _with_ours(items: list[dict], stored: list[list], labels: dict[str, str]) -> None:
-    """The cards' badge "Unser Produkt: PAN-OS": the followed products a story concerns, by their label."""
+    """The cards' badge "Unser Produkt: PAN-OS": the followed products a story concerns, by their label – those of
+    `labels` only (the list passes the scope's: under "Mein Team" the team's products, as the filter and its number)."""
     for x, keys in zip(items, stored, strict=True):
         x["products"] = [{"key": k, "label": labels[k]} for k in keys or [] if k in labels]
 
@@ -189,7 +190,7 @@ async def list_news(
         stmt = stmt.where(or_(key < at, and_(key == at, NewsItem.id < sid)))
     rows = (await db.execute(stmt.order_by(key.desc(), NewsItem.id.desc()).limit(limit + 1))).all()
     items = [_item_out(i, s, None if un else ra, unread=bool(un), muted=bool(mu)) for i, s, ra, un, mu in rows[:limit]]
-    _with_ours(items, [r[0].products for r in rows[:limit]], labels)
+    _with_ours(items, [r[0].products for r in rows[:limit]], {k: v for k, v in labels.items() if k in keys})
     out: dict = {"items": items, "more": len(rows) > limit, "next": None, "upto": upto, "ours_on": bool(keys)}
     await _with_hints(db, out["items"])
     if len(rows) > limit:

@@ -442,6 +442,9 @@ async def test_news_filter_facet_badge_and_team_scope(admin_client, reader_clien
     await _team_of(reader_client.user.id, "fortios")
     team = (await reader_client.get("/api/news", params={"state": "all", "ours": "true", "scope": "team"})).json()
     assert team["items"] == [] and team["counts"]["ours"] == 0 and team["ours_on"] is True
+    # the cards' badge follows the scope as well: under "Mein Team" no GitLab badge
+    team_all = (await reader_client.get("/api/news", params={"state": "all", "scope": "team"})).json()
+    assert next(x for x in team_all["items"] if x["id"] == str(iid))["products"] == []
     assert (await reader_client.get("/api/news", params={"state": "all", "ours": "true"})).json()["counts"]["ours"] == 1
     # read-all of the filter: only the stories about our products
     r = await reader_client.post("/api/news/read-all", json={"ours": True, "upto": page["upto"]})
