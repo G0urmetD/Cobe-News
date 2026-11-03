@@ -684,6 +684,51 @@ def _cna_version(scheme: str, text) -> V | None:
 
 
 _OPEN = ("", "0", "*", "n/a", "unspecified")
+_OP = re.compile(r"^\s*(>=|<=|>|<|=)\s*([^\s,<>=]+)\s*$")
+
+
+def _range_row(x: dict) -> dict:
+    """A range written into the version field, as GitHub's advisories and many CNAs do (">= 3.2.0, < 4.7.1", "< 25.7.0",
+    "<= 2.1", "= 1.4.0") – as the CVE 5 form: version / lessThan / lessThanOrEqual. Read as one version it was
+    3.2.0.4.7.1 (anything above 3.2.0 "newer than listed") and "< 25.7.0" the fixed release 25.7.0 itself ("listed as
+    affected"). "> a" counts from a (rare – a itself then reads affected rather than missed). Anything else unchanged."""
+    text = x.get("version")
+    if not isinstance(text, str) or x.get("lessThan") or x.get("lessThanOrEqual") or not text.strip()[:1] in "<>=":
+        return x
+    lo = hi = hie = eq = None
+    for part in text.split(","):
+        m = _OP.match(part)
+        if m is None:
+            return x
+        op, val = m.groups()
+        if op in (">=", ">"):
+            lo = lo or val
+        elif op == "<":
+            hi = hi or val
+        elif op == "<=":
+            hie = hie or val
+        else:
+            eq = eq or val
+    if eq and not (lo or hi or hie):
+        return {**x, "version": eq}
+    if not (hi or hie):
+        return x  # only a lower bound: "everything from a on" is no range this reads – left as it was (unparsed)
+    out = {k: val for k, val in x.items() if k != "version"}
+    out["version"] = lo or "0"
+    out["lessThan" if hi else "lessThanOrEqual"] = hi or hie
+    return out
+
+
+def _adp_rows(blocks: list) -> list:
+    """CISA's ADP rows for eval_cna: their defaultStatus "affected" sits next to a range and is no statement about every
+    other version (GitLab CVE-2024-4835: 15.11 – < 17.0.1, default affected) – read as "unknown"."""
+    out = []
+    for b in blocks or []:
+        if not isinstance(b, dict):
+            continue
+        rows = [{**a, "defaultStatus": "unknown"} if isinstance(a, dict) and a.get("defaultStatus") == "affected" else a for a in b.get("affectedData") or []]
+        out.append({**b, "affectedData": rows})
+    return out
 
 
 def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
@@ -706,7 +751,7 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                 continue
             if any(name_matches(prod, n, vendor) for n in product.get("excluded_names") or []):
                 continue  # another product the names would take (Dovecot: OX Dovecot Pro)
-            versions = [x for x in a.get("versions") or [] if isinstance(x, dict)]
+            versions = [_range_row(x) for x in a.get("versions") or [] if isinstance(x, dict)]
             if not any(x.get("status") == "affected" for x in versions) and a.get("defaultStatus") != "affected":
                 continue
             relevant = True
@@ -886,7 +931,7 @@ def eval_cvelist(product: dict, data: dict, v: V | None) -> Verdict | None:
         return None
     got = eval_cna(product, data.get("cna") or [], v)
     if got is None and data.get("adp") and product.get("cpes"):
-        got = eval_cna(_adp_product(product), data.get("adp") or [], v)
+        got = eval_cna(_adp_product(product), _adp_rows(data.get("adp")), v)
     return got
 
 
@@ -941,9 +986,14 @@ def eval_nvd(product: dict, data: dict, v: V | None) -> Verdict | None:
     if not filter_ok(product, data):
         return None
     a = eval_configs(product, data.get("configs") or [], v)
-    b = eval_cna(product, data.get("cna") or [], v)
-    if b is None and data.get("adp") and product.get("cpes"):
-        b = eval_cna(_adp_product(product), data.get("adp") or [], v)  # CISA's ADP only where the CNA does not name it (as cvelistV5)
+    cna, adp = data.get("cna") or [], data.get("adp") or []
+    if "adp" not in data and len(cna) > 1:
+        cna, adp = cna[:1], cna[1:]  # stored before 0.1.47 (one list, the CNA's block first): the others are ADPs
+    b = eval_cna(product, cna, v)
+    if a is None and b is None and adp and product.get("cpes"):
+        # CISA's ADP only where neither NVD's analysis nor the CNA names the product (as cvelistV5) – never over
+        # NVD's own ranges (VMware Cloud Foundation CVE-2022-22948: CISA "4.0 – < 5.0", NVD "< 4.4.1")
+        b = eval_cna(_adp_product(product), _adp_rows(adp), v)
     if a is None or b is None:
         return a or b
     if a.status == "affected" or b.status == "affected":

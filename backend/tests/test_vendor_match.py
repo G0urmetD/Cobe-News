@@ -449,3 +449,53 @@ def test_nvd_analysis_decides_where_the_cna_wrote_prose(cat):
     assert evaluate(bs, "nvd", data, "22.09").status == "not_affected"
     assert evaluate(bs, "nvd", data, "26.09.2").status == "not_affected"
     assert evaluate(bs, "nvd", {**data, "configs": []}, "26.09.2").status == "possible"  # without the analysis: still open
+
+
+def test_ranges_written_into_the_version_field():
+    """GitHub's advisories and many CNAs write the range into "version" (">= 3.2.0, < 4.7.1", "< 25.7.0"): read as one
+    version it was 3.2.0.4.7.1 – the fixed release "listed as affected", everything above the start "newer"."""
+    from app.vendor_match import _range_row
+
+    assert _range_row({"version": ">= 3.2.0, < 4.7.1", "status": "affected"}) == {"version": "3.2.0", "lessThan": "4.7.1", "status": "affected"}
+    assert _range_row({"version": "< 25.7.0", "status": "affected"}) == {"version": "0", "lessThan": "25.7.0", "status": "affected"}
+    assert _range_row({"version": "<= 2.1", "status": "affected"}) == {"version": "0", "lessThanOrEqual": "2.1", "status": "affected"}
+    assert _range_row({"version": "= 1.4.0", "status": "affected"}) == {"version": "1.4.0", "status": "affected"}
+    for same in ({"version": ">= 1.0", "status": "affected"}, {"version": "1.2.3"}, {"version": "< 2.0", "lessThan": "2.0"}, {"version": "< 2 or so"}):
+        assert _range_row(same) == same
+
+
+def _gitlab_cna(rows: list, default: str = "unaffected") -> dict:
+    return {"configs": [], "desc": "", "cna": [{"affectedData": [{"vendor": "GitLab", "product": "GitLab", "defaultStatus": default, "versions": rows}]}]}
+
+
+def test_range_strings_decide_like_ranges(cat):
+    gl = cat["gitlab"]
+    data = _gitlab_cna([{"version": ">= 3.2.0, < 4.7.1", "status": "affected"}])
+    assert evaluate(gl, "nvd", data, "4.5.0").status == "affected"  # was "newer than listed"
+    assert evaluate(gl, "nvd", data, "4.7.1").status == "not_affected"  # was "listed as affected"
+    assert evaluate(gl, "nvd", data, "3.1.0").status == "not_affected"
+    below = _gitlab_cna([{"version": "< 25.7.0", "status": "affected"}], default="unknown")
+    assert evaluate(gl, "nvd", below, "25.6.2").status == "affected" and evaluate(gl, "nvd", below, "25.7.0").status == "not_affected"
+
+
+def test_cisa_adp_never_over_nvds_analysis_and_never_a_default(cat):
+    """CISA's rows count only where neither NVD's analysis nor the CNA names the product – and their defaultStatus
+    "affected" is no statement about every other version (cvelistV5 as well)."""
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    full, gl = advs[0]["data"], cat["gitlab"]
+    no_cna = {**full, "cna": []}  # the CNA wrote "n/a" (VMware Cloud Foundation CVE-2022-22948)
+    assert evaluate(gl, "nvd", no_cna, "16.10.6").status == "not_affected"  # NVD: < 16.10.6; CISA: 15.11 – < 17.0.1
+    only_adp = {**no_cna, "configs": []}
+    assert evaluate(gl, "nvd", only_adp, "16.10.6").status == "affected"  # nothing else speaks: CISA's range counts
+    assert evaluate(gl, "nvd", only_adp, "19.5.3").status != "affected"  # its default does not
+    cvl = {"desc": "", "cna": [], "adp": full["adp"]}
+    assert evaluate(gl, "cvelist", cvl, "19.5.3").status != "affected" and evaluate(gl, "cvelist", cvl, "16.0.0").status == "affected"
+
+
+def test_nvd_records_stored_before_the_split(cat):
+    """Stored before 0.1.47: the CNA's and CISA's blocks in one list (the CNA's first) – read apart without a refetch."""
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    new = advs[0]["data"]
+    old = {k: val for k, val in new.items() if k != "adp"} | {"cna": [*new["cna"], *[{"affectedData": [{k: val for k, val in r.items() if k != "cpes"} for r in b["affectedData"]]} for b in new["adp"]]]}
+    gl = cat["gitlab"]
+    assert evaluate(gl, "nvd", old, "19.5.3").status == "not_affected" and evaluate(gl, "nvd", old, "16.11.2").status == "affected"
