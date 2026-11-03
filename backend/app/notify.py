@@ -57,6 +57,7 @@ from app import news as news_svc
 from app import settings as settings_store
 from app import vendor_titles as titles
 from app.config import get_config, tls_verify
+from app.plaintext import neutral
 from app.crypto import decrypt_str
 from app.models import (
     NewsItem,
@@ -273,6 +274,10 @@ class Story:
     topics: list[str] = field(default_factory=list)
     source_kind: str = ""
 
+    def __post_init__(self) -> None:
+        # feed text: no direction or control characters in any channel (app/plaintext.py)
+        self.title, self.summary, self.source, self.product = (neutral(x) for x in (self.title, self.summary, self.source, self.product))
+
 
 def _link(story_id: str) -> str:
     return f"{get_config().base_url}/?story={story_id}"
@@ -297,7 +302,7 @@ def one_line(text: str) -> str:
     """A mail header value: line breaks and other control characters (from a rule or channel name, a product or version
     label, a story title) become spaces – the email package refuses a header with a line break, which made every mail
     of the channel fail and retry for ever."""
-    return " ".join(_CONTROL.sub(" ", text).split())
+    return " ".join(_CONTROL.sub(" ", neutral(text)).split())
 
 
 def _subject(rule: str, stories: list[Story], total: int, lang: str, test: bool) -> str:
@@ -496,7 +501,7 @@ def _safe_url(url: str) -> str:
 
 
 def _one_line(v: str) -> str:
-    return " ".join(str(v).split())
+    return " ".join(neutral(str(v)).split())
 
 
 def _slack_esc(v: str) -> str:
@@ -745,7 +750,7 @@ _BLOCK_CONTROL = re.compile(r"[\x00-\x09\x0b-\x1f\x7f\x85\u2028\u2029\u202a-\u20
 def plain_block(text: str) -> str:
     """Plain text of several lines: line breaks kept (one empty line at most), every other control or direction
     character out."""
-    text = _BLOCK_CONTROL.sub(" ", (text or "").replace("\r\n", "\n").replace("\r", "\n"))
+    text = _BLOCK_CONTROL.sub(" ", neutral(text or ""))
     return re.sub(r"\n{3,}", "\n\n", "\n".join(" ".join(x.split()) for x in text.split("\n"))).strip()
 
 

@@ -270,3 +270,83 @@ async def test_emergency_budget_exceeded_is_reported_once(client, admin_client, 
     monkeypatch.setattr(bruteforce, "_emergency_alerted", [bruteforce._emergency_alerted[0] - 3601])
     f = bruteforce.register_failure("local:notfall", "127.0.0.1", lock_account=False, emergency=True)
     assert f.emergency_alert >= 4
+
+
+# ---------------------------------------------------------------- 6. control and direction characters in mail/chat
+
+# U+202A–202E, U+2066–2069, U+200E/F, U+061C and other control characters (C0 but \n and \t, DEL, C1) – built from their
+# code points, so this file shows what it tests
+DIRECTION = [0x202A, 0x202B, 0x202C, 0x202D, 0x202E, 0x2066, 0x2067, 0x2068, 0x2069, 0x200E, 0x200F, 0x061C]
+CONTROL = [0x00, 0x07, 0x08, 0x0B, 0x0C, 0x1B, 0x7F, 0x85, 0x9B, 0x2028, 0x2029]
+BAD = {chr(c) for c in DIRECTION + CONTROL}
+EVIL = "Update" + chr(0x202E) + "fdp.exe" + chr(0x2066) + " fix" + chr(0x07) + chr(0x1B) + "[31m" + chr(0x200F) + chr(0x85)
+
+
+def _clean(out) -> None:  # noqa: ANN001 - a str, a tuple or a dict of what went out
+    import json
+
+    text = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+    found = sorted({f"U+{ord(c):04X}" for c in text if c in BAD})
+    assert not found, found
+
+
+def test_plaintext_neutral():
+    from app.plaintext import neutral
+
+    assert neutral(EVIL) == "Updatefdp.exe fix  [31m "
+    assert neutral("Zeile 1\r\nZeile 2\rZeile 3\tTab") == "Zeile 1\nZeile 2\nZeile 3\tTab"
+    assert neutral("") == "" and neutral(None) == ""  # type: ignore[arg-type]
+    for c in BAD:
+        assert c not in neutral(f"a{c}b")
+
+
+def test_every_channel_gets_the_story_without_direction_or_control_characters():
+    from app import notify, webpush
+
+    s = notify.Story("00000000-0000-4000-8000-000000000009", EVIL, f"Erster Satz {EVIL}. Zweiter.\n{EVIL}", "https://x.example/a", "critical", f"Quelle {EVIL}", datetime(2026, 11, 3, tzinfo=UTC), ["CVE-2026-1"], product=f"Produkt {EVIL}")
+    many = [notify.Story(f"00000000-0000-4000-8000-00000000001{i}", EVIL, EVIL, "https://x.example/a", "high", EVIL, datetime(2026, 11, 3, tzinfo=UTC), product=EVIL) for i in range(8)]
+    for stories in ([s], many):
+        total = len(stories)
+        subject, text, html = notify.render_mail("Regel", stories, total, "de")
+        _clean(subject)
+        _clean(text)
+        _clean(html)
+        _clean(notify.render_slack("Regel", stories, total, "de"))
+        _clean(notify.render_teams("Regel", stories, total, "de"))
+        _clean(notify.render_discord("Regel", stories, total, "de"))
+        _clean(notify.render_telegram("Regel", stories, total, "de"))
+        _clean(notify.render_webhook("Kanal", ["Regel"], stories, total, "de"))
+        _clean(notify.render_mattermost("Regel", stories, total, "de"))
+        title, message, _sev, _click = notify.render_push("Regel", stories, total, "de")
+        _clean(notify.ntfy_payload("topic", title, message, "high", "https://x.example/"))
+        _clean(notify.gotify_payload(title, message, "high", "https://x.example/"))
+    # the subject of one story still reads as the title (the characters gone, the words kept)
+    assert notify.one_line(notify.render_mail("Regel", [s], 1, "de")[0]) == "[Cobe News] Kritisch: Updatefdp.exe fix [31m"  # as send_mail sets it
+    # a rule or label passed in raw: the one-line helpers neutralise it as well
+    _clean(notify.one_line(EVIL))
+    _clean(notify.plain_block(EVIL))
+    _clean(notify.render_slack(EVIL, [s], 1, "de"))
+    # desktop push (Web Push)
+    _clean(webpush.story_payload({"id": "x", "title": EVIL, "severity": "high", "source": EVIL}, "de"))
+    _clean(webpush.vendor_payload("x", EVIL, EVIL, "high", "/vendor", "de"))
+
+
+def test_forwarded_story_and_comment_without_direction_or_control_characters():
+    from app import forward
+
+    f = forward.Forward(
+        sender="Rudi", team="SOC", comment=forward.clean_comment(f"Bitte prüfen {EVIL}\n\n\n\nZeile"), title=EVIL, summary=f"Erster {EVIL}. Zweiter.", url="https://x.example/a",
+        link="https://news.corp.example/?story=x", severity="high", source=EVIL, published_at=datetime(2026, 11, 3, tzinfo=UTC), product=EVIL,
+    )
+    assert f.comment.startswith("Bitte prüfen Updatefdp[.]exe fix") and "\n\nZeile" in f.comment and "\n\n\n" not in f.comment
+    for out in (
+        forward.render_slack(f, "de"),
+        forward.render_teams(f, "de"),
+        forward.render_discord(f, "de"),
+        forward.render_telegram(f, "en"),
+        forward.render_text(f, "de"),
+        forward.render_mattermost(f, "de"),
+        forward.render_mail(f, "de"),
+        forward.render_webhook(f, "Kanal", "de", "d-1"),
+    ):
+        _clean(out)

@@ -45,6 +45,7 @@ from app import vendor_score
 from app.config import get_config
 from app.deps import Db, NoNul, Reader, api_error
 from app.models import NewsItem, NewsSource, NotifyChannel, StoryDetail, Team, TeamMember, VendorFollow
+from app.plaintext import neutral
 
 router = APIRouter(prefix="/api", tags=["forward"])
 
@@ -67,7 +68,6 @@ def reset() -> None:
 
 # ---------------------------------------------------------------- the comment: plain text in every channel
 
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f\x85  ‪-‮⁦-⁩]")
 _SCHEME = re.compile(r"(?i)\b([a-z][a-z0-9+.-]{1,15}):(?=//)")
 _DOT = re.compile(r"(?<=[A-Za-z0-9])\.(?=[A-Za-z][A-Za-z0-9-])")
 ZWSP = "​"
@@ -84,7 +84,7 @@ def defang(text: str) -> str:
 def clean_comment(text: str) -> str:
     """Line breaks kept (at most one empty line in a row), every other control or direction character out, defanged,
     at most COMMENT_MAX characters."""
-    text = _CONTROL.sub("", (text or "").replace("\r\n", "\n").replace("\r", "\n").replace("\t", " "))
+    text = neutral(text or "", control="").replace("\t", " ")
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return defang(text[:COMMENT_MAX])
 
@@ -154,6 +154,10 @@ class Forward:
     product: str = ""
     topics: list[str] = field(default_factory=list)
     source_kind: str = ""
+
+    def __post_init__(self) -> None:
+        # the feed's text: no direction or control characters in any channel (app/plaintext.py, as the notifications)
+        self.title, self.summary, self.source, self.product = (neutral(x) for x in (self.title, self.summary, self.source, self.product))
 
 
 def _sev(lang: str, s: str) -> str:
