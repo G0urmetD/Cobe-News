@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from unittest.mock import ANY
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app import db, news, notify, story_details, vendor_catalog
 from app.models import NewsItem, NewsSource, StoryDetail, VendorEvent
@@ -173,6 +173,17 @@ async def test_news_story_brings_topics_kind_and_product_from_details():
         await notify.with_products(s, [st])
     assert st.product == "Example Gateway < 2.4.1" == story_details.hint(data)["product"]
     assert notify.card_fields(st, "de")[0] == ("Produkt", "Example Gateway < 2.4.1")
+    # a direction character in the CSAF product name (set after the Story was made): neutral in every renderer – the
+    # webhook's JSON as well
+    async with db.session() as s:
+        bidi = {**data, "products": [{**data["products"][0], "name": "Example\u202e yawetaG\u2066\u0007"}]}
+        await s.execute(update(StoryDetail).where(StoryDetail.item_id == i.id).values(data=bidi))
+        await s.commit()
+        st.product = ""
+        await notify.with_products(s, [st])
+    assert st.product == "Example yawetaG  < 2.4.1"
+    hook = notify.render_webhook("c", [], [st], 1, "de")["stories"][0]
+    assert hook["product"] == st.product and not any(c in json.dumps(hook, ensure_ascii=False) for c in "\u202e\u2066\u0007")
 
 
 def test_vendor_event_product_line():

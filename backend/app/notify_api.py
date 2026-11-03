@@ -395,8 +395,9 @@ class RuleIn(_M):
     channels: list[uuid.UUID] = Field(default_factory=list, max_length=20)
     severities: list[Severity] = Field(default_factory=lambda: ["critical", "high"], max_length=5)
     sources: list[uuid.UUID] = Field(default_factory=list, max_length=50)
-    # news only: stories with one of these topics (OR; AND with severities and sources) – empty: any story
-    topics: list[Topic] = Field(default_factory=list, max_length=9)
+    # news only: stories with one of these topics (OR; AND with severities and sources) – empty: any story; None (not
+    # sent – a client from before topics): an existing rule keeps its topics, a new one has none
+    topics: list[Topic] | None = Field(default=None, max_length=9)
     lang: Literal["de", "en"] = "de"
     # news: stories of the feed; vendor_vuln: a vulnerability affects a followed product; vendor_version: newer
     # version in its line, EOL coming or reached; vendor_change: an advisory of a followed product was revised (a new
@@ -434,7 +435,8 @@ async def _apply_rule(db, rule: NotifyRule, body: RuleIn, *, new: bool) -> list[
     before = notify.rule_filter(rule, had_teams)
     rule.name, rule.lang = body.name, body.lang
     rule.severities, rule.sources = list(body.severities), [str(x) for x in body.sources]
-    rule.topics = [t for t in news_svc.TOPICS if t in body.topics]
+    if body.topics is not None or new:
+        rule.topics = [t for t in news_svc.TOPICS if t in (body.topics or [])]
     rule.kinds = list(dict.fromkeys(body.kinds))
     rule.enabled = body.enabled
     now = datetime.now(UTC)

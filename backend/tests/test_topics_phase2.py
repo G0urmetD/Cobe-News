@@ -275,6 +275,12 @@ async def test_rule_topics_in_the_audit_diff(admin_client):
         e = await s.scalar(select(AuditEntry).where(AuditEntry.action == "rule.changed"))
     assert e.details["changes"]["topics"] == {"from": [], "to": ["zeroday", "poc"]}
     assert [x["topics"] for x in (await admin_client.get("/api/admin/notify/rules")).json()] == [["zeroday", "poc"]]
+    # a client from before topics sends none: the rule keeps them (not "every story" from then on); [] clears them
+    r = await admin_client.put(f"/api/admin/notify/rules/{rule['id']}", json={"name": "Regel neu", "channels": [slack["id"]]})
+    assert r.status_code == 200 and r.json()["topics"] == ["zeroday", "poc"] and r.json()["name"] == "Regel neu"
+    r = await admin_client.put(f"/api/admin/notify/rules/{rule['id']}", json={"name": "Regel neu", "channels": [slack["id"]], "topics": []})
+    assert r.status_code == 200 and r.json()["topics"] == []
+    assert (await _rule(admin_client, "Ohne", [slack["id"]]))["topics"] == []  # new, without the field: none
 
 
 # ---------------------------------------------------------------- desktop and Web Push

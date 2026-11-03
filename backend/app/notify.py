@@ -1275,7 +1275,8 @@ def card_product(data: dict | None, matched: list[dict]) -> str:
         break
     if not product and (h := story_details.hint(data)) and h.get("product"):
         product = str(h["product"])
-    return product[:200]
+    # the advisory's text: no direction or control characters (set after Story.__post_init__ – neutral here)
+    return neutral(product)[:200]
 
 
 # ---------------------------------------------------------------- what a rule lets through (the live round and the dry run)
