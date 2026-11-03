@@ -582,15 +582,18 @@ function SourcesForm({ data }: { data: VendorAdmin }) {
                     <p className="text-xs font-medium">
                       <Explained label={t("vendor.src.providers")} text={t("glossary.tlpText")} />
                     </p>
-                    <ul className="space-y-1">
+                    <ul className="divide-y">
                       {providers.map((p) => (
-                        <li key={p.key} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs" title={`${p.domain} · ${p.vendors.join(", ")}`}>
-                          <span className="min-w-0 break-words">{p.name}</span>
-                          <Pill color={p.needed && v.csaf ? "--success" : "--muted-foreground"} dot>
-                            {p.needed ? t("vendor.src.providerActive") : t("vendor.src.providerIdle")}
-                          </Pill>
+                        // two columns: name and state on the left (they wrap there), the switch always in the same place on the right
+                        <li key={p.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-1.5 text-xs" title={`${p.domain} · ${p.vendors.join(", ")}`}>
+                          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="min-w-0 break-words">{p.name}</span>
+                            <Pill color={p.needed && v.csaf ? "--success" : "--muted-foreground"} dot>
+                              {p.needed ? t("vendor.src.providerActive") : t("vendor.src.providerIdle")}
+                            </Pill>
+                          </span>
                           {/* the label names the switch (htmlFor) – the ⓘ beside it only explains, a click on it never toggles */}
-                          <span className="ml-auto inline-flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1.5 justify-self-end">
                             <Switch
                               id={`green-${p.key}`}
                               size="sm"
