@@ -581,6 +581,34 @@ SSVC und „Erstabruf“ unter *Vendor News & Katalog* (`/docs/vendor-news#epss-
   aber nicht mehr bei der Bewertung (EPSS wird nicht mehr angezeigt); wieder eingeschaltet zählt es sofort wieder. Der
   Hinweis auf eine neue Lücke kann ohne cvelistV5 erst über die NVD kommen.
 
+### Exploit-Hinweise (Metasploit, Exploit-DB, nuclei)
+
+`backend/app/exploits.py`: ob es für eine CVE öffentlichen Exploit-Code oder eine fertige Prüfung gibt – als „Exploit
+öffentlich“ an Befunden (Dringlichkeit +10, nur wenn nicht schon als ausgenutzt bekannt), in den Details einer Meldung,
+bei beobachteten CVEs (Ereignis „Exploit veröffentlicht“, je CVE einmal) und für die Themen der Meldungen (Tabelle
+`exploit_refs`: CVE, Quelle, Link, `first_seen`, `baseline` – nie Code). Schalter je Liste unter *Weitere Quellen*
+(`exploit_metasploit`, `exploit_exploitdb`, `exploit_nuclei` im Abschnitt `vendor`).
+
+| Liste | Datei | Größe | Lizenz | ab Werk |
+|---|---|---|---|---|
+| Metasploit (Rapid7) | `raw.githubusercontent.com/rapid7/metasploit-framework/master/db/modules_metadata_base.json` – nur Module vom Typ `exploit` | ~11 MB (gzip ~1,4 MB) | BSD-3-Clause | an |
+| nuclei-templates (ProjectDiscovery) | `raw.githubusercontent.com/projectdiscovery/nuclei-templates/main/cves.json` (eine JSON-Zeile je Vorlage) | ~2,3 MB (gzip ~0,5 MB) | MIT | an |
+| Exploit-DB (OffSec) | `gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv` (Spalte `codes`) | ~10 MB, GitLab komprimiert nicht | GPL-2.0 (Repository) | aus |
+
+- Je Liste höchstens einmal am Tag (`vendor_fetch` `exploit:<liste>`), bedingt (ETag/If-Modified-Since), Größenlimit
+  24 MB (nuclei 8 MB), über `vendor.get` (Egress-Wächter, Abstand je Host, Pause nach 429/503); nach Fehlern 6 Stunden
+  wachsend, höchstens ein Tag. Nur solange gebraucht: wie der KEV (gefolgtes Produkt oder News an) oder eine CVE
+  beobachtet wird. Nach außen geht nichts über die Installation – dieselbe öffentliche Datei für alle.
+- Metasploit wird Modul für Modul gelesen (nie die 11 MB als ein Python-Objekt). Je CVE ein Link je Liste (der erste
+  Eintrag nach Pfad/Name bzw. die kleinste EDB-ID).
+- Erstes Laden einer Liste (oder nach mehr als 3 Tagen ohne Abruf): `baseline` – gezeigt, nie gemeldet. Führt eine Liste
+  eine CVE nicht mehr, geht die Zeile; bringt eine Antwort weniger als die Hälfte der gespeicherten CVEs, gilt sie als
+  kaputt (Fehler „list shrank“, nichts gelöscht, die alten Validatoren bleiben).
+- Ausgeschaltet: keine Anfrage; Gespeichertes bleibt, wird aber weder gezeigt noch gezählt.
+- Verworfen: inoffizielle PoC-Sammlungen (Trickest/cve, PoC-in-GitHub – ungeprüft, teils Schadcode), GitHub Security
+  Advisories (keine Exploit-Angaben), Dienste mit Schlüssel und eigenen Bedingungen.
+- Gesundheit: Familie `exploit` („Exploit-Hinweise“, Art `structured`).
+
 ### Katalog pflegen
 
 Der kuratierte Teil des Katalogs (Anzeigename, Hersteller, CPEs, Versionsschema, Herstellerquelle, Namen in Hinweisen
@@ -1195,7 +1223,20 @@ Widerrufene und abgelaufene bleiben 30 Tage in der Liste.
   `/api/v1/vendor/products`, `/api/v1/vendor/products/{key}`, `/api/v1/vendor/findings`. Die OpenAPI-Beschreibung gibt
   es im Reiter „Referenz“ (nur Admins); ein öffentliches `/docs` oder `/openapi.json` gibt es nicht.
 - **`/metrics`:** Prometheus-Textformat 0.0.4, 30 s zwischengespeichert: Zustand der Quellen, Kanäle (nur ID und Typ),
-  persönliche Zustellungen, Sicherung, Rücksicherungs-Test, Größe der Datenbank – keine personenbezogenen Daten.
+  persönliche Zustellungen, Sicherung, Rücksicherungs-Test, Größe der Datenbank, `cobe_news_update_available` – keine
+  personenbezogenen Daten.
+
+## Update-Hinweis
+
+`backend/app/update_check.py`: Admins sehen „Version x.y.z verfügbar – Changelog“, wenn GitHub ein neueres Release
+nennt (`https://api.github.com/repos/G0urmetD/Cobe-News/releases/latest`, ohne Anmeldung, höchstens alle 12 Stunden,
+auch nach Fehlern; ETag; 10 s Zeitlimit, 256 KB; über `news.download` mit Egress-Wächter, Weiterleitungen nur auf
+`api.github.com`). Nur fertige `x.y.z` höher als `app.__version__` zählen (Entwürfe, Vorabversionen, andere Tags nicht);
+der Link wird aus dem geprüften Tag gebaut, nie aus der Antwort übernommen. Schließen gilt je Admin und Version
+(`update_dismissals`). Schalter: Abschnitt `updates` `{"check": true}` (ab Werk an), im Benutzermenü *Version &
+Changelog*; aus: keine Anfrage, kein Hinweis. Zustand der letzten Prüfung in `settings` `updates_state`. Leser sehen
+nichts (die API `/api/admin/update` nur für Admins). `/metrics`: `cobe_news_update_available` (1/0, NaN aus oder ohne
+Antwort).
   `prometheus.yml`: `scheme: https`, `authorization: {type: Bearer, credentials_file: …}`, `tls_config: {ca_file: …}`
   beim selbstsignierten Zertifikat; auf demselben Host auch `http://127.0.0.1:8096`.
 
@@ -1257,6 +1298,8 @@ backend/app/csaf_providers.py CSAF-Anbieter der Hersteller (Liste des BSI, ROLIE
 backend/app/cvelist.py        cvelistV5: Änderungen dreimal am Tag und Tagesabschluss, einzelne Einträge bei Bedarf
 backend/app/epss.py           FIRST EPSS je CVE (Befunde, Meldungen)
 backend/app/osv.py            OSV.dev: Bereiche von Open-Source-Paketen, nur nach CVE-/Advisory-Nummer
+backend/app/exploits.py       Exploit-Hinweise: Metasploit, Exploit-DB, nuclei-templates – je CVE Liste und Link, täglich
+backend/app/update_check.py   Update-Hinweis für Admins: GitHubs neuestes Release, höchstens alle 12 Stunden
 backend/app/data/             mitgelieferter Katalog (python -m app.vendor_catalog <endoflife-dump.json> baut ihn neu)
 backend/app/webpush.py        Web Push: Verschlüsselung (RFC 8291), VAPID (RFC 8292), Versand nach jeder Runde
 frontend/public/sw.js         Service Worker – nur Push und Klick auf eine Benachrichtigung, kein Cache

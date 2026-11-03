@@ -215,7 +215,7 @@ Alle Endpunkte sind `GET`, die Antworten JSON. Die Felder im Einzelnen beschreib
 |---|---|---|
 | `/api/v1/news` | Meldungen der eingeschalteten Quellen, neueste zuerst; Antwort `{items, next}` | `severity` (mehrfach: `critical`, `high`, `medium`, `low`, `info`), `source` (Schlüssel der Quelle, mehrfach), `topic` (mehrfach, eines genügt: `zeroday`, `exploited`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` – siehe [Themen](/docs/news-quellen#themen)), `q` (Wörter in Titel, Zusammenfassung, CVE), `since` (Zeit nach ISO 8601), `limit` (1–200, Standard 50), `before` (`next` der vorigen Seite). Jede Meldung trägt `topics`. |
 | `/api/v1/news/sources` | die eingeschalteten Quellen mit Schlüssel und Name | – |
-| `/api/v1/news/{id}` | eine Meldung, dazu [EPSS](term:epss) ihrer CVEs | – |
+| `/api/v1/news/{id}` | eine Meldung, dazu [EPSS](term:epss) ihrer CVEs und die [öffentlichen Exploits](/docs/vendor-news#oeffentlicher-exploit) (`exploits`) | – |
 | `/api/v1/vendor/products` | die gefolgten Produkte mit Versionen, Anzahl der Befunde je Art und Dringlichkeit | – |
 | `/api/v1/vendor/products/{key}` | ein gefolgtes Produkt mit seinen Befunden | `status` (mehrfach; Standard: alle außer `not_affected`), `offset`, `limit` (1–500, Standard 100) |
 | `/api/v1/vendor/findings` | Befunde über alle gefolgten Produkte, die wichtigsten zuerst | `status` (mehrfach; Standard: `affected` und `possible`), `severity` (mehrfach), `exploited=true`, `offset`, `limit` (1–500, Standard 100) |
@@ -345,6 +345,7 @@ Sicherung.
 | `cobe_news_restore_test_last_timestamp_seconds` | – | Zeit, zu der der letzte Test endete |
 | `cobe_news_restore_test_age_seconds` | – | Alter des letzten Tests |
 | `cobe_news_restore_test_duration_seconds` | – | Dauer des letzten Tests |
+| `cobe_news_update_available` | – | 1: eine neuere Version von Cobe News ist veröffentlicht, 0: nicht; `NaN`, solange der [Update-Hinweis](/docs/betrieb#update-hinweis) aus ist oder noch keine Antwort hat |
 | `cobe_news_audit_entries` | `group` | Einträge im [Protokoll](/docs/betrieb#protokoll) je Bereich – nur Zahlen, keine Namen |
 | `cobe_news_audit_newest_timestamp_seconds` | – | Zeit des neuesten Protokoll-Eintrags |
 | `cobe_news_database_size_bytes` | – | Größe der Datenbank auf der Platte (höchstens alle 5 Minuten berechnet) |

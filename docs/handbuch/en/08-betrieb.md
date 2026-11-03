@@ -191,6 +191,24 @@ docker compose logs --tail 50 app
 The first line after the start names version and address: `Cobe News 0.1.x – data in /data, https://…`. If the app
 does not come up, the reason is in the log of `app` or `db-init` ([Logs](#logs)).
 
+### Update notice {#update-hinweis}
+
+Admins see a small notice in the top bar as soon as a newer version is published: **“Version 0.1.48 available –
+changelog”**. The link opens the release page on GitHub; the **×** closes the notice for you and this version – when an
+even newer one appears, it comes back. Readers see nothing.
+
+- **Where from:** GitHub's public release API (`api.github.com/repos/G0urmetD/Cobe-News/releases/latest`), without
+  sign-in, at most every 12 hours – also after an error –, conditional (`ETag`: unchanged does not count against
+  GitHub's limit of 60 requests an hour), with a short timeout and a size limit, through the same hardening as every
+  fetch. Only the request itself is sent, with the user agent `Cobe/<version>` – nothing about your installation.
+- **What counts:** only a final `x.y.z` version higher than the running one. Drafts, pre-releases (`0.1.48-rc1`) and
+  other tags are skipped.
+- **Switch off:** in the user menu *Version & changelog*, switch **“Check for new versions”** (on by default). Off: no
+  request, no notice. That page also shows the latest known version, when it was last checked and an error.
+- **Monitoring:** `/metrics` reports `cobe_news_update_available` ([Metrics](/docs/api#metriken)).
+
+The notice does not replace the update – that stays your step ([Update step by step](#update-schritte)).
+
 ### Back to the old version {#update-zurueck}
 
 ```bash

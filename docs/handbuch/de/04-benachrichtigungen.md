@@ -299,10 +299,13 @@ vor Version 0.1.42 beobachtet hast, haben keine Herkunft und stehen bei „Einze
     Klick auf den Titel öffnet die Meldung bzw. den Befund. Die zuletzt beobachtete Gruppe steht oben, *Einzeln
     hinzugefügt* am Ende. Ältere Links mit `?groups=1` öffnen diese Gruppierung.
 - **Zeilen:** CVE-ID (kopierbar) mit Titel, Schwere, KEV (seit wann; Ransomware im Tooltip), [EPSS](term:epss)
-  (Perzentil als Balken) und die erste Fix-Version („+2“: zwei weitere). Eine CVE, die noch keine Quelle kennt, steht mit
+  (Perzentil als Balken) und die erste Fix-Version („+2“: zwei weitere). „Exploit öffentlich“ neben der CVE-ID: eine
+  Sammlung führt einen Exploit ([Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)); die Links stehen in
+  der aufgeklappten Zeile. Eine CVE, die noch keine Quelle kennt, steht mit
   „Noch keine Quelle kennt sie“ da.
 - **Aufklappen** (Klick auf die Zeile oder den Pfeil): der **Verlauf** seit du die CVE beobachtest, das Neueste oben –
-  Fix-Version erschienen (in welchem Advisory), in KEV aufgenommen, EPSS gestiegen, Advisory zurückgezogen; ganz unten,
+  Fix-Version erschienen (in welchem Advisory), in KEV aufgenommen, EPSS gestiegen, Exploit veröffentlicht, Advisory
+  zurückgezogen; ganz unten,
   seit wann du sie beobachtest. Darunter *Meldungen (n)* (die Meldungsliste mit der CVE als Suche), *Advisory öffnen*
   (die Seite des Herstellers, sonst CSAF oder NVD) und *Nicht mehr beobachten*. Das lässt sich in der Bestätigung mit
   „Rückgängig“ zurücknehmen – die CVE wird dann ab diesem Moment neu beobachtet.
@@ -346,6 +349,11 @@ Eine Meldung kommt, wenn bei der CVE etwas Wichtiges passiert:
 | CISA KEV | die CVE wird in den Katalog der aktiv ausgenutzten Schwachstellen aufgenommen |
 | EPSS | das Perzentil erreicht **0,9** (unter den 10 % wahrscheinlichsten) oder der Wert steigt um **0,1** (10 Prozentpunkte) seit der letzten Meldung; höchstens eine Meldung am Tag |
 | Zurückgezogen | ein Advisory zur CVE wird zurückgezogen (z. B. NVD lehnt die CVE ab) |
+| Exploit veröffentlicht | eine eingeschaltete Sammlung (Metasploit, Exploit-DB, nuclei) führt zum ersten Mal einen Exploit für die CVE ([Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)); je CVE **einmal** |
+
+„Exploit veröffentlicht“ kommt nur für Einträge, die nach dem ersten Laden einer Sammlung erscheinen: Was eine
+Sammlung beim ersten Mal mitbringt (oder nachdem sie tagelang aus war), steht in der Liste, wird aber nicht gemeldet.
+Schwere der Meldung: die der CVE, mindestens *hoch*.
 
 Beim EPSS gilt eine kleine Spanne: Ist das Perzentil einmal über 0,9 gemeldet, kommt die nächste Meldung dazu erst,
 nachdem es unter 0,85 gefallen ist – Schwanken um 0,9 erzeugt keine Meldungsserie. Der Anstieg um 0,1 zählt vom

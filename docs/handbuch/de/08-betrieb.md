@@ -192,6 +192,24 @@ docker compose logs --tail 50 app
 Die erste Zeile nach dem Start nennt Version und Adresse: `Cobe News 0.1.x – data in /data, https://…`. Kommt die
 App nicht hoch, steht der Grund im Log von `app` oder `db-init` ([Logs](#logs)).
 
+### Update-Hinweis {#update-hinweis}
+
+Admins sehen oben in der Leiste einen kleinen Hinweis, sobald eine neuere Version veröffentlicht ist: **„Version
+0.1.48 verfügbar – Changelog“**. Der Link öffnet die Release-Seite auf GitHub; das **×** schließt den Hinweis für dich
+und diese Version – erscheint eine noch neuere, kommt er wieder. Leser sehen nichts.
+
+- **Woher:** die öffentliche Release-Schnittstelle von GitHub (`api.github.com/repos/G0urmetD/Cobe-News/releases/latest`),
+  ohne Anmeldung, höchstens alle 12 Stunden – auch nach einem Fehler –, bedingt (`ETag`: unverändert zählt nicht gegen
+  GitHubs Grenze von 60 Anfragen pro Stunde), mit kurzer Wartezeit und Größenlimit, über dieselbe Härtung wie jeder
+  Abruf. Gesendet wird nur die Anfrage selbst mit der Kennung `Cobe/<Version>` – nichts über eure Installation.
+- **Was zählt:** nur eine fertige Version `x.y.z`, die höher ist als die laufende. Entwürfe, Vorabversionen
+  (`0.1.48-rc1`) und andere Tags werden übergangen.
+- **Abschalten:** im Benutzermenü *Version & Changelog*, Schalter **„Nach neuen Versionen suchen“** (ab Werk an). Aus:
+  keine Anfrage, kein Hinweis. Dort stehen auch die neueste bekannte Version, wann zuletzt geprüft wurde und ein Fehler.
+- **Überwachung:** `/metrics` meldet `cobe_news_update_available` ([Metriken](/docs/api#metriken)).
+
+Der Hinweis ersetzt das Update nicht – das bleibt ein Schritt von euch ([Update in Schritten](#update-schritte)).
+
 ### Zurück zur alten Version {#update-zurueck}
 
 ```bash

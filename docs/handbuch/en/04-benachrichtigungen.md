@@ -290,10 +290,12 @@ and are listed under “Added one by one”.
     the story or the finding. The group watched last comes first, *Added one by one* last. Older links with
     `?groups=1` open this grouping.
 - **Rows:** the CVE id (copyable) with its title, severity, KEV (since when; ransomware in the tooltip),
-  [EPSS](term:epss) (the percentile as a bar) and the first fixed version (“+2”: two more). A CVE no source knows yet
-  says “No source knows it yet”.
+  [EPSS](term:epss) (the percentile as a bar) and the first fixed version (“+2”: two more). “Public exploit” next to the
+  CVE id: a collection lists an exploit ([Public exploit](/docs/vendor-news#oeffentlicher-exploit)); the links are in the
+  opened row. A CVE no source knows yet says “No source knows it yet”.
 - **Open a row** (click it or the arrow): the **history** since you started watching, newest first – a fixed version
-  appeared (in which advisory), added to KEV, EPSS rose, an advisory withdrawn; at the bottom since when you watch it.
+  appeared (in which advisory), added to KEV, EPSS rose, exploit published, an advisory withdrawn; at the bottom since
+  when you watch it.
   Below: *Stories (n)* (the story list searching for the CVE), *Open advisory* (the vendor's page, else CSAF or NVD) and
   *Stop watching*. “Undo” in the confirmation takes that back – the CVE is then watched anew from that moment.
 - **New since your last visit:** Cobe News remembers when you last opened the list. Whatever happened to a CVE after
@@ -335,6 +337,11 @@ A notice comes when something important happens to the CVE:
 | CISA KEV | the CVE is added to the catalogue of actively exploited vulnerabilities |
 | EPSS | the percentile reaches **0.9** (among the 10 % likeliest) or the score rises by **0.1** (10 percentage points) since the last notice; at most one notice a day |
 | Withdrawn | an advisory about the CVE is withdrawn (e.g. NVD rejects the CVE) |
+| Exploit published | a switched-on collection (Metasploit, Exploit-DB, nuclei) lists an exploit for the CVE for the first time ([Public exploit](/docs/vendor-news#oeffentlicher-exploit)); **once** per CVE |
+
+“Exploit published” comes only for entries that appear after a collection was first loaded: what a collection brings
+the first time (or after it was off for days) is shown in the list but not notified. Severity of the notice: the
+CVE's, at least *high*.
 
 EPSS has a small margin: once a percentile above 0.9 was reported, the next such notice comes only after it fell below
 0.85 – swinging around 0.9 makes no series of notices. The rise by 0.1 counts from the last reported value (or the
