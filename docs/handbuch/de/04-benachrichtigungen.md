@@ -359,7 +359,8 @@ Eine Meldung kommt, wenn bei der CVE etwas Wichtiges passiert:
 | Exploit veröffentlicht | eine eingeschaltete Sammlung (Metasploit, Exploit-DB, nuclei) führt zum ersten Mal einen Exploit für die CVE ([Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)); je CVE **einmal** |
 
 „Exploit veröffentlicht“ kommt nur für Einträge, die nach dem ersten Laden einer Sammlung erscheinen: Was eine
-Sammlung beim ersten Mal mitbringt (oder nachdem sie tagelang aus war), steht in der Liste, wird aber nicht gemeldet.
+Sammlung beim ersten Mal mitbringt (oder nachdem sie ausgeschaltet war oder nicht gebraucht wurde), steht in der Liste,
+wird aber nicht gemeldet. Ein Ausfall des Downloads zählt nicht dazu: Was danach neu ist, wird gemeldet.
 Schwere der Meldung: die der CVE, mindestens *hoch*.
 
 Beim EPSS gilt eine kleine Spanne: Ist das Perzentil einmal über 0,9 gemeldet, kommt die nächste Meldung dazu erst,
@@ -1255,6 +1256,11 @@ z. B. „Kritisch an SOC“ nur für *Aktiv ausgenutzt* und *Exploit veröffentl
   stuft auf „poc“. Eine Meldung, die nach dem Speichern der Regel eintraf und ein verlangtes Thema erst danach bekommt,
   wird **dann** verschickt – mit der nächsten Runde, **einmal** pro Kanal, nie doppelt (auch nicht, wenn später ein
   weiteres Thema dazukommt). Ältere Meldungen bleiben, wie unter [Nur Neues](#nur-neues) beschrieben, außen vor.
+- **Kein Schwall durch Neuberechnung:** Bekommen viele Meldungen ein Thema auf einmal, weil alle Themen neu berechnet
+  werden – eine Exploit-Sammlung wird eingeschaltet oder zum ersten Mal geladen, ein Update ändert die Themenregeln –,
+  zeigt Cobe News das Thema an diesen Meldungen (Filter, Badge), verschickt sie dafür aber **nicht**. Das gilt auch für
+  „Exploit veröffentlicht“, das nur auf dem Grundbestand einer Sammlung beruht. Ein Thema durch ein eigenes Ereignis
+  (neuer KEV-Eintrag, neuer Eintrag einer Sammlung, eingetroffene Details) kommt weiter einmal.
 - **Nur Security-Meldungen:** Für Vendor-News-Ereignisse und Quellen-Gesundheit gelten die Themen nicht.
 - **Erweitern:** Themen entfernen oder weitere wählen ist ein [erweiterter Filter](#nur-neues) – was erst dadurch
   passt, kommt ab der Änderung.

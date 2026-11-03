@@ -109,6 +109,11 @@ class NewsItem(Base):
     # the story's topics (news.topics_of: zeroday, exploited, ransomware, nopatch, breach, supply, phishing, ot) – from
     # title, stored teaser, source, CVEs, details and the KEV; recomputed when any of them changes (news.retopic)
     topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    # those of its topics the story gained quietly – by a full recompute (news.backfill_topics: a new rule version, an
+    # exploit list's first import or switched on) or through a list's baseline entries only: shown and filtered like
+    # any, never a reason for a notification rule to send it (news.loud_topic) – an old story is no news because a list
+    # was switched on. A topic lost is no longer quiet.
+    quiet_topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
     # the followed products (catalogue keys) the story's details concern – story_details.matches, as the drawer's
     # "Betrifft deine Systeme": from the advisory's structured data, never from words. Recomputed when the details arrive
     # and when a follow or its versions change (story_details.products_round); "Betrifft unsere Produkte" on News
@@ -605,7 +610,6 @@ class ExploitRef(Base):
     `baseline`: brought by the source's first import – shown, never notified."""
 
     __tablename__ = "exploit_refs"
-    __table_args__ = (Index("ix_exploit_refs_first_seen", "first_seen"),)
 
     cve: Mapped[str] = mapped_column(Text, primary_key=True)
     source: Mapped[str] = mapped_column(Text, primary_key=True)  # nuclei | metasploit | exploitdb

@@ -1295,10 +1295,12 @@ def news_filter(rule: NotifyRule) -> list:
     ]
     if rule.severities:
         where.append(NewsItem.severity.in_(list(rule.severities)))
-    # topics: one of them (OR within the topics, AND with the rest) – a story that gets one only later (the KEV,
-    # its details) matches from then on and is sent then, once (pending: not sent to the channel yet)
+    # topics: one of them (OR within the topics, AND with the rest) – a story that gets one only later by an event of
+    # its own (a new KEV entry, a list's new exploit entry, its details) matches from then on and is sent then, once
+    # (pending: not sent to the channel yet); one gained quietly (a full recompute: an exploit list switched on or its
+    # first import, a new rule version – news.loud_topic) never: an older story is no news because of that
     if topics := rule_topics(rule):
-        where.append(news_svc.has_topic(topics))
+        where.append(news_svc.loud_topic(topics))
     # carried by a switched-on source (of the rule's, when it names some) – also as a further source ("also in")
     ids = news_svc._ids(rule.sources)
     where.append(news_svc.visible(ids) if ids or not rule.sources else false())  # only unreadable ids: nothing, not "all"
@@ -1418,7 +1420,7 @@ def _earlier_news(rule: NotifyRule) -> list:
             match.append(news_svc.carried(ids) if ids else false())
         if x.get("topics") is not None:
             want = [t for t in x["topics"] if t in news_svc.TOPICS]
-            match.append(news_svc.has_topic(want) if want else false())
+            match.append(news_svc.loud_topic(want) if want else false())
         if match:
             out.append(or_(NewsItem.seq > int(x["seq"]), and_(*match)))
     return out

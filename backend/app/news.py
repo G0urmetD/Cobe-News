@@ -40,9 +40,10 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit
 
 import httpx
 import nh3
-from sqlalchemy import and_, case, delete, func, or_, select, text, update
+from sqlalchemy import Text, and_, case, delete, func, literal_column, or_, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,7 +55,7 @@ from app.db import fold
 from app.config import get_config, tls_verify
 from app import settings as settings_store
 from app import source_health
-from app.models import NewsItem, NewsItemSource, NewsSource, StoryDetail, VendorAdvisory, VendorKev
+from app.models import Counter, NewsItem, NewsItemSource, NewsSource, StoryDetail, VendorAdvisory, VendorKev
 from app.netaddr import forbidden_literal, forbidden_target, pinned_transport
 
 log = logging.getLogger("cobe_news.news")
@@ -312,13 +313,14 @@ async def download(
     transport: httpx.AsyncBaseTransport | None = None,
     follow_redirects: bool = True,
     only=None,  # noqa: ANN001 - a check every request (redirects included) must pass, see _guard
+    timeout: float | None = None,
 ) -> Fetched:
     """One GET (redirects included unless `follow_redirects` is off), measured for the source health (source_health.measure:
-    time, size, status)."""
+    time, size, status). `timeout`: seconds for the whole download (default DOWNLOAD_S – a big file asks for more)."""
     t0 = time.monotonic()
     got: Fetched | None = None
     try:
-        got = await _download(url, proxy=proxy, verify=verify, headers=headers, limit=limit, transport=transport, follow_redirects=follow_redirects, only=only)
+        got = await _download(url, proxy=proxy, verify=verify, headers=headers, limit=limit, transport=transport, follow_redirects=follow_redirects, only=only, timeout=timeout)
         return got
     finally:
         source_health.measure(time.monotonic() - t0, got.status if got else None, len(got.body) if got else 0)
@@ -334,12 +336,13 @@ async def _download(
     transport: httpx.AsyncBaseTransport | None,
     follow_redirects: bool = True,
     only=None,  # noqa: ANN001
+    timeout: float | None = None,
 ) -> Fetched:
     if transport is None and not proxy and await asyncio.to_thread(forbidden_target, url):
         raise NewsError("http", "forbidden target")
     try:
         async with (
-            asyncio.timeout(DOWNLOAD_S),
+            asyncio.timeout(timeout or DOWNLOAD_S),
             httpx.AsyncClient(
                 timeout=httpx.Timeout(20.0, connect=10.0),
                 proxy=proxy,
@@ -1080,6 +1083,10 @@ TOPICS = ("zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "sup
 # (2: "Exploit veröffentlicht" – CISA's SSVC "exploitation: poc" and the wording)
 TOPICS_V = 2
 TOPICS_COUNTER = "news_topics_v"
+# every story's topics again for another reason than a rule version (topics_again: the KEV's first fetch, an exploit
+# list's first import or switched on or off): ASK counts the requests up, DONE is the request the last full run answered
+TOPICS_ASK = "news_topics_ask"
+TOPICS_DONE = "news_topics_done"
 KEV_KEY = "cisa-kev"
 CATALOG_KEYS = frozenset({"cisa-kev", "enisa-euvd"})
 # OT vendors and the ICS desk of a newsroom: everything they publish is about OT/ICS
@@ -1259,8 +1266,23 @@ def topic_list(title: str, teaser: str, source: str, ids: list[str] | None = Non
 
 def has_topic(topics: list[str]):  # noqa: ANN201
     """SQL: the story has one of these topics (OR within the topics; the GIN index on news_items.topics) – the News
-    filter, the notification rules, desktop and Web Push."""
+    filter, desktop and Web Push."""
     return NewsItem.topics.op("?|")(pg_array(sorted(set(topics))))
+
+
+# news_items.quiet_topics as a text[] – for "topics minus quiet_topics" (jsonb - text[] drops those array elements)
+_QUIET = literal_column("ARRAY(SELECT jsonb_array_elements_text(news_items.quiet_topics))", type_=ARRAY(Text))
+
+
+def loud_topic(topics: list[str]):  # noqa: ANN201
+    """SQL: the story has one of these topics, and not only quietly (quiet_topics: gained by a full recompute – the
+    topics' backfill, an exploit list's first import, a list switched on – not by an event of its own) – the
+    notification rules: a story that gains a topic quietly is no news for a rule asking for that topic. The GIN index
+    first (has_topic), then the quiet ones taken out."""
+    want = sorted({t for t in topics if t in TOPICS})
+    if not want:
+        return has_topic([])
+    return and_(has_topic(want), NewsItem.topics.op("-", return_type=JSONB)(_QUIET).op("?|")(pg_array(want)))
 
 
 async def kev_cves(db: AsyncSession, ids) -> set[str]:  # noqa: ANN001
@@ -1295,7 +1317,7 @@ async def exploit_cves(db: AsyncSession, ids) -> dict[str, str]:  # noqa: ANN001
 
     And the exploit lists (app/exploits.py – Metasploit modules, Exploit-DB entries, nuclei templates; switched-on
     lists only, from memory): CVE → the list's name, where SSVC says nothing. A list that learns or drops CVEs calls
-    retopic_cves for them (exploits.retopic_changed) – topics_of takes whatever this returns."""
+    retopic_cves for them (exploits.retopic_later → retopic_pending) – topics_of takes whatever this returns."""
     from app import exploits as exploit_lists  # exploits imports this module
 
     want = sorted({str(c).upper() for c in ids or [] if c})
@@ -1328,13 +1350,37 @@ async def exploit_all(db: AsyncSession) -> dict[str, str]:
 RETOPIC_BATCH = 500
 
 
-async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None, exploits: dict[str, str] | None = None) -> int:  # noqa: ANN001
+def _ordered(topics) -> list[str]:  # noqa: ANN001
+    return [t for t in TOPICS if t in topics]
+
+
+def quiet_after(old: list[str], new: list[str], quiet_before: list[str], *, bulk: bool, baseline_poc: bool = False) -> list[str]:
+    """The story's quiet topics after a recompute (old → new topics): a topic gained by a full recompute (`bulk`) is
+    quiet – so is "poc" gained only through an exploit list's baseline (`baseline_poc`); a topic the story loses is no
+    longer quiet (gained again later by an event of its own, it is news); the rest stays as it was."""
+    gained = set(new) - set(old)
+    keep = set(quiet_before) & set(new)
+    if bulk:
+        keep |= gained
+    elif baseline_poc and "poc" in gained:
+        keep.add("poc")
+    return _ordered(keep)
+
+
+async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None, exploits: dict[str, str] | None = None, bulk: bool = False) -> int:  # noqa: ANN001
     """The topics of the stories matching `where` computed again (their text, CVEs or details changed, the KEV, a known
     exploit) – in chunks of RETOPIC_BATCH by id, a few columns each (not the article text); only changed rows are
     written. In the caller's transaction (it commits). Returns how many changed – a change makes the next notification
-    round look at every rule (a rule asking for a topic the story has only now sends it then, once)."""
+    round look at every rule (a rule asking for a topic the story has only now sends it then, once).
+
+    `bulk` (the full recompute – backfill_topics): what a story gains is quiet (quiet_topics) – shown and filtered, never
+    a rule's delivery (loud_topic): an exploit list switched on, its first import or a new rule version would otherwise
+    send every older story that gains a topic. Not bulk (an event: a new KEV entry, a list's new entry, the details of a
+    story arriving): a gained topic is loud – except "poc" that rests only on a list's baseline entries."""
+    from app import exploits as exploit_lists  # exploits imports this module
+
     keys = dict((await db.execute(select(NewsSource.id, NewsSource.key))).all())
-    cols = (NewsItem.id, NewsItem.source_id, NewsItem.title, NewsItem.summary, NewsItem.cves, NewsItem.reasons, NewsItem.topics)
+    cols = (NewsItem.id, NewsItem.source_id, NewsItem.title, NewsItem.summary, NewsItem.cves, NewsItem.reasons, NewsItem.topics, NewsItem.quiet_topics)
     changed, last = 0, None
     while True:
         stmt = select(*cols).where(where).order_by(NewsItem.id).limit(RETOPIC_BATCH)
@@ -1349,22 +1395,34 @@ async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None, explo
         named = [c for r in rows for c in r[4] or []]
         known = kev if kev is not None else await kev_cves(db, named)
         ex = exploits if exploits is not None else await exploit_cves(db, named)
+        # an event: "poc" through a list counts only by an entry that is no baseline (SSVC always)
+        loud = None
+        if not bulk:
+            listed = [c for c, label in ex.items() if label != SSVC_LABEL]
+            fresh = await exploit_lists.loud(db, listed) if listed else set()
+            loud = {c: label for c, label in ex.items() if label == SSVC_LABEL or c in fresh}
 
-        def compute(rows=rows, dets=dets, known=known, ex=ex) -> list[dict]:  # noqa: ANN001
+        def compute(rows=rows, dets=dets, known=known, ex=ex, loud=loud) -> list[dict]:  # noqa: ANN001
             out = []
-            for iid, sid, title, summary, ids_, reasons, topics in rows:
-                new = topic_list(title, summary or "", keys.get(sid, ""), list(ids_ or []), details=dets.get(iid), kev=known, reasons=reasons, exploits=ex)
-                if new != list(topics or []):
-                    out.append({"id": iid, "topics": new})
+            for iid, sid, title, summary, ids_, reasons, topics, quiet in rows:
+                old, was_quiet = list(topics or []), list(quiet or [])
+                kw = {"details": dets.get(iid), "kev": known, "reasons": reasons}
+                new = topic_list(title, summary or "", keys.get(sid, ""), list(ids_ or []), exploits=ex, **kw)
+                baseline_poc = False
+                if loud is not None and "poc" in new and "poc" not in old and len(loud) < len(ex):
+                    baseline_poc = "poc" not in topic_list(title, summary or "", keys.get(sid, ""), list(ids_ or []), exploits=loud, **kw)
+                q = quiet_after(old, new, was_quiet, bulk=bulk, baseline_poc=baseline_poc)
+                if new != old or q != was_quiet:
+                    out.append({"id": iid, "topics": new, "quiet_topics": q, "_moved": new != old})
             return out
 
         upd = await asyncio.to_thread(compute) if len(rows) > 50 else compute()
         if upd:
+            changed += sum(1 for u in upd if u.pop("_moved"))
             await db.execute(update(NewsItem), upd)
-            changed += len(upd)
         if len(rows) < RETOPIC_BATCH:
             break
-    if changed:
+    if changed and not bulk:
         from app import notify  # notify imports this module
 
         notify.changed()
@@ -1380,32 +1438,54 @@ async def retopic_cves(db: AsyncSession, ids) -> int:  # noqa: ANN001
     return n
 
 
+async def _counters(db: AsyncSession) -> dict[str, int]:
+    rows = await db.execute(select(Counter.name, Counter.value).where(Counter.name.in_([TOPICS_COUNTER, TOPICS_ASK, TOPICS_DONE])))
+    return {n: int(v or 0) for n, v in rows.all()}
+
+
 async def topics_due(db: AsyncSession) -> bool:
-    return int(await db.scalar(text("SELECT value FROM counters WHERE name = :n"), {"n": TOPICS_COUNTER}) or 0) < TOPICS_V
+    c = await _counters(db)
+    return c.get(TOPICS_COUNTER, 0) < TOPICS_V or c.get(TOPICS_DONE, 0) < c.get(TOPICS_ASK, 0)
 
 
 async def backfill_topics(db: AsyncSession) -> int | None:
     """Background job: every stored story's topics, once per rule version (counters `news_topics_v` < TOPICS_V – a new
-    installation, the upgrade to 0.1.46, a later rule change, or the KEV's first fetch). In chunks of RETOPIC_BATCH,
-    each committed on its own (a restart midway starts again – it changes nothing twice). None: nothing to do."""
+    installation, the upgrade to 0.1.46, a later rule change) and once more per request (topics_again: the KEV's first
+    fetch, an exploit list's first import or switched on or off – `news_topics_ask` above `news_topics_done`). In
+    chunks of RETOPIC_BATCH, each committed on its own (a restart midway starts again – it changes nothing twice).
+    What a story gains here is quiet (retopic bulk: shown, never a rule's delivery). A request arriving while it runs
+    (after the upgrade: the version, then each list's first import) starts it again from the beginning with what is
+    known now – one run answers them all, and none ends with the data of before. None: nothing to do."""
+    from app import exploits as exploit_lists  # exploits imports this module
+
     if not await topics_due(db):
         return None
-    kev = await kev_all(db)
-    exploits = await exploit_all(db)
+
+    async def known() -> tuple[int, set[str], dict[str, str]]:
+        ask = (await _counters(db)).get(TOPICS_ASK, 0)
+        exploit_lists.invalidate()  # the lists as stored now (a list's import may have committed a moment ago)
+        return ask, await kev_all(db), await exploit_all(db)
+
+    ask, kev, exploits = await known()
     await dbm.release(db)
     changed, last = 0, None
     while True:
+        if last is not None and (await _counters(db)).get(TOPICS_ASK, 0) != ask:
+            ask, kev, exploits = await known()  # asked again meanwhile: from the start
+            await dbm.release(db)
+            last = None
         cond = NewsItem.id > last if last is not None else text("true")
         stmt = select(NewsItem.id).where(cond).order_by(NewsItem.id).offset(RETOPIC_BATCH - 1).limit(1)
         upto = await db.scalar(stmt)
         part = and_(cond, NewsItem.id <= upto) if upto is not None else cond
-        changed += await retopic(db, part, kev=kev, exploits=exploits)
+        changed += await retopic(db, part, kev=kev, exploits=exploits, bulk=True)
         await db.commit()
         if upto is None:
             break
         last = upto
     stmt = "INSERT INTO counters (name, value) VALUES (:n, :v) ON CONFLICT (name) DO UPDATE SET value = :v"
     await db.execute(text(stmt), {"n": TOPICS_COUNTER, "v": TOPICS_V})
+    await db.execute(text(stmt), {"n": TOPICS_DONE, "v": ask})
     await db.commit()
     if changed:
         log.info("news: topics of %d stories computed", changed)
@@ -1413,8 +1493,11 @@ async def backfill_topics(db: AsyncSession) -> int | None:
 
 
 async def topics_again(db: AsyncSession) -> None:
-    """All topics computed again with the next round (the KEV's first fetch: every story may name one of its CVEs)."""
-    await db.execute(text("DELETE FROM counters WHERE name = :n"), {"n": TOPICS_COUNTER})
+    """All topics computed again with the next round (the KEV's first fetch: every story may name one of its CVEs; an
+    exploit list's first import, switched on or off) – a request counted up, in the caller's transaction: committed
+    with what caused it, it cannot be lost (a restart between the two). What a story gains then is quiet."""
+    stmt = "INSERT INTO counters (name, value) VALUES (:n, 1) ON CONFLICT (name) DO UPDATE SET value = counters.value + 1"
+    await db.execute(text(stmt), {"n": TOPICS_ASK})
 
 
 async def story_topics(db: AsyncSession, i: NewsItem, source_key: str, details: dict | None) -> list[dict]:

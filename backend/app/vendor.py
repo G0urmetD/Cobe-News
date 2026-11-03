@@ -683,9 +683,11 @@ async def get(
     has_key: bool = False,
     conditional: bool = True,
     only=None,  # noqa: ANN001
+    timeout: float | None = None,
 ) -> bytes | None:
     """One GET through the news fetcher's hardened download. None: 304 (unchanged). Errors as NewsError. `only`: a check
-    of the URL every request – redirects included – must pass (a CSAF provider's own hosts).
+    of the URL every request – redirects included – must pass (a CSAF provider's own hosts, an exploit list's host).
+    `timeout`: seconds for the whole download (default: the feeds' DOWNLOAD_S).
     `db`: the caller's session – what it has pending is written first (`release`), so no write transaction waits on
     this host's gap or the download. `st` is updated only after the answer."""
     if db is not None:
@@ -703,7 +705,9 @@ async def get(
         # a request with the NVD API key follows no redirect: httpx would send the apiKey header to any other host
         # (it strips only Authorization) – NVD's API answers directly (security review 0.1.16 L5)
         keyed = any(k.lower() == "apikey" for k in h)
-        got = await news_svc.download(url, proxy=get_config().proxy, verify=tls_verify(), headers=h, limit=limit, transport=transport, follow_redirects=not keyed, only=only)
+        got = await news_svc.download(
+            url, proxy=get_config().proxy, verify=tls_verify(), headers=h, limit=limit, transport=transport, follow_redirects=not keyed, only=only, timeout=timeout
+        )
     finally:
         if st is not None:
             st.last_fetch_at = asked

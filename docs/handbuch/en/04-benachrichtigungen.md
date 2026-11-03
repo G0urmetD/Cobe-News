@@ -346,7 +346,8 @@ A notice comes when something important happens to the CVE:
 | Exploit published | a switched-on collection (Metasploit, Exploit-DB, nuclei) lists an exploit for the CVE for the first time ([Public exploit](/docs/vendor-news#oeffentlicher-exploit)); **once** per CVE |
 
 “Exploit published” comes only for entries that appear after a collection was first loaded: what a collection brings
-the first time (or after it was off for days) is shown in the list but not notified. Severity of the notice: the
+the first time (or after it was switched off or not needed) is shown in the list but not notified. A failed download
+does not count: what is new afterwards is notified. Severity of the notice: the
 CVE's, at least *high*.
 
 EPSS has a small margin: once a percentile above 0.9 was reported, the next such notice comes only after it fell below
@@ -1225,6 +1226,11 @@ to SOC" only for *Actively exploited* and *Exploit published*.
   A story that arrived after the rule was saved and gets a required topic only afterwards is sent **then** – with the
   next round, **once** per channel, never twice (not even when another topic is added later). Older stories stay out,
   as described under [Only new stories](#nur-neues).
+- **No flood from a recompute:** when many stories get a topic at once because every story's topics are computed
+  again – an exploit collection is switched on or loaded for the first time, an update changes the topic rules –, Cobe
+  News shows the topic on them (filter, badge) but does **not** send them for it. The same goes for "Exploit published"
+  that rests only on a collection's initial load. A topic from an event of the story's own (a new KEV entry, a new
+  entry of a collection, details arriving) is still sent once.
 - **Security stories only:** topics do not apply to Vendor News events and source health.
 - **Widening:** removing topics or choosing more is a [widened filter](#nur-neues) – what only matches because of it
   comes from the change on.

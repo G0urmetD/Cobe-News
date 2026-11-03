@@ -667,9 +667,17 @@ bei beobachteten CVEs (Ereignis „Exploit veröffentlicht“, je CVE einmal) un
   beobachtet wird. Nach außen geht nichts über die Installation – dieselbe öffentliche Datei für alle.
 - Metasploit wird Modul für Modul gelesen (nie die 11 MB als ein Python-Objekt). Je CVE ein Link je Liste (der erste
   Eintrag nach Pfad/Name bzw. die kleinste EDB-ID).
-- Erstes Laden einer Liste (oder nach mehr als 3 Tagen ohne Abruf): `baseline` – gezeigt, nie gemeldet. Führt eine Liste
-  eine CVE nicht mehr, geht die Zeile; bringt eine Antwort weniger als die Hälfte der gespeicherten CVEs, gilt sie als
-  kaputt (Fehler „list shrank“, nichts gelöscht, die alten Validatoren bleiben).
+- Erstes Laden einer Liste – oder das erste, nachdem sie aus war oder nicht gebraucht wurde (Marker `{"baseline": true}`
+  im `cursor` ihres `vendor_fetch`-Eintrags, gesetzt von der Runde; Fehlversuche setzen ihn nicht): `baseline` –
+  gezeigt, nie gemeldet. Führt eine Liste eine CVE nicht mehr, geht die Zeile; bringt eine Antwort weniger als die
+  Hälfte der gespeicherten CVEs, gilt sie als kaputt (Fehler „list shrank … (n of 3)“, nichts gelöscht, die alten
+  Validatoren bleiben) – kommt **dieselbe** Antwort dreimal in Folge, wird sie übernommen (Warnung im Log).
+- Download je Liste mit eigener Frist (Metasploit, Exploit-DB 120 s, nuclei 60 s), Weiterleitungen nur auf dem Host der
+  Liste (`raw.githubusercontent.com`, `gitlab.com`).
+- Thema „Exploit veröffentlicht“ der News: Erstes Laden oder mehr als 2000 geänderte CVEs → alle Themen neu
+  (`counters` `news_topics_ask`/`news_topics_done`, Hintergrundjob in Blöcken; was eine Meldung dabei bekommt, steht in
+  `news_items.quiet_topics` und löst keine Regel aus). Sonst die geänderten CVEs in `settings` `exploit_retopic`, mit
+  der Liste in einer Transaktion gespeichert und direkt danach abgearbeitet (nach einem Absturz in der nächsten Runde).
 - Ausgeschaltet: keine Anfrage; Gespeichertes bleibt, wird aber weder gezeigt noch gezählt.
 - Verworfen: inoffizielle PoC-Sammlungen (Trickest/cve, PoC-in-GitHub – ungeprüft, teils Schadcode), GitHub Security
   Advisories (keine Exploit-Angaben), Dienste mit Schlüssel und eigenen Bedingungen.
