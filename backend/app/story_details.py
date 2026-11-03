@@ -30,7 +30,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
-from sqlalchemy import Text, and_, cast, literal, or_, select, true, update
+from sqlalchemy import Text, and_, any_, cast, false, func, literal, or_, select, true, update
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.exc import SQLAlchemyError
@@ -42,7 +42,7 @@ from app import vendor
 from app import vendor_sources as src
 from app.models import NewsItem, NewsSource, StoryDetail, VendorAdvisory, VendorFetch, VendorFollow, VendorKev, VendorVersion
 from app.news import NewsError, _date, html_to_text
-from app.vendor_match import evaluate, ranges_of, worst
+from app.vendor_match import cpe_fields, evaluate, name_words, ranges_of, worst
 from app.vendor_versions import parse
 
 log = logging.getLogger("cobe_news.details")
@@ -903,13 +903,55 @@ async def followed_labels(db: AsyncSession) -> dict[str, str]:
     return out
 
 
+def anchors(product: dict) -> set[str] | None:
+    """Words (lower case) one of which a story's details must contain for the matcher (matches → vendor_match.evaluate)
+    to find this product at all: per name it compares – the catalogue names (Palo Alto, Fortinet, Veeam, CSAF, the
+    CNA's rows), the CNA names, the label (CSAF), the CPEs' product part (NVD's configurations, a CSAF product's CPE,
+    CISA's ADP rows), the OSV package names – the longest of its words (every word of a name must be there for it to
+    match; "and" may be a "&"). None: no such word can be given (a Windows build: its CPE comes from the version; a name
+    of no word) – every story's details are looked at. The prefilter of reproduct; it narrows, it never decides."""
+    if (product.get("scheme") or "generic") == "windows":
+        return None
+    label = str(product.get("label") or "")
+    texts = [str(n) for n in product.get("names") or []]
+    texts += [str(b) for _, b in product.get("cna") or []]
+    texts += [label, re.sub(r"\s*\(.*?\)\s*$", "", label)]
+    texts += [str(n) for _, n in product.get("osv") or []]
+    for c in product.get("cpes") or []:
+        parts = cpe_fields(c)
+        if len(parts) < 3:
+            return None
+        texts.append(parts[2].replace("_", " "))
+    out: set[str] = set()
+    for t in texts:
+        if not t.strip():
+            continue
+        words = [w for w in name_words(t) if w != "and"]
+        if not words:
+            return None
+        out.add(max(words, key=len))
+    return out
+
+
+def anchor_hit(words: set[str], raw: str) -> bool:
+    """reproduct's prefilter as Python does it (the tests compare it with the matcher): one of the words in the details."""
+    low = raw.lower()
+    return any(w in low for w in words)
+
+
 async def reproduct(db: AsyncSession, fol: list[tuple[dict, list[VendorVersion]]], keys: set[str] | None = None) -> int:
     """The stored stories' products computed again – for these product keys only (the rest of each list stays), or all of
     them (None: every list replaced). Keys no longer followed leave every list by SQL alone; the others are judged
     against the stored details in chunks of PRODUCTS_BATCH stories (off the event loop), each chunk committed on its
-    own. Returns how many stories changed."""
+    own. Returns how many stories changed.
+
+    For some keys (a follow or its versions changed) only the details that can concern them are read: SQL picks those
+    containing one of their products' anchors (a word of a name the matcher compares) or listing one of the keys
+    already (it may have to leave) – one edit no longer judges every stored document; a product without anchors
+    (Windows) reads them all. The result is the same as the full pass (tests/test_topics_phase2.py)."""
     have = {str(p["key"]) for p, _ in fol}
     changed = 0
+    prefilter = None  # every stored document (the full pass)
     if keys is not None:
         if gone := sorted(keys - have):
             res = await db.execute(
@@ -923,6 +965,14 @@ async def reproduct(db: AsyncSession, fol: list[tuple[dict, list[VendorVersion]]
         fol = [x for x in fol if str(x[0]["key"]) in keys]
         if not fol:
             return changed
+        words: set[str] | None = set()
+        for p, _ in fol:
+            got = anchors(p)
+            words = None if got is None or words is None else words | got
+        if words is not None:
+            low = func.lower(cast(StoryDetail.data, Text))
+            named = low.like(any_(pg_array(sorted(f"%{w}%" for w in words)))) if words else false()
+            prefilter = or_(NewsItem.products.op("?|")(pg_array(sorted(keys))), named)
     else:
         # every list replaced: a story without (usable) details concerns no product – nothing followed: none does
         empty = NewsItem.products != cast(literal("[]"), JSONB)
@@ -937,7 +987,7 @@ async def reproduct(db: AsyncSession, fol: list[tuple[dict, list[VendorVersion]]
         stmt = (
             select(StoryDetail.item_id, cast(StoryDetail.data, Text), NewsItem.products)
             .join(NewsItem, NewsItem.id == StoryDetail.item_id)
-            .where(StoryDetail.status == "ok", StoryDetail.data.is_not(None))
+            .where(StoryDetail.status == "ok", StoryDetail.data.is_not(None), *([prefilter] if prefilter is not None else []))
             .order_by(StoryDetail.item_id)
             .limit(PRODUCTS_BATCH)
         )

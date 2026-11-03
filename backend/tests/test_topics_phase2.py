@@ -485,3 +485,80 @@ def test_topic_lists_agree():
     assert typing.get_args(typing.get_args(auth_api.DesktopIn.model_fields["topics"].annotation)[0]) == news.TOPICS
     assert set(notify.CARD_LABELS["de"]["topics"]) == set(news.TOPICS) == set(notify.CARD_LABELS["en"]["topics"])
     assert json.dumps(news.TOPICS)
+
+
+# ---------------------------------------------------------------- one follow edit: only the details that can concern it
+
+
+def _fixture_details() -> list[dict]:
+    """Details as the stories keep them: the CSAF documents of the fixtures (BSI, Cisco, Siemens, Fortinet), Palo Alto's
+    CVE record, and the trimmed CNA/NVD records of the catalogue accuracy test – each as an NVD and a cvelist match."""
+    out = [
+        story_details.parse_csaf((FIX / name).read_bytes(), kind)
+        for name, kind in (("csaf_wid.json", "bsi"), ("csaf_cisco.json", "cisco"), ("csaf_siemens.json", "siemens"), ("fortinet_csaf_wad.json", "fortinet"))
+    ]
+    out.append(story_details.parse_cve5((FIX / "cve5_pan.json").read_bytes()))
+    out.append(story_details.parse_csaf((FIX.parent / "structured" / "csaf_cisco_asa.json").read_bytes(), "cisco", story_details.STORE_PRODUCTS))
+    records = json.loads((FIX / "accuracy_records.json").read_text())["records"]
+    for rec in records.values():
+        out.append({"kind": "nvd", "match": [{"source": "nvd", "data": rec}]})
+        out.append({"kind": "cvelist", "match": [{"source": "cvelist", "data": rec}]})
+    return out
+
+
+def test_the_prefilter_never_drops_a_story_the_matcher_finds():
+    """Every catalogue product against every fixture's details: whenever the matcher finds the product, its anchors are
+    in the details' text – the SQL prefilter (story_details.anchors) narrows, it never decides."""
+    from app import vendor_catalog
+
+    details = _fixture_details()
+    texts = [json.dumps(d, ensure_ascii=False) for d in details]
+    found = skipped = 0
+    for p in vendor_catalog.load()["products"]:
+        words = story_details.anchors(p)
+        if words is None:
+            skipped += 1
+            continue
+        for d, raw in zip(details, texts, strict=True):
+            if story_details.matches(d, [(p, [])]):
+                found += 1
+                assert story_details.anchor_hit(words, raw), (p["key"], words)
+    assert found > 20 and skipped < 30  # the fixtures do concern products – and almost every product has anchors
+
+
+async def test_a_follow_edit_reads_only_the_details_that_can_concern_it_with_the_same_result(admin_client, monkeypatch):
+    details = _fixture_details()
+    ids = [await _story_with_details(f"Story {n}", d) for n, d in enumerate(details)]
+    for key in ("gitlab", "panos", "msexchange", "fortios"):
+        assert (await admin_client.put(f"/api/vendor/follows/{key}", json={"enabled": True})).status_code == 200
+    assert (await admin_client.post("/api/vendor/follows/panos/versions", json={"version": "12.2.5"})).status_code == 200
+    await _round()
+    before = {i: await _products(i) for i in ids}
+    assert any(before.values())
+    seen: list[int] = []
+    real = story_details.products_of
+
+    def spy(d, fol):  # noqa: ANN001, ANN202
+        seen.append(1)
+        return real(d, fol)
+
+    monkeypatch.setattr(story_details, "products_of", spy)
+    # a version of one product (an affected one, beside a fixed one): only the stories whose details name it are judged …
+    assert (await admin_client.post("/api/vendor/follows/panos/versions", json={"version": "12.2.1"})).status_code == 200
+    await _round()
+    assert 0 < len(seen) < len(ids) / 3
+    partial = {i: await _products(i) for i in ids}
+    assert partial != before  # the edit did change lists
+    # … with exactly what the full pass gives
+    async with db.session() as s:
+        await story_details.reproduct(s, await story_details.followed(s))
+    full = {i: await _products(i) for i in ids}
+    assert partial == full
+    # a story that listed the product and whose details no longer name it still leaves the list
+    async with db.session() as s:
+        await s.execute(update(StoryDetail).where(StoryDetail.item_id == ids[0]).values(data={"kind": "bsi", "products": []}))
+        await s.execute(update(NewsItem).where(NewsItem.id == ids[0]).values(products=["panos"]))
+        await s.commit()
+    assert (await admin_client.post("/api/vendor/follows/panos/versions", json={"version": "11.2.0"})).status_code == 200
+    await _round()
+    assert "panos" not in await _products(ids[0])
