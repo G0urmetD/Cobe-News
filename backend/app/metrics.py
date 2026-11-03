@@ -307,8 +307,12 @@ async def render() -> bytes:
 
             last = await settings_store.get(s, backup.LAST)
             st = await restore_test.status(s)
+            from app import update_check
+
+            update = await update_check.available_metric(s)
         _backup(last, out)
         _restore(st, out)
+        out.one("cobe_news_update_available", "1 when a newer Cobe News release is published, 0 when not, NaN while the check is off or has no answer yet", update)
         if _cache.db_size is not None:
             out.one("cobe_news_database_size_bytes", "Size of the database on disk", _cache.db_size)
         out.one("cobe_news_metrics_generated_timestamp_seconds", f"Unix time this answer was computed (kept up to {int(CACHE_S)} s)", time.time())

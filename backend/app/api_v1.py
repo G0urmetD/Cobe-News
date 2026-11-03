@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.dialects.postgresql import array as pg_array
 
-from app import __version__, epss
+from app import __version__, epss, exploits
 from app import news as news_svc
 from app import vendor as svc
 from app.api_tokens import ReadToken
@@ -76,8 +76,16 @@ class EpssScore(BaseModel):
     date: str | None = None
 
 
+class ExploitHint(BaseModel):
+    cve: str
+    source: Literal["metasploit", "exploitdb", "nuclei"] = Field(description="The list naming public exploit code (or a ready-made exploit check) for the CVE")
+    url: str = Field(description="The entry in that list")
+    first_seen: str | None = Field(default=None, description="When Cobe News first saw it there")
+
+
 class StoryDetail(Story):
     epss: list[EpssScore] = Field(default_factory=list, description="EPSS of the story's CVEs, likeliest first")
+    exploits: list[ExploitHint] = Field(default_factory=list, description="Public exploits for the story's CVEs (switched-on exploit lists)")
 
 
 class Version(BaseModel):
@@ -120,6 +128,7 @@ class Finding(BaseModel):
     exploited: bool = Field(description="Known to be exploited (CISA KEV or the vendor)")
     kev: Kev | None = None
     epss: EpssScore | None = None
+    exploits: list[ExploitHint] = Field(default_factory=list, description="Public exploits for the finding's CVEs (switched-on exploit lists)")
     status: Status = Field(description="The worst verdict over the versions entered")
     published_at: str | None = None
     versions: list[FindingVersion] = []
@@ -252,6 +261,8 @@ async def get_story(story_id: uuid.UUID, token: ReadToken, db: Db) -> dict:
     out = _story(i, s)
     scores = await epss.scores(db, [c.upper() for c in (i.cves or [])[:60]])
     out["epss"] = sorted(scores.values(), key=lambda e: -e["score"])[:12]
+    named = [c.upper() for c in (i.cves or [])[:60]]
+    out["exploits"] = exploits.brief(await exploits.of_cves(db, named), named, 12)
     return out
 
 
@@ -273,6 +284,7 @@ def _finding(x: dict) -> dict:
         **{k: x.get(k) for k in ("id", "source", "ident", "title", "headline", "url", "cvss", "severity", "kev", "epss", "status", "published_at")},
         "cves": list(x.get("cves") or []),
         "exploited": bool(x.get("exploited")),
+        "exploits": list(x.get("exploit") or []),
         "versions": [{"version": r.get("version"), "status": r.get("status"), "fixed": r.get("fixed")} for r in x.get("versions") or []],
     }
 

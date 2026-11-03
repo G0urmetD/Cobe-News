@@ -37,7 +37,7 @@ MARKER = "sqlite_import"
 ROWID_INTO = {"news_item_sources": "n", "vendor_events": "n"}  # SQLite's rowid → the identity column standing for it
 # tables added after 0.1.15 (PostgreSQL only): not in the SQLite file – neither required nor imported. They start
 # empty; the backup and the tests see them like any other table (tables()).
-NOT_IN_SQLITE = frozenset({"source_fetch_stats", "source_health_events", "source_health_deliveries", "catalog_cpe_checks", "catalog_checks", "epss_scores", "teams", "team_groups", "team_members", "team_products", "team_product_members", "team_welcome", "notify_rule_teams", "person_routes", "person_notify", "person_deliveries", "vendor_advisory_state", "vendor_advisory_changes", "cve_watches", "cve_watch_state", "calendar_feeds", "person_absences", "team_weekly", "team_weekly_sends", "api_tokens", "audit_log", "delivery_log", "product_suggestions", "user_passkeys", "reader_state", "vendor_reads", "person_mutes", "saved_views", "auth_locks", "password_history"})
+NOT_IN_SQLITE = frozenset({"source_fetch_stats", "source_health_events", "source_health_deliveries", "catalog_cpe_checks", "catalog_checks", "epss_scores", "teams", "team_groups", "team_members", "team_products", "team_product_members", "team_welcome", "notify_rule_teams", "person_routes", "person_notify", "person_deliveries", "vendor_advisory_state", "vendor_advisory_changes", "cve_watches", "cve_watch_state", "calendar_feeds", "person_absences", "team_weekly", "team_weekly_sends", "api_tokens", "audit_log", "delivery_log", "product_suggestions", "user_passkeys", "reader_state", "vendor_reads", "person_mutes", "saved_views", "auth_locks", "password_history", "exploit_refs", "update_dismissals"})
 
 
 class ImportRefused(Exception):

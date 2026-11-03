@@ -585,6 +585,31 @@ class EpssScore(Base):
     fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class ExploitRef(Base):
+    """A source that lists public exploit code or a ready-made check for one CVE (app/exploits.py): Metasploit module,
+    Exploit-DB entry, nuclei template – the CVE, the source, a link to the entry, when Cobe News first saw it. No code.
+    `baseline`: brought by the source's first import – shown, never notified."""
+
+    __tablename__ = "exploit_refs"
+    __table_args__ = (Index("ix_exploit_refs_first_seen", "first_seen"),)
+
+    cve: Mapped[str] = mapped_column(Text, primary_key=True)
+    source: Mapped[str] = mapped_column(Text, primary_key=True)  # nuclei | metasploit | exploitdb
+    url: Mapped[str] = mapped_column(Text)
+    first_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    baseline: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+
+
+class UpdateDismissal(Base):
+    """The release whose update notice an admin closed (app/update_check.py): a newer one shows it again."""
+
+    __tablename__ = "update_dismissals"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    version: Mapped[str] = mapped_column(Text)
+    dismissed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 # ---------------------------------------------------------------- source health (app/source_health.py)
 
 

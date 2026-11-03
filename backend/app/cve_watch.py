@@ -8,6 +8,9 @@
   rose by EPSS_JUMP (0.1, absolute) since the last notice (or since the watch began). A percentile that fell below
   EPSS_PCT_RESET (0.85) may reach EPSS_PCT again later; between the two nothing flaps. At most one EPSS notice a day.
 - **Withdrawn**: an advisory naming it was withdrawn (NVD rejected the CVE, OSV withdrew its record …).
+- **Exploit** (0.1.47): a switched-on exploit list (app/exploits.py: Metasploit, Exploit-DB, nuclei) names it for the
+  first time – once per CVE (key watch:<CVE>:exploit). What a list brought with its first import (its baseline) is
+  shown, never notified; a state from before this check knows no exploit yet and takes the current one silently.
 
 Nothing old, exactly once: per CVE one state row (cve_watch_state) holds what was seen at the last check – made from
 the data at the moment of the first watch (the baseline, never notified). A difference becomes one VendorEvent (kind
@@ -83,9 +86,15 @@ async def facts(db: AsyncSession, cves: list[str]) -> dict[str, dict]:
     """Per CVE what the stored data says now: kev (and its entry), the fixed versions of every advisory naming it, the
     highest severity, a title, the EPSS (score, percentile, day), which advisory first named each fixed version
     (`fixed_in`) and the advisory to open (`link`). Only the own database – nothing is fetched."""
-    out: dict[str, dict] = {c: {"kev": None, "fixed": [], "fixed_in": {}, "severity": "info", "title": "", "epss": None, "advisories": [], "link": None} for c in cves}
+    from app import exploits, vendor
+
+    out: dict[str, dict] = {c: {"kev": None, "fixed": [], "fixed_in": {}, "severity": "info", "title": "", "epss": None, "advisories": [], "link": None, "exploits": []} for c in cves}
+    xcfg = await vendor.config(db)
     for i in range(0, len(cves), CHUNK):
         part = cves[i : i + CHUNK]
+        for c, hits in (await exploits.of_cves(db, part, xcfg)).items():
+            if c in out:
+                out[c]["exploits"] = [{"source": e["source"], "url": e["url"], "first_seen": e["first_seen"], "baseline": e["baseline"]} for e in hits]
         for k in await db.scalars(select(VendorKev).where(VendorKev.cve.in_(part))):
             out[k.cve]["kev"] = {"added": k.date_added, "due": k.due, "ransomware": bool(k.ransomware), "name": k.name[:200]}
         for e in await db.scalars(select(EpssScore).where(EpssScore.cve.in_(part), EpssScore.score.is_not(None))):
@@ -142,7 +151,13 @@ def baseline(f: dict) -> dict:
     """The state of a CVE as first seen – nothing of it is notified."""
     e = f.get("epss") or {}
     pct = e.get("percentile")
-    return {"kev": f.get("kev") is not None, "fixed": list(f.get("fixed") or []), "epss_base": e.get("score"), "epss_high": pct is not None and pct >= EPSS_PCT}
+    return {
+        "kev": f.get("kev") is not None,
+        "fixed": list(f.get("fixed") or []),
+        "epss_base": e.get("score"),
+        "epss_high": pct is not None and pct >= EPSS_PCT,
+        "exploit": bool(f.get("exploits")),
+    }
 
 
 def compare(cve: str, st: dict, f: dict) -> tuple[dict, list[dict]]:
@@ -190,6 +205,21 @@ def compare(cve: str, st: dict, f: dict) -> tuple[dict, list[dict]]:
             new["epss_high"] = True
         elif pct is not None and pct < EPSS_PCT_RESET:
             new["epss_high"] = False
+    ex = [x for x in f.get("exploits") or [] if isinstance(x, dict)]
+    if "exploit" not in st:
+        new["exploit"] = bool(ex)  # a state from before 0.1.47: what is listed now is its baseline
+    elif ex and not st.get("exploit"):
+        fresh = [x for x in ex if not x.get("baseline")]
+        if fresh:
+            events.append(
+                {
+                    "what": "exploit",
+                    "key": f"watch:{cve}:exploit",
+                    "severity": sev if SEV_RANK.get(sev, 0) >= SEV_RANK["high"] else "high",
+                    "data": {"exploits": [{"source": str(x.get("source") or ""), "url": str(x.get("url") or "")} for x in fresh][:3]},
+                }
+            )
+        new["exploit"] = True
     for ev in events:
         ev["data"] = {"cve": cve, "what": ev["what"], "title": title, **ev["data"]}
     return new, events
@@ -439,13 +469,14 @@ async def listing(db: AsyncSession, user_id) -> list[dict]:  # noqa: ANN001
             {
                 "cve": r.cve,
                 "since": r.created_at.isoformat(),
-                "known": bool(f["advisories"] or f["kev"] or f["epss"]),
+                "known": bool(f["advisories"] or f["kev"] or f["epss"] or f["exploits"]),
                 "title": f["title"],
                 "severity": f["severity"],
                 "kev": f["kev"],
                 "epss": f["epss"],
                 "fixed": f["fixed"][:FIX_LIST],
                 "fixed_count": len(f["fixed"]),
+                "exploits": [{"source": x["source"], "url": x["url"], "first_seen": x["first_seen"]} for x in f["exploits"]],
                 "advisories": len(f["advisories"]),
                 "advisory": f["link"],
                 "last_event": last.get(r.cve),
@@ -469,6 +500,8 @@ def _event_out(at: datetime, d: dict) -> dict:
         out |= {"score": d.get("score"), "percentile": d.get("percentile"), "from": d.get("from"), "reasons": [str(x) for x in d.get("reasons") or []]}
     elif what == "withdrawn":
         out |= {"source": str(d.get("source") or ""), "ident": str(d.get("ident") or "")}
+    elif what == "exploit":
+        out |= {"exploits": [{"source": str(x.get("source") or ""), "url": str(x.get("url") or "")} for x in d.get("exploits") or [] if isinstance(x, dict)][:3]}
     return out
 
 
