@@ -157,12 +157,18 @@ services:
     pids_limit: 64
     environment:
       NEWS_HTTPS_PORT: ${PORT:-8095}
+      # the names nginx answers to (16-server-names.envsh): BASE_URL's host, NEWS_HOSTNAME, TLS_NAMES, localhost – any
+      # other Host header gets no answer (docs/BETRIEB.md: HTTPS, Host-Namen)
+      NEWS_BASE_URL: ${BASE_URL:-https://localhost:8095}
+      NEWS_TLS_HOSTNAME: ${NEWS_HOSTNAME:-}
+      NEWS_TLS_NAMES: ${TLS_NAMES:-}
       NGINX_ENVSUBST_FILTER: "^NEWS_"
     ports:
       # with a sign-in in front, BIND=0.0.0.0 may open it to the network (docs/BETRIEB.md)
       - "${BIND:-127.0.0.1}:${PORT:-8095}:443"
     volumes:
       - ./deploy/nginx/cobe-news.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./deploy/nginx/16-server-names.envsh:/docker-entrypoint.d/16-server-names.envsh:ro
       - ./deploy/nginx/40-cert-watch.sh:/docker-entrypoint.d/40-cert-watch.sh:ro
       - ${TLS_SOURCE:-tls}:/etc/nginx/tls:ro
     networks:
