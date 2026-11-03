@@ -445,6 +445,9 @@ class VendorAdvisoryProduct(Base):
 
     product: Mapped[str] = mapped_column(Text, primary_key=True)
     advisory_id: Mapped[str] = mapped_column(ForeignKey("vendor_advisories.id", ondelete="CASCADE"), primary_key=True, index=True)
+    # found by the relink after a catalogue change (vendor.relink_catalog): a finding only such links make is shown,
+    # never notified – a later store of the advisory links it anew (not quiet)
+    quiet: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
 
 
 class VendorFetch(Base):
