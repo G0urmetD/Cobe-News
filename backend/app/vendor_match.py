@@ -526,6 +526,21 @@ def _cpe_parts(criteria: str) -> list[str]:
     return re.split(r"(?<!\\):", criteria)
 
 
+def cpe_fields(cpe: str) -> list[str]:
+    """The fields of a CPE – "cpe:2.3:a:vendor:product:…", "cpe:/a:vendor:product" or the catalogue's "a:vendor:product"
+    – split only at the colons between fields (NVD escapes one inside a field: a:mailcow:mailcow\\:_dockerized is the
+    product "mailcow:_dockerized"), NVD's escapes removed."""
+    t = str(cpe or "")
+    t = t[8:] if t.startswith("cpe:2.3:") else t[5:] if t.startswith("cpe:/") else t
+    return [re.sub(r"\\(.)", r"\1", f) for f in _cpe_parts(t)]
+
+
+def cpe_vendor_product(cpe: str) -> str:
+    """"vendor:product" of a CPE in any of the forms cpe_fields reads ("" when it has no product)."""
+    f = cpe_fields(cpe)
+    return f"{f[1]}:{f[2]}" if len(f) >= 3 and f[1] and f[2] else ""
+
+
 WINDOWS_RELEASE_CPE = re.compile(r"^o:microsoft:windows(?:_|$)")
 
 
@@ -653,7 +668,7 @@ def _cna_names(product: dict) -> list[tuple[str, str]]:
         return names
     out = []
     for c in product.get("cpes") or []:
-        parts = c.replace("\\", "").split(":")
+        parts = cpe_fields(c)
         if len(parts) == 3:
             out.append((parts[1].replace("_", " "), parts[2].replace("_", " ")))
     return out
@@ -669,6 +684,51 @@ def _cna_version(scheme: str, text) -> V | None:
 
 
 _OPEN = ("", "0", "*", "n/a", "unspecified")
+_OP = re.compile(r"^\s*(>=|<=|>|<|=)\s*([^\s,<>=]+)\s*$")
+
+
+def _range_row(x: dict) -> dict:
+    """A range written into the version field, as GitHub's advisories and many CNAs do (">= 3.2.0, < 4.7.1", "< 25.7.0",
+    "<= 2.1", "= 1.4.0") – as the CVE 5 form: version / lessThan / lessThanOrEqual. Read as one version it was
+    3.2.0.4.7.1 (anything above 3.2.0 "newer than listed") and "< 25.7.0" the fixed release 25.7.0 itself ("listed as
+    affected"). "> a" counts from a (rare – a itself then reads affected rather than missed). Anything else unchanged."""
+    text = x.get("version")
+    if not isinstance(text, str) or x.get("lessThan") or x.get("lessThanOrEqual") or not text.strip()[:1] in "<>=":
+        return x
+    lo = hi = hie = eq = None
+    for part in text.split(","):
+        m = _OP.match(part)
+        if m is None:
+            return x
+        op, val = m.groups()
+        if op in (">=", ">"):
+            lo = lo or val
+        elif op == "<":
+            hi = hi or val
+        elif op == "<=":
+            hie = hie or val
+        else:
+            eq = eq or val
+    if eq and not (lo or hi or hie):
+        return {**x, "version": eq}
+    if not (hi or hie):
+        return x  # only a lower bound: "everything from a on" is no range this reads – left as it was (unparsed)
+    out = {k: val for k, val in x.items() if k != "version"}
+    out["version"] = lo or "0"
+    out["lessThan" if hi else "lessThanOrEqual"] = hi or hie
+    return out
+
+
+def _adp_rows(blocks: list) -> list:
+    """CISA's ADP rows for eval_cna: their defaultStatus "affected" sits next to a range and is no statement about every
+    other version (GitLab CVE-2024-4835: 15.11 – < 17.0.1, default affected) – read as "unknown"."""
+    out = []
+    for b in blocks or []:
+        if not isinstance(b, dict):
+            continue
+        rows = [{**a, "defaultStatus": "unknown"} if isinstance(a, dict) and a.get("defaultStatus") == "affected" else a for a in b.get("affectedData") or []]
+        out.append({**b, "affectedData": rows})
+    return out
 
 
 def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
@@ -689,7 +749,9 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
             vendor, prod = str(a.get("vendor") or ""), str(a.get("product") or "")
             if not any(name_matches(prod, want, vendor) and (_norm(vendor)[:1] == _norm(wv)[:1] or name_matches(vendor, wv)) for wv, want in names):
                 continue
-            versions = [x for x in a.get("versions") or [] if isinstance(x, dict)]
+            if any(name_matches(prod, n, vendor) for n in product.get("excluded_names") or []):
+                continue  # another product the names would take (Dovecot: OX Dovecot Pro)
+            versions = [_range_row(x) for x in a.get("versions") or [] if isinstance(x, dict)]
             if not any(x.get("status") == "affected" for x in versions) and a.get("defaultStatus") != "affected":
                 continue
             relevant = True
@@ -722,6 +784,8 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                     # NetScaler: version "14.1", lessThan "8.50" – the build within the line: below 14.1-8.50
                     end_text = f"{base}-{str(end_text).strip()}"
                 if end_text:
+                    # Dell: lessThan "7.30.10.50 or later" – fixed in that version (or a later one): below it is affected
+                    end_text = re.sub(r"(?i)\s+or\s+later\s*$", "", str(end_text))
                     line = str(end_text).strip().endswith(".*")
                     start = _cna_version(scheme, _FLAVOUR.sub("", str(start_text or "")).strip(" -") if flavour else start_text)
                     end = None if str(end_text).strip() == "*" else _cna_version(scheme, end_text)
@@ -843,7 +907,7 @@ def _adp_product(product: dict) -> dict:
     rows carry CPE names, not the CNA's."""
     names = []
     for c in product.get("cpes") or []:
-        parts = c.replace("\\", "").split(":")
+        parts = cpe_fields(c)
         if len(parts) == 3:
             names.append((parts[1].replace("_", " "), parts[2].replace("_", " ")))
     return {**product, "cna": names}
@@ -867,7 +931,7 @@ def eval_cvelist(product: dict, data: dict, v: V | None) -> Verdict | None:
         return None
     got = eval_cna(product, data.get("cna") or [], v)
     if got is None and data.get("adp") and product.get("cpes"):
-        got = eval_cna(_adp_product(product), data.get("adp") or [], v)
+        got = eval_cna(_adp_product(product), _adp_rows(data.get("adp")), v)
     return got
 
 
@@ -922,13 +986,23 @@ def eval_nvd(product: dict, data: dict, v: V | None) -> Verdict | None:
     if not filter_ok(product, data):
         return None
     a = eval_configs(product, data.get("configs") or [], v)
-    b = eval_cna(product, data.get("cna") or [], v)
+    cna, adp = data.get("cna") or [], data.get("adp") or []
+    if "adp" not in data and len(cna) > 1:
+        cna, adp = cna[:1], cna[1:]  # stored before 0.1.47 (one list, the CNA's block first): the others are ADPs
+    b = eval_cna(product, cna, v)
+    if b is None and (a is None or a.status == "possible") and adp and product.get("cpes"):
+        # CISA's ADP only where the CNA does not name the product and NVD's analysis decides nothing (none, or only
+        # "possibly": vCenter's exact update CPEs, CVE-2024-37080 – CISA's "8.0 < 8.0u2d" settles it) – never over a
+        # clear NVD verdict (VMware Cloud Foundation CVE-2022-22948: CISA "4.0 – < 5.0", NVD "< 4.4.1")
+        b = eval_cna(_adp_product(product), _adp_rows(adp), v)
     if a is None or b is None:
         return a or b
     if a.status == "affected" or b.status == "affected":
         return a if a.status == "affected" else b
     if b.status == "not_affected" and a.status in ("possible", "not_affected"):
         return b  # the CNA (mostly the vendor itself) decides where NVD's CPEs are less precise
+    if a.status == "not_affected" and b.status == "possible" and b.reason == "unparsed_data":
+        return a  # the CNA wrote prose ("versions prior to v22.09"): NVD's analysed ranges decide (BookStack CVE-2022-40690)
     return worst(a, b)
 
 
@@ -1128,15 +1202,18 @@ def entries_for(product: dict, data: dict) -> list[dict]:
     if not csaf_speaks_for(product, data):
         return []
     own = str(product.get("vendor") or "") if data.get("provider") else ""
-    cpes = {":".join(c.replace("\\", "").split(":")[1:3]) for c in product.get("cpes") or []}
+    cpes = {cpe_vendor_product(c) for c in product.get("cpes") or []} - {""}
     names = [(str(a), str(b)) for a, b in product.get("cna") or []] + [("", str(product.get("label") or ""))]
     names += [("", re.sub(r"\s*\(.*?\)\s*$", "", str(product.get("label") or "")))]
+    excluded = [str(n) for n in product.get("excluded_names") or []]
     out = []
     for e in data.get("products") or []:
         if own and not any(_same_vendor(str(e.get("vendor") or ""), o) for o in _vendor_names(own)):
             continue  # another vendor's branch in a provider's document
+        if excluded and any(name_matches(str(e.get("name") or ""), n, str(e.get("vendor") or "")) for n in excluded):
+            continue  # another product under the same CPE (Dovecot: OX Dovecot Pro)
         cpe = e.get("cpe") or ""
-        if cpe and ":".join(cpe.split(":")[1:3]) in cpes:
+        if cpe and cpe_vendor_product(cpe) in cpes:  # an escaped colon stays in its field (mailcow:_dockerized)
             out.append(e)
             continue
         if not cpe and any(w and name_matches(str(e.get("name") or ""), w, str(e.get("vendor") or "")) for _, w in names):

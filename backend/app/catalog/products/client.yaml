@@ -13,7 +13,10 @@
   kw: [Microsoft Edge]
   example: 131.0.2903.86
 - key: firefox  # the release channel (endoflife.date's product); Firefox ESR is its own product
+  label: Mozilla Firefox  # endoflife.date says "Firefox" – named like Mozilla Firefox ESR and Mozilla Thunderbird
+  vendor: Mozilla
   cpes: [a:mozilla:firefox]
+  kw: [Firefox]  # the word NVD's keyword search and the related stories look for (the label was "Firefox" before)
   cpe_editions: [[a:mozilla:firefox, "*"], [a:mozilla:firefox, "-"]]  # the release channel; "esr" is Firefox ESR
   belongs: [{pattern: '(?i)esr\s*$', to: firefox-esr}]
 - key: firefox-esr
@@ -26,6 +29,7 @@
   kw: [Firefox ESR]
   aliases: [Firefox Extended Support Release]
   example: 140.4.0esr
+  lines_only: lts  # only the ESR lines (endoflife.date: Firefox's LTS lines 115, 128, 140, 153 …) – "134.0" is refused
 - key: thunderbird
   label: Mozilla Thunderbird
   vendor: Mozilla

@@ -7,17 +7,22 @@ import { describe, expect, it, vi } from "vitest"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import aboutDe from "@/i18n/about.de"
 import type { Changelog } from "@/lib/changelog"
+import { UPDATE_KEY, type UpdateStatus } from "@/lib/update-api"
 import { AboutPage } from "./about"
 
 // sonner (pulled in by the shared helpers) injects its CSS on import – not in node
 vi.mock("sonner", () => ({ toast: Object.assign(() => undefined, { error: () => undefined, success: () => undefined }) }))
+// the update check is for admins only (app/update_check.py) – a reader by default, an admin where a test says so
+const auth = vi.hoisted(() => ({ isAdmin: false }))
+vi.mock("@/lib/auth", () => ({ useAuth: () => auth }))
 
 const t = i18n.createInstance()
 void t.use(initReactI18next).init({ lng: "de", resources: { de: { translation: aboutDe } }, keySeparator: false, nsSeparator: false, interpolation: { escapeValue: false } })
 
-function render(data: Changelog): string {
+function render(data: Changelog, update?: UpdateStatus): string {
   const qc = new QueryClient()
   qc.setQueryData(["changelog"], data)
+  if (update) qc.setQueryData(UPDATE_KEY, update)
   return renderToStaticMarkup(
     createElement(I18nextProvider, { i18n: t }, createElement(QueryClientProvider, { client: qc }, createElement(TooltipProvider, null, createElement(AboutPage)))),
   )
@@ -101,5 +106,41 @@ describe("AboutPage", () => {
     const html = render({ version: "0.1.2", entries: [{ version: "0.1.1", title: "x", items: ["y"] }] })
     expect(html).toContain("Für 0.1.2 gibt es noch keine Notizen")
     expect(html).toContain("0.1.1")
+  })
+
+  it("shows admins the switch of the update check and what it found – readers nothing", () => {
+    const data = { version: "0.1.46", entries: [] }
+    const update: UpdateStatus = {
+      enabled: true,
+      current: "0.1.46",
+      latest: "0.1.48",
+      available: true,
+      ahead: false,
+      dismissed: false,
+      url: "https://github.com/G0urmetD/Cobe-News/releases/tag/v0.1.48",
+      published_at: null,
+      checked_at: null, // a time (Ts) needs the browser's clock – not in a server render
+      error: null,
+      rev: 1,
+    }
+    expect(render(data, update)).not.toContain("Nach neuen Versionen suchen")
+    auth.isAdmin = true
+    try {
+      const html = render(data, update)
+      expect(html).toContain("Nach neuen Versionen suchen")
+      expect(html).toContain("0.1.48 verfügbar")
+      expect(html).toContain('href="https://github.com/G0urmetD/Cobe-News/releases/tag/v0.1.48"')
+      expect(html).toContain('rel="noopener noreferrer"')
+      // the release link only as an https address – as the shell's notice (no link otherwise)
+      const bad = render(data, { ...update, url: "javascript:alert(1)" })
+      expect(bad).not.toContain("javascript:")
+      expect(bad).not.toContain("0.1.48 verfügbar</a>")
+      // a build newer than the latest release (installed before its tag): no "verfügbar", but said so
+      const ahead = render({ ...data, version: "0.1.47" }, { ...update, current: "0.1.47", latest: "0.1.46", available: false, ahead: true, url: null })
+      expect(ahead).toContain("diese Installation (0.1.47) ist neuer")
+      expect(ahead).not.toContain("verfügbar")
+    } finally {
+      auth.isAdmin = false
+    }
   })
 })

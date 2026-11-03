@@ -209,9 +209,9 @@ All endpoints are `GET`, the answers JSON. The OpenAPI file in the **"Reference"
 
 | Endpoint | Content | Parameters |
 |---|---|---|
-| `/api/v1/news` | stories of the switched-on sources, newest first; answer `{items, next}` | `severity` (repeatable: `critical`, `high`, `medium`, `low`, `info`), `source` (key of the source, repeatable), `topic` (repeatable, any one matches: `zeroday`, `exploited`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` – see [Topics](/docs/news-quellen#themen)), `q` (words in title, summary, CVE), `since` (time in ISO 8601), `limit` (1–200, default 50), `before` (`next` of the previous page). Every story carries `topics`. |
+| `/api/v1/news` | stories of the switched-on sources, newest first; answer `{items, next}` | `severity` (repeatable: `critical`, `high`, `medium`, `low`, `info`), `source` (key of the source, repeatable), `topic` (repeatable, any one matches: `zeroday`, `exploited`, `poc`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` – see [Topics](/docs/news-quellen#themen)), `q` (words in title, summary, CVE), `since` (time in ISO 8601), `limit` (1–200, default 50), `before` (`next` of the previous page). Every story carries `topics`. |
 | `/api/v1/news/sources` | the switched-on sources with key and name | – |
-| `/api/v1/news/{id}` | one story, with the [EPSS](term:epss) of its CVEs | – |
+| `/api/v1/news/{id}` | one story, with the [EPSS](term:epss) of its CVEs and the [public exploits](/docs/vendor-news#oeffentlicher-exploit) (`exploits`) | – |
 | `/api/v1/vendor/products` | the followed products with versions, number of findings of each kind and urgency | – |
 | `/api/v1/vendor/products/{key}` | one followed product with its findings | `status` (repeatable; default: all but `not_affected`), `offset`, `limit` (1–500, default 100) |
 | `/api/v1/vendor/findings` | findings across all followed products, the most relevant first | `status` (repeatable; default: `affected` and `possible`), `severity` (repeatable), `exploited=true`, `offset`, `limit` (1–500, default 100) |
@@ -340,6 +340,7 @@ All metrics are of type `gauge`. Times are Unix seconds. `NaN` means "nothing ye
 | `cobe_news_restore_test_last_timestamp_seconds` | – | time the last test ended |
 | `cobe_news_restore_test_age_seconds` | – | age of the last test |
 | `cobe_news_restore_test_duration_seconds` | – | how long the last test took |
+| `cobe_news_update_available` | – | 1: a newer Cobe News version is published, 0: not; `NaN` while the [update notice](/docs/betrieb#update-hinweis) is off or has no answer yet |
 | `cobe_news_audit_entries` | `group` | entries in the [audit log](/docs/betrieb#protokoll) per area – counts only, no names |
 | `cobe_news_audit_newest_timestamp_seconds` | – | time of the newest audit log entry |
 | `cobe_news_database_size_bytes` | – | size of the database on disk (computed at most every 5 minutes) |

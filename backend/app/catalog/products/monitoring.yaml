@@ -87,3 +87,16 @@
   kw: [LibreNMS]
   example: "24.12.0"
   where: web_about
+
+# ---------------------------------------------------------------- added 0.1.47
+- key: oxidized
+  label: Oxidized (Oxidized Web)
+  vendor: Oxidized (ytti)
+  cpes: [a:oxidized_web_project:oxidized_web]  # NVD has no CPE for oxidized itself, only for the web interface (checked 2026-11-03)
+  cna: [[ytti, Oxidized Web], [Oxidized Web project, Oxidized Web]]
+  osv: [[RubyGems, oxidized-web]]
+  kw: [Oxidized]
+  aliases: [oxidized-web]
+  example: "0.18.1"  # oxidized-web's numbers, not oxidized's (0.37.0)
+  version_cmd: gem list oxidized-web
+  where: oxidized_web

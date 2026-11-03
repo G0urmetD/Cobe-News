@@ -8,7 +8,7 @@
   label: Dell iDRAC9
   vendor: Dell
   cpes: [o:dell:idrac9_firmware]
-  cna: [[Dell, Integrated Dell Remote Access Controller 9]]
+  cna: [[Dell, Integrated Dell Remote Access Controller 9], [Dell, iDRAC9]]  # Dell's newer records: "iDRAC9" (CVE-2026-23855)
   kw: [iDRAC]
   aliases: [iDRAC 9, Integrated Dell Remote Access Controller 9]
   example: 7.00.00.181
@@ -40,14 +40,13 @@
   example: "1.12"
   hint: nocpe
   where: ilo
-- key: dell-idrac10  # no CPE in NVD yet (checked 2026-11-02); CNA names in the form of iDRAC9's records
+- key: dell-idrac10  # checked 2026-11-03 against CVE-2026-35155 and CVE-2026-23855: Dell's CNA rows say "Dell / iDRAC10", NVD's CPE is o:dell:idrac10_firmware
   label: Dell iDRAC10
   vendor: Dell
-  cpes: []
-  cna: [[Dell, Integrated Dell Remote Access Controller 10], [Dell, iDRAC10]]
+  cpes: [o:dell:idrac10_firmware]
+  cna: [[Dell, iDRAC10], [Dell, Integrated Dell Remote Access Controller 10]]
   kw: [iDRAC10, iDRAC 10]
   example: "1.20.25.00"
-  hint: nocpe
   where: idrac
 - key: lenovo-xcc
   label: "Lenovo XClarity Controller (XCC)"

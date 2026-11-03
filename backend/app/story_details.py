@@ -23,22 +23,26 @@ limit). CSAF advisories are also stored as Vendor News advisories (`csaf:<id>`),
 the same documents under the same id (csaf_advisory), so one advisory is one record however it came."""
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import Text, and_, any_, cast, false, func, literal, or_, select, true, update
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import db as dbm
+from app import settings as settings_store
 from app import vendor
 from app import vendor_sources as src
 from app.models import NewsItem, NewsSource, StoryDetail, VendorAdvisory, VendorFetch, VendorFollow, VendorKev, VendorVersion
 from app.news import NewsError, _date, html_to_text
-from app.vendor_match import evaluate, ranges_of, worst
+from app.vendor_match import cpe_fields, evaluate, name_words, ranges_of, worst
 from app.vendor_versions import parse
 
 log = logging.getLogger("cobe_news.details")
@@ -175,7 +179,8 @@ def parse_csaf(data: bytes, kind: str, max_products: int = MAX_PRODUCTS) -> dict
         e = products.setdefault((p.get("vendor") or "", name), {"vendor": p.get("vendor") or "", "name": name, "cpe": "", "affected": set(), "fixed": set(), "not_affected": set()})
         cpe = p.get("cpe") or ""
         if cpe and not e["cpe"]:
-            parts = cpe.replace("cpe:2.3:", "").replace("cpe:/", "").split(":")
+            # split only between fields: an escaped colon belongs to its field (a:mailcow:mailcow\\:_dockerized)
+            parts = re.split(r"(?<!\\):", cpe.replace("cpe:2.3:", "").replace("cpe:/", ""))
             e["cpe"] = ":".join(parts[:3]) if len(parts) >= 3 else ""
         return e
 
@@ -601,6 +606,11 @@ async def build(db: AsyncSession, item: NewsItem, source: NewsSource, prev: dict
             body = await vendor.get(url, db=db, conditional=False, limit=CSAF_LIMIT)
             # all products for Vendor News (the same advisory from its CSAF provider is stored alike), the first ones shown
             d = await asyncio.to_thread(parse_csaf, body or b"{}", kind, STORE_PRODUCTS)
+            if d.get("tlp") and d["tlp"] not in ("WHITE", "CLEAR"):
+                # a story's document is shown to every reader and stored for Vendor News: only a public one (TLP:GREEN
+                # only from a CSAF provider an admin allows it for – csaf_providers, labelled there)
+                log.info("details: %s document labelled TLP:%s – not used", kind, d["tlp"][:20])
+                return None
             if not d["cvss"] and d["cves"]:
                 advs = [a for c in d["cves"][:MAX_CVES] if (a := await _nvd_cve(db, c, key, budget))]
                 if advs:
@@ -721,6 +731,7 @@ async def enrich_round(db: AsyncSession, *, limit: int = 60) -> int:
     csaf_left = CSAF_PER_ROUND
     now = datetime.now(UTC)
     done = 0
+    fol: list | None = None  # the followed products – read once, when the first details arrive (story.products)
     # only the stories without details or due again, among the newest 2000 – by the index, a few columns: not every
     # stored detail with its JSON every minute (20k stories: half a second on the event loop, every round)
     floor = await db.scalar(
@@ -788,8 +799,12 @@ async def enrich_round(db: AsyncSession, *, limit: int = 60) -> int:
             det.failures, det.status, det.next_try_at = (det.failures or 0) + 1, "error", now + timedelta(hours=6)
         await db.commit()
         if err is None:
-            # the details may make it "exploited" or "ohne Patch" (CSAF: no fix available) – its topics again
+            # the details may make it "exploited" or "ohne Patch" (CSAF: no fix available) – its topics again; and the
+            # followed products they concern ("Betrifft unsere Produkte")
             await news_svc.retopic(db, NewsItem.id == item.id)
+            if fol is None:
+                fol = await followed(db)
+            await set_products(db, item.id, products_of(d, fol))
             await db.commit()
         done += 1
         if done >= limit:
@@ -842,3 +857,193 @@ def hint(details: dict | None) -> dict | None:
         "product": f"{first['name']} {rng}".strip()[:120] if first else None,
         "exploited": bool(details.get("exploited")),
     }
+
+
+# ---------------------------------------------------------------- the story's products ("Betrifft unsere Produkte")
+#
+# news_items.products: the followed products a story's details concern – exactly matches() (the drawer's "Betrifft deine
+# Systeme"): the advisory's structured data (CSAF product tree, the NVD's CPE configurations, the CNA's affected rows)
+# judged by Vendor News' matcher – a product whose every entered version is "not affected" does not count, a product
+# without versions does. Never the words of the story (a keyword "Exchange" in a headline is no product hint).
+# Computed when the details arrive (enrich_round), for every stored story once per PRODUCTS_V, and again for the
+# products whose follow or versions changed (products_round: a signature per product, kept in the settings row
+# PRODUCTS_STATE – a product no longer followed is taken out of every list without looking at the details).
+
+PRODUCTS_V = 1
+PRODUCTS_STATE = "news_products"
+PRODUCTS_BATCH = 500
+_products_gen = [-1]  # vendor.gen.value at the last look – unchanged: nothing followed changed, no signature computed
+
+
+def products_of(details: dict | None, fol: list[tuple[dict, list[VendorVersion]]]) -> list[str]:
+    """The followed products (catalogue keys, sorted) these details concern."""
+    return sorted({m["product"] for m in matches(details, fol)}) if details and fol else []
+
+
+async def set_products(db: AsyncSession, item_id, keys: list[str]) -> None:  # noqa: ANN001
+    await db.execute(update(NewsItem).where(NewsItem.id == item_id, NewsItem.products != cast(literal(json.dumps(keys)), JSONB)).values(products=keys))
+
+
+def _signature(fol: list[tuple[dict, list[VendorVersion]]]) -> dict[str, str]:
+    """Per followed product: a hash of what decides its matches – the catalogue's entry (names, CPEs, scheme) and the
+    entered versions."""
+    out = {}
+    for p, vers in fol:
+        blob = json.dumps([p, sorted(str(v.version or "") for v in vers or [])], sort_keys=True, default=str)
+        out[str(p["key"])] = hashlib.sha256(blob.encode()).hexdigest()[:20]
+    return out
+
+
+async def followed_labels(db: AsyncSession) -> dict[str, str]:
+    """The followed products by key with their label ("PAN-OS") – the cards' badge "Unser Produkt: …"."""
+    out = {}
+    for f in await db.scalars(select(VendorFollow).where(VendorFollow.enabled.is_(True))):
+        if p := vendor.product_of(f):
+            out[str(p["key"])] = str(p.get("label") or p.get("name") or p["key"])
+    return out
+
+
+def anchors(product: dict) -> set[str] | None:
+    """Words (lower case) one of which a story's details must contain for the matcher (matches → vendor_match.evaluate)
+    to find this product at all: per name it compares – the catalogue names (Palo Alto, Fortinet, Veeam, CSAF, the
+    CNA's rows), the CNA names, the label (CSAF), the CPEs' product part (NVD's configurations, a CSAF product's CPE,
+    CISA's ADP rows), the OSV package names – the longest of its words (every word of a name must be there for it to
+    match; "and" may be a "&"). None: no such word can be given (a Windows build: its CPE comes from the version; a name
+    of no word) – every story's details are looked at. The prefilter of reproduct; it narrows, it never decides."""
+    if (product.get("scheme") or "generic") == "windows":
+        return None
+    label = str(product.get("label") or "")
+    texts = [str(n) for n in product.get("names") or []]
+    texts += [str(b) for _, b in product.get("cna") or []]
+    texts += [label, re.sub(r"\s*\(.*?\)\s*$", "", label)]
+    texts += [str(n) for _, n in product.get("osv") or []]
+    for c in product.get("cpes") or []:
+        parts = cpe_fields(c)
+        if len(parts) < 3:
+            return None
+        texts.append(parts[2].replace("_", " "))
+    out: set[str] = set()
+    for t in texts:
+        if not t.strip():
+            continue
+        words = [w for w in name_words(t) if w != "and"]
+        if not words:
+            return None
+        out.add(max(words, key=len))
+    return out
+
+
+def anchor_hit(words: set[str], raw: str) -> bool:
+    """reproduct's prefilter as Python does it (the tests compare it with the matcher): one of the words in the details."""
+    low = raw.lower()
+    return any(w in low for w in words)
+
+
+async def reproduct(db: AsyncSession, fol: list[tuple[dict, list[VendorVersion]]], keys: set[str] | None = None) -> int:
+    """The stored stories' products computed again – for these product keys only (the rest of each list stays), or all of
+    them (None: every list replaced). Keys no longer followed leave every list by SQL alone; the others are judged
+    against the stored details in chunks of PRODUCTS_BATCH stories (off the event loop), each chunk committed on its
+    own. Returns how many stories changed.
+
+    For some keys (a follow or its versions changed) only the details that can concern them are read: SQL picks those
+    containing one of their products' anchors (a word of a name the matcher compares) or listing one of the keys
+    already (it may have to leave) – one edit no longer judges every stored document; a product without anchors
+    (Windows) reads them all. The result is the same as the full pass (tests/test_topics_phase2.py)."""
+    have = {str(p["key"]) for p, _ in fol}
+    changed = 0
+    prefilter = None  # every stored document (the full pass)
+    if keys is not None:
+        if gone := sorted(keys - have):
+            res = await db.execute(
+                update(NewsItem)
+                .where(NewsItem.products.op("?|")(pg_array(gone)))
+                .values(products=NewsItem.products.op("-")(cast(pg_array(gone), ARRAY(Text))))
+                .execution_options(synchronize_session=False)
+            )
+            changed += res.rowcount or 0
+            await db.commit()
+        fol = [x for x in fol if str(x[0]["key"]) in keys]
+        if not fol:
+            return changed
+        words: set[str] | None = set()
+        for p, _ in fol:
+            got = anchors(p)
+            words = None if got is None or words is None else words | got
+        if words is not None:
+            low = func.lower(cast(StoryDetail.data, Text))
+            named = low.like(any_(pg_array(sorted(f"%{w}%" for w in words)))) if words else false()
+            prefilter = or_(NewsItem.products.op("?|")(pg_array(sorted(keys))), named)
+    else:
+        # every list replaced: a story without (usable) details concerns no product – nothing followed: none does
+        empty = NewsItem.products != cast(literal("[]"), JSONB)
+        has = select(StoryDetail.item_id).where(StoryDetail.item_id == NewsItem.id, StoryDetail.status == "ok", StoryDetail.data.is_not(None)).exists()
+        res = await db.execute(update(NewsItem).where(empty, ~has if fol else true()).values(products=[]).execution_options(synchronize_session=False))
+        changed += res.rowcount or 0
+        await db.commit()
+        if not fol:
+            return changed
+    last = None
+    while True:
+        stmt = (
+            select(StoryDetail.item_id, cast(StoryDetail.data, Text), NewsItem.products)
+            .join(NewsItem, NewsItem.id == StoryDetail.item_id)
+            .where(StoryDetail.status == "ok", StoryDetail.data.is_not(None), *([prefilter] if prefilter is not None else []))
+            .order_by(StoryDetail.item_id)
+            .limit(PRODUCTS_BATCH)
+        )
+        if last is not None:
+            stmt = stmt.where(StoryDetail.item_id > last)
+        rows = (await db.execute(stmt)).all()
+        if not rows:
+            break
+        last = rows[-1][0]
+
+        def compute(rows=rows) -> list[dict]:  # noqa: ANN001
+            out = []
+            for iid, raw, old in rows:
+                hit = products_of(json.loads(raw) if raw else None, fol)
+                new = hit if keys is None else sorted({k for k in old or [] if k not in keys} | set(hit))
+                if new != list(old or []):
+                    out.append({"id": iid, "products": new})
+            return out
+
+        upd = await asyncio.to_thread(compute)
+        await dbm.release(db)
+        if upd:
+            await db.execute(update(NewsItem), upd)
+            changed += len(upd)
+        await db.commit()
+        if len(rows) < PRODUCTS_BATCH:
+            break
+    return changed
+
+
+async def products_round(db: AsyncSession) -> int | None:
+    """Background (after the details round): the stories' products once per PRODUCTS_V (a new installation, the upgrade
+    that brought the column – every list), else again for the products whose follow or versions changed since the last look (their
+    signature) – a follow added, switched off, removed, a version entered. Nothing changed: None (and while Vendor
+    News' generation counter stands still not even the signatures are computed)."""
+    stamp = vendor.gen.value
+    state = await settings_store.get(db, PRODUCTS_STATE)
+    due = int(state.get("v") or 0) < PRODUCTS_V
+    if not due and _products_gen[0] == stamp:
+        return None
+    fol = await followed(db)
+    sig = _signature(fol)
+    old = state.get("sig") if isinstance(state.get("sig"), dict) else {}
+    keys = None if due else {k for k in set(sig) | set(old) if sig.get(k) != old.get(k)}
+    n = None
+    if keys is None or keys:
+        await dbm.release(db)
+        n = await reproduct(db, fol, keys)
+        await settings_store.put(db, PRODUCTS_STATE, {"v": PRODUCTS_V, "sig": sig})
+        await db.commit()
+        if n:
+            log.info("details: products of %d stories computed", n)
+    _products_gen[0] = stamp
+    return n
+
+
+def reset_products() -> None:
+    """Forget the last look (tests: a database of their own each)."""
+    _products_gen[0] = -1

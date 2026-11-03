@@ -74,6 +74,8 @@ class NewsItem(Base):
         Index("ix_news_items_search_trgm", "search", postgresql_using="gin", postgresql_ops={"search": "gin_trgm_ops"}),
         # the topic filter (topics ?| …) and "which stories name these CVEs" (KEV changes, a new KEV story) – migration 0024
         Index("ix_news_items_topics", "topics", postgresql_using="gin"),
+        # "Betrifft unsere Produkte" (products ?| the followed ones) – migration 0026
+        Index("ix_news_items_products", "products", postgresql_using="gin"),
         Index("ix_news_items_cves", "cves", postgresql_using="gin"),
     )
 
@@ -107,6 +109,15 @@ class NewsItem(Base):
     # the story's topics (news.topics_of: zeroday, exploited, ransomware, nopatch, breach, supply, phishing, ot) – from
     # title, stored teaser, source, CVEs, details and the KEV; recomputed when any of them changes (news.retopic)
     topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    # those of its topics the story gained quietly – by a full recompute (news.backfill_topics: a new rule version, an
+    # exploit list's first import or switched on) or through a list's baseline entries only: shown and filtered like
+    # any, never a reason for a notification rule to send it (news.loud_topic) – an old story is no news because a list
+    # was switched on. A topic lost is no longer quiet.
+    quiet_topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    # the followed products (catalogue keys) the story's details concern – story_details.matches, as the drawer's
+    # "Betrifft deine Systeme": from the advisory's structured data, never from words. Recomputed when the details arrive
+    # and when a follow or its versions change (story_details.products_round); "Betrifft unsere Produkte" on News
+    products: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
 
 
 class NewsItemSource(Base):
@@ -165,6 +176,9 @@ class User(Base):
     external_id: Mapped[str | None] = mapped_column(Text)  # objectGUID (AD) / object id (Entra)
     password_hash: Mapped[str | None] = mapped_column(Text)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    # when the temporary password was issued (admin, CLI reset-emergency): valid for `temp_password_days` (settings
+    # section "sessions") – a sign-in with it after that is refused (auth_api.temp_password_expired)
+    temp_password_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     totp_secret_enc: Mapped[str | None] = mapped_column(Text)
     totp_last_step: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -315,6 +329,8 @@ class NotifyRule(Base):
     # so a wider rule starts from then instead of sending everything older that newly matches (notify.widened)
     earlier: Mapped[list] = mapped_column(Json, default=list)
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")  # optimistic concurrency, as channels
+    # news only: stories with one of these topics (news.TOPICS; empty = any) – AND with severities and sources
+    topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
 
 
 class NotifyRuleChannel(Base):
@@ -445,6 +461,9 @@ class VendorAdvisoryProduct(Base):
 
     product: Mapped[str] = mapped_column(Text, primary_key=True)
     advisory_id: Mapped[str] = mapped_column(ForeignKey("vendor_advisories.id", ondelete="CASCADE"), primary_key=True, index=True)
+    # found by the relink after a catalogue change (vendor.relink_catalog): a finding only such links make is shown,
+    # never notified – a later store of the advisory links it anew (not quiet)
+    quiet: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
 
 
 class VendorFetch(Base):
@@ -583,6 +602,30 @@ class EpssScore(Base):
     percentile: Mapped[float | None] = mapped_column(Float)
     day: Mapped[str] = mapped_column(Text, default="")
     fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ExploitRef(Base):
+    """A source that lists public exploit code or a ready-made check for one CVE (app/exploits.py): Metasploit module,
+    Exploit-DB entry, nuclei template – the CVE, the source, a link to the entry, when Cobe News first saw it. No code.
+    `baseline`: brought by the source's first import – shown, never notified."""
+
+    __tablename__ = "exploit_refs"
+
+    cve: Mapped[str] = mapped_column(Text, primary_key=True)
+    source: Mapped[str] = mapped_column(Text, primary_key=True)  # nuclei | metasploit | exploitdb
+    url: Mapped[str] = mapped_column(Text)
+    first_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    baseline: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+
+
+class UpdateDismissal(Base):
+    """The release whose update notice an admin closed (app/update_check.py): a newer one shows it again."""
+
+    __tablename__ = "update_dismissals"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    version: Mapped[str] = mapped_column(Text)
+    dismissed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 # ---------------------------------------------------------------- source health (app/source_health.py)

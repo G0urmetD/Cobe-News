@@ -213,3 +213,15 @@
   aliases: [Autotask Endpoint Management, CentraStage]
   hint: nocpe
   where: client_about
+
+# ---------------------------------------------------------------- added 0.1.47
+- key: apache-guacamole
+  label: Apache Guacamole
+  vendor: Apache Software Foundation
+  cpes: [a:apache:guacamole]  # a:guac-dev:guacamole (before Apache) is deprecated
+  cna: [[Apache Software Foundation, Apache Guacamole]]
+  osv: [[Maven, org.apache.guacamole:guacamole-common]]
+  kw: [Guacamole]
+  aliases: [Guacamole]
+  example: "1.6.0"
+  where: linux_package

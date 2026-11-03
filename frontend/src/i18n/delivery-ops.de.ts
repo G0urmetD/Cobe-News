@@ -136,6 +136,7 @@ const deliveryOpsDe: Record<string, string> = {
   "dlog.dry.because": "weil: {{parts}}",
   "dlog.dry.bySeverity": "Schwere {{sev}}",
   "dlog.dry.bySource": "Quelle {{source}}",
+  "dlog.dry.byTopic": "Thema {{topics}}",
   "dlog.dry.byTeams": "Produkt eines gewählten Teams",
   "dlog.dry.truncated": "Die neuesten {{shown}} von {{count}} Treffern sind aufgeführt.",
 }

@@ -23,10 +23,11 @@ Everything about the installation itself (address, certificate, network, databas
 | `BIND` | which host address the port listens on. `0.0.0.0` opens it to the network ([Address for colleagues](#adresse)) | `127.0.0.1` (this machine only) |
 | `BASE_URL` | the address people type in the browser – for links in notifications, the Entra redirect URI, the push contact address and the names in the certificate | `https://localhost:8095` |
 | `NEWS_HOSTNAME` | [FQDN](term:fqdn) for the self-signed certificate (besides `localhost` and `127.0.0.1`) | empty |
-| `TLS_NAMES` | more names or IP addresses for the self-signed certificate, comma separated | empty |
+| `TLS_NAMES` | more names or IP addresses for the self-signed certificate, comma separated. nginx answers only to the names from `BASE_URL`, `NEWS_HOSTNAME`, `TLS_NAMES` and `localhost` ([Known names only](#host-namen)) | empty |
 | `APP_PORT` | http port of the app, always bound to `127.0.0.1`: for the health check, Prometheus on the same host ([Metrics](/docs/api#prometheus-konfiguration)) and your own reverse proxy on the same host | `8096` |
 | `COMPOSE_FILE` | `docker-compose.yml:docker-compose.http.yml` switches on the redirect from http to https ([HTTPS](#http-umleitung)) | not set |
 | `HTTP_PORT` | http port that only redirects to https (only with `COMPOSE_FILE` as above) | `8094` |
+| `COBE_NEWS_IMAGE` | the released, signed image instead of the local build, e.g. `ghcr.io/g0urmetd/cobe-news:0.1.46` – only with `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; verify the signature with cosign first (docs/BETRIEB.md) | not set (local build) |
 
 ### Certificate {#env-zertifikat}
 
@@ -49,7 +50,7 @@ Everything about the installation itself (address, certificate, network, databas
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `SECRET_KEY` | [master key](term:masterkey) for stored secrets (webhook URLs, SMTP and LDAP password, Entra secret, TOTP of local accounts). Do not change it once secrets are stored | empty: key file `./data/secret.key` |
+| `SECRET_KEY` | [master key](term:masterkey) for stored secrets (webhook URLs, SMTP and LDAP password, Entra secret, TOTP of local accounts). At least 32 random characters, e.g. from `openssl rand -base64 32` – a shorter one (or one of only a few different characters) starts, but logs a warning at the start and shows a notice under *Settings → HTTPS & certificate*. Do not change it once secrets are stored | empty: key file `./data/secret.key` |
 | `WEBHOOK_HOSTS` | more allowed hosts for Teams and Slack channels (besides the Microsoft and Slack hosts), e.g. `chat.corp.example` | empty |
 | `WEBHOOK_PRIVATE_NETS` | private addresses or networks notification channels may post to (e.g. an n8n in the company network), e.g. `10.20.0.0/16,192.168.10.5`; also the own Docker networks and the Docker host by its address. Loopback, link-local (`169.254.169.254`), "any" and multicast stay blocked always ([Allowed targets](/docs/benachrichtigungen#webhook-ziele)) | empty: public targets only |
 | `SMTP_ALLOW_INTERNAL` | address of an [SMTP](term:smtp) relay that would otherwise be refused as internal (e.g. on the Docker host behind the gateway `172.31.250.1`; then also by a name like `host.docker.internal`). Loopback, link-local, "any" and multicast stay blocked always | empty |
@@ -85,6 +86,7 @@ More: [Web Push](/docs/integrationen#web-push), key [VAPID](term:vapid).
 | `EDGE_SUBNET` | subnet of the Docker network `edge` between nginx and the app – change it only if it collides with one of your networks | `172.31.250.0/24` |
 | `EDGE_RANGE` | range within it for dynamic addresses (the proxy's fixed address lies outside) | `172.31.250.128/25` |
 | `PROXY_IP` | fixed address of the bundled nginx in the network `edge`; only from it (and from `TRUSTED_PROXIES`) does the app take the client address. Must lie in `EDGE_SUBNET` and outside `EDGE_RANGE` | `172.31.250.10` |
+| `MAX_BODY_BYTES` | largest request the app itself takes, in bytes (16 KiB to 64 MiB) – behind nginx, which refuses at 1 MB already; larger ones get `413` (`body_too_large`). Only needed for your own proxy that lets more through; no endpoint needs more | `1048576` (1 MiB) |
 
 Fixed in `docker-compose.yml` and not settable through the `.env`: the app's `TLS_PATH`, `POSTGRES_HOST` and
 `POSTGRES_USER`. Other variables the code knows (e.g. `BACKUP_DIR`, `DATABASE_URL`) are not passed to the container
@@ -190,6 +192,24 @@ docker compose logs --tail 50 app
 
 The first line after the start names version and address: `Cobe News 0.1.x – data in /data, https://…`. If the app
 does not come up, the reason is in the log of `app` or `db-init` ([Logs](#logs)).
+
+### Update notice {#update-hinweis}
+
+Admins see a small notice in the top bar as soon as a newer version is published: **“Version 0.1.48 available –
+changelog”**. The link opens the release page on GitHub; the **×** closes the notice for you and this version – when an
+even newer one appears, it comes back. Readers see nothing.
+
+- **Where from:** GitHub's public release API (`api.github.com/repos/G0urmetD/Cobe-News/releases/latest`), without
+  sign-in, at most every 12 hours – also after an error –, conditional (`ETag`: unchanged does not count against
+  GitHub's limit of 60 requests an hour), with a short timeout and a size limit, through the same hardening as every
+  fetch. Only the request itself is sent, with the user agent `Cobe/<version>` – nothing about your installation.
+- **What counts:** only a final `x.y.z` version higher than the running one. Drafts, pre-releases (`0.1.48-rc1`) and
+  other tags are skipped.
+- **Switch off:** in the user menu *Version & changelog*, switch **“Check for new versions”** (on by default). Off: no
+  request, no notice. That page also shows the latest known version, when it was last checked and an error.
+- **Monitoring:** `/metrics` reports `cobe_news_update_available` ([Metrics](/docs/api#metriken)).
+
+The notice does not replace the update – that stays your step ([Update step by step](#update-schritte)).
 
 ### Back to the old version {#update-zurueck}
 
@@ -302,6 +322,30 @@ HTTP_PORT=8094
 
 Then `docker compose up -d`. The port only redirects, it serves no content. It listens on the same address as `BIND`.
 
+Even without this port: whoever sends `http://…` to the https port (e.g. `http://news.corp.example:8095`) is redirected
+to `https://` instead of seeing nginx's error page "plain HTTP request was sent to HTTPS port".
+
+### Known names only {#host-namen}
+
+The bundled nginx serves Cobe News only under the names that belong to the installation:
+
+- the name from `BASE_URL`,
+- `NEWS_HOSTNAME` and every entry of `TLS_NAMES` (names and IP addresses),
+- `localhost`, `127.0.0.1` and `[::1]` – access on the server itself always works.
+
+A request with another name in the `Host` header – someone scanning address ranges, or a foreign DNS name pointing at
+your server – gets no page: over https only the line "Unbekannter Hostname – in .env BASE_URL oder TLS_NAMES
+eintragen. / Unknown host name – add it to BASE_URL or TLS_NAMES in .env." (HTTP 421), over http nothing (nginx closes
+the connection, code 444 in the proxy's log). If someone opens the page by a further name or an IP address, put it
+into `TLS_NAMES` and run `docker compose up -d` – with the self-signed certificate it then goes into the certificate as
+well. Which names apply is in the log at the start: `docker compose logs proxy | grep "answering to"`. When Cobe News
+is opened to the network (`BIND=0.0.0.0`) while `BASE_URL` still names `localhost`, a warning is there as well.
+
+> **Upgrading to 0.1.47:** earlier versions answered to any name. If you open Cobe News by an IP address or a name that
+> is not in `BASE_URL`, `NEWS_HOSTNAME` or `TLS_NAMES`, the browser shows "Unknown host name" after the update. Before
+> it, put the address from the address bar into `TLS_NAMES` (or set `BASE_URL` correctly), then `docker compose up -d`. Enter names with umlauts in their `xn--` form; an entry with
+characters other than letters, digits, `.`, `-`, `:`, `[`, `]` (and a leading `*.`) is skipped and named in the log.
+
 ## Own reverse proxy {#reverse-proxy}
 
 If the server already runs an nginx, Traefik or similar with a certificate, it can serve Cobe News. The bundled nginx
@@ -396,7 +440,8 @@ TLS_NAMES=10.0.0.5
 ```
 
 1. Create a DNS record, e.g. `news.corp.example`, pointing to the server's address.
-2. Put the values above into the `.env`. `TLS_NAMES` only if someone also opens the page by its IP address. If the
+2. Put the values above into the `.env`. `TLS_NAMES` only if someone also opens the page by its IP address – then it is
+   needed, though: nginx answers only to known names ([Known names only](#host-namen)). If the
    address should have no port: `PORT=443` and `BASE_URL=https://news.corp.example`.
 3. In the server's firewall open the port from `PORT` (8095 out of the box, TCP) to the company network – with the
    http redirect also `HTTP_PORT`.
@@ -457,9 +502,9 @@ docker compose logs db
 
 | Container | When to look |
 |---|---|
-| `app` | almost always: start (version, address), certificate (`tls:`), fetching (`news:`), notifications (`notify:`, `push:`), source health, directory sync, requests (address, method, path, status, duration) |
+| `app` | almost always: start (version, address), certificate (`tls:`), fetching (`news:`), notifications (`notify:`, `push:`), source health, directory sync, requests (address, method, path, status, duration); warnings about anything suspicious: `SECRET_KEY is short` (at the start), `csrf check failed` (at most one line per address and minute), `emergency admin: … failed sign-in checks` (at most one an hour) |
 | `db-init` | when the app does not start – usually a problem with the database passwords |
-| `proxy` | certificate reloaded ("certificate changed – nginx reloaded") or nginx does not start |
+| `proxy` | certificate reloaded ("certificate changed – nginx reloaded"), the names nginx answers to ("answering to …"), or nginx does not start |
 | `db` | errors of the database itself, e.g. too little memory |
 
 `-f` follows the log continuously (stop with Ctrl+C), `--since 1h` shows only the last hour, `--tail 100` the last 100
@@ -573,7 +618,8 @@ either.
   authentication context), [Second factor for everyone](/docs/anmeldung#zweiter-faktor-alle) and the session limits,
   group mappings, the setup, sign-ins of **admins**
   with the method (password, password and TOTP, AD/LDAP, passkey, Entra ID, Entra ID and TOTP), account locks and address blocks after
-  failed attempts – also after refused passkey sign-ins.
+  failed attempts – also after refused passkey sign-ins –, and when the failed attempts of the
+  [emergency admin](/docs/anmeldung#notfall-admin) exceed the hourly budget.
 - **API tokens:** created and revoked (name, scopes, validity).
 - **Channels & rules, teams, sources & products:** created, changed, deleted; for teams also groups, members, products,
   assignment, weekly review and absences. For channels also ntfy, Gotify and Mattermost (topic and tokens as "changed"

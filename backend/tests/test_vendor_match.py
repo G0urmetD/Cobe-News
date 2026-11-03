@@ -404,3 +404,110 @@ def test_cve5_exact_version_with_status_unknown_is_not_cleared():
     assert eval_cna(product, aff, parse("generic", "2.0")).status == "possible"
     assert eval_cna(product, aff, parse("generic", "1.0")).status == "affected"
     assert eval_cna(product, aff, parse("generic", "1.5")).status == "not_affected"
+
+
+# ---------------------------------------------------------------- NVD: the CNA's data and CISA's ADP kept apart
+
+
+def test_nvd_cisa_adp_default_is_not_the_vendors_word(cat):
+    """GitLab CVE-2024-4835: GitLab's own rows (15.11 – < 16.10.6, 16.11 – < 16.11.3, 17.0 – < 17.0.1, default
+    unaffected) and CISA's ADP (15.11 – < 17.0.1, default *affected*), which NVD lists side by side. CISA's default
+    once made every later version "affected" – "laut Hersteller alle anderen Versionen betroffen" for 19.5.3."""
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    data = advs[0]["data"]
+    assert [r["vendor"] for b in data["cna"] for r in b["affectedData"]] == ["GitLab"]
+    assert [r["vendor"] for b in data["adp"] for r in b["affectedData"]] == ["gitlab"]
+    assert data["adp"][0]["affectedData"][0]["cpes"] == ["cpe:2.3:a:gitlab:gitlab:*:*:*:*:*:*:*:*"]
+    gl = cat["gitlab"]
+    assert evaluate(gl, "nvd", data, "19.5.3").status == "not_affected"
+    assert evaluate(gl, "nvd", data, "16.11.2").status == "affected"
+    assert evaluate(gl, "nvd", data, "17.0.0").status == "affected"
+    assert evaluate(gl, "nvd", data, "16.10.6").status == "not_affected"
+
+
+def test_nvd_adp_only_where_the_cna_does_not_name_the_product(cat):
+    """CISA's rows still count where the CNA's do not name the product (as for cvelistV5) – and a record without
+    sources (stored before) keeps every block as the CNA's."""
+    adp_block = {"source": "134c704f-9b21-4f2e-91b3-4a467353bcc0", "affectedData": [{"vendor": "gitlab", "product": "gitlab", "cpes": ["cpe:2.3:a:gitlab:gitlab:*:*:*:*:*:*:*:*"], "defaultStatus": "unknown", "versions": [{"version": "15.0", "lessThan": "17.0.1", "status": "affected", "versionType": "custom"}]}]}
+    cna_block = {"source": "cve@example.org", "affectedData": [{"vendor": "Example", "product": "Other thing", "defaultStatus": "unaffected", "versions": [{"version": "1.0", "lessThan": "1.2", "status": "affected"}]}]}
+    cna, adp = src._split_affected([cna_block, adp_block], "cve@example.org")
+    assert cna == [cna_block] and adp == [adp_block]
+    assert src._split_affected([cna_block, adp_block], "") == ([cna_block, adp_block], [])
+    assert src._split_affected([{"affectedData": []}], "cve@example.org") == ([{"affectedData": []}], [])
+    data = {"configs": [], "desc": "", "cna": src._trim_cna(cna), "adp": src._trim_cna(adp, cpes=True)}
+    gl = cat["gitlab"]
+    assert evaluate(gl, "nvd", data, "16.0.0").status == "affected"
+    assert evaluate(gl, "nvd", data, "17.0.1").status == "not_affected"
+
+
+def test_nvd_analysis_decides_where_the_cna_wrote_prose(cat):
+    """BookStack CVE-2022-40690: JPCERT's row says "versions prior to v22.09" (no range anyone can read), NVD's analysis
+    says < 22.09 – a later version is not affected, not "possibly"."""
+    _, advs = src.parse_nvd((FIX / "nvd_bookstack_prose.json").read_bytes())
+    data, bs = advs[0]["data"], cat["bookstack"]
+    assert evaluate(bs, "nvd", data, "22.08").status == "affected"
+    assert evaluate(bs, "nvd", data, "22.09").status == "not_affected"
+    assert evaluate(bs, "nvd", data, "26.09.2").status == "not_affected"
+    assert evaluate(bs, "nvd", {**data, "configs": []}, "26.09.2").status == "possible"  # without the analysis: still open
+
+
+def test_ranges_written_into_the_version_field():
+    """GitHub's advisories and many CNAs write the range into "version" (">= 3.2.0, < 4.7.1", "< 25.7.0"): read as one
+    version it was 3.2.0.4.7.1 – the fixed release "listed as affected", everything above the start "newer"."""
+    from app.vendor_match import _range_row
+
+    assert _range_row({"version": ">= 3.2.0, < 4.7.1", "status": "affected"}) == {"version": "3.2.0", "lessThan": "4.7.1", "status": "affected"}
+    assert _range_row({"version": "< 25.7.0", "status": "affected"}) == {"version": "0", "lessThan": "25.7.0", "status": "affected"}
+    assert _range_row({"version": "<= 2.1", "status": "affected"}) == {"version": "0", "lessThanOrEqual": "2.1", "status": "affected"}
+    assert _range_row({"version": "= 1.4.0", "status": "affected"}) == {"version": "1.4.0", "status": "affected"}
+    for same in ({"version": ">= 1.0", "status": "affected"}, {"version": "1.2.3"}, {"version": "< 2.0", "lessThan": "2.0"}, {"version": "< 2 or so"}):
+        assert _range_row(same) == same
+
+
+def _gitlab_cna(rows: list, default: str = "unaffected") -> dict:
+    return {"configs": [], "desc": "", "cna": [{"affectedData": [{"vendor": "GitLab", "product": "GitLab", "defaultStatus": default, "versions": rows}]}]}
+
+
+def test_range_strings_decide_like_ranges(cat):
+    gl = cat["gitlab"]
+    data = _gitlab_cna([{"version": ">= 3.2.0, < 4.7.1", "status": "affected"}])
+    assert evaluate(gl, "nvd", data, "4.5.0").status == "affected"  # was "newer than listed"
+    assert evaluate(gl, "nvd", data, "4.7.1").status == "not_affected"  # was "listed as affected"
+    assert evaluate(gl, "nvd", data, "3.1.0").status == "not_affected"
+    below = _gitlab_cna([{"version": "< 25.7.0", "status": "affected"}], default="unknown")
+    assert evaluate(gl, "nvd", below, "25.6.2").status == "affected" and evaluate(gl, "nvd", below, "25.7.0").status == "not_affected"
+
+
+def test_cisa_adp_never_over_nvds_analysis_and_never_a_default(cat):
+    """CISA's rows count only where neither NVD's analysis nor the CNA names the product – and their defaultStatus
+    "affected" is no statement about every other version (cvelistV5 as well)."""
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    full, gl = advs[0]["data"], cat["gitlab"]
+    no_cna = {**full, "cna": []}  # the CNA wrote "n/a" (VMware Cloud Foundation CVE-2022-22948)
+    assert evaluate(gl, "nvd", no_cna, "16.10.6").status == "not_affected"  # NVD: < 16.10.6; CISA: 15.11 – < 17.0.1
+    only_adp = {**no_cna, "configs": []}
+    assert evaluate(gl, "nvd", only_adp, "16.10.6").status == "affected"  # nothing else speaks: CISA's range counts
+    assert evaluate(gl, "nvd", only_adp, "19.5.3").status != "affected"  # its default does not
+    cvl = {"desc": "", "cna": [], "adp": full["adp"]}
+    assert evaluate(gl, "cvelist", cvl, "19.5.3").status != "affected" and evaluate(gl, "cvelist", cvl, "16.0.0").status == "affected"
+
+
+def test_nvd_records_stored_before_the_split(cat):
+    """Stored before 0.1.47: the CNA's and CISA's blocks in one list (the CNA's first) – read apart without a refetch."""
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    new = advs[0]["data"]
+    old = {k: val for k, val in new.items() if k != "adp"} | {"cna": [*new["cna"], *[{"affectedData": [{k: val for k, val in r.items() if k != "cpes"} for r in b["affectedData"]]} for b in new["adp"]]]}
+    gl = cat["gitlab"]
+    assert evaluate(gl, "nvd", old, "19.5.3").status == "not_affected" and evaluate(gl, "nvd", old, "16.11.2").status == "affected"
+
+
+def test_cisa_adp_settles_a_possibly_of_nvds_analysis(cat):
+    """vCenter: NVD's configurations name exact update CPEs (only "possibly" for others), the CNA wrote "n/a" – CISA's
+    range then decides. Here: NVD lists only 17.0.0, CISA 15.11 – < 17.0.1."""
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    full, gl = advs[0]["data"], cat["gitlab"]
+    exact = [{"nodes": [{"operator": "OR", "cpeMatch": [{"vulnerable": True, "criteria": "cpe:2.3:a:gitlab:gitlab:17.0.0:*:*:*:community:*:*:*"}]}]}]
+    data = {**full, "cna": [], "configs": exact}
+    assert evaluate(gl, "nvd", {**data, "adp": []}, "16.0.0").status == "possible"  # NVD alone: not listed
+    assert evaluate(gl, "nvd", data, "16.0.0").status == "affected"
+    assert evaluate(gl, "nvd", data, "17.0.1").status == "not_affected"

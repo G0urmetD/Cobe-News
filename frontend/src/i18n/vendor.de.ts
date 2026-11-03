@@ -530,10 +530,20 @@ const vendorDe: Record<string, string> = {
   "glossary.csafText":
     "Maschinenlesbares Format für Sicherheitshinweise (Version 2.0). Hersteller veröffentlichen damit betroffene und behobene Versionen je Produkt – Cobe News liest sie direkt beim Hersteller.",
   "glossary.tlp": "TLP (Traffic Light Protocol)",
-  "glossary.tlpText": "Kennzeichnung, wer eine Information weitergeben darf. Cobe News liest nur TLP:CLEAR bzw. TLP:WHITE (öffentlich) – nie GREEN, AMBER oder RED.",
+  "glossary.tlpText":
+    "Kennzeichnung, wer eine Information weitergeben darf. Cobe News liest TLP:CLEAR bzw. TLP:WHITE (öffentlich); TLP:GREEN nur, wo ein Admin es für einen CSAF-Anbieter zulässt – solche Befunde tragen das Zeichen „TLP:GREEN“. AMBER und RED nie.",
+  "vendor.tlpGreenHint": "TLP:GREEN: Weitergabe nur innerhalb eurer Organisation/Community, nicht öffentlich.",
+  "vendor.src.allowGreen": "TLP:GREEN zulassen",
+  "vendor.src.greenOffTitle": "TLP:GREEN nicht mehr zulassen?",
+  "vendor.src.greenOffText":
+    "Die gespeicherten TLP:GREEN-Hinweise von {{names}} werden beim Speichern gelöscht – mit den Befunden, die nur auf ihnen beruhen. Bereits gesendete Benachrichtigungen bleiben im Verlauf.",
+  "vendor.src.greenOffConfirm": "Speichern und löschen",
   "glossary.ssvc": "SSVC (Stakeholder-Specific Vulnerability Categorization)",
   "glossary.ssvcText":
     "Einstufung der CISA je CVE: ob die Lücke ausgenutzt wird (keine / Exploit-Code öffentlich / aktiv), ob sich ein Angriff automatisieren lässt und wie schwer die Folgen sind.",
+  "glossary.exploit": "Öffentlicher Exploit",
+  "glossary.exploitText":
+    "Eine öffentliche Sammlung führt fertigen Angriffscode oder eine fertige Prüfung für die Lücke (Metasploit-Modul, Exploit-DB-Eintrag, nuclei-Vorlage). Das heißt nicht, dass sie schon ausgenutzt wird – aber dass es jeder leicht kann. Cobe News speichert nur den Verweis, nie den Code.",
   "glossary.osv": "OSV (Open Source Vulnerabilities)",
   "glossary.osvText":
     "Datenbank von osv.dev mit betroffenen und behobenen Versionen von Open-Source-Paketen (Maven, PyPI, Go, npm …). Cobe News fragt sie nur mit der CVE- bzw. Advisory-Nummer ab.",
@@ -588,7 +598,7 @@ const vendorDe: Record<string, string> = {
   "vendor.src.offVendor": "Vendor News ist aus – keine dieser Quellen fragt an.",
   "vendor.src.csaf": "CSAF-Anbieter der Hersteller",
   "vendor.src.csafHint":
-    "Hinweise direkt von Siemens, Cisco, Schneider Electric und Open-Xchange (CSAF 2.0, nur TLP:CLEAR/WHITE, Prüfsumme geprüft), sobald ihr einem Produkt des Herstellers folgt. Gefunden über die Liste des BSI oder die Standard-Adresse des Herstellers. Was der erste Abruf an Älterem (über 7 Tage) bringt, steht auf der Seite, wird aber nicht gemeldet; ein Hersteller-Hinweis zählt nur für die eigenen Produkte des Herstellers.",
+    "Hinweise direkt von Siemens, Cisco, Schneider Electric und Open-Xchange (CSAF 2.0, TLP:CLEAR/WHITE – TLP:GREEN nur, wenn ihr es je Anbieter zulasst –, Prüfsumme geprüft), sobald ihr einem Produkt des Herstellers folgt. Gefunden über die Liste des BSI oder die Standard-Adresse des Herstellers. Was der erste Abruf an Älterem (über 7 Tage) bringt, steht auf der Seite, wird aber nicht gemeldet; ein Hersteller-Hinweis zählt nur für die eigenen Produkte des Herstellers.",
   "vendor.src.cvelist": "cvelistV5 (CVE-Liste)",
   "vendor.src.cvelistHint":
     "Dreimal am Tag (nach 5, 11 und 17 Uhr UTC) und einmal nach Tageswechsel nur die geänderten CVE-Einträge (eine ZIP-Datei von GitHub, zusammen etwa 10 MB am Tag, nie die ganze Liste) und einzelne ältere Einträge, wo die NVD noch nicht analysiert hat: die betroffenen Versionen des Herstellers (CNA) und die Einstufung der CISA (CVSS, SSVC, KEV). Behalten wird nur, was gefolgte Produkte betrifft.",
@@ -610,6 +620,25 @@ const vendorDe: Record<string, string> = {
   "vendor.src.osvProducts_other": "{{count}} gefolgte Produkte mit OSV-Paketen",
   "vendor.src.queries": "Zustand",
   "vendor.src.health": "Verlauf unter Gesundheit",
+  "vendor.src.exploitTitle": "Exploit-Hinweise",
+  "vendor.src.exploitIntro":
+    "Zeigt bei Funden, Meldungen und beobachteten CVEs, ob öffentlicher Exploit-Code existiert, und zählt in die Dringlichkeit (+10, solange die Lücke nicht schon als ausgenutzt bekannt ist). Jede Liste wird höchstens einmal am Tag geladen, nur wenn sie sich geändert hat. Gespeichert wird je CVE nur der Verweis auf den Eintrag – nie Code.",
+  "vendor.src.exploit.metasploit": "Metasploit Framework",
+  "vendor.src.exploit.metasploitHint": "Die Modulliste von Rapid7 (BSD-3-Clause): etwa 11 MB, komprimiert etwa 1,4 MB je Abruf; es zählen nur Exploit-Module.",
+  "vendor.src.exploit.exploitdb": "Exploit-DB",
+  "vendor.src.exploit.exploitdbHint": "Der Index von OffSec (GitLab, GPL-2.0): etwa 10 MB je Abruf, unkomprimiert – die größte Liste.",
+  "vendor.src.exploit.nuclei": "nuclei-templates",
+  "vendor.src.exploit.nucleiHint": "Der CVE-Index von ProjectDiscovery (MIT): etwa 2,3 MB, komprimiert etwa 0,5 MB je Abruf – Vorlagen, die eine Lücke gezielt prüfen.",
+  "vendor.src.leaves.exploitGithub": "der Abruf einer öffentlichen Datei bei GitHub (raw.githubusercontent.com) – für jede Installation dieselbe",
+  "vendor.src.leaves.exploitGitlab": "der Abruf einer öffentlichen Datei bei GitLab (gitlab.com) – für jede Installation dieselbe",
+  "vendor.src.default.on": "Standard: an",
+  "vendor.src.default.off": "Standard: aus",
+  "exploit.pill": "Exploit-Code öffentlich",
+  "exploit.open": "{{source}}-Eintrag zu {{cve}} öffnen",
+  "exploit.openNoCve": "{{source}}-Eintrag öffnen",
+  "exploit.source.metasploit": "Metasploit",
+  "exploit.source.exploitdb": "Exploit-DB",
+  "exploit.source.nuclei": "nuclei",
   "details.viaCvelist": "ergänzt aus der CVE-Liste (cvelistV5)",
   "details.epss": "Ausnutzung in 30 Tagen",
 }

@@ -141,7 +141,7 @@ async def test_baseline_is_silent_kev_and_fix_once(reader_client):
 
 def test_epss_threshold():
     st = cve_watch.baseline({"epss": {"score": 0.05, "percentile": 0.80, "day": "2026-10-01"}})
-    assert st == {"kev": False, "fixed": [], "epss_base": 0.05, "epss_high": False}
+    assert st == {"kev": False, "fixed": [], "epss_base": 0.05, "epss_high": False, "exploit": False}
 
     def step(st, score, pct, day):  # noqa: ANN001, ANN202
         return cve_watch.compare(CVE, st, {"epss": {"score": score, "percentile": pct, "day": day}})

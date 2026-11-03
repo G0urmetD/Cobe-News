@@ -124,7 +124,7 @@ export const useTeamMembers = (teamId: string, q: string, offset: number, loadin
     refetchInterval: loading ? 3000 : false,
     enabled,
   })
-export const useMyTeams = () => useQuery({ queryKey: ["me", "teams"], queryFn: () => api.get<MyTeams>("/api/me/teams"), staleTime: 60_000 })
+export const useMyTeams = (enabled = true) => useQuery({ queryKey: ["me", "teams"], queryFn: () => api.get<MyTeams>("/api/me/teams"), staleTime: 60_000, enabled })
 
 /** The i18n key of a group's state line: what the last load said, with the permission it lacks when Graph refused. */
 export function groupStateKey(g: Pick<TeamGroup, "state" | "error" | "source">): string {
@@ -177,9 +177,10 @@ export function resolveScope(teams: MyTeams | undefined, pending: boolean, choic
   return teams?.enabled && teams.teams.length > 0 ? choice : "all"
 }
 
-/** "Mein Team / Alle" of the vendor page – one state for the tab's number and the overview (one request, not two). */
-export function useVendorScope(userId: string | undefined) {
-  const mine = useMyTeams()
+/** "Mein Team / Alle" of the vendor page – one state for the tab's number and the overview (one request, not two).
+ *  `needed` false: the teams are not asked (the scope stays `null` – News while "Betrifft unsere Produkte" is off). */
+export function useVendorScope(userId: string | undefined, needed = true) {
+  const mine = useMyTeams(needed)
   const [choice, setChoice] = useState<VendorScope>(() => readScope(userId))
   const scope = resolveScope(mine.data, mine.isPending, choice)
   const setScope = (s: VendorScope) => {

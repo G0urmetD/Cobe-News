@@ -132,6 +132,7 @@ function DeliveryRow({ d, showChannel }: { d: Delivery; showChannel: boolean }) 
                 <li key={`${x.kind}:${x.id}`} className="[overflow-wrap:anywhere]">
                   {x.severity && <span className="text-muted-foreground">[{t(`news.sev.${x.severity}`, { defaultValue: x.severity })}] </span>}
                   {x.title}
+                  {!!x.topics?.length && <span className="text-muted-foreground"> · {x.topics.map((k) => t(`news.topic.${k}`, { defaultValue: k })).join(", ")}</span>}
                 </li>
               ))}
               {d.total > d.items.length && <li className="text-muted-foreground">{t("dlog.moreItems", { count: d.total - d.items.length })}</li>}

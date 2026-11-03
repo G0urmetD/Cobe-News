@@ -92,6 +92,7 @@ GAPS = {
     "api.github.com": 5.0,  # unauthenticated: 60 requests an hour – cvelistV5 asks about one an hour
     "github.com": 2.0,
     "raw.githubusercontent.com": 1.0,
+    "gitlab.com": 2.0,  # the Exploit-DB list (app/exploits.py), daily
     "api.first.org": 2.0,
     "api.osv.dev": 1.0,
     "wid.cert-bund.de": 1.0,
@@ -134,6 +135,9 @@ def bump(products: "list[str] | set[str] | None" = None) -> None:
 
 def reset() -> None:
     """In-process state back to the start (tests: every test has its own database)."""
+    from app import exploits
+
+    exploits.reset()
     _last.clear()
     _blocked.clear()
     _locks.clear()
@@ -306,6 +310,7 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
     touched: set[str] = set()  # the products whose view changes (linked before or now)
     known_keys = [p["key"] for p in ix.products]
     targets: dict[str, dict] | None = None  # the followed products and versions – read once, when a stored one comes again
+    poc_moved: list[str] = []  # CVEs whose SSVC "poc" came or went: the news naming them get their topics again
     for i in range(0, len(advs), STORE_BATCH):
         part = list({a["id"]: a for a in advs[i : i + STORE_BATCH]}.values())
         ids = [a["id"] for a in part]
@@ -360,10 +365,22 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
                     skipped.append(str(a.get("id")))
                 continue
             changed += 1
+            if a.get("source") == "cvelist" and _ssvc_poc(olds[a["id"]].data if a["id"] in olds else None) != _ssvc_poc(a.get("data")):
+                poc_moved.append(str(a.get("ident") or ""))
         await db.commit()
     if changed:
         bump(touched)
+    if poc_moved:
+        from app import news
+
+        await news.retopic_cves(db, poc_moved)  # "Exploit veröffentlicht" (news.exploit_cves)
+        await db.commit()
     return changed
+
+
+def _ssvc_poc(data: dict | None) -> bool:
+    ssvc = (data or {}).get("ssvc") if isinstance(data, dict) else None
+    return isinstance(ssvc, dict) and str(ssvc.get("exploitation") or "").lower() == "poc"
 
 
 async def change_targets(db: AsyncSession) -> dict[str, dict]:
@@ -477,11 +494,12 @@ def _relink_candidates(product: dict):  # noqa: ANN202
     return or_(VendorAdvisory.source.not_in(CVE_SOURCES), *conds)
 
 
-async def relink(db: AsyncSession, product: dict) -> int:
-    """A product followed later (or added by CPE, or given more CPEs by a catalogue refresh): the stored advisories that
-    concern it are linked now – the queries of other products may have brought them already. Only the candidates
-    (_relink_candidates) are read, in batches as raw JSON text, decoded and matched off the event loop: a database
-    with 60k NVD records never stalls the requests."""
+async def relink(db: AsyncSession, product: dict, *, quiet: bool = False) -> int:
+    """A product followed later (or added by CPE, or given more CPEs or names by a catalogue change): the stored
+    advisories that concern it are linked now – the queries of other products may have brought them already. Only the
+    candidates (_relink_candidates) are read, in batches as raw JSON text, decoded and matched off the event loop: a
+    database with 60k NVD records never stalls the requests. `quiet`: the links it adds are quiet – a finding that
+    exists only through them is shown, never notified (a catalogue change is no news, relink_catalog)."""
     one = index_of([product])
     have = set(await db.scalars(select(VendorAdvisoryProduct.advisory_id).where(VendorAdvisoryProduct.product == product["key"])))
 
@@ -509,11 +527,45 @@ async def relink(db: AsyncSession, product: dict) -> int:
         hits += await asyncio.to_thread(match, rows)
         await dbm.release(db)  # the read transaction ends between batches
     if hits:
-        await db.execute(pg_insert(VendorAdvisoryProduct).on_conflict_do_nothing(), [{"product": product["key"], "advisory_id": x} for x in hits])
+        await db.execute(pg_insert(VendorAdvisoryProduct).on_conflict_do_nothing(), [{"product": product["key"], "advisory_id": x, "quiet": quiet} for x in hits])
     await db.commit()
     added = len(hits)
     if added:
         bump([product["key"]])
+    return added
+
+
+RELINK_STATE = "catalog_relink"  # settings row: {version, done: [product keys], complete}
+RELINK_PRODUCTS = 10  # followed products relinked per round – a database with many products is done over a few rounds
+
+
+async def relink_catalog(db: AsyncSession) -> int | None:
+    """Once per catalogue version (catalog.yaml catalog_version): the followed products linked again against the stored
+    advisories – a new catalogue can give a product names (CNA names, CPEs) its stored advisories carry, which only
+    new or updated advisories would get linked by otherwise. RELINK_PRODUCTS a round; where it got to is kept (settings
+    row RELINK_STATE), so a restart goes on, nothing is done twice; a product relinked already finds nothing new
+    (relink skips links that are there). The links it adds are quiet: what appears only through them is the baseline
+    – shown, not sent – as a catalogue rollout is no news, and an advisory linked this way is an old one (the round
+    links new and updated advisories with the current catalogue anyway). None: nothing (left) to do."""
+    version = catalog.catalog_version()
+    state = await settings_store.get(db, RELINK_STATE)
+    if state.get("version") == version and state.get("complete"):
+        return None
+    if state.get("version") != version:
+        state = {"version": version, "done": [], "complete": False}
+    done = set(state.get("done") or [])
+    keys = sorted({f.product for f in await follows(db, enabled_only=False) if not f.custom})
+    todo = [k for k in keys if k not in done]
+    added = 0
+    for k in todo[:RELINK_PRODUCTS]:
+        if (p := catalog.product(k)) is not None:
+            added += await relink(db, p, quiet=True)
+        done.add(k)
+    state = {"version": version, "done": sorted(done & set(keys)), "complete": len(todo) <= RELINK_PRODUCTS}
+    await settings_store.put(db, RELINK_STATE, state)
+    await db.commit()
+    if added:
+        log.info("vendor: catalogue %s – %d stored advisories linked to followed products (quiet)", version, added)
     return added
 
 
@@ -631,9 +683,11 @@ async def get(
     has_key: bool = False,
     conditional: bool = True,
     only=None,  # noqa: ANN001
+    timeout: float | None = None,
 ) -> bytes | None:
     """One GET through the news fetcher's hardened download. None: 304 (unchanged). Errors as NewsError. `only`: a check
-    of the URL every request – redirects included – must pass (a CSAF provider's own hosts).
+    of the URL every request – redirects included – must pass (a CSAF provider's own hosts, an exploit list's host).
+    `timeout`: seconds for the whole download (default: the feeds' DOWNLOAD_S).
     `db`: the caller's session – what it has pending is written first (`release`), so no write transaction waits on
     this host's gap or the download. `st` is updated only after the answer."""
     if db is not None:
@@ -651,7 +705,9 @@ async def get(
         # a request with the NVD API key follows no redirect: httpx would send the apiKey header to any other host
         # (it strips only Authorization) – NVD's API answers directly (security review 0.1.16 L5)
         keyed = any(k.lower() == "apikey" for k in h)
-        got = await news_svc.download(url, proxy=get_config().proxy, verify=tls_verify(), headers=h, limit=limit, transport=transport, follow_redirects=not keyed, only=only)
+        got = await news_svc.download(
+            url, proxy=get_config().proxy, verify=tls_verify(), headers=h, limit=limit, transport=transport, follow_redirects=not keyed, only=only, timeout=timeout
+        )
     finally:
         if st is not None:
             st.last_fetch_at = asked
@@ -1129,10 +1185,11 @@ async def sync_eol(db: AsyncSession, every: timedelta, force: bool) -> int | Non
             _record(db, st, meter, items=max(0, len(cat["products"]) - had) if had else 0)
             await db.commit()
             bump()
-            # a followed product with new CPEs or names: the stored advisories that concern it now are linked
+            # a followed product with new CPEs or names: the stored advisories that concern it now are linked –
+            # quietly, as after a catalogue update (relink_catalog): old advisories found anew are no news
             for key, sig in before.items():
                 if (p := catalog.product(key)) is not None and _match_sig(p) != sig:
-                    await relink(db, p)
+                    await relink(db, p, quiet=True)
         else:
             _ok(st, every)
             _record(db, st, meter)
@@ -1181,7 +1238,10 @@ async def active_keys(db: AsyncSession) -> set[str]:
     """The queries the round asks now (the source health: anything else in vendor_fetch is switched off – a product no
     longer followed, Vendor News off). As run_round: nothing at all while nothing is followed."""
     cfg = await config(db)
+    from app import exploits
+
     kev = {"kev"} if await kev_wanted(db) else set()
+    kev |= await exploits.active_keys(db, cfg)  # the exploit lists: as the KEV, and for the watched CVEs
     if not cfg.get("enabled", True):
         return kev
     from app import epss
@@ -1222,6 +1282,14 @@ async def run_round(*, force: bool = False, only: str | None = None) -> dict:
         # the KEV also with nothing followed (or Vendor News off) while the news are on: their topics need it
         if await kev_wanted(db):
             await sync_kev(db, eol_every, force)
+        # the exploit lists (app/exploits.py): daily, for the findings, the news' topics and the watched CVEs
+        from app import exploits
+
+        try:
+            out |= await exploits.sync_all(db, force)
+        except Exception:  # noqa: BLE001 - the exploit lists never stop the round
+            await db.rollback()
+            log.exception("exploit lists failed")
         if not cfg.get("enabled", True):
             return out
         fs = await follows(db)
@@ -1234,6 +1302,12 @@ async def run_round(*, force: bool = False, only: str | None = None) -> dict:
         ix = await current_index(db)
         key = nvd_key(cfg)
         await sync_eol(db, eol_every, False)
+        try:
+            if (r := await relink_catalog(db)) is not None:
+                out["relink:catalog"] = r
+        except Exception:  # noqa: BLE001 - the relink never stops the round; it goes on next round
+            await db.rollback()
+            log.exception("vendor: relinking after the catalogue change failed")
         names = list(dict.fromkeys(n for p in products if p.get("adv") == "paloalto" for n in p.get("names") or []))
         for n in names:
             if (r := await sync_paloalto(db, n, every, ix, force)) is not None:
@@ -1270,8 +1344,16 @@ async def sync_structured(db: AsyncSession, cfg: dict, products: list[dict], eve
     from app import csaf_providers, cvelist
 
     out: dict[str, int] = {}
+    green = csaf_providers.green_allowed(cfg)
+    try:
+        # TLP:GREEN of a provider no longer allowed to bring it: gone before anything else is read (also with CSAF off)
+        if n := await csaf_providers.purge_green(db, green):
+            out["csaf:tlp_green_removed"] = n
+    except Exception:  # noqa: BLE001 - tried again next round
+        await db.rollback()
+        log.exception("vendor: removing TLP:GREEN advisories failed")
     if cfg.get("csaf", True):
-        for k, n in (await csaf_providers.sync_all(db, products, every, ix, force)).items():
+        for k, n in (await csaf_providers.sync_all(db, products, every, ix, force, green)).items():
             out[k] = n
     if cfg.get("cvelist", True):
         if (r := await cvelist.sync_delta(db, products, ix, force)) is not None:
@@ -1481,8 +1563,11 @@ def findings(
                 # FIRST EPSS: the CVE of the group most likely to be exploited in the next 30 days (epss.py)
                 "epss": {"cve": top["cve"], "score": top["score"], "percentile": top["percentile"], "date": top["date"]} if top else None,
                 "ssvc": ssvc,  # CISA's SSVC decision points (cvelistV5 ADP): exploitation, automatable, technical impact
-                # an advisory a CSAF provider brought with its first fill: shown, never notified (csaf_providers)
-                "quiet": bool(data.get("initial")),
+                # an advisory a CSAF provider brought with its first fill: shown, never notified (csaf_providers) –
+                # as a finding only links of the relink after a catalogue change make (relink_catalog)
+                "quiet": bool(data.get("initial")) or all(getattr(x, "quiet", False) for x in all_advs),
+                # from a CSAF provider's TLP:GREEN document (allowed per provider): labelled wherever it is shown or sent
+                "tlp": "GREEN" if any((x.data or {}).get("tlp") == "GREEN" for x in all_advs) else None,
                 "published_at": (a.published_at or a.updated_at).isoformat() if (a.published_at or a.updated_at) else None,
                 "status": worst.status,
                 "versions": [
@@ -1764,6 +1849,7 @@ class Adv:
     published_at: datetime | None
     updated_at: datetime | None
     data: dict
+    quiet: bool = False  # its link to the product is quiet (relink_catalog)
 
 
 _ADV_COLS = (
@@ -1787,12 +1873,17 @@ def _advs(rows: list) -> list[Adv]:
     out = []
     for r in rows:
         data = json.loads(r[12]) if r[12] else {}
-        out.append(Adv(r[0], r[1], r[2] or "", r[3] or "", r[4] or "", r[5] or "", json.loads(r[6]) if r[6] else [], r[7], r[8] or "info", bool(r[9]), r[10], r[11], data if isinstance(data, dict) else {}))
+        quiet = bool(r[13]) if len(r) > 13 else False
+        out.append(Adv(r[0], r[1], r[2] or "", r[3] or "", r[4] or "", r[5] or "", json.loads(r[6]) if r[6] else [], r[7], r[8] or "info", bool(r[9]), r[10], r[11], data if isinstance(data, dict) else {}, quiet))
     return out
 
 
 async def load_advs(db: AsyncSession, product: str) -> list[Adv]:
-    rows = (await db.execute(select(*_ADV_COLS).join(VendorAdvisoryProduct, VendorAdvisoryProduct.advisory_id == VendorAdvisory.id).where(VendorAdvisoryProduct.product == product))).all()
+    rows = (
+        await db.execute(
+            select(*_ADV_COLS, VendorAdvisoryProduct.quiet).join(VendorAdvisoryProduct, VendorAdvisoryProduct.advisory_id == VendorAdvisory.id).where(VendorAdvisoryProduct.product == product)
+        )
+    ).all()
     return await asyncio.to_thread(_advs, rows)
 
 
@@ -1858,6 +1949,7 @@ async def _compute_view(f: VendorFollow, vers: list[VendorVersion], kev: dict, e
     found, targets = await asyncio.to_thread(evaluate_all)
     if "epss" not in off:
         await _add_epss(found)
+    await _add_exploits(found)
     _stamp[0] += 1
     return {"product": p, "findings": found, "targets": targets, "stamp": _stamp[0]}
 
@@ -1877,6 +1969,20 @@ async def _add_epss(found: list[dict]) -> None:
         top = max((scores[c] for c in x["cves"] if c in scores), key=lambda e: e["score"], default=None)
         if top is not None:
             x["epss"] = top
+
+
+async def _add_exploits(found: list[dict]) -> None:
+    """Exploit-Hinweise on every finding with a CVE some switched-on list names (app/exploits.py – from memory)."""
+    from app import exploits
+
+    hits = [x for x in found if x["cves"]]
+    if not hits:
+        return
+    async with dbm.session() as db:
+        got = await exploits.of_cves(db, {c for x in hits for c in x["cves"]})
+    for x in hits:
+        if got and (e := exploits.brief(got, x["cves"], 4)):
+            x["exploit"] = e
 
 
 def summary(view: dict, vers: list[VendorVersion]) -> dict:
@@ -2149,7 +2255,17 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
     exploited" for a finding notified before without it. Returns how many events (not baseline) were created. Only
     products whose view or versions changed since the last evaluation are looked at (all of them hourly); each
     product's events are read by their scope and written in a short transaction of its own."""
+    from app import csaf_providers
+
     now = datetime.now(UTC)
+    # TLP:GREEN of a provider no longer allowed (switched off while the round read its documents): gone before any event
+    # is made of it – never stored as news, never sent
+    try:
+        if await csaf_providers.purge_green(db, csaf_providers.green_allowed(await config(db))):
+            await db.commit()
+    except Exception:  # noqa: BLE001 - tried again with the next round (the round's own first step does it as well)
+        await db.rollback()
+        log.exception("vendor: removing TLP:GREEN advisories failed")
     fs = await follows(db)
     vers = await versions_of(db, [f.id for f in fs])
     kev, euvd = await kev_index(db), await euvd_cves(db)
@@ -2160,8 +2276,6 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
     created = 0
     answered = await _answered(db)
     if not (await config(db)).get("csaf", True):
-        from app import csaf_providers
-
         answered |= {f"csaf:{x['key']}" for x in csaf_providers.providers()}  # switched off: nothing to wait for
     for f in fs:
         p = product_of(f)
@@ -2227,6 +2341,7 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                 "cvss": fd["cvss"],
                 "exploited": fd["exploited"],
                 "published_at": fd["published_at"],
+                **({"tlp": fd["tlp"]} if fd.get("tlp") else {}),
             }
             key = f"{scope}:{fd['id']}"[:400]
             if key not in known and not (cves & known_cves[scope]):
@@ -2390,6 +2505,13 @@ class VendorLoop:
                         await story_details.enrich_round(db)
                     except Exception:  # noqa: BLE001 - the details never stop Vendor News
                         log.exception("story details round failed")
+                    # the stories' products ("Betrifft unsere Produkte"): once after the upgrade, then for the products
+                    # whose follow or versions changed – after the details, in the same loop (never both at once)
+                    try:
+                        await story_details.products_round(db)
+                    except Exception:  # noqa: BLE001 - never stops Vendor News
+                        await db.rollback()
+                        log.exception("story products round failed")
                     cfg = await config(db)
                     if cfg.get("enabled", True):
                         await after_round(db, cfg, force)

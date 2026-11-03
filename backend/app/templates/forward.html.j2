@@ -41,6 +41,7 @@
           <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:{{ sev_bg }};color:{{ sev_color }};font-size:11px;font-weight:600;">{{ meta }}</span>
         </td></tr>
         <tr><td style="padding:4px 16px 2px;font-size:16px;font-weight:600;line-height:1.35;">{% if url %}<a href="{{ url }}" style="color:#1f2330;text-decoration:none;">{{ title }}</a>{% else %}{{ title }}{% endif %}</td></tr>
+        {% if tlp %}<tr><td style="padding:4px 16px 0;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e6f4ea;color:#1e6b34;font-size:11px;font-weight:700;">{{ tlp }}</span></td></tr>{% endif %}
         {% if summary %}<tr><td style="padding:6px 16px 4px;font-size:14px;line-height:1.55;color:#4a5066;">{{ summary }}</td></tr>{% endif %}
         {% for x in facts %}<tr><td style="padding:4px 16px 0;font-size:13px;line-height:1.5;color:#1f2330;">{{ x }}</td></tr>{% endfor %}
         <tr><td style="padding:10px 16px 14px;font-size:13px;">{% if url %}<a href="{{ url }}" style="color:#3d55d4;">{{ labels.article }}</a> &nbsp;·&nbsp; {% endif %}<a href="{{ link }}" style="color:#3d55d4;">{{ labels.open }}</a></td></tr>

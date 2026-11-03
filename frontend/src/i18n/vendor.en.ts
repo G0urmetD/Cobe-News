@@ -527,10 +527,20 @@ const vendorEn: Record<string, string> = {
   "glossary.csafText":
     "Machine-readable format for security advisories (version 2.0). Vendors publish affected and fixed versions per product in it – Cobe News reads them straight from the vendor.",
   "glossary.tlp": "TLP (Traffic Light Protocol)",
-  "glossary.tlpText": "Marks who may share a piece of information. Cobe News only reads TLP:CLEAR or TLP:WHITE (public) – never GREEN, AMBER or RED.",
+  "glossary.tlpText":
+    "Marks who may share a piece of information. Cobe News reads TLP:CLEAR or TLP:WHITE (public); TLP:GREEN only where an admin allows it for a CSAF provider – such findings carry the mark “TLP:GREEN”. Never AMBER or RED.",
+  "vendor.tlpGreenHint": "TLP:GREEN: share only within your organisation/community, not publicly.",
+  "vendor.src.allowGreen": "Allow TLP:GREEN",
+  "vendor.src.greenOffTitle": "Stop allowing TLP:GREEN?",
+  "vendor.src.greenOffText":
+    "The stored TLP:GREEN advisories of {{names}} are deleted when you save – with the findings that rest on them alone. Notifications already sent stay in the history.",
+  "vendor.src.greenOffConfirm": "Save and delete",
   "glossary.ssvc": "SSVC (Stakeholder-Specific Vulnerability Categorization)",
   "glossary.ssvcText":
     "CISA's rating per CVE: whether the flaw is exploited (none / public exploit code / active), whether an attack can be automated and how severe the impact is.",
+  "glossary.exploit": "Public exploit",
+  "glossary.exploitText":
+    "A public collection lists ready-made attack code or a ready-made check for the vulnerability (Metasploit module, Exploit-DB entry, nuclei template). That does not mean it is exploited yet – but that anybody can do it easily. Cobe News keeps only the reference, never the code.",
   "glossary.osv": "OSV (Open Source Vulnerabilities)",
   "glossary.osvText": "Database at osv.dev with the affected and fixed versions of open-source packages (Maven, PyPI, Go, npm …). Cobe News only asks it by CVE or advisory id.",
   "vendor.epssPill": "{{score}} %",
@@ -583,7 +593,7 @@ const vendorEn: Record<string, string> = {
   "vendor.src.offVendor": "Vendor News is off – none of these sources asks anything.",
   "vendor.src.csaf": "Vendors' CSAF providers",
   "vendor.src.csafHint":
-    "Advisories straight from Siemens, Cisco, Schneider Electric and Open-Xchange (CSAF 2.0, TLP:CLEAR/WHITE only, checksum checked) once you follow a product of the vendor. Found via the BSI's list or the vendor's standard address. What the first fetch brings that is older (over 7 days) is shown, but not notified; a vendor's advisory only counts for that vendor's own products.",
+    "Advisories straight from Siemens, Cisco, Schneider Electric and Open-Xchange (CSAF 2.0, TLP:CLEAR/WHITE – TLP:GREEN only where you allow it per provider –, checksum checked) once you follow a product of the vendor. Found via the BSI's list or the vendor's standard address. What the first fetch brings that is older (over 7 days) is shown, but not notified; a vendor's advisory only counts for that vendor's own products.",
   "vendor.src.cvelist": "cvelistV5 (CVE list)",
   "vendor.src.cvelistHint":
     "Three times a day (after 5, 11 and 17 h UTC) and once after the day change only the changed CVE records (a zip from GitHub, about 10 MB a day in all, never the whole list) and single older records where the NVD has not analysed yet: the vendor's (CNA) affected versions and CISA's rating (CVSS, SSVC, KEV). Only what concerns followed products is kept.",
@@ -605,6 +615,25 @@ const vendorEn: Record<string, string> = {
   "vendor.src.osvProducts_other": "{{count}} followed products with OSV packages",
   "vendor.src.queries": "State",
   "vendor.src.health": "History under Health",
+  "vendor.src.exploitTitle": "Exploit hints",
+  "vendor.src.exploitIntro":
+    "Shows on findings, stories and watched CVEs whether public exploit code exists, and counts in the urgency (+10 while the vulnerability is not known as exploited already). Each list is downloaded at most once a day, only when it changed. Per CVE only the reference to the entry is kept – never code.",
+  "vendor.src.exploit.metasploit": "Metasploit Framework",
+  "vendor.src.exploit.metasploitHint": "Rapid7's module list (BSD-3-Clause): about 11 MB, about 1.4 MB compressed per download; only exploit modules count.",
+  "vendor.src.exploit.exploitdb": "Exploit-DB",
+  "vendor.src.exploit.exploitdbHint": "OffSec's index (GitLab, GPL-2.0): about 10 MB per download, uncompressed – the biggest list.",
+  "vendor.src.exploit.nuclei": "nuclei-templates",
+  "vendor.src.exploit.nucleiHint": "ProjectDiscovery's CVE index (MIT): about 2.3 MB, about 0.5 MB compressed per download – templates that check for a vulnerability.",
+  "vendor.src.leaves.exploitGithub": "the download of a public file at GitHub (raw.githubusercontent.com) – the same for every installation",
+  "vendor.src.leaves.exploitGitlab": "the download of a public file at GitLab (gitlab.com) – the same for every installation",
+  "vendor.src.default.on": "Default: on",
+  "vendor.src.default.off": "Default: off",
+  "exploit.pill": "Public exploit code",
+  "exploit.open": "Open the {{source}} entry for {{cve}}",
+  "exploit.openNoCve": "Open the {{source}} entry",
+  "exploit.source.metasploit": "Metasploit",
+  "exploit.source.exploitdb": "Exploit-DB",
+  "exploit.source.nuclei": "nuclei",
   "details.viaCvelist": "completed from the CVE list (cvelistV5)",
   "details.epss": "Exploitation within 30 days",
 }

@@ -28,6 +28,7 @@ from app.models import NotifyChannel, NotifyRule, NotifyRuleChannel, NotifyRuleT
 
 router = APIRouter(prefix="/api/admin/notify", tags=["notify"])
 Severity = Literal["critical", "high", "medium", "low", "info"]
+Topic = Literal["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]  # news.TOPICS
 ChannelType = Literal["email", "teams", "slack", "discord", "telegram", "webhook", "ntfy", "gotify", "mattermost"]
 PUSH_TYPES = ("ntfy", "gotify")  # a server address (no secret) and a token / topic (secrets bound to that server)
 EMAIL = r"^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+$"
@@ -380,6 +381,7 @@ def _rule_out(r: NotifyRule, channel_ids: list[uuid.UUID], team_ids: list[uuid.U
         "channels": [str(c) for c in channel_ids],
         "severities": list(r.severities or []),
         "sources": list(r.sources or []),
+        "topics": notify.rule_topics(r),
         "lang": r.lang,
         "kinds": notify.rule_kinds(r),
         "created_at": r.created_at.isoformat(),
@@ -393,6 +395,9 @@ class RuleIn(_M):
     channels: list[uuid.UUID] = Field(default_factory=list, max_length=20)
     severities: list[Severity] = Field(default_factory=lambda: ["critical", "high"], max_length=5)
     sources: list[uuid.UUID] = Field(default_factory=list, max_length=50)
+    # news only: stories with one of these topics (OR; AND with severities and sources) – empty: any story; None (not
+    # sent – a client from before topics): an existing rule keeps its topics, a new one has none
+    topics: list[Topic] | None = Field(default=None, max_length=9)
     lang: Literal["de", "en"] = "de"
     # news: stories of the feed; vendor_vuln: a vulnerability affects a followed product; vendor_version: newer
     # version in its line, EOL coming or reached; vendor_change: an advisory of a followed product was revised (a new
@@ -430,6 +435,8 @@ async def _apply_rule(db, rule: NotifyRule, body: RuleIn, *, new: bool) -> list[
     before = notify.rule_filter(rule, had_teams)
     rule.name, rule.lang = body.name, body.lang
     rule.severities, rule.sources = list(body.severities), [str(x) for x in body.sources]
+    if body.topics is not None or new:
+        rule.topics = [t for t in news_svc.TOPICS if t in (body.topics or [])]
     rule.kinds = list(dict.fromkeys(body.kinds))
     rule.enabled = body.enabled
     now = datetime.now(UTC)
@@ -472,6 +479,7 @@ async def _rule_state(db, r: NotifyRule) -> dict:  # noqa: ANN001
         "kinds": list(r.kinds or []),
         "severities": list(r.severities or []),
         "sources": sorted(names.get(x, x) for x in r.sources or []),
+        "topics": notify.rule_topics(r),
         "lang": r.lang,
         "channels": sorted(chans.values(), key=str.lower),
         "teams": sorted(teams.values(), key=str.lower),
@@ -483,6 +491,7 @@ class DryRunIn(_M):
 
     severities: list[Severity] = Field(default_factory=list, max_length=5)
     sources: list[uuid.UUID] = Field(default_factory=list, max_length=50)
+    topics: list[Topic] = Field(default_factory=list, max_length=9)
     lang: Literal["de", "en"] = "de"
     kinds: list[Literal["news", "vendor_vuln", "vendor_version", "vendor_change", "source_health"]] = Field(min_length=1, max_length=5)
     teams: list[uuid.UUID] = Field(default_factory=list, max_length=50)
@@ -504,7 +513,15 @@ async def dry_run(body: DryRunIn, admin: Admin, db: Db) -> dict:
     _dry_at[admin.id] = now
     if len(_dry_at) > 500:
         _dry_at.clear()
-    rule = NotifyRule(name="dry run", severities=list(body.severities), sources=[str(x) for x in body.sources], kinds=list(dict.fromkeys(body.kinds)), lang=body.lang, earlier=[])
+    rule = NotifyRule(
+        name="dry run",
+        severities=list(body.severities),
+        sources=[str(x) for x in body.sources],
+        topics=[t for t in news_svc.TOPICS if t in body.topics],
+        kinds=list(dict.fromkeys(body.kinds)),
+        lang=body.lang,
+        earlier=[],
+    )
     async with _dry_lock:
         try:
             return await notify.dry_run(db, rule, list(dict.fromkeys(body.teams)), body.days)

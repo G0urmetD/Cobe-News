@@ -1,12 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
-import { Check, CheckCheck, ExternalLink, Loader2, MoreHorizontal, Newspaper, RotateCcw, Search, Settings2 } from "lucide-react"
+import { Check, CheckCheck, ExternalLink, Loader2, MoreHorizontal, Newspaper, Package, RotateCcw, Search, Settings2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -48,6 +49,7 @@ import {
   useNewsSources,
 } from "@/lib/news-api"
 import { useAuth } from "@/lib/auth"
+import { useVendorScope } from "@/lib/teams-api"
 import { cn } from "@/lib/utils"
 import { AffectsYou, DetailHint, StoryCves, StoryDetailsBlock } from "@/pages/news-details"
 import { StoryChanges } from "@/components/cobe/advisory-changes"
@@ -68,7 +70,7 @@ export function NewsPage() {
   const fallback = useCallback(
     (p: URLSearchParams) => {
       const f = loadNewsFilter(user?.id)
-      return f.sources.length || f.severities.length || f.topics.length ? writeNewsFilter(p, f) : null
+      return f.sources.length || f.severities.length || f.topics.length || f.ours ? writeNewsFilter(p, f) : null
     },
     [user?.id],
   )
@@ -76,9 +78,14 @@ export function NewsPage() {
   const choose = useCallback(
     (next: Partial<NewsUrlFilter>) => {
       setParams((p) => writeNewsFilter(p, next), { replace: true, state: IN_PAGE })
-      if (next.sources !== undefined || next.severities !== undefined || next.topics !== undefined) {
+      if (next.sources !== undefined || next.severities !== undefined || next.topics !== undefined || next.ours !== undefined) {
         const cur = readNewsFilter(new URLSearchParams(window.location.search))
-        saveNewsFilter(user?.id, { sources: next.sources ?? cur.sources, severities: next.severities ?? cur.severities, topics: next.topics ?? cur.topics })
+        saveNewsFilter(user?.id, {
+          sources: next.sources ?? cur.sources,
+          severities: next.severities ?? cur.severities,
+          topics: next.topics ?? cur.topics,
+          ours: next.ours ?? cur.ours,
+        })
       }
     },
     [setParams, user?.id],
@@ -136,7 +143,16 @@ export function NewsPage() {
   const [shown, setShown] = useState<string | null>(open)
   if (open && open !== shown) setShown(open)
 
-  const list = useNews({ state, sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted }, !deciding)
+  // "Betrifft unsere Produkte" in Vendor News' scope: under "Mein Team" the products of my teams – the teams asked only
+  // while the filter is on, and the list then waits for them (the full list would flash first otherwise); off, the
+  // scope is not part of the request (one first load, the chip's label and number do not change on their own)
+  const vscope = useVendorScope(user?.id, filter.ours)
+  const scope = filter.ours && vscope.scope === "team" ? "team" : "all"
+  const waitScope = filter.ours && vscope.scope === null
+  const list = useNews(
+    { state, sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope },
+    !deciding && !waitScope,
+  )
   const mark = useMarkRead()
   const items = useMemo(() => mergePages(list.data?.pages), [list.data])
   const first = list.data?.pages[0]
@@ -163,7 +179,8 @@ export function NewsPage() {
     [sources, t],
   )
   const quick = filter.topics.filter((x) => QUICK_TOPICS.includes(x))
-  const anyFilter = activeSources.length > 0 || filter.severities.length > 0 || filter.topics.length > 0
+  const anyFilter = activeSources.length > 0 || filter.severities.length > 0 || filter.topics.length > 0 || filter.ours
+  const showOurs = !!first?.ours_on || filter.ours
 
   const markRef = useRef(mark.mutate)
   useEffect(() => {
@@ -196,7 +213,7 @@ export function NewsPage() {
     })
     if (!ok) return
     try {
-      const body = readAllBody({ sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted }, first)
+      const body = readAllBody({ sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope }, first)
       const r = await api.post<{ marked: number }>("/api/news/read-all", body)
       toast.success(t("news.readAllDone", { count: r.marked }))
       // the lists and the number – not the sources or every story's details
@@ -265,28 +282,45 @@ export function NewsPage() {
         />
         <ViewsMenu page="news" />
         {anyFilter && (
-          <Button variant="ghost" size="sm" onClick={() => choose({ sources: [], severities: [], topics: [] })}>
+          <Button variant="ghost" size="sm" onClick={() => choose({ sources: [], severities: [], topics: [], ours: false })}>
             {t("news.resetFilter")}
           </Button>
         )}
       </div>
-      {/* one click for the topics asked most – the same filter as "Thema" (OR with the topics chosen there) */}
-      <ToggleGroup
-        type="multiple"
-        variant="outline"
-        size="sm"
-        value={quick}
-        onValueChange={(v) => choose({ topics: NEWS_TOPICS.filter((x) => (QUICK_TOPICS.includes(x) ? v.includes(x) : filter.topics.includes(x))) })}
-        className="flex-wrap"
-        aria-label={t("news.quickTopics")}
-      >
-        {QUICK_TOPICS.map((x) => (
-          <ToggleGroupItem key={x} value={x} title={t(`news.topicHint.${x}`)} className="h-8 rounded-full! px-3 text-xs">
-            {t(`news.topic.${x}`)}
-            {topicCounts && <span className="text-muted-foreground tabular-nums">{topicCounts[x] ?? 0}</span>}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <div className="flex flex-wrap items-center gap-2">
+        {/* one click for the topics asked most – the same filter as "Thema" (OR with the topics chosen there) */}
+        <ToggleGroup
+          type="multiple"
+          variant="outline"
+          size="sm"
+          value={quick}
+          onValueChange={(v) => choose({ topics: NEWS_TOPICS.filter((x) => (QUICK_TOPICS.includes(x) ? v.includes(x) : filter.topics.includes(x))) })}
+          className="flex-wrap"
+          aria-label={t("news.quickTopics")}
+        >
+          {QUICK_TOPICS.map((x) => (
+            <ToggleGroupItem key={x} value={x} title={t(`news.topicHint.${x}`)} className="h-8 rounded-full! px-3 text-xs">
+              {t(`news.topic.${x}`)}
+              {topicCounts && <span className="text-muted-foreground tabular-nums">{topicCounts[x] ?? 0}</span>}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        {/* "Betrifft unsere Produkte": AND with the other filters – only while something is followed (or it is on) */}
+        {showOurs && (
+          <Toggle
+            variant="outline"
+            size="sm"
+            pressed={filter.ours}
+            onPressedChange={(v) => choose({ ours: v })}
+            title={t(scope === "team" ? "news.oursHintTeam" : "news.oursHint")}
+            className="h-8 rounded-full! px-3 text-xs"
+          >
+            <Package className="size-3.5" />
+            {t(scope === "team" ? "news.oursTeam" : "news.ours")}
+            {first?.counts?.ours !== undefined && <span className="text-muted-foreground tabular-nums">{first.counts.ours}</span>}
+          </Toggle>
+        )}
+      </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <div className="flex items-center gap-2">
           <Switch id="news-unread" checked={filter.unread} onCheckedChange={(v) => choose({ unread: v })} />
@@ -475,6 +509,28 @@ function TopicBadges({ topics }: { topics?: NewsTopic[] }) {
   )
 }
 
+/** "Unser Produkt: PAN-OS" – the first followed product the story's details concern, "+n" for more (all on hover). */
+function OursBadge({ products }: { products?: { key: string; label: string }[] }) {
+  const { t } = useTranslation()
+  if (!products?.length) return null
+  const names = products.map((p) => p.label).join(", ")
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="relative z-10 inline-flex max-w-full min-w-0" tabIndex={0}>
+          <Pill color="--primary" className="max-w-full min-w-0 shrink">
+            <span className="truncate">
+              {t("news.oursBadge", { name: products[0].label })}
+              {products.length > 1 && ` +${products.length - 1}`}
+            </span>
+          </Pill>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs leading-relaxed">{t("news.oursBadgeHint", { names })}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 /** The drawer's "Themen": each topic with what it rests on (computed by the server on request). */
 function TopicsBlock({ reasons }: { reasons: TopicReason[] }) {
   const { t } = useTranslation()
@@ -544,6 +600,7 @@ const NewsCard = memo(function NewsCard({ n, onOpen, onToggle }: { n: NewsItem; 
       <DetailHint n={n} />
       <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
         <SeverityTag s={n.severity} />
+        <OursBadge products={n.products} />
         <TopicBadges topics={n.topics} />
         {n.cves.length > 0 && (
           <span className="inline-flex items-center gap-0.5">
@@ -710,7 +767,7 @@ function NewsDrawer({
                   dangerouslySetInnerHTML={{ __html: d.content_html }}
                 />
               )}
-              {d.cves.length > 0 && <StoryCves d={d} />}
+              {(d.cves.length > 0 || (d.exploits?.length ?? 0) > 0) && <StoryCves d={d} />}
             </>
           )}
         </div>

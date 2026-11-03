@@ -10,14 +10,14 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import ConfigDict, Field, ValidationError, field_validator
-from sqlalchemy import Text, and_, cast, delete, exists, func, literal, or_, select
+from sqlalchemy import Text, and_, cast, delete, exists, false, func, literal, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import __version__, advisory_changes, audit, epss, netaddr, reader, story_details
+from app import __version__, advisory_changes, audit, epss, exploits, netaddr, reader, story_details
 from app import settings as settings_store
 from app import news as news_svc
 from app.config import get_config, tls_verify
@@ -27,7 +27,7 @@ from app.models import NewsItem, NewsItemSource, NewsSource, NotifyRule, StoryDe
 
 router = APIRouter(prefix="/api", tags=["news"])
 Severity = Literal["critical", "high", "medium", "low", "info"]
-Topic = Literal["zeroday", "exploited", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]  # news.TOPICS
+Topic = Literal["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]  # news.TOPICS
 
 
 # in-process, no Redis: one process, one background loop
@@ -86,7 +86,7 @@ def _item_out(i: NewsItem, s: NewsSource, read_at, *, full: bool = False, unread
 
 def _topic_filter(topics: list[str]):  # noqa: ANN202
     """The story has one of these topics (OR within the topics; the GIN index on news_items.topics)."""
-    return NewsItem.topics.op("?|")(pg_array(sorted(set(topics))))
+    return news_svc.has_topic(topics)
 
 
 def _filters(sources: list[uuid.UUID], severity: list[str], q: str, topics: list[str] | None = None) -> list:
@@ -106,6 +106,29 @@ def _with_source(stmt):  # noqa: ANN001, ANN202
     return stmt.join(NewsSource, NewsSource.id == NewsItem.source_id)
 
 
+async def ours_keys(db: AsyncSession, user: User, scope: str, labels: dict[str, str] | None = None) -> set[str]:
+    """"Betrifft unsere Produkte": the products that count – every followed one, or under "Mein Team" (`scope=team`, as
+    Vendor News) those of the person's teams (while Teams is off: every followed one)."""
+    from app import teams
+
+    keys = set((labels if labels is not None else await story_details.followed_labels(db)).keys())
+    if scope == "team" and (mine := await teams.my_products(db, user.id)) is not None:
+        keys &= mine
+    return keys
+
+
+def _ours_filter(keys: set[str]):  # noqa: ANN202
+    """The story concerns one of these products (news_items.products – story_details.products_of; the GIN index)."""
+    return NewsItem.products.op("?|")(pg_array(sorted(keys))) if keys else false()
+
+
+def _with_ours(items: list[dict], stored: list[list], labels: dict[str, str]) -> None:
+    """The cards' badge "Unser Produkt: PAN-OS": the followed products a story concerns, by their label – those of
+    `labels` only (the list passes the scope's: under "Mein Team" the team's products, as the filter and its number)."""
+    for x, keys in zip(items, stored, strict=True):
+        x["products"] = [{"key": k, "label": labels[k]} for k in keys or [] if k in labels]
+
+
 @router.get("/news")
 async def list_news(
     user: Reader,
@@ -113,19 +136,25 @@ async def list_news(
     state: Literal["all", "new", "read"] = "new",
     source: Annotated[list[uuid.UUID], Query(max_length=50)] = [],  # noqa: B006 - FastAPI query list (several sources)
     severity: Annotated[list[Severity], Query()] = [],  # noqa: B006 - FastAPI query list
-    topic: Annotated[list[Topic], Query(max_length=8)] = [],  # noqa: B006 - FastAPI query list (OR within the topics)
+    topic: Annotated[list[Topic], Query(max_length=9)] = [],  # noqa: B006 - FastAPI query list (OR within the topics)
     q: Annotated[str, Query(max_length=100)] = "",
     limit: Annotated[int, Query(ge=1, le=120)] = 60,
     before: Annotated[str | None, Query(max_length=100)] = None,
     counts: bool = True,
     muted: bool = False,
+    ours: bool = False,
+    scope: Literal["all", "team"] = "all",
 ) -> dict:
     """Stories newest first – "all", "new" (unread by me) or "read" (read by me); app/reader.py decides what is read
     (the watermark, the marks, the age). `muted`: also the stories whose CVEs I all muted (flagged, dimmed by the page) –
     without it they are left out. `counts.new` counts the unread ones of the list (the filter, muted as asked).
 
     Paged by a cursor (`before` = the `next` of the previous page: time and id of its last story) instead of an
-    offset – stories arriving or being read meanwhile neither repeat nor skip one on the next page."""
+    offset – stories arriving or being read meanwhile neither repeat nor skip one on the next page.
+
+    `ours` ("Betrifft unsere Produkte"): only stories whose details concern a followed product – under `scope=team`
+    one of the person's teams. `counts.ours` counts them with every other filter; `ours_on`: anything is followed (in
+    that scope) at all."""
     me = user.id
     now = datetime.now(UTC)
     # the arrival number of the newest story stored before this list was read ("Alle gelesen" marks up to it, not
@@ -138,9 +167,16 @@ async def list_news(
     hush = reader.news_muted(mutes)
     if hush is not None and not muted:
         where.append(~hush)
-    facet_where = list(where)
+    labels = await story_details.followed_labels(db)
+    keys = await ours_keys(db, user, scope, labels)
+    facet_where = list(where)  # the topics' facets: every filter but the topics
+    ours_where = list(where)  # the count of "Betrifft unsere Produkte": every filter but itself
     if topic:
         where.append(_topic_filter(list(topic)))
+        ours_where.append(_topic_filter(list(topic)))
+    if ours:
+        where.append(_ours_filter(keys))
+        facet_where.append(_ours_filter(keys))
     unread = reader.news_unread(r, m, now)
     cols = (NewsItem, NewsSource, r.read_at, unread.label("is_unread"), (hush if hush is not None else literal(False)).label("is_muted"))
     stmt = _with_source(select(*cols).select_from(NewsItem)).outerjoin(r, on).where(*where)
@@ -154,7 +190,8 @@ async def list_news(
         stmt = stmt.where(or_(key < at, and_(key == at, NewsItem.id < sid)))
     rows = (await db.execute(stmt.order_by(key.desc(), NewsItem.id.desc()).limit(limit + 1))).all()
     items = [_item_out(i, s, None if un else ra, unread=bool(un), muted=bool(mu)) for i, s, ra, un, mu in rows[:limit]]
-    out: dict = {"items": items, "more": len(rows) > limit, "next": None, "upto": upto}
+    _with_ours(items, [r[0].products for r in rows[:limit]], {k: v for k, v in labels.items() if k in keys})
+    out: dict = {"items": items, "more": len(rows) > limit, "next": None, "upto": upto, "ours_on": bool(keys)}
     await _with_hints(db, out["items"])
     if len(rows) > limit:
         i = rows[limit - 1][0]
@@ -162,7 +199,12 @@ async def list_news(
     if counts:  # the next pages do not need them
         total = int(await db.scalar(_with_source(select(func.count()).select_from(NewsItem)).where(*where)) or 0)
         new = await reader.news_unread_count(db, me, m, where, now, _with_source)
-        out["counts"] = {"new": new, "read": max(0, total - new), "topics": await _topic_counts(db, facet_where, r, on, unread, state)}
+        out["counts"] = {
+            "new": new,
+            "read": max(0, total - new),
+            "topics": await _topic_counts(db, facet_where, r, on, unread, state),
+            "ours": await _ours_count(db, [*ours_where, _ours_filter(keys)], r, on, unread, state) if keys else 0,
+        }
     out["enabled"] = bool((await news_svc.config(db)).get("enabled"))
     return out
 
@@ -177,6 +219,14 @@ async def _topic_counts(db: AsyncSession, where: list, r, on, unread, state: str
     rows = (await db.execute(select(sub.c.t, func.count()).group_by(sub.c.t))).all()
     got = {str(t): int(n) for t, n in rows}
     return {t: got.get(t, 0) for t in news_svc.TOPICS}
+
+
+async def _ours_count(db: AsyncSession, where: list, r, on, unread, state: str) -> int:  # noqa: ANN001
+    """Stories of the list as it is filtered that concern one of our products (the number on the chip)."""
+    stmt = _with_source(select(func.count()).select_from(NewsItem))
+    if state != "all":
+        stmt = stmt.outerjoin(r, on).where(unread if state == "new" else ~unread)
+    return int(await db.scalar(stmt.where(*where)) or 0)
 
 
 TIME_MIN, TIME_MAX = datetime(1970, 1, 1, tzinfo=UTC), datetime(2100, 1, 1, tzinfo=UTC)
@@ -212,12 +262,15 @@ async def sources(user: Reader, db: Db) -> list[dict]:
 
 
 def desktop_filter(user_prefs: dict | None) -> list:
-    """What a person chose for desktop notifications (severities, sources; empty = all) as SQL conditions – the tab's
-    /news/recent and the server's Web Push send exactly the same."""
+    """What a person chose for desktop notifications (severities, sources, topics; empty = all) as SQL conditions – the
+    tab's /news/recent and the server's Web Push send exactly the same. The topics are those the story has when it
+    arrives (title, teaser, source, the KEV) – a topic its details bring later does not pop up afterwards."""
     prefs = user_prefs or {}
     where = []
     if sev := [x for x in prefs.get("severities") or [] if x in news_svc.SEVERITIES]:
         where.append(NewsItem.severity.in_(sev))
+    if topics := [x for x in news_svc.TOPICS if x in (prefs.get("topics") or [])]:
+        where.append(news_svc.has_topic(topics))
     if ids := news_svc._ids(prefs.get("sources")):
         where.append(news_svc.visible(ids))  # also a story first stored for another source that this one carries too
     return where
@@ -291,6 +344,7 @@ async def get_story(sid: uuid.UUID, user: Reader, db: Db) -> dict:
     read_at, unread = (await db.execute(select(r.read_at, reader.news_unread(r, m, now)).select_from(NewsItem).outerjoin(r, on).where(NewsItem.id == i.id))).one()
     mutes = await reader.mutes_of(db, user.id, now)
     out = _item_out(i, s, None if unread else read_at, full=True, unread=bool(unread), muted=mutes.all_cves(i.cves))
+    _with_ours([out], [i.products], await story_details.followed_labels(db))
     det = await db.get(StoryDetail, i.id)
     data = det.data if det is not None and det.status == "ok" else None
     out["details"] = {k: v for k, v in data.items() if k != "match"} if data else None
@@ -300,6 +354,9 @@ async def get_story(sid: uuid.UUID, user: Reader, db: Db) -> dict:
     out["affects"] = story_details.matches(data, await story_details.followed(db)) if data else []
     # FIRST EPSS of the story's CVEs (as far as asked – app/epss.py), the likeliest first
     out["epss"] = sorted((await epss.scores(db, [c.upper() for c in (i.cves or [])[:60]])).values(), key=lambda e: -e["score"])[:12]
+    # Exploit-Hinweise: the switched-on exploit lists naming the story's CVEs (its own and its details' – app/exploits.py)
+    named = list(dict.fromkeys(str(c).upper() for c in [*(i.cves or []), *((data or {}).get("cves") or [])] if isinstance(c, str)))[:60]
+    out["exploits"] = exploits.brief(await exploits.of_cves(db, named), named, 12)
     # the revisions of the advisory behind the story (Vendor News keeps them – app/advisory_changes.py)
     out["changes"] = await advisory_changes.of_advisories(db, story_details.advisory_ids(det.kind, det.ident, i.cves or [])) if det is not None else []
     return out
@@ -366,12 +423,14 @@ async def mark_unread(sid: uuid.UUID, user: Reader, db: Db) -> dict:
 class ReadAllIn(_M):
     source: list[uuid.UUID] = Field(default_factory=list, max_length=50)
     severity: list[Severity] = Field(default_factory=list, max_length=5)
-    topic: list[Topic] = Field(default_factory=list, max_length=8)
+    topic: list[Topic] = Field(default_factory=list, max_length=9)
     q: str = Field(default="", max_length=100)
     # the list's `upto`: only what had arrived when the page was loaded – a story arriving meanwhile stays new (unseen).
     # At most what the column holds (news_items.seq is an integer): a bigger number reached PostgreSQL – a 500
     upto: int | None = Field(default=None, ge=0, le=2**31 - 1)
     muted: bool = False  # the list showed the muted stories too ("Stummgeschaltete zeigen")
+    ours: bool = False  # "Betrifft unsere Produkte"
+    scope: Literal["all", "team"] = "all"
 
 
 @router.post("/news/read-all")
@@ -383,8 +442,10 @@ async def read_all(body: ReadAllIn, user: Reader, db: Db) -> dict:
     hush = reader.news_muted(mutes)
     if hush is not None and not body.muted:
         where.append(~hush)
-    # a topic is a filter: marks for its unread stories, the watermark stays
-    everything = not body.source and not body.severity and not body.topic and not body.q.strip() and (hush is None or body.muted)
+    if body.ours:
+        where.append(_ours_filter(await ours_keys(db, user, body.scope)))
+    # a topic (or our products) is a filter: marks for its unread stories, the watermark stays
+    everything = not body.source and not body.severity and not body.topic and not body.ours and not body.q.strip() and (hush is None or body.muted)
     top = await news_svc.last_seq(db)
     upto = min(body.upto, top) if body.upto is not None else top
     marked = await reader.news_read_all(db, user, where, _with_source, upto=upto, everything=everything)

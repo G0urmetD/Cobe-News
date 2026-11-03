@@ -40,8 +40,15 @@ Die Einstellungen gelten für dein Konto. Der Zustand (Berechtigung, Push) gilt 
 1. Öffne Cobe News über die https-Adresse, z. B. {{base_url}}.
 2. Gehe zu [*Einstellungen → Benachrichtigungen*](/settings/notifications).
 3. Schalte „Desktop-Benachrichtigungen“ ein. Der Browser fragt nach der Erlaubnis – stimme zu.
-4. Wähle die **Schweregrade** (ab Werk Kritisch und Hoch) und die **Quellen**. Leer heißt: alle.
+4. Wähle die **Schweregrade** (ab Werk Kritisch und Hoch), die **Quellen** und die **Themen**. Leer heißt: alle.
 5. Klicke „Speichern“.
+
+**Themen** ([was sie bedeuten](/docs/news-quellen#themen)): Eines der gewählten genügt, zusammen mit Schwere und
+Quelle – „Aktiv ausgenutzt, Exploit veröffentlicht“ mit allen Schweregraden meldet jede Meldung mit einem der beiden
+Themen. Es zählt das Thema, das die Meldung **beim Eintreffen** hat (aus Titel, Anrisstext, Quelle und dem
+KEV-Katalog). Ein Thema, das erst später dazukommt – etwa aus den Details aus der Quelle –, löst keine
+Desktop-Benachrichtigung mehr aus; dafür gibt es [Regeln](#regel-themen), die so eine Meldung dann nachreichen. Der
+offene Tab und Push bei geschlossenem Tab filtern gleich.
 
 Darunter zeigt die Karte „Zustand in diesem Browser“:
 
@@ -299,10 +306,13 @@ vor Version 0.1.42 beobachtet hast, haben keine Herkunft und stehen bei „Einze
     Klick auf den Titel öffnet die Meldung bzw. den Befund. Die zuletzt beobachtete Gruppe steht oben, *Einzeln
     hinzugefügt* am Ende. Ältere Links mit `?groups=1` öffnen diese Gruppierung.
 - **Zeilen:** CVE-ID (kopierbar) mit Titel, Schwere, KEV (seit wann; Ransomware im Tooltip), [EPSS](term:epss)
-  (Perzentil als Balken) und die erste Fix-Version („+2“: zwei weitere). Eine CVE, die noch keine Quelle kennt, steht mit
+  (Perzentil als Balken) und die erste Fix-Version („+2“: zwei weitere). „Exploit-Code öffentlich“ neben der CVE-ID: eine
+  Sammlung führt einen Exploit ([Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)); die Links stehen in
+  der aufgeklappten Zeile. Eine CVE, die noch keine Quelle kennt, steht mit
   „Noch keine Quelle kennt sie“ da.
 - **Aufklappen** (Klick auf die Zeile oder den Pfeil): der **Verlauf** seit du die CVE beobachtest, das Neueste oben –
-  Fix-Version erschienen (in welchem Advisory), in KEV aufgenommen, EPSS gestiegen, Advisory zurückgezogen; ganz unten,
+  Fix-Version erschienen (in welchem Advisory), in KEV aufgenommen, EPSS gestiegen, Exploit veröffentlicht, Advisory
+  zurückgezogen; ganz unten,
   seit wann du sie beobachtest. Darunter *Meldungen (n)* (die Meldungsliste mit der CVE als Suche), *Advisory öffnen*
   (die Seite des Herstellers, sonst CSAF oder NVD) und *Nicht mehr beobachten*. Das lässt sich in der Bestätigung mit
   „Rückgängig“ zurücknehmen – die CVE wird dann ab diesem Moment neu beobachtet.
@@ -346,6 +356,12 @@ Eine Meldung kommt, wenn bei der CVE etwas Wichtiges passiert:
 | CISA KEV | die CVE wird in den Katalog der aktiv ausgenutzten Schwachstellen aufgenommen |
 | EPSS | das Perzentil erreicht **0,9** (unter den 10 % wahrscheinlichsten) oder der Wert steigt um **0,1** (10 Prozentpunkte) seit der letzten Meldung; höchstens eine Meldung am Tag |
 | Zurückgezogen | ein Advisory zur CVE wird zurückgezogen (z. B. NVD lehnt die CVE ab) |
+| Exploit veröffentlicht | eine eingeschaltete Sammlung (Metasploit, Exploit-DB, nuclei) führt zum ersten Mal einen Exploit für die CVE ([Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)); je CVE **einmal** |
+
+„Exploit veröffentlicht“ kommt nur für Einträge, die nach dem ersten Laden einer Sammlung erscheinen: Was eine
+Sammlung beim ersten Mal mitbringt (oder nachdem sie ausgeschaltet war oder nicht gebraucht wurde), steht in der Liste,
+wird aber nicht gemeldet. Ein Ausfall des Downloads zählt nicht dazu: Was danach neu ist, wird gemeldet.
+Schwere der Meldung: die der CVE, mindestens *hoch*.
 
 Beim EPSS gilt eine kleine Spanne: Ist das Perzentil einmal über 0,9 gemeldet, kommt die nächste Meldung dazu erst,
 nachdem es unter 0,85 gefallen ist – Schwanken um 0,9 erzeugt keine Meldungsserie. Der Anstieg um 0,1 zählt vom
@@ -787,7 +803,7 @@ Felder einer Meldung in `stories`:
 | `published_at` | Veröffentlichung (bei Vendor News und Quellen-Ereignissen: Zeitpunkt des Ereignisses). |
 | `cves` | CVE-Nummern, falls bekannt. |
 | `kind` | `news`, `vendor.vuln`, `vendor.version`, `vendor.eol`, `vendor.change` oder `source.health`. |
-| `topics` | die [Themen](/docs/news-quellen#themen) der Meldung: `zeroday`, `exploited`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` (seit 0.1.46; bei Vendor News `exploited`, wenn aktiv ausgenutzt). |
+| `topics` | die [Themen](/docs/news-quellen#themen) der Meldung: `zeroday`, `exploited`, `poc` (Exploit veröffentlicht), `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` (seit 0.1.46; bei Vendor News `exploited`, wenn aktiv ausgenutzt). |
 | `product` | das Produkt, wenn sicher bekannt (wie das Feld „Produkt“ der [Karten](#nachrichten-format)), sonst leer (seit 0.1.46). |
 
 Bei `vendor.*` öffnet `link` das Produkt auf der Seite Vendor News; `source` ist „Vendor News“. Bei `source.health`
@@ -1179,7 +1195,7 @@ Reiter „Regeln“. Lege zuerst mindestens einen Kanal an.
 5. **Kanäle** wählen – mindestens einer, mehrere sind möglich. „Neuen Kanal anlegen“ führt zu den Kanälen.
 6. Bei „Was wird gesendet?“ eine oder mehrere Arten einschalten (siehe unten).
 7. **Schweregrade** wählen (ab Werk Kritisch und Hoch; leer = alle) und bei Security-Meldungen die **Quellen**
-   (leer = alle).
+   (leer = alle) und die **Themen** (leer = jede Meldung, siehe [Themen in Regeln](#regel-themen)).
 8. Speichern.
 
 In der Liste schaltest du eine Regel mit dem Schalter rechts ein und aus; der Stift öffnet sie, der Papierkorb löscht
@@ -1219,7 +1235,7 @@ Meldungen, Vendor-News-Ereignisse und Zustandswechsel der Quellen, mit derselben
 wäre ein Kanal die ganze Zeit verbunden gewesen). Das Ergebnis:
 
 - die Zahl der Treffer und eine Liste der neuesten (Titel, Zeit, Schwere und warum sie passt: Art, Schwere, Quelle,
-  Team),
+  Thema, Team),
 - wie viele **Nachrichten** daraus geworden wären – was in derselben Minute eintrifft, kommt in einer Runde, ab 4
   Meldungen als eine [Sammelnachricht](#einmal-pro-kanal) –, im Schnitt pro Tag und am stärksten Tag,
 - die Warnung **„Dieser Kanal würde geflutet“**, wenn es an einem Tag mehr als 20 Nachrichten gewesen wären.
@@ -1227,6 +1243,30 @@ wäre ein Kanal die ganze Zeit verbunden gewesen). Das Ergebnis:
 Der Probelauf sendet nichts und schreibt nichts: keine Markierung „verschickt“, keine Änderung an Regel oder Kanal. Er
 läuft lesend und mit Zeitlimit; dauert er zu lange, wähle einen kürzeren Zeitraum. Ändert sich das Formular danach,
 wird das Ergebnis blass – einfach erneut starten. Nur Admins.
+
+### Themen in Regeln {#regel-themen}
+
+Bei Security-Meldungen kann eine Regel zusätzlich **Themen** verlangen ([was sie bedeuten](/docs/news-quellen#themen)),
+z. B. „Kritisch an SOC“ nur für *Aktiv ausgenutzt* und *Exploit veröffentlicht*.
+
+- **Eines genügt:** Die Meldung braucht eines der gewählten Themen – **und** passt außerdem zu Schweregraden und
+  Quellen. Leer heißt: jede Meldung, wie bisher. Bestehende Regeln haben keine Themen und verhalten sich unverändert.
+- **Thema kommt später:** Viele Themen stehen erst nach dem Eintreffen fest – die CVE kommt in den KEV-Katalog, die
+  [Details aus der Quelle](/docs/news-quellen#details-aus-der-quelle) sagen „ausgenutzt“ oder „kein Fix“, die CISA
+  stuft auf „poc“. Eine Meldung, die nach dem Speichern der Regel eintraf und ein verlangtes Thema erst danach bekommt,
+  wird **dann** verschickt – mit der nächsten Runde, **einmal** pro Kanal, nie doppelt (auch nicht, wenn später ein
+  weiteres Thema dazukommt). Ältere Meldungen bleiben, wie unter [Nur Neues](#nur-neues) beschrieben, außen vor.
+- **Kein Schwall durch Neuberechnung:** Bekommen viele Meldungen ein Thema auf einmal, weil alle Themen neu berechnet
+  werden – eine Exploit-Sammlung wird eingeschaltet oder zum ersten Mal geladen, ein Update ändert die Themenregeln –,
+  zeigt Cobe News das Thema an diesen Meldungen (Filter, Badge), verschickt sie dafür aber **nicht**. Das gilt auch für
+  „Exploit veröffentlicht“, das nur auf dem Grundbestand einer Sammlung beruht. Ein Thema durch ein eigenes Ereignis
+  (neuer KEV-Eintrag, neuer Eintrag einer Sammlung, eingetroffene Details) kommt weiter einmal.
+- **Nur Security-Meldungen:** Für Vendor-News-Ereignisse und Quellen-Gesundheit gelten die Themen nicht.
+- **Erweitern:** Themen entfernen oder weitere wählen ist ein [erweiterter Filter](#nur-neues) – was erst dadurch
+  passt, kommt ab der Änderung.
+- Der [Probelauf](#probelauf) prüft die Themen mit und nennt bei jedem Treffer das Thema, über das er passt; das
+  [Zustellprotokoll](#protokoll-inhalt) zeigt die Themen jeder verschickten Meldung, das
+  [Protokoll](/docs/betrieb#protokoll) jede Änderung der Themen einer Regel.
 
 ### Auf Teams beschränken {#regel-teams}
 
@@ -1243,7 +1283,7 @@ nachgeschickt.
 
 - **Neue oder wieder eingeschaltete Regel:** zählt ab diesem Moment. Was eintraf, während sie aus war, kommt nicht.
 - **Kanal, der einer Regel später hinzugefügt wird:** bekommt nur, was danach eintrifft.
-- **Erweiterter Filter** (mehr Schweregrade, Quellen oder Arten): Was erst dadurch passt, kommt ab der Änderung. Was
+- **Erweiterter Filter** (mehr Schweregrade, Quellen, Themen oder Arten): Was erst dadurch passt, kommt ab der Änderung. Was
   schon vorher passte und noch offen ist, kommt weiterhin.
 - **Neu eingeschaltete Quelle:** Die älteren Meldungen, die sie beim ersten Abruf mitbringt, werden nicht verschickt –
   nur, was danach frisch dazukommt.
@@ -1280,8 +1320,8 @@ oder „3 Fehler in 24 Std.“ (gelb, wenn danach etwas durchging; rot, wenn nic
 | Test | „Testen“ eines Kanals |
 
 Pro Zustellung: Kanal (mit dem Namen, den er damals hatte – auch nach dem Löschen), was verschickt wurde (Meldung,
-Ereignis oder Befund mit Titel; bei einer Sammelnachricht die aufgeführten und wie viele insgesamt), die Regeln, Zeit,
-Versuch und Ergebnis:
+Ereignis oder Befund mit Titel, bei Meldungen mit ihren Themen; bei einer Sammelnachricht die aufgeführten und wie viele
+insgesamt), die Regeln, Zeit, Versuch und Ergebnis:
 
 | Ergebnis | Bedeutung |
 |---|---|

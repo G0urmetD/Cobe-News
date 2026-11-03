@@ -217,3 +217,6 @@ where:
   zyxel:
     de: "Weboberfläche: Dashboard bzw. Wartung → Firmware-Paket, oder CLI: show version – z. B. „V5.38(ABPS.0)“. Eintragen als 5.38 (ohne V und Modellcode); ein Patch („V5.38 Patch 1“) als 5.38 Patch 1."
     en: "Web interface: dashboard or Maintenance → firmware package, or CLI: show version – e.g. “V5.38(ABPS.0)”. Enter it as 5.38 (without V and model code); a patch (“V5.38 Patch 1”) as 5.38 Patch 1."
+  oxidized_web:
+    de: "Verglichen wird die Version der Weboberfläche oxidized-web (eigenes Gem mit eigenen Nummern, z. B. 0.18.1), nicht die von Oxidized selbst (z. B. 0.37.0): auf dem Server bzw. im Container gem list oxidized-web. Die CVEs der NVD betreffen bisher nur oxidized-web."
+    en: "The version compared is that of the web interface oxidized-web (a gem of its own with its own numbers, e.g. 0.18.1), not that of Oxidized itself (e.g. 0.37.0): on the server or in the container gem list oxidized-web. NVD's CVEs so far concern oxidized-web only."

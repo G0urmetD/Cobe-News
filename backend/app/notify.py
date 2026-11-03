@@ -57,6 +57,7 @@ from app import news as news_svc
 from app import settings as settings_store
 from app import vendor_titles as titles
 from app.config import get_config, tls_verify
+from app.plaintext import neutral
 from app.crypto import decrypt_str
 from app.models import (
     NewsItem,
@@ -272,6 +273,20 @@ class Story:
     product: str = ""
     topics: list[str] = field(default_factory=list)
     source_kind: str = ""
+    # "GREEN": from a CSAF provider's TLP:GREEN document (allowed per provider) – every format labels it
+    tlp: str = ""
+
+    def __post_init__(self) -> None:
+        # feed text: no direction or control characters in any channel (app/plaintext.py)
+        self.title, self.summary, self.source, self.product = (neutral(x) for x in (self.title, self.summary, self.source, self.product))
+
+
+TLP_PREFIX = "[TLP:GREEN] "
+
+
+def tlp_line(lang: str) -> str:
+    """The label of a TLP:GREEN item, as each channel shows it."""
+    return CARD_LABELS.get(lang, CARD_LABELS["de"])["tlp_green"]
 
 
 def _link(story_id: str) -> str:
@@ -297,7 +312,7 @@ def one_line(text: str) -> str:
     """A mail header value: line breaks and other control characters (from a rule or channel name, a product or version
     label, a story title) become spaces – the email package refuses a header with a line break, which made every mail
     of the channel fail and retry for ever."""
-    return " ".join(_CONTROL.sub(" ", text).split())
+    return " ".join(_CONTROL.sub(" ", neutral(text)).split())
 
 
 def _subject(rule: str, stories: list[Story], total: int, lang: str, test: bool) -> str:
@@ -329,6 +344,7 @@ def render_mail(rule: str, stories: list[Story], total: int, lang: str, *, test:
             "sev_label": lb["sev"][s.severity],
             "sev_color": SEV_COLORS[s.severity][0],
             "sev_bg": SEV_COLORS[s.severity][1],
+            "tlp": tlp_line(lang) if s.tlp == "GREEN" else "",
         }
         for s in stories
     ]
@@ -351,6 +367,8 @@ def render_mail(rule: str, stories: list[Story], total: int, lang: str, *, test:
     lines = [heading, "=" * min(len(heading), 60), ""]
     for c in cards:
         lines += [f"[{c['sev_label']}] {c['source']} · {c['date']}", c["title"]]
+        if c["tlp"]:
+            lines.append(c["tlp"])
         if c["summary"]:
             lines.append(c["summary"])
         if c["url"]:
@@ -375,9 +393,12 @@ CARD_LABELS = {
         "product": "Produkt",
         "source": "Quelle",
         "category": "Kategorie",
+        "tlp": "TLP",
+        "tlp_green": "TLP:GREEN – nur intern weitergeben",
         "topics": {
             "zeroday": "Zero-Day",
             "exploited": "Aktiv ausgenutzt",
+            "poc": "Exploit veröffentlicht",
             "ransomware": "Ransomware",
             "nopatch": "Ohne Patch",
             "breach": "Vorfall/Datenleck",
@@ -401,9 +422,12 @@ CARD_LABELS = {
         "product": "Product",
         "source": "Source",
         "category": "Category",
+        "tlp": "TLP",
+        "tlp_green": "TLP:GREEN – share internally only",
         "topics": {
             "zeroday": "Zero-day",
             "exploited": "Actively exploited",
+            "poc": "Exploit published",
             "ransomware": "Ransomware",
             "nopatch": "No patch",
             "breach": "Incident/data leak",
@@ -472,7 +496,8 @@ def category(s: "Story", lang: str) -> str:
 def card_fields(s: "Story", lang: str) -> list[tuple[str, str]]:
     """(label, value) of a card: Produkt (when known), Quelle, Kategorie – plain text, each channel escapes it."""
     cl = CARD_LABELS[lang]
-    out = [(cl["product"], s.product)] if s.product else []
+    out = [(cl["tlp"], cl["tlp_green"])] if s.tlp == "GREEN" else []
+    out += [(cl["product"], s.product)] if s.product else []
     return [*out, (cl["source"], s.source), (cl["category"], category(s, lang))]
 
 
@@ -496,7 +521,7 @@ def _safe_url(url: str) -> str:
 
 
 def _one_line(v: str) -> str:
-    return " ".join(str(v).split())
+    return " ".join(neutral(str(v)).split())
 
 
 def _slack_esc(v: str) -> str:
@@ -726,6 +751,8 @@ def render_webhook(channel: str, rules: list[str], stories: list[Story], total: 
                 # 0.1.46, additive: the story's topics (news.TOPICS) and the product when reliably known ("" otherwise)
                 "topics": list(s.topics or []),
                 "product": s.product,
+                # additive: "GREEN" for a CSAF provider's TLP:GREEN document (share internally only), else ""
+                "tlp": s.tlp or "",
             }
             for s in stories
         ],
@@ -745,7 +772,7 @@ _BLOCK_CONTROL = re.compile(r"[\x00-\x09\x0b-\x1f\x7f\x85\u2028\u2029\u202a-\u20
 def plain_block(text: str) -> str:
     """Plain text of several lines: line breaks kept (one empty line at most), every other control or direction
     character out."""
-    text = _BLOCK_CONTROL.sub(" ", (text or "").replace("\r\n", "\n").replace("\r", "\n"))
+    text = _BLOCK_CONTROL.sub(" ", neutral(text or ""))
     return re.sub(r"\n{3,}", "\n\n", "\n".join(" ".join(x.split()) for x in text.split("\n"))).strip()
 
 
@@ -1248,13 +1275,14 @@ def card_product(data: dict | None, matched: list[dict]) -> str:
         break
     if not product and (h := story_details.hint(data)) and h.get("product"):
         product = str(h["product"])
-    return product[:200]
+    # the advisory's text: no direction or control characters (set after Story.__post_init__ – neutral here)
+    return neutral(product)[:200]
 
 
 # ---------------------------------------------------------------- what a rule lets through (the live round and the dry run)
 #
-# The filters below are the one matcher of the rules: built from the rule's fields only (severities, sources, kinds,
-# teams) – no channel, no "sent" marks, no time. The live round (pending / vendor_pending / health_pending) adds the
+# The filters below are the one matcher of the rules: built from the rule's fields only (severities, sources, topics,
+# kinds, teams) – no channel, no "sent" marks, no time. The live round (pending / vendor_pending / health_pending) adds the
 # time since the rule (and the link) and what the channel got already; the dry run (dry_run) adds only the time window.
 
 
@@ -1268,10 +1296,21 @@ def news_filter(rule: NotifyRule) -> list:
     ]
     if rule.severities:
         where.append(NewsItem.severity.in_(list(rule.severities)))
+    # topics: one of them (OR within the topics, AND with the rest) – a story that gets one only later by an event of
+    # its own (a new KEV entry, a list's new exploit entry, its details) matches from then on and is sent then, once
+    # (pending: not sent to the channel yet); one gained quietly (a full recompute: an exploit list switched on or its
+    # first import, a new rule version – news.loud_topic) never: an older story is no news because of that
+    if topics := rule_topics(rule):
+        where.append(news_svc.loud_topic(topics))
     # carried by a switched-on source (of the rule's, when it names some) – also as a further source ("also in")
     ids = news_svc._ids(rule.sources)
     where.append(news_svc.visible(ids) if ids or not rule.sources else false())  # only unreadable ids: nothing, not "all"
     return where
+
+
+def rule_topics(rule: NotifyRule) -> list[str]:
+    """The rule's topics as news.TOPICS knows them (in their order) – empty: every story, whatever its topics."""
+    return [t for t in news_svc.TOPICS if t in (getattr(rule, "topics", None) or [])]
 
 
 def _teams_clause(teams) -> ColumnElement:  # noqa: ANN001
@@ -1316,19 +1355,20 @@ EARLIER_MAX = 10  # filters kept per rule; more: the two oldest become one (stri
 
 
 def rule_filter(rule: NotifyRule, teams: list | None = None) -> dict:
-    """What a rule lets through, normalised: severities / sources / teams None = all (a rule's empty list). `teams`: the
-    rule's team filter (notify_rule_teams – not on the rule row)."""
+    """What a rule lets through, normalised: severities / sources / topics / teams None = all (a rule's empty list).
+    `teams`: the rule's team filter (notify_rule_teams – not on the rule row)."""
     return {
         "severities": sorted(rule.severities or []) or None,
         "sources": sorted(str(x) for x in rule.sources or []) or None,
+        "topics": sorted(rule_topics(rule)) or None,
         "kinds": sorted(rule_kinds(rule)),
         "teams": sorted(str(x) for x in teams or []) or None,
     }
 
 
 def widens(old: dict, new: dict) -> bool:
-    """`new` lets through something `old` did not: another severity, source, kind or team (or "all" instead of a
-    choice)."""
+    """`new` lets through something `old` did not: another severity, source, topic, kind or team (or "all" instead of a
+    choice). A filter of before topics existed has none (`topics` missing: all)."""
 
     def more(a: list | None, b: list | None) -> bool:
         return a is not None and (b is None or bool(set(b) - set(a)))
@@ -1336,6 +1376,7 @@ def widens(old: dict, new: dict) -> bool:
     return (
         more(old["severities"], new["severities"])
         or more(old["sources"], new["sources"])
+        or more(old.get("topics"), new.get("topics"))
         or bool(set(new["kinds"]) - set(old["kinds"]))
         or more(old.get("teams"), new.get("teams"))
     )
@@ -1360,6 +1401,7 @@ def widened(rule: NotifyRule, before: dict, seq: int, at: datetime) -> None:
         merged = {
             "severities": _both(a["severities"], b["severities"]),
             "sources": _both(a["sources"], b["sources"]),
+            "topics": _both(a.get("topics"), b.get("topics")),
             "kinds": sorted(set(a["kinds"]) & set(b["kinds"])),
             "teams": _both(a.get("teams"), b.get("teams")),
         }
@@ -1377,6 +1419,9 @@ def _earlier_news(rule: NotifyRule) -> list:
         if x["sources"] is not None:
             ids = news_svc._ids(x["sources"])
             match.append(news_svc.carried(ids) if ids else false())
+        if x.get("topics") is not None:
+            want = [t for t in x["topics"] if t in news_svc.TOPICS]
+            match.append(news_svc.loud_topic(want) if want else false())
         if match:
             out.append(or_(NewsItem.seq > int(x["seq"]), and_(*match)))
     return out
@@ -1538,6 +1583,8 @@ VENDOR_LABELS = {
         "watch_epss_jump": "Vorher {before}.",
         "watch_withdrawn": "{cve}: Advisory zurückgezogen",
         "watch_withdrawn_text": "{ident} ({source}) wurde von der Quelle zurückgezogen.",
+        "watch_exploit": "{cve}: Exploit veröffentlicht",
+        "watch_exploit_text": "Öffentlich verfügbar: {where}.",
         "watch_hint": "Du beobachtest diese CVE in Cobe News.",
     },
     "en": {
@@ -1568,6 +1615,8 @@ VENDOR_LABELS = {
         "watch_epss_jump": "Before: {before}.",
         "watch_withdrawn": "{cve}: advisory withdrawn",
         "watch_withdrawn_text": "{ident} ({source}) was withdrawn by its source.",
+        "watch_exploit": "{cve}: exploit published",
+        "watch_exploit_text": "Publicly available: {where}.",
         "watch_hint": "You watch this CVE in Cobe News.",
     },
 }
@@ -1608,10 +1657,13 @@ def vendor_story(ev: VendorEvent, lang: str) -> Story:
         title = f"{where}: {d.get('ident') or ''} – {head}".strip(" –")
         if d.get("now_exploited"):
             title = f"{lb['now_exploited']}: {title}"
+        tlp = "GREEN" if d.get("tlp") == "GREEN" else ""
+        if tlp:
+            title = TLP_PREFIX + title  # also in a subject, a compact list and a desktop notification
         product_line = f"{product} {version}".strip() + (f" → {d['fixed']}" if d.get("fixed") and version else "")
         return Story(
             str(ev.id), title[:300], summary[:600], str(d.get("url") or link), ev.severity, lb["source"], ev.created_at, list(d.get("cves") or []), "vendor.vuln", link,
-            product=product_line, topics=["exploited"] if d.get("exploited") else [], source_kind="vendor_news",
+            product=product_line, topics=["exploited"] if d.get("exploited") else [], source_kind="vendor_news", tlp=tlp,
         )
     if ev.kind == "change":
         return change_story(ev, lang, where=product, link=link)
@@ -1664,6 +1716,12 @@ def watch_story(ev: VendorEvent, lang: str) -> Story:
         if d.get("from") is not None:
             parts.append(lb["watch_epss_jump"].format(before=_pct(d.get("from"), lang)))
         text = " ".join(parts)
+    elif what == "exploit":
+        from app.exploits import SOURCES
+
+        title = lb["watch_exploit"].format(cve=cve)
+        names = [f"{SOURCES[x['source']].name} ({x.get('url') or ''})" if x.get("url") else SOURCES[x["source"]].name for x in d.get("exploits") or [] if isinstance(x, dict) and x.get("source") in SOURCES]
+        text = lb["watch_exploit_text"].format(where="; ".join(names) or "?")
     else:
         title = lb["watch_withdrawn"].format(cve=cve)
         text = lb["watch_withdrawn_text"].format(ident=d.get("ident") or d.get("advisory") or "?", source=d.get("source") or "?")
@@ -1689,7 +1747,10 @@ def change_story(ev: VendorEvent, lang: str, *, where: str, link: str) -> Story:
     if d.get("title"):
         summary += f"\n{d['title']}"
     src_name = VENDOR_LABELS.get(lang, VENDOR_LABELS["de"])["source"]
-    return Story(str(ev.id), title[:300], summary[:600], str(d.get("url") or link), ev.severity, src_name, ev.created_at, list(d.get("cves") or []), "vendor.change", link, product=where, source_kind="vendor_news")
+    tlp = "GREEN" if d.get("tlp") == "GREEN" else ""
+    if tlp:
+        title = TLP_PREFIX + title
+    return Story(str(ev.id), title[:300], summary[:600], str(d.get("url") or link), ev.severity, src_name, ev.created_at, list(d.get("cves") or []), "vendor.change", link, product=where, source_kind="vendor_news", tlp=tlp)
 
 
 @dataclass
@@ -1744,7 +1805,7 @@ class Message:
         """What the delivery log keeps of it: the listed stories by reference and title, the rules, what a resend sends."""
         return {
             "ref": delivery_log.ref_of(self.key),
-            "items": [{"kind": x.kind, "id": x.id, "title": x.title, "severity": x.severity} for x in self.stories],
+            "items": [{"kind": x.kind, "id": x.id, "title": x.title, "severity": x.severity, "topics": list(x.topics or []) if x.kind == "news" else []} for x in self.stories],
             "total": self.total,
             "rules": self.by,
             "refs": [f"{kind}:{item}:{rule}" for kind, item, rule in self.items],
@@ -2129,7 +2190,8 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
     now = now or datetime.now(UTC)
     since = now - timedelta(days=days)
     lang = rule.lang if rule.lang in LABELS else "de"
-    restricted = {"severity": bool(rule.severities), "source": bool(rule.sources), "teams": bool(teams)}
+    restricted = {"severity": bool(rule.severities), "source": bool(rule.sources), "topic": bool(rule_topics(rule)), "teams": bool(teams)}
+    wanted = set(rule_topics(rule))
     items: list[dict] = []
     buckets: dict[datetime, int] = {}
     total = 0
@@ -2146,7 +2208,11 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
                 total += int(n)
             stmt = select(NewsItem, NewsSource).join(NewsSource, NewsSource.id == NewsItem.source_id).where(*where).order_by(NewsItem.fetched_at.desc()).limit(DRY_LIMIT)
             for i, src in (await db.execute(stmt)).all():
-                items.append({"kind": "news", "id": str(i.id), "title": i.title, "severity": i.severity, "at": i.fetched_at.isoformat(), "source": src.name, "match": {"kind": "news", **restricted, "teams": False}})
+                # the topics it matched by (the rule's that the story has) – shown as "Thema: …"
+                hit = [t for t in news_svc.TOPICS if t in wanted and t in (i.topics or [])]
+                items.append(
+                    {"kind": "news", "id": str(i.id), "title": i.title, "severity": i.severity, "at": i.fetched_at.isoformat(), "source": src.name, "topics": hit, "match": {"kind": "news", **restricted, "teams": False}}
+                )
         match = vendor_filter(rule, list(teams))
         if match is not None:
             where = [VendorEvent.created_at > since, VendorEvent.created_at <= now, *match]
@@ -2158,7 +2224,17 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
                 st = vendor_story(ev, lang)
                 kind = {"vuln": "vendor_vuln", "change": "vendor_change"}.get(ev.kind, "vendor_version")
                 severity_counts = ev.kind in SEVERITY_KINDS and restricted["severity"]
-                items.append({"kind": kind, "id": str(ev.id), "title": st.title, "severity": ev.severity, "at": ev.created_at.isoformat(), "source": st.source, "match": {"kind": kind, "severity": severity_counts, "source": False, "teams": restricted["teams"]}})
+                items.append(
+                    {
+                        "kind": kind,
+                        "id": str(ev.id),
+                        "title": st.title,
+                        "severity": ev.severity,
+                        "at": ev.created_at.isoformat(),
+                        "source": st.source,
+                        "match": {"kind": kind, "severity": severity_counts, "source": False, "topic": False, "teams": restricted["teams"]},
+                    }
+                )
         match = health_filter(rule)
         if match is not None:
             where = [SourceHealthEvent.created_at > since, SourceHealthEvent.created_at <= now, *match]
@@ -2168,7 +2244,7 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
                 total += int(n)
             for hv in await db.scalars(select(SourceHealthEvent).where(*where).order_by(SourceHealthEvent.created_at.desc()).limit(DRY_LIMIT)):
                 st = health_story(hv, lang)
-                items.append({"kind": "source_health", "id": str(hv.id), "title": st.title, "severity": st.severity, "at": hv.created_at.isoformat(), "source": st.source, "match": {"kind": "source_health", "severity": False, "source": False, "teams": False}})
+                items.append({"kind": "source_health", "id": str(hv.id), "title": st.title, "severity": st.severity, "at": hv.created_at.isoformat(), "source": st.source, "match": {"kind": "source_health", "severity": False, "source": False, "topic": False, "teams": False}})
     finally:
         await db.rollback()
     per_day: dict[str, dict] = {}

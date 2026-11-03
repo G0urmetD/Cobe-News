@@ -49,7 +49,7 @@ from app.models import User  # noqa: E402
 
 LOCAL = ("127.0.0.1", "localhost", "::1")
 _real_getaddrinfo, _real_create_connection = socket.getaddrinfo, socket.create_connection
-STRUCTURED_OFF = {"csaf": False, "cvelist": False, "epss": False, "osv": False}
+STRUCTURED_OFF = {"csaf": False, "cvelist": False, "epss": False, "osv": False, "exploit_metasploit": False, "exploit_exploitdb": False, "exploit_nuclei": False}
 PASSWORD = "Ein-langes-Test-Passwort-2026"  # test fixture only
 
 

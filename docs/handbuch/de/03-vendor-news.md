@@ -195,6 +195,11 @@ Firefox, `2019` bei nginx. Das Formular lehnt sie ab und nennt die bekannten Lin
 die bekannten und ältere gehen. Produkte ohne Release-Linien prüft Vendor News darauf nicht; manche haben stattdessen
 ein festes Muster (Exchange und SQL Server: Build-Nummern, VMware Tools: `12.4.0`).
 
+Manche Produkte haben nur einen Teil der Linien: **Mozilla Firefox ESR** nur die ESR-Linien (115, 128, 140, 153 …),
+**Jenkins LTS** nur die LTS-Linien (2.555, 2.568 …). Eine Version dazwischen, die auf keiner davon liegt – `134.0` bei
+Firefox ESR, `2.500.1` bei Jenkins LTS –, lehnt das Formular ab und nennt die Linien; meist ist es das andere Produkt
+(Mozilla Firefox, Jenkins weekly). Eine Linie, die neuer ist als alle bekannten, geht auch hier.
+
 ### Getrennte Produkte {#getrennte-produkte}
 
 Produkte mit zwei Versionslinien unter einem Namen sind getrennt, weil ihre Hinweise getrennt rechnen:
@@ -519,6 +524,31 @@ sie nur, wenn sie mehr sagt als „nichts bekannt“:
 Steht schon „SSVC: aktiv ausgenutzt“ da, fehlt die eigene Markierung „aktiv ausgenutzt“ (dieselbe Aussage); ein
 KEV-Eintrag wird trotzdem als **KEV** gezeigt.
 
+### Öffentlicher Exploit {#oeffentlicher-exploit}
+
+**„Exploit-Code öffentlich“** (orange) heißt: Eine öffentliche Sammlung führt Code, der die Lücke ausnutzt, oder eine fertige
+Prüfung, die sie ausnutzt. Daneben steht je Sammlung ein Link zu ihrem Eintrag:
+
+| Sammlung | Was sie führt |
+|---|---|
+| **Metasploit** | ein Exploit-Modul des Metasploit Framework (nur Module vom Typ „exploit“, keine reinen Scanner) |
+| **Exploit-DB** | einen Eintrag in der Exploit-Datenbank von OffSec (Proof of Concept, Exploit-Code) |
+| **nuclei** | eine Vorlage der nuclei-templates von ProjectDiscovery – eine fertige Prüfung, die die Lücke im Netz findet |
+
+Gut zu wissen:
+
+- Das ist **keine Aussage über Angriffe**: Ein öffentlicher Exploit macht Angriffe leicht, „aktiv ausgenutzt“ heißt,
+  sie finden statt. Steht beides da, zählt „aktiv ausgenutzt“ (auch in der [Dringlichkeit](#dringlichkeit-formel)).
+- Cobe News speichert nur die CVE, die Sammlung, den Link und wann es den Eintrag zuerst gesehen hat – **nie den Code**.
+- Die Sammlungen werden höchstens einmal am Tag geladen; ein neuer Eintrag erscheint also spätestens am nächsten Tag.
+  Welche Sammlungen geladen werden, legt ein Admin fest
+  ([Exploit-Hinweise](/docs/integrationen#exploit-hinweise)) – ab Werk Metasploit und nuclei, Exploit-DB nicht.
+- Fehlt der Hinweis, heißt das nur: Keine der eingeschalteten Sammlungen führt die CVE. Exploits kursieren auch
+  anderswo.
+- Derselbe Hinweis steht in den Details einer Meldung bei ihren CVEs und in der Liste der
+  [beobachteten CVEs](/docs/benachrichtigungen#cves-liste); taucht für eine beobachtete CVE ein Exploit auf, kommt
+  einmal die Meldung **„Exploit veröffentlicht“** ([Wann eine Meldung kommt](/docs/benachrichtigungen#cves-meldungen)).
+
 ### Nach EPSS sortieren {#nach-epss-sortieren}
 
 In der Schublade eines Produkts, Reiter „Schwachstellen“, steht bei mehr als einer Schwachstelle die Auswahl
@@ -556,6 +586,7 @@ Kein Modell, kein Lernen – feste Punkte, zusammengezählt und auf 0 bis 100 be
 | [EPSS](term:epss)-Perzentil | ab 95 % +20 · ab 80 % +10 · ab 50 % +5 |
 | Im [KEV](term:kev)-Katalog | +30 |
 | Sonst bekannt als ausgenutzt (Hersteller, [EUVD](term:euvd)) | +25 |
+| [Öffentlicher Exploit](#oeffentlicher-exploit) (Metasploit, Exploit-DB, nuclei) – nur, wenn die Lücke nicht schon als ausgenutzt bekannt ist | +10 |
 | Eure Version | betroffen +25 · möglicherweise betroffen oder ohne Version +5 · Cloud-Dienst 0 · unklare Altdaten −50 · nicht betroffen −70 |
 | Kein Fix bekannt (bei betroffen oder möglicherweise) | +5 |
 | Alter | in den letzten 7 Tagen veröffentlicht +10 · in den letzten 30 Tagen +5 |
@@ -567,8 +598,10 @@ Gut zu wissen:
 - Hat ein Befund **mehrere eurer Versionen**, zählt die dringendste; der Tooltip nennt sie.
 - **Kritisch und betroffen** ergibt mindestens 60 (*Sofort*), **hoch und betroffen** 50 (*Bald*) – passend zur roten
   bzw. orangen Karte der Übersicht.
-- Ein Platz für „öffentlicher Exploit bekannt“ ist vorgesehen, wird aber **noch nicht genutzt** (die Datenquelle ist
-  nicht freigegeben).
+- **Öffentlicher Exploit +10** liegt bewusst zwischen „nichts bekannt“ (0) und „ausgenutzt“ (+25/+30) – wie bei
+  [SSVC](term:ssvc) „Exploit-Code öffentlich“ zwischen „keine“ und „aktiv“. Ist die Lücke schon als ausgenutzt bekannt,
+  zählt nur das; beides zusammen gibt es nicht. So wird **hoch und betroffen** mit öffentlichem Exploit 60 (*Sofort*)
+  statt 50 – Befunde ohne Exploit behalten ihre Zahl.
 - Die Zahl rechnet der Server aus den Daten, die Cobe News ohnehin hat – keine zusätzliche Abfrage. Das Alter rückt
   täglich weiter, deshalb kann eine Zahl über Nacht sinken.
 
@@ -685,8 +718,9 @@ Ein Vorschlag wird genau einmal beantwortet. Adressen werden nur als Text und Li
 | CVE-Liste (cvelistV5) | die Angaben des Herstellers zu einer CVE und die Einstufung der CISA ([SSVC](term:ssvc)) – vor allem, solange die NVD eine CVE noch nicht analysiert hat |
 | FIRST [EPSS](term:epss) | Wahrscheinlichkeit der Ausnutzung in 30 Tagen |
 | [OSV](term:osv) | Fix-Versionen von Open-Source-Paketen (Tomcat, Jenkins, Django …) |
+| Metasploit, Exploit-DB, nuclei-templates | „Exploit-Code öffentlich“ ([Öffentlicher Exploit](#oeffentlicher-exploit)) |
 
-Hersteller-Hinweise werden nur geholt, wenn einem Produkt dieses Herstellers gefolgt wird. Die letzten vier Quellen
+Hersteller-Hinweise werden nur geholt, wenn einem Produkt dieses Herstellers gefolgt wird. Die letzten sieben Quellen
 schaltet ein Admin einzeln ab ([Weitere Quellen](/docs/integrationen#weitere-quellen)); nach außen gehen dabei nur
 CVE-Nummern und öffentliche Adressen, nie eure Produkte oder Versionen.
 

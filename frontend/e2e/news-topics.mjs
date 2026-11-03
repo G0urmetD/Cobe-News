@@ -15,7 +15,8 @@ import crypto from "node:crypto"
 import { BASE, COMBOS, H, SHOTS, check, creds, dismissToasts, finish, json, open, pw, scrollCheck, settle, signIn, toastAfter, toastCount, tooltipOf } from "./common.mjs"
 import { texts } from "./i18n-text.mjs"
 
-const TOPICS = ["zeroday", "exploited", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]
+// 0.1.47: "poc" (Exploit veröffentlicht) after "exploited"
+const TOPICS = ["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]
 const QUICK = ["exploited", "zeroday", "nopatch"]
 const PREFIX = "E2E Thema:"
 async function until(fn, ms = 8000, step = 250) {
@@ -67,7 +68,7 @@ async function flows(browser, combo, t) {
   )
   await scrollCheck(p, `${combo.lang} ${combo.width}px ${combo.theme}`, "topic filter", SHOTS && `${combo.lang}-topic_filter`)
   await p.keyboard.press("Escape")
-  check(`${tag}: "${t("news.filterTopic")}" – eight topics with their explanation and the API's numbers`, rows.length === 8 && ok, {
+  check(`${tag}: "${t("news.filterTopic")}" – ${TOPICS.length} topics with their explanation and the API's numbers`, rows.length === TOPICS.length && ok, {
     rows: rows.map((x) => x.slice(0, 30) + "…" + x.slice(-4)),
     counts,
   })

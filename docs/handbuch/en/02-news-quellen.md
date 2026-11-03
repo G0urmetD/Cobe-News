@@ -17,7 +17,9 @@ Each tile shows:
   **⋯** menu (read/unread, [mute](/docs/benachrichtigungen#stummschalten) the story's CVEs),
 - the title and the start of the summary,
 - if known, the affected product ("affects GitLab …" or "affects your systems: …"),
-- at the bottom the **severity**, the CVE mentioned (or "3 CVEs") and the age of the story.
+- at the bottom the **severity**, "Our product: …" (when the story concerns a followed product, see
+  [Concerns our products](#unsere-produkte)), the [topics](#themen), the CVE mentioned (or "3 CVEs") and the age of the
+  story.
 
 Critical stories have a red border. Unread ones have a dot in front of a bold title; muted ones (visible only with
 "Show muted") are pale and say "Muted".
@@ -52,9 +54,11 @@ tab) and "Close".
 - The **sources** are grouped by their kind (authorities & CERTs, vulnerability catalogues, vendor advisories, research,
   press, own sources). "All: Authorities & CERTs" picks a whole group – e.g. for the authorities' warnings.
 - **Quick filters** below the filter row: "Actively exploited", "Zero-day" and "No patch" in one click – the same filter
-  as *Topic*, with the number of stories.
-- The browser also remembers source, severity and topic for your account (when you have no default view).
-- "Reset filter" clears source, severity and topic.
+  as *Topic*, with the number of stories. Next to them **"Concerns our products"** as soon as you follow a product in
+  Vendor News ([more](#unsere-produkte)) – it applies on top of all other filters.
+- The browser also remembers source, severity, topic and "Concerns our products" for your account (when you have no
+  default view).
+- "Reset filter" clears source, severity, topic and "Concerns our products".
 - **Unread only**: hides what is read. **Show muted**: also shows the stories whose CVEs you all muted (pale) – otherwise
   they are left out.
 - **Views**: save the filters under a name, make one the default, share it as a link ([Views](/docs/erste-schritte#ansichten)).
@@ -145,6 +149,7 @@ the reason ("CISA KEV lists CVE-…", "in the title: ‘actively exploited’") 
 |---|---|
 | **Zero-day** | "zero-day", "0-day" in title or teaser (not the Zero Day Initiative, not "Kein Zero-Day"). A zero-day story is also *actively exploited*. |
 | **Actively exploited** | an entry of the [CISA KEV](term:kev) or [ENISA EUVD](term:euvd) catalogues; a CVE of the story is in the KEV (see below); the [details from the source](#details-aus-der-quelle) say "exploited"; words such as "actively exploited", "exploited in the wild", "aktiv ausgenutzt", "wird bereits ausgenutzt" – not denied, not as a duty to report ([negations](#verneinungen)) |
+| **Exploit published** | a public exploit or proof of concept is known: CISA rates a CVE of the story in [SSVC](term:ssvc) with "Exploitation: poc" (from the CVE list, see below); a switched-on exploit collection (Metasploit, Exploit-DB, nuclei – [Public exploit](/docs/vendor-news#oeffentlicher-exploit)) lists a CVE of the story; words such as "PoC exploit", "proof-of-concept exploit released", "Exploit-Code veröffentlicht", "public exploit" – not denied ("no public exploit", "a public exploit is not known"). No evidence of attacks yet – that is *Actively exploited*. |
 | **Ransomware** | "ransomware", "Erpressertrojaner", known gangs (LockBit, Akira, Qilin, Black Basta, Cl0p); for KEV entries CISA's note on ransomware campaigns |
 | **No patch** | "[UNGEPATCHT]" in the title of a BSI warning; a CSAF advisory with "no fix available" or "no fix planned" and no vendor fix; a few unambiguous phrases ("no patch yet", "noch kein Update", "unpatched flaw") |
 | **Incident/data leak** | "data breach", "Datenleck", "Datenpanne", "Kundendaten", "cyberattack on …", stolen or exposed data |
@@ -165,6 +170,15 @@ authorities at once.
   or teaser names that CVE or it names at most three CVEs. A Patch Tuesday round-up with 80 CVEs does not become
   "actively exploited" because one of them is in the KEV. CISA's ransomware note goes only to the KEV entry itself, not
   to every story about the same CVE.
+- **Exploit published by CVE:** Cobe News reads CISA's SSVC rating from the stored entries of the CVE list (cvelistV5 –
+  Vendor News keeps them for the followed products and for the CVEs it looks up for stories and findings). "poc" makes
+  the story *Exploit published* – by the same round-up rule as for the KEV. "active" (active exploitation) is no PoC:
+  that story is *Actively exploited*. When CISA changes its rating, the stories about that CVE follow.
+- **Exploit published by the exploit collections:** when a switched-on collection (Metasploit, Exploit-DB, nuclei)
+  lists a CVE of the story, it is *Exploit published* as well (same round-up rule); the drawer names the collection as
+  the reason. When a collection adds or drops a CVE, the stories about that CVE follow at once; on a collection's first
+  load, with very many changes at once and when a collection is switched on or off, Cobe News recomputes all stories in
+  the background.
 - **Ads** ("heise-Angebot", "Anzeige", "Webinar:", "(g+)") get no topics from their words.
 - **Recomputed** whenever something changes: the story is updated, the details from the source arrive, a CVE is newly
   added to the KEV catalogue or a KEV story about the same CVE appears. After an update or a change of the rules
@@ -179,7 +193,30 @@ authorities at once.
 - *No patch* recognises only cases said explicitly. No such note does not mean that a patch exists.
 - *Actively exploited* via the KEV needs the story to name the CVE; stories without a CVE are recognised by their
   wording only.
-- Topics do not (yet) apply to notification rules, desktop notifications or Web Push.
+- *Exploit published* knows only what CISA rates in SSVC, what a switched-on exploit collection lists and what title
+  and teaser say. With all collections off, only SSVC and the wording count.
+- Topics also apply to [notification rules](/docs/benachrichtigungen#regel-themen) and to
+  [desktop notifications and Web Push](/docs/benachrichtigungen#desktop-einschalten).
+
+## Concerns our products {#unsere-produkte}
+
+The quick filter **"Concerns our products"** shows only the stories that concern a product you follow in
+[Vendor News](/docs/vendor-news#ueberblick). The tile then says **"Our product: PAN-OS"** (for several "+n", hovering
+names all). The number on the toggle says how many stories that is with the other filters.
+
+- **How Cobe News knows:** from the [details from the source](#details-aus-der-quelle) – the CSAF product tree, the
+  NVD's CPE data, the affected products of the CVE list –, judged as in Vendor News. It is the same decision as
+  "Affects your systems" in the opened story. **Never from words:** a title naming "Exchange" does not make a story
+  yours.
+- **Versions count:** if you entered versions and none of them is affected, the story does not count. Without an entered
+  version every story about the product counts.
+- **My team:** if Vendor News is set to ["My team"](/docs/vendor-news#mein-team) for you, the filter shows only your
+  teams' products ("Concerns our products (my team)"). With "All" every followed product counts.
+- **When it changes:** as soon as a story's details arrive, and when you follow a product, unfollow it or change its
+  versions – Cobe News then recomputes the stored stories for that product in the background (in blocks of 500,
+  usually within a minute). After the update to this version that happens once for all.
+- **Limits:** stories without details (no CVE, press articles without an advisory) concern no product for the filter –
+  even if their text names one. The toggle appears only once you follow at least one product.
 
 ## Built-in sources {#eingebaute-quellen}
 
@@ -336,7 +373,7 @@ Every news source, every source family of Vendor News and each of the [more sour
 | **not fetched yet** | switched on but never asked – happens with the next round |
 | **dead** (red) | HTTP 401/403/410 twice in a row; HTTP 404 three times in a row; no successful fetch for **14 days**; news only: no new story for **60 days** although fetching works |
 | **disturbed** (amber) | 3 failures in a row; a current failure that is not just passing (e.g. wrong address, certificate, unreadable answer) – the source pauses until its next try; an unreadable answer within the last 24 hours |
-| **slow** (blue) | more than 5 seconds per request on average over the last 7 days; frequent timeouts (at least 3 and at least a quarter of the fetches); or a passing failure about to be retried |
+| **slow** (blue) | more than 5 seconds per request on average over the last 7 days (big downloads of more than 1 MB per request do not count here – such as the first full NVD fetch of a product just followed); frequent timeouts (at least 3 and at least a quarter of the fetches); or a passing failure about to be retried |
 | **healthy** (green) | everything else |
 
 Passing failures are timeouts, connection errors, HTTP 5xx and "too many requests". They pause a source for at most

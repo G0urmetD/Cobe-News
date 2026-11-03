@@ -270,14 +270,14 @@ async def test_news_api_read_per_person(reader_client):
     await _sources(("feed-a", "https://news.example.org/a.xml"))
     await news.refresh_due(transport=_site({"/a.xml": RSS}, []))
     d = (await client.get("/api/news")).json()
-    assert d["counts"] == {"new": 3, "read": 0, "topics": ANY} and d["enabled"] and [i["severity"] for i in d["items"]] == ["high", "critical", "info"]
+    assert d["counts"] == {"new": 3, "read": 0, "topics": ANY, "ours": 0} and d["enabled"] and [i["severity"] for i in d["items"]] == ["high", "critical", "info"]
     first = d["items"][0]
     assert first["source"]["logo"] and (await client.get(f"/api/news/sources/{first['source']['id']}/logo")).headers["content-type"] == "image/x-icon"
     full = (await client.get(f"/api/news/{first['id']}")).json()
     assert full["reasons"] and "content_html" in full
     assert (await client.post(f"/api/news/{first['id']}/read")).status_code == 200
     d = (await client.get("/api/news")).json()
-    assert d["counts"] == {"new": 2, "read": 1, "topics": ANY} and first["id"] not in [i["id"] for i in d["items"]]
+    assert d["counts"] == {"new": 2, "read": 1, "topics": ANY, "ours": 0} and first["id"] not in [i["id"] for i in d["items"]]
     assert [i["id"] for i in (await client.get("/api/news?state=read")).json()["items"]] == [first["id"]]
     # filters and "all read"
     assert [i["severity"] for i in (await client.get("/api/news?severity=critical")).json()["items"]] == ["critical"]
@@ -292,13 +292,13 @@ async def test_news_api_read_per_person(reader_client):
     assert (await client.get("/api/news?q=%25")).json()["counts"]["new"] == 2  # % is no wildcard: matches like an empty search
     assert (await client.post("/api/news/read-all", json={"severity": ["critical"]})).json() == {"marked": 1}
     assert (await client.delete(f"/api/news/{first['id']}/read")).status_code == 200
-    assert (await client.get("/api/news")).json()["counts"] == {"new": 2, "read": 1, "topics": ANY}
+    assert (await client.get("/api/news")).json()["counts"] == {"new": 2, "read": 1, "topics": ANY, "ours": 0}
     # read per person: an account made later starts with everything read (app/reader.py) – but another reader's marks
     # never count for it: what arrives now is new for tom, though rudi read everything
     tom = await add_user("tom")
     async with make_client() as other:
         await sign_in(other, tom)
-        assert (await other.get("/api/news")).json()["counts"] == {"new": 0, "read": 3, "topics": ANY}
+        assert (await other.get("/api/news")).json()["counts"] == {"new": 0, "read": 3, "topics": ANY, "ours": 0}
         await client.post("/api/news/read-all", json={})
         async with db.session() as s:
             src_a = await s.scalar(select(NewsSource).where(NewsSource.key == "feed-a"))

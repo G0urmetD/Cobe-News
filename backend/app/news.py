@@ -40,9 +40,10 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit
 
 import httpx
 import nh3
-from sqlalchemy import and_, case, delete, func, or_, select, text, update
+from sqlalchemy import Text, and_, case, delete, func, literal_column, or_, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,7 +55,7 @@ from app.db import fold
 from app.config import get_config, tls_verify
 from app import settings as settings_store
 from app import source_health
-from app.models import NewsItem, NewsItemSource, NewsSource, StoryDetail, VendorKev
+from app.models import Counter, NewsItem, NewsItemSource, NewsSource, StoryDetail, VendorAdvisory, VendorKev
 from app.netaddr import forbidden_literal, forbidden_target, pinned_transport
 
 log = logging.getLogger("cobe_news.news")
@@ -312,13 +313,14 @@ async def download(
     transport: httpx.AsyncBaseTransport | None = None,
     follow_redirects: bool = True,
     only=None,  # noqa: ANN001 - a check every request (redirects included) must pass, see _guard
+    timeout: float | None = None,
 ) -> Fetched:
     """One GET (redirects included unless `follow_redirects` is off), measured for the source health (source_health.measure:
-    time, size, status)."""
+    time, size, status). `timeout`: seconds for the whole download (default DOWNLOAD_S – a big file asks for more)."""
     t0 = time.monotonic()
     got: Fetched | None = None
     try:
-        got = await _download(url, proxy=proxy, verify=verify, headers=headers, limit=limit, transport=transport, follow_redirects=follow_redirects, only=only)
+        got = await _download(url, proxy=proxy, verify=verify, headers=headers, limit=limit, transport=transport, follow_redirects=follow_redirects, only=only, timeout=timeout)
         return got
     finally:
         source_health.measure(time.monotonic() - t0, got.status if got else None, len(got.body) if got else 0)
@@ -334,12 +336,13 @@ async def _download(
     transport: httpx.AsyncBaseTransport | None,
     follow_redirects: bool = True,
     only=None,  # noqa: ANN001
+    timeout: float | None = None,
 ) -> Fetched:
     if transport is None and not proxy and await asyncio.to_thread(forbidden_target, url):
         raise NewsError("http", "forbidden target")
     try:
         async with (
-            asyncio.timeout(DOWNLOAD_S),
+            asyncio.timeout(timeout or DOWNLOAD_S),
             httpx.AsyncClient(
                 timeout=httpx.Timeout(20.0, connect=10.0),
                 proxy=proxy,
@@ -927,6 +930,12 @@ NEGATED_NEAR = re.compile(
     r"bislang|bisher|derzeit|aktuell|noch|aktiv|aktive|aktiven|bekannt|bekannte|bekannten|öffentlich|öffentliche)){0,3}\s*$",
     re.I,
 )
+# a denial right after the match: "Ein öffentlicher Exploit ist (bislang) nicht bekannt", "a public exploit is not known"
+DENIED_AFTER = re.compile(
+    r"\s*(?:\S+\s+){0,3}?(?:ist|sind|war|is|are|was|were|existiert|exist[s]?|gibt es)\s+(?:\w+\s+){0,2}?(?:nicht|not|keine?n?|no|nie|never)\b|"
+    r"\s*(?:\S+\s+){0,2}?(?:liegt|liegen)\s+(?:\w+\s+){0,2}?nicht\b|\s*(?:\S+\s+){0,2}?(?:has|have)\s+not\b",
+    re.I,
+)
 RULES: list[tuple[str, str, re.Pattern]] = [
     (
         "critical",
@@ -987,17 +996,21 @@ DUTY_TITLE = re.compile(r"meldepflicht|reporting obligation|cyber resilience act
 def _found(rx: re.Pattern, text: str, kind: str, *, title: str | None = None) -> re.Match | None:
     """The first match – for "exploited" the first one not denied in the same sentence ("not known to be actively
     exploited": Cisco and Ivanti write that under advisories of bugs nobody exploits) and not part of a duty to report
-    ("müssen aktiv ausgenutzte Schwachstellen melden", see DUTY; `title`: none at all under a title about that duty)."""
+    ("müssen aktiv ausgenutzte Schwachstellen melden", see DUTY; `title`: none at all under a title about that duty).
+    "poc" (a public exploit) likewise – and not denied right after it either ("Ein öffentlicher Exploit ist nicht
+    bekannt")."""
     if kind == "exploited" and title is not None and DUTY_TITLE.search(title):
         return None
     for m in rx.finditer(text):
-        if kind != "exploited":
+        if kind not in ("exploited", "poc"):
             return m
         before = re.split(r"[.!?;\n]", text[max(0, m.start() - 120) : m.start()])[-1]
         if NEGATED.search(before) or NEGATED_NEAR.search(re.split(r"[,:–—()]", before)[-1]):
             continue
         after = re.split(r"[.!?;\n]", text[m.end() : m.end() + 160])[0]
         if DUTY.search(f"{before}{m.group(0)}{after}"):
+            continue
+        if kind == "poc" and DENIED_AFTER.match(after):
             continue
         return m
     return None
@@ -1064,11 +1077,16 @@ def search_text(title: str, summary: str, cve_ids: list[str]) -> str:
 # The topics of a story (the filter "Thema" on the News page, the badges on the cards). Wording counts only in the title
 # and the stored teaser – never in the full article (a long report mentions "zero-day" or "phishing" in passing) and
 # never in a catalogue's own text (CISA's "Known ransomware campaign use: Unknown" is boilerplate). The order is the
-# order of the badges: the first two are shown on a card.
-TOPICS = ("zeroday", "exploited", "ransomware", "nopatch", "breach", "supply", "phishing", "ot")
+# order of the badges: the first two are shown on a card. "poc": a public exploit or proof of concept exists.
+TOPICS = ("zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot")
 # raised when a rule changes: the background job (backfill_topics) computes every stored story again
-TOPICS_V = 1
+# (2: "Exploit veröffentlicht" – CISA's SSVC "exploitation: poc" and the wording)
+TOPICS_V = 2
 TOPICS_COUNTER = "news_topics_v"
+# every story's topics again for another reason than a rule version (topics_again: the KEV's first fetch, an exploit
+# list's first import or switched on or off): ASK counts the requests up, DONE is the request the last full run answered
+TOPICS_ASK = "news_topics_ask"
+TOPICS_DONE = "news_topics_done"
 KEV_KEY = "cisa-kev"
 CATALOG_KEYS = frozenset({"cisa-kev", "enisa-euvd"})
 # OT vendors and the ICS desk of a newsroom: everything they publish is about OT/ICS
@@ -1093,6 +1111,19 @@ TOPIC_WORDS: list[tuple[str, re.Pattern]] = [
             r"aktive ausnutzung|angriffe (?:auf|gegen) [^.!?\n]{0,40}?(?:lücke|schwachstelle)|"
             r"in freier wildbahn(?=(?:\s+\S+){0,4}?\s+(?:angriff|attack|ausgenutzt|ausnutz|exploit|missbrauch|angegriffen))|"
             r"(?:ausgenutzt|angegriffen|missbraucht|ausnutzung|\bexploit\w*+)\s+(?:\S+\s+){0,2}?in freier wildbahn",
+            _W,
+        ),
+    ),
+    # a public exploit or proof of concept – named as such, not "exploit" alone (every advisory says "could exploit")
+    (
+        "poc",
+        re.compile(
+            r"(?:proof[- ]of[- ]concepts?|\bpocs?)(?:[- ]|\s+)(?:exploit\w*|code\b|released|published|veröffentlicht|for cve-)|"
+            r"\bexploit(?:[- ]code)?s? (?:for (?:(?!patch|update|fix)\S+ ){1,3})?(?:released|published|now public|made public|goes public|leaked)\b|"
+            r"public(?:ly available)? (?:exploits?|exploit[- ]code|pocs?)\b|"
+            r"\b(?:exploit|poc)(?:[- ]code)? (?:(?!patch|update|fix|sicherheitsupdate)\S+ ){0,6}?veröffentlicht\b|"
+            r"veröffentlich\w* (?:(?:einen|den|ein|nun|jetzt) )?(?:poc|exploit|proof)\w*|"
+            r"öffentliche[rn]? exploit\w*|\bexploit(?:[- ]code)? (?:ist |sind )?(?:öffentlich|frei verfügbar)\b",
             _W,
         ),
     ),
@@ -1143,17 +1174,28 @@ TOPIC_WORDS: list[tuple[str, re.Pattern]] = [
         ),
     ),
 ]
-# wording whose denial counts ("Kein Zero-Day", "not actively exploited") – and whose duty to report does not count
-NEGATABLE = frozenset({"zeroday", "exploited"})
+# wording whose denial counts ("Kein Zero-Day", "not actively exploited", "no public exploit") – and whose duty to report
+# does not count
+NEGATABLE = frozenset({"zeroday", "exploited", "poc"})
+SSVC_LABEL = "CISA SSVC"
 NO_FIX = ("none_available", "no_fix_planned")
 
 
 def topics_of(
-    title: str, teaser: str, source: str, ids: list[str] | None = None, *, details: dict | None = None, kev: set[str] | frozenset = frozenset(), reasons: list | None = None
+    title: str,
+    teaser: str,
+    source: str,
+    ids: list[str] | None = None,
+    *,
+    details: dict | None = None,
+    kev: set[str] | frozenset = frozenset(),
+    reasons: list | None = None,
+    exploits: dict[str, str] | None = None,
 ) -> dict[str, dict]:
     """The topics of one story with what each rests on ({"kind", "value"} – the drawer says why): `source` is the key of
     the story's own source, `ids` its CVEs, `details` its Details aus der Quelle (data), `kev` the CVEs among them CISA's
-    KEV lists, `reasons` its severity reasons. Pure – ordered as TOPICS.
+    KEV lists, `reasons` its severity reasons, `exploits` the CVEs among them a public exploit is known for (CVE → what
+    says so – exploit_cves). Pure – ordered as TOPICS.
 
     - exploited: a catalogue's story (CISA KEV, ENISA EUVD – or a story they carry, by its reasons), a CVE the KEV lists
       (when the title or teaser names it, or the story names at most KEV_DIGEST CVEs – a digest is not exploited because
@@ -1162,6 +1204,10 @@ def topics_of(
     - ransomware: the wording – and CISA's ransomware flag on the KEV's own stories only (never passed on by a CVE).
     - nopatch: the BSI's "[UNGEPATCHT]", a CSAF advisory with no fix available or planned (and no vendor fix), a few
       narrow phrases.
+    - poc ("Exploit veröffentlicht"): a CVE with a known public exploit (`exploits`: CISA's SSVC "exploitation: poc" –
+      by the KEV's digest rule), the details' SSVC "poc" (not for a digest), the wording ("proof of concept", "PoC
+      exploit", "exploit released", "Exploit veröffentlicht" – denied ones do not count). SSVC "active" is no PoC: it
+      makes the story "exploited" (the details' "exploited").
     - ot: the OT sources (Siemens, CERT@VDE, Rockwell, SecurityWeek ICS) and the OT terms."""
     got: dict[str, dict] = {}
 
@@ -1177,9 +1223,18 @@ def topics_of(
     if any(r.get("kind") == "ransomware" and r.get("value") == "CISA" for r in rs):  # only the KEV's catalog entries carry it
         put("ransomware", "kev_flag", "CISA KEV")
     d = details if isinstance(details, dict) else {}
+    named = set(cves(f"{title}\n{teaser}"))
+    mine = [str(c).upper() for c in ids or []]
+    ex = exploits or {}
+    known = [c for c in mine if c in ex]
+    if known:
+        hit = next((c for c in known if c in named), None)
+        if hit or len(mine) <= KEV_DIGEST:
+            put("poc", "exploit", f"{hit or known[0]} · {ex[hit or known[0]]}")
+    ssvc = d.get("ssvc") if isinstance(d.get("ssvc"), dict) else {}
+    if str(ssvc.get("exploitation") or "").lower() == "poc" and len(mine) <= KEV_DIGEST:
+        put("poc", "ssvc", SSVC_LABEL)
     if not catalog:
-        named = set(cves(f"{title}\n{teaser}"))
-        mine = [str(c).upper() for c in ids or []]
         listed = [c for c in mine if c in kev]
         if listed:
             hit = next((c for c in listed if c in named), None)
@@ -1196,7 +1251,7 @@ def topics_of(
     if not catalog and not ADS.search(title or ""):
         for topic, rx in TOPIC_WORDS:
             for where, text_ in (("title", title or ""), ("teaser", teaser or "")):
-                m = _found(rx, text_, "exploited", title=title) if topic in NEGATABLE else rx.search(text_)
+                m = _found(rx, text_, "poc" if topic == "poc" else "exploited", title=title) if topic in NEGATABLE else rx.search(text_)
                 if m:
                     put(topic, where, m.group(0).strip())
                     break
@@ -1207,6 +1262,27 @@ def topics_of(
 
 def topic_list(title: str, teaser: str, source: str, ids: list[str] | None = None, **kw) -> list[str]:  # noqa: ANN003
     return list(topics_of(title, teaser, source, ids, **kw))
+
+
+def has_topic(topics: list[str]):  # noqa: ANN201
+    """SQL: the story has one of these topics (OR within the topics; the GIN index on news_items.topics) – the News
+    filter, desktop and Web Push."""
+    return NewsItem.topics.op("?|")(pg_array(sorted(set(topics))))
+
+
+# news_items.quiet_topics as a text[] – for "topics minus quiet_topics" (jsonb - text[] drops those array elements)
+_QUIET = literal_column("ARRAY(SELECT jsonb_array_elements_text(news_items.quiet_topics))", type_=ARRAY(Text))
+
+
+def loud_topic(topics: list[str]):  # noqa: ANN201
+    """SQL: the story has one of these topics, and not only quietly (quiet_topics: gained by a full recompute – the
+    topics' backfill, an exploit list's first import, a list switched on – not by an event of its own) – the
+    notification rules: a story that gains a topic quietly is no news for a rule asking for that topic. The GIN index
+    first (has_topic), then the quiet ones taken out."""
+    want = sorted({t for t in topics if t in TOPICS})
+    if not want:
+        return has_topic([])
+    return and_(has_topic(want), NewsItem.topics.op("-", return_type=JSONB)(_QUIET).op("?|")(pg_array(want)))
 
 
 async def kev_cves(db: AsyncSession, ids) -> set[str]:  # noqa: ANN001
@@ -1234,15 +1310,77 @@ async def kev_all(db: AsyncSession) -> set[str]:
     return got
 
 
+async def exploit_cves(db: AsyncSession, ids) -> dict[str, str]:  # noqa: ANN001
+    """Which of these CVEs a public exploit or proof of concept is known for – CVE → what says so (the topic "poc", its
+    reason in the drawer). Today: CISA's SSVC "exploitation: poc" in the stored cvelistV5 records (Vendor News keeps
+    those of the followed products and the ones looked up for stories and findings – app/cvelist.py).
+
+    And the exploit lists (app/exploits.py – Metasploit modules, Exploit-DB entries, nuclei templates; switched-on
+    lists only, from memory): CVE → the list's name, where SSVC says nothing. A list that learns or drops CVEs calls
+    retopic_cves for them (exploits.retopic_later → retopic_pending) – topics_of takes whatever this returns."""
+    from app import exploits as exploit_lists  # exploits imports this module
+
+    want = sorted({str(c).upper() for c in ids or [] if c})
+    got: dict[str, str] = {}
+    for i in range(0, len(want), 1000):
+        keys = [f"cvelist:{c}" for c in want[i : i + 1000]]
+        rows = await db.scalars(select(VendorAdvisory.ident).where(VendorAdvisory.id.in_(keys), _ssvc_poc()))
+        got |= {str(c).upper(): SSVC_LABEL for c in rows}
+    if want:
+        for c, label in (await exploit_lists.labels(db, want)).items():
+            got.setdefault(c, label)
+    return got
+
+
+def _ssvc_poc():  # noqa: ANN202
+    return func.lower(func.jsonb_extract_path_text(VendorAdvisory.data, "ssvc", "exploitation")) == "poc"
+
+
+async def exploit_all(db: AsyncSession) -> dict[str, str]:
+    """exploit_cves for every stored record – for the backfill."""
+    from app import exploits as exploit_lists
+
+    rows = await db.scalars(select(VendorAdvisory.ident).where(VendorAdvisory.source == "cvelist", _ssvc_poc()))
+    got = {str(c).upper(): SSVC_LABEL for c in rows}
+    for c, label in (await exploit_lists.labels(db)).items():
+        got.setdefault(c, label)
+    return got
+
+
 RETOPIC_BATCH = 500
 
 
-async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None) -> int:  # noqa: ANN001
-    """The topics of the stories matching `where` computed again (their text, CVEs or details changed, or the KEV) – in
-    chunks of RETOPIC_BATCH by id, a few columns each (not the article text); only changed rows are written. In the
-    caller's transaction (it commits). Returns how many changed."""
+def _ordered(topics) -> list[str]:  # noqa: ANN001
+    return [t for t in TOPICS if t in topics]
+
+
+def quiet_after(old: list[str], new: list[str], quiet_before: list[str], *, bulk: bool, baseline_poc: bool = False) -> list[str]:
+    """The story's quiet topics after a recompute (old → new topics): a topic gained by a full recompute (`bulk`) is
+    quiet – so is "poc" gained only through an exploit list's baseline (`baseline_poc`); a topic the story loses is no
+    longer quiet (gained again later by an event of its own, it is news); the rest stays as it was."""
+    gained = set(new) - set(old)
+    keep = set(quiet_before) & set(new)
+    if bulk:
+        keep |= gained
+    elif baseline_poc and "poc" in gained:
+        keep.add("poc")
+    return _ordered(keep)
+
+
+async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None, exploits: dict[str, str] | None = None, bulk: bool = False) -> int:  # noqa: ANN001
+    """The topics of the stories matching `where` computed again (their text, CVEs or details changed, the KEV, a known
+    exploit) – in chunks of RETOPIC_BATCH by id, a few columns each (not the article text); only changed rows are
+    written. In the caller's transaction (it commits). Returns how many changed – a change makes the next notification
+    round look at every rule (a rule asking for a topic the story has only now sends it then, once).
+
+    `bulk` (the full recompute – backfill_topics): what a story gains is quiet (quiet_topics) – shown and filtered, never
+    a rule's delivery (loud_topic): an exploit list switched on, its first import or a new rule version would otherwise
+    send every older story that gains a topic. Not bulk (an event: a new KEV entry, a list's new entry, the details of a
+    story arriving): a gained topic is loud – except "poc" that rests only on a list's baseline entries."""
+    from app import exploits as exploit_lists  # exploits imports this module
+
     keys = dict((await db.execute(select(NewsSource.id, NewsSource.key))).all())
-    cols = (NewsItem.id, NewsItem.source_id, NewsItem.title, NewsItem.summary, NewsItem.cves, NewsItem.reasons, NewsItem.topics)
+    cols = (NewsItem.id, NewsItem.source_id, NewsItem.title, NewsItem.summary, NewsItem.cves, NewsItem.reasons, NewsItem.topics, NewsItem.quiet_topics)
     changed, last = 0, None
     while True:
         stmt = select(*cols).where(where).order_by(NewsItem.id).limit(RETOPIC_BATCH)
@@ -1254,22 +1392,40 @@ async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None) -> in
         last = rows[-1][0]
         ids = [r[0] for r in rows]
         dets = dict((await db.execute(select(StoryDetail.item_id, StoryDetail.data).where(StoryDetail.item_id.in_(ids), StoryDetail.data.is_not(None)))).all())
-        known = kev if kev is not None else await kev_cves(db, [c for r in rows for c in r[4] or []])
+        named = [c for r in rows for c in r[4] or []]
+        known = kev if kev is not None else await kev_cves(db, named)
+        ex = exploits if exploits is not None else await exploit_cves(db, named)
+        # an event: "poc" through a list counts only by an entry that is no baseline (SSVC always)
+        loud = None
+        if not bulk:
+            listed = [c for c, label in ex.items() if label != SSVC_LABEL]
+            fresh = await exploit_lists.loud(db, listed) if listed else set()
+            loud = {c: label for c, label in ex.items() if label == SSVC_LABEL or c in fresh}
 
-        def compute(rows=rows, dets=dets, known=known) -> list[dict]:  # noqa: ANN001
+        def compute(rows=rows, dets=dets, known=known, ex=ex, loud=loud) -> list[dict]:  # noqa: ANN001
             out = []
-            for iid, sid, title, summary, ids_, reasons, topics in rows:
-                new = topic_list(title, summary or "", keys.get(sid, ""), list(ids_ or []), details=dets.get(iid), kev=known, reasons=reasons)
-                if new != list(topics or []):
-                    out.append({"id": iid, "topics": new})
+            for iid, sid, title, summary, ids_, reasons, topics, quiet in rows:
+                old, was_quiet = list(topics or []), list(quiet or [])
+                kw = {"details": dets.get(iid), "kev": known, "reasons": reasons}
+                new = topic_list(title, summary or "", keys.get(sid, ""), list(ids_ or []), exploits=ex, **kw)
+                baseline_poc = False
+                if loud is not None and "poc" in new and "poc" not in old and len(loud) < len(ex):
+                    baseline_poc = "poc" not in topic_list(title, summary or "", keys.get(sid, ""), list(ids_ or []), exploits=loud, **kw)
+                q = quiet_after(old, new, was_quiet, bulk=bulk, baseline_poc=baseline_poc)
+                if new != old or q != was_quiet:
+                    out.append({"id": iid, "topics": new, "quiet_topics": q, "_moved": new != old})
             return out
 
         upd = await asyncio.to_thread(compute) if len(rows) > 50 else compute()
         if upd:
+            changed += sum(1 for u in upd if u.pop("_moved"))
             await db.execute(update(NewsItem), upd)
-            changed += len(upd)
         if len(rows) < RETOPIC_BATCH:
             break
+    if changed and not bulk:
+        from app import notify  # notify imports this module
+
+        notify.changed()
     return changed
 
 
@@ -1282,31 +1438,54 @@ async def retopic_cves(db: AsyncSession, ids) -> int:  # noqa: ANN001
     return n
 
 
+async def _counters(db: AsyncSession) -> dict[str, int]:
+    rows = await db.execute(select(Counter.name, Counter.value).where(Counter.name.in_([TOPICS_COUNTER, TOPICS_ASK, TOPICS_DONE])))
+    return {n: int(v or 0) for n, v in rows.all()}
+
+
 async def topics_due(db: AsyncSession) -> bool:
-    return int(await db.scalar(text("SELECT value FROM counters WHERE name = :n"), {"n": TOPICS_COUNTER}) or 0) < TOPICS_V
+    c = await _counters(db)
+    return c.get(TOPICS_COUNTER, 0) < TOPICS_V or c.get(TOPICS_DONE, 0) < c.get(TOPICS_ASK, 0)
 
 
 async def backfill_topics(db: AsyncSession) -> int | None:
     """Background job: every stored story's topics, once per rule version (counters `news_topics_v` < TOPICS_V – a new
-    installation, the upgrade to 0.1.46, a later rule change, or the KEV's first fetch). In chunks of RETOPIC_BATCH,
-    each committed on its own (a restart midway starts again – it changes nothing twice). None: nothing to do."""
+    installation, the upgrade to 0.1.46, a later rule change) and once more per request (topics_again: the KEV's first
+    fetch, an exploit list's first import or switched on or off – `news_topics_ask` above `news_topics_done`). In
+    chunks of RETOPIC_BATCH, each committed on its own (a restart midway starts again – it changes nothing twice).
+    What a story gains here is quiet (retopic bulk: shown, never a rule's delivery). A request arriving while it runs
+    (after the upgrade: the version, then each list's first import) starts it again from the beginning with what is
+    known now – one run answers them all, and none ends with the data of before. None: nothing to do."""
+    from app import exploits as exploit_lists  # exploits imports this module
+
     if not await topics_due(db):
         return None
-    kev = await kev_all(db)
+
+    async def known() -> tuple[int, set[str], dict[str, str]]:
+        ask = (await _counters(db)).get(TOPICS_ASK, 0)
+        exploit_lists.invalidate()  # the lists as stored now (a list's import may have committed a moment ago)
+        return ask, await kev_all(db), await exploit_all(db)
+
+    ask, kev, exploits = await known()
     await dbm.release(db)
     changed, last = 0, None
     while True:
+        if last is not None and (await _counters(db)).get(TOPICS_ASK, 0) != ask:
+            ask, kev, exploits = await known()  # asked again meanwhile: from the start
+            await dbm.release(db)
+            last = None
         cond = NewsItem.id > last if last is not None else text("true")
         stmt = select(NewsItem.id).where(cond).order_by(NewsItem.id).offset(RETOPIC_BATCH - 1).limit(1)
         upto = await db.scalar(stmt)
         part = and_(cond, NewsItem.id <= upto) if upto is not None else cond
-        changed += await retopic(db, part, kev=kev)
+        changed += await retopic(db, part, kev=kev, exploits=exploits, bulk=True)
         await db.commit()
         if upto is None:
             break
         last = upto
     stmt = "INSERT INTO counters (name, value) VALUES (:n, :v) ON CONFLICT (name) DO UPDATE SET value = :v"
     await db.execute(text(stmt), {"n": TOPICS_COUNTER, "v": TOPICS_V})
+    await db.execute(text(stmt), {"n": TOPICS_DONE, "v": ask})
     await db.commit()
     if changed:
         log.info("news: topics of %d stories computed", changed)
@@ -1314,14 +1493,18 @@ async def backfill_topics(db: AsyncSession) -> int | None:
 
 
 async def topics_again(db: AsyncSession) -> None:
-    """All topics computed again with the next round (the KEV's first fetch: every story may name one of its CVEs)."""
-    await db.execute(text("DELETE FROM counters WHERE name = :n"), {"n": TOPICS_COUNTER})
+    """All topics computed again with the next round (the KEV's first fetch: every story may name one of its CVEs; an
+    exploit list's first import, switched on or off) – a request counted up, in the caller's transaction: committed
+    with what caused it, it cannot be lost (a restart between the two). What a story gains then is quiet."""
+    stmt = "INSERT INTO counters (name, value) VALUES (:n, 1) ON CONFLICT (name) DO UPDATE SET value = counters.value + 1"
+    await db.execute(text(stmt), {"n": TOPICS_ASK})
 
 
 async def story_topics(db: AsyncSession, i: NewsItem, source_key: str, details: dict | None) -> list[dict]:
     """The drawer's "Themen": each topic of the story with what it rests on – computed on request, as stored."""
     kev = await kev_cves(db, i.cves or [])
-    got = topics_of(i.title, i.summary or "", source_key, list(i.cves or []), details=details, kev=kev, reasons=i.reasons)
+    ex = await exploit_cves(db, i.cves or [])
+    got = topics_of(i.title, i.summary or "", source_key, list(i.cves or []), details=details, kev=kev, reasons=i.reasons, exploits=ex)
     return [{"topic": t, **r} for t, r in got.items()]
 
 
@@ -1557,6 +1740,7 @@ async def store(db: AsyncSession, src: NewsSource, entries: list[dict], keep: ti
     by_cve = await _cve_peers(db, src, [x for x in stories if x is not None])
     # the CVEs of this fetch the KEV lists – once per fetch, for the topics of the stories (topics_of)
     kev = await kev_cves(db, [c for x in stories if x is not None for c in x["cves"]])
+    exploits = await exploit_cves(db, [c for x in stories if x is not None for c in x["cves"]])
     fresh_kev: list[str] = []  # CVEs of new KEV stories: the other stories naming them become "exploited"
     skipped = 0
     for s in stories:
@@ -1568,7 +1752,7 @@ async def store(db: AsyncSession, src: NewsSource, entries: list[dict], keep: ti
         # one savepoint per story: a story the database refuses is left out (and logged), not the whole feed with it
         try:
             async with db.begin_nested():
-                got = await _store_one(db, src, s, now, undated=undated, primed=primed, by_cve=by_cve, kev=kev)
+                got = await _store_one(db, src, s, now, undated=undated, primed=primed, by_cve=by_cve, kev=kev, exploits=exploits)
                 added += got
                 if got and src.key == KEV_KEY:
                     fresh_kev += s["cves"]
@@ -1583,7 +1767,9 @@ async def store(db: AsyncSession, src: NewsSource, entries: list[dict], keep: ti
     return added
 
 
-async def _store_one(db: AsyncSession, src: NewsSource, s: dict, now: datetime, *, undated: bool, primed: bool, by_cve: dict, kev: set[str] | None = None) -> int:
+async def _store_one(
+    db: AsyncSession, src: NewsSource, s: dict, now: datetime, *, undated: bool, primed: bool, by_cve: dict, kev: set[str] | None = None, exploits: dict[str, str] | None = None
+) -> int:
     """One story of store(): known (by URL, title or CVE) – only noted for this source – or inserted. 1: inserted.
     The topics follow what changed: a new story gets them, an updated one (title, teaser, CVEs) or one that took a
     catalogue's rating (the same CVE) has them computed again."""
@@ -1614,7 +1800,9 @@ async def _store_one(db: AsyncSession, src: NewsSource, s: dict, now: datetime, 
         return 0
     seq = await next_seq(db)  # a number lost to a clash below leaves a gap – harmless
     row = {"id": uuid.uuid4(), "source_id": src.id, "fetched_at": now, "seq": seq, **s}
-    row["topics"] = topic_list(s["title"], s["summary"], src.key, s["cves"], kev=kev if kev is not None else await kev_cves(db, s["cves"]), reasons=s["reasons"])
+    known_kev = kev if kev is not None else await kev_cves(db, s["cves"])
+    ex = exploits if exploits is not None else await exploit_cves(db, s["cves"])
+    row["topics"] = topic_list(s["title"], s["summary"], src.key, s["cves"], kev=known_kev, reasons=s["reasons"], exploits=ex)
     row |= {"seen_at": now if undated else None, "backlog": _backlog(s["published_at"], now, undated=undated, primed=primed)}
     res = await db.execute(pg_insert(NewsItem).values(**row).on_conflict_do_nothing(index_elements=["url_key"]))
     return res.rowcount or 0

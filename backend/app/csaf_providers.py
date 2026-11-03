@@ -9,7 +9,9 @@ vendor's own CSAF distribution – not only those a news story points at (story_
   the feed or changes.csv (conditional where the server allows it), then the documents changed after the watermark,
   oldest first, DOCS_PER_ROUND at most (a backlog continues BACKLOG_AGAIN later). The first fill goes back INITIAL.
 - Each document: its hash file (.sha512, else .sha256 – where the provider offers one) must match, its TLP label must be
-  WHITE or CLEAR (a document without a label only from a distribution not labelled otherwise), its publisher namespace
+  WHITE or CLEAR (a document without a label only from a distribution not labelled otherwise) – or GREEN where an admin
+  allows it for this provider (settings vendor.csaf_green; the advisory then carries `tlp: "GREEN"` everywhere it is
+  shown or sent; AMBER, AMBER+STRICT and RED never), its publisher namespace
   must be on the provider's domain; then parsed like the details of a story (story_details.parse_csaf) and stored as
   `csaf:<tracking id>` for Siemens and Cisco – the same record their stories store, so an advisory is never there (or
   notified) twice – and as `csaf:<provider>:<tracking id>` for the others. A record of another publisher is never
@@ -54,6 +56,7 @@ LIST_LIMIT = 16 * 1024 * 1024  # a ROLIE feed of all advisories (Siemens: ~1.2 M
 DOC_LIMIT = 8 * 1024 * 1024
 HASH_LIMIT = 4096
 OPEN_TLP = ("WHITE", "CLEAR")
+GREEN = "GREEN"  # limited disclosure: within the organisation / community – only where an admin allows it per provider
 KIND = {"siemens": "siemens", "cisco": "cisco"}  # the kinds story_details uses for the same publishers (same record)
 HEX = re.compile(r"^[0-9a-fA-F]{64}(?:[0-9a-fA-F]{64})?$")
 # the providers whose records the stories share (KIND): only their own kind of tracking id – never a BSI WID-SEC or
@@ -70,6 +73,16 @@ HASH_AGAIN = timedelta(days=7)  # a provider without hash files is asked for the
 
 def providers() -> list[dict]:
     return list(catalog.CSAF_PROVIDERS)
+
+
+def green_allowed(cfg: dict) -> frozenset[str]:
+    """The providers whose TLP:GREEN documents an admin allows (settings vendor.csaf_green) – only known ones."""
+    known = {p["key"] for p in catalog.CSAF_PROVIDERS}
+    return frozenset(str(k) for k in cfg.get("csaf_green") or [] if str(k) in known)
+
+
+def _labels(green: bool) -> tuple[str, ...]:
+    return (*OPEN_TLP, GREEN) if green else OPEN_TLP
 
 
 def providers_for(product: dict) -> list[dict]:
@@ -112,9 +125,9 @@ def parse_aggregator(data: bytes) -> dict[str, str]:
 
 
 @src._shaped
-def parse_metadata(data: bytes, provider: dict) -> dict:
-    """provider-metadata.json: the ROLIE feeds labelled TLP:WHITE/CLEAR and the directories – each on the provider's
-    hosts. {feeds: [{url, tlp}], directories: [url], publisher}"""
+def parse_metadata(data: bytes, provider: dict, green: bool = False) -> dict:
+    """provider-metadata.json: the ROLIE feeds labelled TLP:WHITE/CLEAR (and GREEN where allowed) and the directories –
+    each on the provider's hosts. {feeds: [{url, tlp}], directories: [url], publisher}"""
     doc = src._json(data)
     if not isinstance(doc, dict) or not isinstance(doc.get("distributions"), list):
         raise NewsError("format", "no CSAF provider-metadata")
@@ -124,7 +137,7 @@ def parse_metadata(data: bytes, provider: dict) -> dict:
         for f in src._l(src._d(d.get("rolie")).get("feeds")):
             f = src._d(f)
             u, tlp = src._s(f.get("url"), 400), src._s(f.get("tlp_label"), 20).upper()
-            if tlp in OPEN_TLP and allowed(provider, u):
+            if tlp in _labels(green) and allowed(provider, u):
                 feeds.append({"url": u, "tlp": tlp})
         u = src._s(d.get("directory_url"), 400)
         if u and allowed(provider, u):
@@ -194,11 +207,19 @@ def check_hash(body: bytes, text: bytes) -> bool | None:
     return algo(body).hexdigest().lower() == first.lower()
 
 
-def tlp_ok(doc_label: str, dist_label: str) -> bool:
-    """Only TLP:WHITE/CLEAR: a labelled document must be, an unlabelled one only from an unlabelled or open distribution."""
+def tlp_ok(doc_label: str, dist_label: str, green: bool = False) -> bool:
+    """Only TLP:WHITE/CLEAR (with `green` also GREEN): a labelled document must be, an unlabelled one only from an
+    unlabelled or such a distribution. AMBER, AMBER+STRICT and RED never."""
+    ok = _labels(green)
     if doc_label:
-        return doc_label.upper() in OPEN_TLP
-    return not dist_label or dist_label.upper() in OPEN_TLP
+        return doc_label.upper() in ok
+    return not dist_label or dist_label.upper() in ok
+
+
+def tlp_of(doc_label: str, dist_label: str) -> str:
+    """The label an advisory carries: GREEN when the document (or, unlabelled, its distribution) says so, else ""."""
+    label = (doc_label or dist_label or "").upper()
+    return GREEN if label == GREEN else ""
 
 
 def own_host(provider: dict, url: str) -> bool:
@@ -208,15 +229,15 @@ def own_host(provider: dict, url: str) -> bool:
     return bool(host) and any(host == b or host.endswith("." + b) for b in bases)
 
 
-def advisory(body: bytes, provider: dict, entry: dict) -> dict | None:
+def advisory(body: bytes, provider: dict, entry: dict, green: bool = False) -> dict | None:
     """One document as an advisory (or None: nothing affected). Raises NewsError: "format" when unreadable, "blocked"
     when not public (TLP) or not the provider's own (its publisher namespace is another domain, a tracking id of a kind
     the provider does not issue). The record: `csaf:<tracking id>` for the providers whose advisories also come with
     stories (Siemens, Cisco – one record however it came), `csaf:<provider>:<tracking id>` for the others – a provider
     never writes another's record (security review 0.1.26 H2; vendor.store also refuses another publisher)."""
     d = details.parse_csaf(body, KIND.get(provider["key"], "csaf"), details.STORE_PRODUCTS)
-    if not tlp_ok(d.get("tlp") or "", entry.get("tlp") or ""):
-        raise NewsError("blocked", f"TLP:{d.get('tlp')}")
+    if not tlp_ok(d.get("tlp") or "", entry.get("tlp") or "", green):
+        raise NewsError("blocked", f"TLP:{d.get('tlp') or entry.get('tlp')}")
     if not own_host(provider, d.get("namespace") or ""):
         raise NewsError("blocked", f"publisher namespace {str(d.get('namespace'))[:80]!r} is not the provider's")
     pattern = TRACKING.get(provider["key"])
@@ -233,6 +254,8 @@ def advisory(body: bytes, provider: dict, entry: dict) -> dict | None:
         adv["ident"] = adv["ident"].removeprefix(f"{provider['key']}:")
         adv["data"]["provider"] = provider["key"]
         adv["data"]["feed"] = True  # from the provider's own feed (switched with "csaf" – vendor.switched_off)
+        if tlp_of(d.get("tlp") or "", entry.get("tlp") or ""):
+            adv["data"]["tlp"] = GREEN  # shown and sent with the label "TLP:GREEN – nur intern weitergeben"
     return adv
 
 
@@ -364,12 +387,20 @@ async def _document(db: AsyncSession, provider: dict, entry: dict, cur: dict) ->
     return body, None
 
 
+async def _green_now(db: AsyncSession, key: str) -> bool:
+    """Whether the provider's TLP:GREEN documents are allowed now – the settings as saved this moment, not as the round
+    began (rare: only asked for a GREEN document)."""
+    from app import vendor
+
+    return key in green_allowed(await vendor.config(db))
+
+
 def _retry_list(cur: dict) -> dict[str, dict]:
     r = cur.get("retry")
     return {k: v for k, v in r.items() if isinstance(v, dict) and isinstance(k, str)} if isinstance(r, dict) else {}
 
 
-async def sync_provider(db: AsyncSession, provider: dict, hosts: dict[str, str], every: timedelta, ix, force: bool) -> int | None:  # noqa: ANN001
+async def sync_provider(db: AsyncSession, provider: dict, hosts: dict[str, str], every: timedelta, ix, force: bool, green: bool = False) -> int | None:  # noqa: ANN001
     """One provider: its metadata, its list of documents, the documents changed after the watermark (oldest first) and
     those waiting for another try. A document failing for a passing reason (5xx, timeout, a listed hash not there) goes
     on the retry list and the watermark moves on – it is tried again in the next rounds, skipped after RETRY_MAX tries or
@@ -399,7 +430,11 @@ async def sync_provider(db: AsyncSession, provider: dict, hosts: dict[str, str],
             body, ok = await _document(db, provider, e, cur)
             if ok is False:
                 raise NewsError("format", "hash mismatch")
-            adv = await asyncio.to_thread(advisory, body, provider, e)
+            adv = await asyncio.to_thread(advisory, body, provider, e, green)
+            if adv is not None and adv["data"].get("tlp") == GREEN and not await _green_now(db, provider["key"]):
+                # an admin took the provider off the TLP:GREEN list while this round read it: not stored (allowed
+                # again, its list is read from the start)
+                raise NewsError("blocked", "TLP:GREEN no longer allowed")
             if adv is not None:
                 # the first fill: what is older than FRESH_FILL is shown, never notified; a fresh one is (M7)
                 if first_fill and e["ts"] < (now - FRESH_FILL).strftime("%Y-%m-%dT%H:%M:%SZ"):
@@ -432,7 +467,7 @@ async def sync_provider(db: AsyncSession, provider: dict, hosts: dict[str, str],
         meta_url = await _metadata_url(provider, hosts)
         if not allowed(provider, meta_url):
             raise NewsError("blocked", "metadata outside the provider's domain")
-        meta = await asyncio.to_thread(parse_metadata, await vendor.get(meta_url, db=db, conditional=False, limit=META_LIMIT, only=_only(provider)) or b"{}", provider)
+        meta = await asyncio.to_thread(parse_metadata, await vendor.get(meta_url, db=db, conditional=False, limit=META_LIMIT, only=_only(provider)) or b"{}", provider, green)
         listed = await _listing(db, provider, meta, st)
         budget = DOCS_PER_ROUND
         in_row = 0
@@ -494,14 +529,48 @@ async def sync_provider(db: AsyncSession, provider: dict, hosts: dict[str, str],
     return changed
 
 
-async def sync_all(db: AsyncSession, products: list[dict], every: timedelta, ix, force: bool) -> dict[str, int]:  # noqa: ANN001
-    """The providers of the followed products' vendors – the aggregator first (daily)."""
+async def sync_all(db: AsyncSession, products: list[dict], every: timedelta, ix, force: bool, green: frozenset[str] = frozenset()) -> dict[str, int]:  # noqa: ANN001
+    """The providers of the followed products' vendors – the aggregator first (daily). `green`: the providers whose
+    TLP:GREEN documents are allowed."""
     want = needed(products)
     if not want:
         return {}
     hosts = await sync_aggregator(db, force)
     out: dict[str, int] = {}
     for p in want:
-        if (r := await sync_provider(db, p, hosts, every, ix, force)) is not None:
+        if (r := await sync_provider(db, p, hosts, every, ix, force, p["key"] in green)) is not None:
             out[f"csaf:{p['key']}"] = r
     return out
+
+
+async def purge_green(db: AsyncSession, allowed_: frozenset[str]) -> int:
+    """TLP:GREEN advisories of providers no longer allowed to bring them: removed – with their links, without a
+    revision or a "withdrawn" event (the source did not take them back; the admin no longer wants them kept). Their
+    events not sent yet never go out (made baseline); what was sent stays in the history, labelled. Returns how many."""
+    from sqlalchemy import or_, select, update
+
+    from app import vendor
+    from app.models import VendorAdvisory, VendorEvent
+
+    stmt = select(VendorAdvisory.id, VendorAdvisory.data["provider"].as_string()).where(VendorAdvisory.source == "csaf", VendorAdvisory.data["tlp"].as_string() == GREEN)
+    ids = [aid for aid, prov in (await db.execute(stmt)).all() if prov not in allowed_]
+    if not ids:
+        return 0
+    for i in range(0, len(ids), 200):
+        part = ids[i : i + 200]
+        await db.execute(
+            update(VendorEvent)
+            .where(VendorEvent.data["tlp"].as_string() == GREEN, or_(or_keys(VendorEvent.key, part), VendorEvent.data["advisory"].as_string().in_(part)), VendorEvent.baseline.is_(False))
+            .values(baseline=True)
+            .execution_options(synchronize_session=False)
+        )
+    n = await vendor.drop_advisories(db, ids, withdrawn=False)
+    log.info("csaf: %d TLP:GREEN advisories removed (no longer allowed for their provider)", n)
+    return n
+
+
+def or_keys(col, ids: list[str]):  # noqa: ANN001, ANN201
+    """Events of these advisories: their keys end with ":<advisory id>" (vuln:…, exploited:vuln:…)."""
+    from sqlalchemy import or_
+
+    return or_(*(col.endswith(":" + aid, autoescape=True) for aid in ids))

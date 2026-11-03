@@ -43,6 +43,38 @@ Zertifikat (siehe [HTTPS](#https)).
 | `cobe-news-app` | FastAPI + Web-UI + Hintergrundjobs (Feeds, Benachrichtigungen, Zertifikat, Verzeichnisabgleich) | `127.0.0.1:8096` (http, nur Health/Notfall) |
 | `cobe-news-db` | PostgreSQL 18 – alle Daten (siehe [PostgreSQL](#postgresql)) | keiner (internes Netz, nur die App) |
 
+### Veröffentlichtes Image statt lokalem Build
+
+Standard ist der lokale Build (`docker compose up -d --build`, Image `cobe-news:latest`) – daran ändert sich nichts.
+Wer stattdessen das veröffentlichte, signierte Image einer Version betreiben will
+(`ghcr.io/g0urmetd/cobe-news:<version>`, gebaut von der Release-Pipeline, siehe [Release](#release)), schaltet die
+Datei `docker-compose.image.yml` zu – in `.env`:
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
+COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:0.1.47          # eine Version, nicht latest (oder …:0.1.46@sha256:<digest>)
+```
+
+Die Datei ersetzt beim Dienst `app` nur das Image (`image: ${COBE_NEWS_IMAGE}`, der `build`-Teil fällt weg); alles
+andere – Datenbank, Proxy, Volumes, `.env` – bleibt, wie es ist. Ohne `COBE_NEWS_IMAGE` bricht `docker compose` mit
+einem Hinweis ab, statt still etwas anderes zu starten. Vor dem Start die Signatur prüfen (cosign ≥ 2, keyless – die
+Identität ist der Release-Workflow dieses Repositorys):
+
+```bash
+cosign verify ghcr.io/g0urmetd/cobe-news:0.1.47 \
+  --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+docker compose pull app          # holt das Image (pull_policy: missing – ein vorhandenes wird nicht neu geholt)
+docker compose up -d             # ohne --build
+docker compose config app | grep image:   # zeigt, welches Image Compose nimmt
+```
+
+`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn in `COBE_NEWS_IMAGE` übernimmt
+(`…:0.1.46@sha256:<digest>`), startet genau das geprüfte Image, auch wenn der Tag später anders zeigen sollte. Ein Update:
+`COBE_NEWS_IMAGE` auf die neue Version setzen, Signatur prüfen, `docker compose pull app && docker compose up -d` (die
+Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen aus `.env` nehmen und
+`docker compose up -d --build`.
+
 ## Erster Start: Setup-Token und Notfall-Admin
 
 Beim ersten Start schreibt die App ein **einmaliges Setup-Token** ins Log (60 Minuten gültig, bei jedem Neustart bis
@@ -67,8 +99,13 @@ Version konnte auf halbem Weg stehen bleiben), gibt es beim nächsten Start bzw.
   – auch die richtige – erst 3 Sekunden, und es läuft nur eine gleichzeitig, über alle Adressen (parallele Versuche
   bekommen sofort „zu viele Versuche“). Raten von vielen Adressen aus schafft so höchstens einen Versuch alle paar Sekunden, der Besitzer kommt (etwas
   langsamer) immer hinein,
+- meldet sich, wenn jemand rät: Überschreiten die Fehlversuche das Budget, schreibt die App eine Warnung ins Log
+  (`emergency admin: N failed sign-in checks in the last hour …`, mit der letzten Adresse bzw. ihrem /64), einen
+  Protokolleintrag `login.emergency_slowed` und zeigt 24 Stunden lang einen Hinweis unter *Einstellungen → HTTPS &
+  Zertifikat* – höchstens einmal pro Stunde (wer weiter rät, flutet weder Log noch Protokoll),
 - Passwort/TOTP verloren: auf dem Server zurücksetzen –
-  `docker compose exec app python -m app.cli reset-emergency` (gibt ein temporäres Passwort aus, TOTP wird neu eingerichtet).
+  `docker compose exec app python -m app.cli reset-emergency` (gibt ein temporäres Passwort aus, TOTP wird neu eingerichtet;
+  das Passwort gilt wie jedes temporäre 7 Tage, siehe [Lokale Konten](#lokale-konten)).
 
 Zugangsdaten des Notfall-Admins offline aufbewahren (Passwort-Tresor).
 
@@ -102,6 +139,10 @@ Optional **„Zweiter Faktor für alle Pflicht“** (aus ab Werk): dann richten 
 Sitzungs- und CSRF-Cookie heißen mit HTTPS `__Host-cobe_news_session` / `__Host-cobe_news_csrf` (nur diese Origin, nur
 über HTTPS – keine Subdomain und keine http-Seite kann sie setzen). Ein kürzeres absolutes Timeout gilt sofort auch für
 laufende Sitzungen. Zweiten Faktor ersetzen oder entfernen verlangt den aktuellen Code (ohne TOTP: das Passwort).
+Ein schreibender Aufruf ohne oder mit falschem CSRF-Token wird mit 403 `csrf_failed` abgelehnt und als Warnung geloggt
+(`cobe_news.security: csrf check failed: <Methode> <Pfad> from <Adresse bzw. /64> (<was fehlte>)` – nie Token oder
+Cookie); höchstens eine Zeile pro Herkunft und Minute und 30 pro Minute insgesamt, die zurückgehaltenen zählt die
+nächste Zeile mit. Kein Protokolleintrag (niemand angemeldet, keine Aktion an etwas).
 
 **Erneut bestätigen** – heikle Änderungen verlangen, dass sich der Admin in den letzten 10 Minuten ausgewiesen hat (die
 Anmeldung selbst zählt): Anmelde-Einstellungen (AD, Entra, Sitzungen), Rollen-Zuordnungen, einen Admin anlegen, eine
@@ -119,7 +160,13 @@ mitschicken; ohne `rev` wird nicht geprüft). Trifft das Speichern eines Kanals 
 ### Lokale Konten
 
 *Einstellungen → Benutzer & Rollen → Lokalen Benutzer anlegen*: Name, Rolle → ein **temporäres Passwort** erscheint einmal und muss bei der
-ersten Anmeldung ersetzt werden. Admins müssen TOTP einrichten, für Reader ist es freiwillig (*Profil & Sicherheit* im Benutzermenü unten links).
+ersten Anmeldung ersetzt werden. Es gilt `temp_password_days` Tage ab Vergabe (*Einstellungen → Anmeldung → Sitzungen*,
+„Startpasswort gültig für“, 1–30, Standard 7) – ebenso eines aus „Passwort zurücksetzen“ und aus `reset-emergency`;
+gespeichert ist die Vergabezeit (`users.temp_password_at`, Migration 0029 – Konten, die beim Update noch auf ihre erste
+Passwortänderung warten, zählen ab dem Update). Danach lehnt die Anmeldung das richtige temporäre Passwort mit
+`temp_password_expired` ab („Startpasswort abgelaufen – Admin um ein neues bitten“, keine Sitzung, kein Fehlversuch);
+die Benutzerliste zeigt „Startpasswort läuft ab am …“ bzw. „Startpasswort abgelaufen“. Die Einstellung gilt für schon
+vergebene Passwörter mit (gerechnet ab ihrer Vergabe); ihre Änderung steht im Protokoll (`signin.config_changed`). Admins müssen TOTP einrichten, für Reader ist es freiwillig (*Profil & Sicherheit* im Benutzermenü unten links).
 Admins können Konten deaktivieren, die Rolle ändern, Passwort und/oder TOTP zurücksetzen, entsperren und löschen.
 
 ### Active Directory (LDAP)
@@ -272,7 +319,34 @@ server {
 ```
 
 **http → https:** standardmäßig gibt es keinen http-Port. Mit `COMPOSE_FILE=docker-compose.yml:docker-compose.http.yml`
-in `.env` leitet zusätzlich `HTTP_PORT` (Standard 8094) auf https um.
+in `.env` leitet zusätzlich `HTTP_PORT` (Standard 8094) auf https um. Plain http an den https-Port (`http://name:8095`)
+leitet nginx ebenfalls auf https um (`error_page 497`) statt der Fehlerseite „plain HTTP request was sent to HTTPS port“.
+
+**Host-Namen:** nginx liefert Cobe News nur unter den Namen der Installation aus – dem Host aus `BASE_URL`,
+`NEWS_HOSTNAME`, den Einträgen aus `TLS_NAMES` sowie `localhost`, `127.0.0.1` und `[::1]` (lokaler Zugang,
+selbstsigniert, Health-Checks auf dem Server). `deploy/nginx/16-server-names.envsh` bildet daraus beim Start des
+Proxys `NEWS_SERVER_NAMES` (`server_name` im Template; nur Zeichen `a-z 0-9 . - : [ ]` und ein führendes `*.` – alles
+andere wird übergangen und geloggt, ein Wert mit Zeilenumbruch ganz; es kommt nichts anderes in die Konfiguration;
+IPv6 in eckigen Klammern). Für jeden anderen `Host` antwortet der `default_server` auf 443 mit `421 Misdirected
+Request` und einer kurzen Textzeile („Unbekannter Hostname – in .env BASE_URL oder TLS_NAMES eintragen.“, kein Name der
+Installation, nie die App), Port 80 und Klartext an den https-Port mit `444` (Verbindung zu). Wer die Seite über eine IP
+oder einen weiteren Namen öffnet, trägt ihn in `TLS_NAMES` ein. Welche Namen gelten:
+`docker compose logs proxy | grep "answering to"`. Steht `BIND` nicht auf dieser Maschine (`0.0.0.0` o. Ä.), `BASE_URL`
+aber noch auf `localhost`, warnt der Proxy beim Start (`WARNING – BIND=… publishes Cobe News to the network`), ebenso
+bei einer festen `BIND`-Adresse, die unter den Namen fehlt (`NEWS_BIND` in `docker-compose.yml`, nur dafür).
+
+**Upgrade auf 0.1.47 (Host-Namen):** Ältere Versionen haben jeden `Host` ausgeliefert. Wer Cobe News bisher über eine IP
+oder einen Namen öffnet, der weder in `BASE_URL` noch in `NEWS_HOSTNAME` oder `TLS_NAMES` steht, sieht nach dem Update
+„Unbekannter Hostname“ (HTTP 421). Vor dem Update prüfen: Steht die Adresse aus der Adresszeile des Browsers in `.env`?
+Sonst in `TLS_NAMES` ergänzen (z. B. `TLS_NAMES=10.0.0.5,news.intern`) bzw. `BASE_URL` auf den richtigen Namen setzen
+und `docker compose up -d`. Mit `TLS_MODE=external` (eigener Proxy) gilt das für den eigenen
+Proxy nicht – dort selbst ein `server_name` und einen Default-Server setzen.
+
+**Größe der Anfragen:** nginx nimmt höchstens 1 MB (`client_max_body_size 1m`), die App selbst ebenso
+(`MAX_BODY_BYTES`, Standard 1 MiB, 16 KiB bis 64 MiB; reine ASGI-Middleware `app/bodylimit.py`): `Content-Length`
+darüber → sofort `413 body_too_large`; ohne `Content-Length` (chunked) wird mitgezählt und beim Überschreiten
+abgebrochen – mit denselben Sicherheits-Headern wie jede Antwort. Kein Endpunkt braucht mehr (es gibt keinen Upload:
+Sicherungen entstehen und werden eingespielt auf dem Server).
 
 Der mitgelieferte nginx (`nginx:1.30-alpine`) läuft schreibgeschützt mit `tmpfs`, ohne Capabilities außer den für
 Zertifikat und Port nötigen, TLS 1.2/1.3 mit Forward Secrecy, HTTP/2; ein vom Client mitgeschicktes `X-Forwarded-For`
@@ -285,7 +359,9 @@ Neuladen fehl (halb geschriebene Dateien, Schlüssel passt noch nicht), versucht
 Standard ist `BIND=127.0.0.1` – erreichbar nur von diesem Rechner. Seit es eine Anmeldung gibt, darf
 `BIND=0.0.0.0` den Port ins Netz öffnen. Die Voreinstellung bleibt trotzdem lokal: Ein Dienst, der neu aufgesetzt wird,
 soll nicht schon im Netz hängen, bevor der erste Admin (Setup-Token) angelegt, TOTP eingerichtet und ein vertrauenswürdiges
-Zertifikat hinterlegt ist. Danach `BIND=0.0.0.0` und `BASE_URL`/`NEWS_HOSTNAME` passend setzen.
+Zertifikat hinterlegt ist. Danach `BIND=0.0.0.0` und `BASE_URL`/`NEWS_HOSTNAME` passend setzen – und jeden weiteren
+Namen bzw. jede IP, über die die Seite geöffnet wird, in `TLS_NAMES`: nginx antwortet nur auf bekannte Namen
+([HTTPS](#https), Host-Namen).
 
 **Docker Desktop / Colima (Mac, Windows)**: Dort gehen die echten Client-Adressen schon bei Dockers Port-Weiterleitung
 verloren – nginx sieht jede Anfrage vom Docker-Gateway (z. B. `172.31.250.1`). Was man dann sieht: im Access-Log der App
@@ -406,7 +482,7 @@ Pause bis zum nächsten Versuch.
 | noch nicht abgerufen | eingeschaltet, aber noch nie gefragt |
 | **tot** (rot) | HTTP 401/403/410 zweimal in Folge, HTTP 404 dreimal in Folge; seit **14 Tagen** kein erfolgreicher Abruf (gezählt ab dem letzten Erfolg bzw. dem Einschalten); nur News: seit **60 Tagen** keine neue Meldung, obwohl der Abruf klappt – erst bewertet, wenn Meldungen und Statistik die 60 Tage abdecken |
 | **gestört** (bernstein) | 3 Fehlschläge in Folge; ein aktueller Fehler, der nicht nur vorübergehend ist (alles außer Zeitüberschreitung, Verbindungsfehler, HTTP 5xx, „zu viele Anfragen“) – die Quelle pausiert bis zum nächsten Versuch; eine unlesbare Antwort in den letzten 24 Stunden |
-| **langsam** (blau – ein Hinweis, nichts zu tun) | im Mittel der letzten 7 Tage über 5 s je Anfrage (mind. 3 Anfragen), mind. 3 Zeitüberschreitungen und mind. ein Viertel der Abrufe, oder ein vorübergehender Fehler, der gleich wiederholt wird |
+| **langsam** (blau – ein Hinweis, nichts zu tun) | im Mittel der letzten 7 Tage über 5 s je Anfrage (mind. 3 Anfragen; Downloads über 1 MB je Anfrage zählen nicht), mind. 3 Zeitüberschreitungen und mind. ein Viertel der Abrufe, oder ein vorübergehender Fehler, der gleich wiederholt wird |
 | **gesund** (grün) | alles andere |
 
 - **Gespeichert** wird je Abruf eine Zeile (`source_fetch_stats`): Zeit, Erfolg, HTTP-Status, Fehlerart (Zeitüberschreitung,
@@ -581,6 +657,42 @@ SSVC und „Erstabruf“ unter *Vendor News & Katalog* (`/docs/vendor-news#epss-
   aber nicht mehr bei der Bewertung (EPSS wird nicht mehr angezeigt); wieder eingeschaltet zählt es sofort wieder. Der
   Hinweis auf eine neue Lücke kann ohne cvelistV5 erst über die NVD kommen.
 
+### Exploit-Hinweise (Metasploit, Exploit-DB, nuclei)
+
+`backend/app/exploits.py`: ob es für eine CVE öffentlichen Exploit-Code oder eine fertige Prüfung gibt – als „Exploit
+öffentlich“ an Befunden (Dringlichkeit +10, nur wenn nicht schon als ausgenutzt bekannt), in den Details einer Meldung,
+bei beobachteten CVEs (Ereignis „Exploit veröffentlicht“, je CVE einmal) und für die Themen der Meldungen (Tabelle
+`exploit_refs`: CVE, Quelle, Link, `first_seen`, `baseline` – nie Code). Schalter je Liste unter *Weitere Quellen*
+(`exploit_metasploit`, `exploit_exploitdb`, `exploit_nuclei` im Abschnitt `vendor`).
+
+| Liste | Datei | Größe | Lizenz | ab Werk |
+|---|---|---|---|---|
+| Metasploit (Rapid7) | `raw.githubusercontent.com/rapid7/metasploit-framework/master/db/modules_metadata_base.json` – nur Module vom Typ `exploit` | ~11 MB (gzip ~1,4 MB) | BSD-3-Clause | an |
+| nuclei-templates (ProjectDiscovery) | `raw.githubusercontent.com/projectdiscovery/nuclei-templates/main/cves.json` (eine JSON-Zeile je Vorlage) | ~2,3 MB (gzip ~0,5 MB) | MIT | an |
+| Exploit-DB (OffSec) | `gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv` (Spalte `codes`) | ~10 MB, GitLab komprimiert nicht | GPL-2.0 (Repository) | aus |
+
+- Je Liste höchstens einmal am Tag (`vendor_fetch` `exploit:<liste>`), bedingt (ETag/If-Modified-Since), Größenlimit
+  24 MB (nuclei 8 MB), über `vendor.get` (Egress-Wächter, Abstand je Host, Pause nach 429/503); nach Fehlern 6 Stunden
+  wachsend, höchstens ein Tag. Nur solange gebraucht: wie der KEV (gefolgtes Produkt oder News an) oder eine CVE
+  beobachtet wird. Nach außen geht nichts über die Installation – dieselbe öffentliche Datei für alle.
+- Metasploit wird Modul für Modul gelesen (nie die 11 MB als ein Python-Objekt). Je CVE ein Link je Liste (der erste
+  Eintrag nach Pfad/Name bzw. die kleinste EDB-ID).
+- Erstes Laden einer Liste – oder das erste, nachdem sie aus war oder nicht gebraucht wurde (Marker `{"baseline": true}`
+  im `cursor` ihres `vendor_fetch`-Eintrags, gesetzt von der Runde; Fehlversuche setzen ihn nicht): `baseline` –
+  gezeigt, nie gemeldet. Führt eine Liste eine CVE nicht mehr, geht die Zeile; bringt eine Antwort weniger als die
+  Hälfte der gespeicherten CVEs, gilt sie als kaputt (Fehler „list shrank … (n of 3)“, nichts gelöscht, die alten
+  Validatoren bleiben) – kommt **dieselbe** Antwort dreimal in Folge, wird sie übernommen (Warnung im Log).
+- Download je Liste mit eigener Frist (Metasploit, Exploit-DB 120 s, nuclei 60 s), Weiterleitungen nur auf dem Host der
+  Liste (`raw.githubusercontent.com`, `gitlab.com`).
+- Thema „Exploit veröffentlicht“ der News: Erstes Laden oder mehr als 2000 geänderte CVEs → alle Themen neu
+  (`counters` `news_topics_ask`/`news_topics_done`, Hintergrundjob in Blöcken; was eine Meldung dabei bekommt, steht in
+  `news_items.quiet_topics` und löst keine Regel aus). Sonst die geänderten CVEs in `settings` `exploit_retopic`, mit
+  der Liste in einer Transaktion gespeichert und direkt danach abgearbeitet (nach einem Absturz in der nächsten Runde).
+- Ausgeschaltet: keine Anfrage; Gespeichertes bleibt, wird aber weder gezeigt noch gezählt.
+- Verworfen: inoffizielle PoC-Sammlungen (Trickest/cve, PoC-in-GitHub – ungeprüft, teils Schadcode), GitHub Security
+  Advisories (keine Exploit-Angaben), Dienste mit Schlüssel und eigenen Bedingungen.
+- Gesundheit: Familie `exploit` („Exploit-Hinweise“, Art `structured`).
+
 ### Katalog pflegen
 
 Der kuratierte Teil des Katalogs (Anzeigename, Hersteller, CPEs, Versionsschema, Herstellerquelle, Namen in Hinweisen
@@ -610,7 +722,28 @@ schema/*.schema.json      JSON Schema für Editoren (aus app/catalog_data.py erz
   # hosts: [example.com]           # erlaubte Hosts der Feeds und Dokumente (Standard: die letzten zwei Teile der domain)
 ```
 
-Eingetragen: Siemens, Cisco, Schneider Electric, Open-Xchange (0.1.45). Citrix/NetScaler hat keinen CSAF-Anbieter und
+Eingetragen: Siemens, Cisco, Schneider Electric, Open-Xchange (0.1.45; seit Katalog 2026.11.03-1 auch für Dovecot –
+Hersteller `Dovecot (Open-Xchange)`: die Dokumente `oxdc-adv-…` führen „OX Dovecot CE“ und „OX Dovecot Pro“ im Zweig
+„Open-Xchange GmbH“ mit der CPE `a:open-xchange:dovecot`; der Katalog-Eintrag ist Dovecot CE, „OX Dovecot Pro“ zählt
+nicht, `excluded_names`). Open-Xchange kennzeichnet seine CSAF-Dokumente (App Suite und Dovecot, geprüft 03.11.2026)
+mit **TLP:GREEN** (Weitergabe nur innerhalb der Organisation/Community, nicht öffentlich). Ab Werk wird nur
+TLP:WHITE/CLEAR gelesen, solche Dokumente werden abgelehnt (Quellen-Gesundheit: „blocked“); Dovecots Befunde kommen
+dann aus den CVE-Einträgen (CNA „OX“: „Open-Xchange GmbH / OX Dovecot CE“) und der NVD.
+
+**TLP:GREEN je Anbieter** – *Integrationen → Vendor News → Weitere Quellen*, Schalter „TLP:GREEN zulassen“ je
+Anbieter (Einstellung `vendor.csaf_green`, Liste der Anbieter-Schlüssel, ab Werk leer; Audit: `settings.changed`).
+Eingeschaltet liest der Anbieter auch TLP:GREEN-Feeds und -Dokumente (seine Liste wird dafür einmal von vorn gelesen,
+Älteres als 7 Tage still wie beim ersten Abruf); jeder solche Hinweis trägt `data.tlp = "GREEN"`, der Befund `tlp`,
+und jede Ausgabe kennzeichnet ihn: Karte und Schublade (Zeichen „TLP:GREEN“), Mail/Chat/ntfy/Gotify/Mattermost (Feld
+„TLP“, `[TLP:GREEN]` vor dem Titel, auch Web Push), Weiterleiten an Teams, Wochenbericht, Webhook (`tlp`, in
+`news.stories` und `news.forward`) und `/api/v1` (`tlp`). AMBER, AMBER+STRICT und RED werden nie gelesen. Öffentliche
+Wege gibt es nicht; der Kalender-Feed enthält keine Hinweise (nur Support-Enden). Die Details zu News-Meldungen nehmen
+nur öffentliche Dokumente (ein Dokument mit anderem TLP als CLEAR/WHITE wird dort nicht verwendet). Wieder
+ausgeschaltet: die gespeicherten TLP:GREEN-Hinweise des Anbieters werden sofort entfernt (und in jeder Runde erneut
+geprüft, `csaf_providers.purge_green`), ohne Revision und ohne „zurückgezogen“; noch nicht verschickte Ereignisse
+daraus werden still (baseline), verschickte bleiben in der Historie mit Kennzeichnung. Entfernt statt versteckt: wer
+TLP:GREEN abschaltet, will solche Inhalte nicht halten – versteckt stünden sie weiter in Datenbank, Sicherung und
+Export, und jeder Ausgabeweg bräuchte einen eigenen Filter. Citrix/NetScaler hat keinen CSAF-Anbieter und
 keinen Feed der Security Bulletins (geprüft 02.11.2026: BSI-Liste, `/.well-known/csaf/` von citrix.com, netscaler.com,
 cloud.com, support.citrix.com; der alte RSS-Feed liefert nur die Webseite) – Citrix-Produkte laufen über die CNA-Daten
 der CVE-Liste und NVD, die Webseiten werden nicht ausgelesen.
@@ -644,15 +777,19 @@ Version besteht, wenn endoflife.date es nicht oder falsch zeigt – weniger Teil
 und ohne `depth` ist keine Version ungenau). Regeln für eingetragene Versionen (`app/version_input.py`): `pattern`
 (regulärer Ausdruck, dem eine Version genügen muss, z. B. nur Builds) mit `pattern_hint` (Text aus texts.yaml),
 `normalize` (Anzeigeformen übersetzen: `two_digit_year`, `netscaler`, `ise_patch`, `office_build`, `nginx_plus`,
-`checkpoint`, `horizon_yymm`), `belongs` (`[{pattern, to}]` – Formen eines abgetrennten Produkts, z. B. pfSense Plus bei pfSense CE),
+`checkpoint`, `horizon_yymm`, `leading_zeros` – Exchange `15.02.1748.024` → `15.2.1748.24`), `lines_only` (`lts`: nur
+die Linien, die endoflife.date als LTS führt, sind die des Produkts – Firefox ESR, Jenkins LTS; `all`: jede gelistete
+Linie; eine Version dazwischen auf keiner davon wird abgelehnt, ältere und neuere als die bekannten nicht), `belongs` (`[{pattern, to}]` – Formen eines abgetrennten Produkts, z. B. pfSense Plus bei pfSense CE),
 `editions` (Editionen mit gleichen Versionsnummern und ihren Build-Bereichen, z. B. SharePoint 2016/2019/SE),
 `line_depth` (Teile, die eine Linie mit eigenen Zeilen in CVE-Einträgen bilden, Exchange: 3) und `cpe_editions`
-(`[cpe, sw_edition]` – nur diese Editionen einer CPE zählen, Firefox `esr`, Jenkins `lts`). Gegen die Release-Linien
+(`[cpe, sw_edition]` – nur diese Editionen einer CPE zählen, Firefox `esr`, Jenkins `lts`), `excluded_names`
+(Produktnamen in CSAF-Dokumenten und CNA-Zeilen, die trotz passender CPE ein anderes Produkt sind – Dovecot:
+`OX Dovecot Pro`). Gegen die Release-Linien
 von endoflife.date wird jede Version auf Plausibilität geprüft. Eine Build-Tabelle (`kind: names`) nennt `products`,
 `sources`, `fetched`, optional `strip`, `extract`, `claims`, `hint` und `rows: [{value, names}]` – ein Name, den die
 Tabelle zweimal vergibt, stoppt den Start. Ein Eintrag ohne `label` verschiebt nur ein
 endoflife.date-Produkt in diese Kategorie (erlaubt dann nur `cpes`, `scheme`, `hint`, `osv`, `aliases`, `replaces` und
-die Versionsregeln `pattern`, `pattern_hint`, `normalize`, `belongs`, `cpe_editions`). Ein Produkt ohne CPE in der NVD
+die Versionsregeln `pattern`, `pattern_hint`, `normalize`, `belongs`, `cpe_editions`, `lines_only`). Ein Produkt ohne CPE in der NVD
 bekommt `cpes: []` und `hint: nocpe`.
 
 **CPE prüfen** – gibt es sie im CPE-Verzeichnis der NVD? Im Katalog „Nicht im Katalog?“ suchen (dieselbe Abfrage) oder
@@ -704,6 +841,16 @@ Die **Katalogversion** steht unten im Katalog und auf „Version & Changelog“ 
 endoflife.date neu gebauter Katalog (`data/vendor_catalog.json`) merkt sich den Fingerabdruck der Katalogdaten; ändern
 sich die Daten mit einem Update, werden sie beim Laden neu angewandt – ohne auf die nächste Aktualisierung zu warten.
 
+**Neu verknüpfen nach einer Katalogänderung** – neue Namen oder CPEs eines Produkts (z. B. CNA-Namen wie „Exchange
+Server Subscription Edition“) verknüpfen von sich aus nur neue oder geänderte Hinweise. Deshalb verknüpft die
+Vendor-News-Runde einmal je `catalog_version` die gespeicherten Hinweise neu mit den gefolgten Produkten
+(`vendor.relink_catalog`): zehn Produkte je Runde, der Stand steht in der Einstellung `catalog_relink` (Version,
+erledigte Produkte) – ein Neustart macht weiter, nichts doppelt. So gefundene Verknüpfungen sind **still**
+(`vendor_advisory_products.quiet`, Migration 0028): ein Befund, den es nur durch sie gibt, erscheint in der Ansicht,
+wird aber nicht gemeldet (wie die Grundlinie eines neu gefolgten Produkts) – eine Katalogänderung ist keine Neuigkeit,
+und die Hinweise sind alt. Wird ein Hinweis später neu gespeichert (die Quelle ändert ihn), gilt seine Verknüpfung
+wieder normal. Dasselbe gilt für neue CPEs aus der täglichen endoflife.date-Aktualisierung.
+
 **Signierte Katalog-Updates (geplant, nicht gebaut)** – heute kommen Katalog-Änderungen mit dem Image. Später soll ein
 Katalog auch ohne neues Image kommen können:
 
@@ -751,6 +898,22 @@ Feeds: `services.nvd.nist.gov` (für Meldungen mit CVE), sonst dieselben Hosts w
 (`wid.cert-bund.de`, `cert-portal.siemens.com`, `sec.cloudapps.cisco.com`, `filestore.fortinet.com`,
 `security.paloaltonetworks.com`).
 
+**Gefolgte Produkte einer Meldung** (`news_items.products`, Filter „Betrifft unsere Produkte“): berechnet, sobald die
+Details einer Meldung ankommen (dieselbe Prüfung wie „Betrifft deine Systeme“), und im selben Hintergrundtask nach jeder
+Details-Runde für die Produkte, deren Folgen oder Versionen sich geändert haben – erkannt an einem Fingerabdruck je
+Produkt in der Einstellungszeile `news_products`. Entfolgte Produkte gehen per SQL aus allen Listen, geänderte werden in
+Blöcken von 500 Meldungen neu bewertet (abseits der Ereignisschleife). Nach dem Update auf die Version mit Migration 0026
+läuft das einmal für alle gespeicherten Meldungen. Kein zusätzlicher Abruf. Neu berechnen erzwingen:
+`DELETE FROM settings WHERE key = 'news_products';` – die nächste Runde rechnet alles neu.
+
+**Themen** (`news_items.topics`): Das Thema „Exploit veröffentlicht“ (`poc`) kommt aus der SSVC-Einstufung der CISA in
+den gespeicherten cvelistV5-Einträgen (und dem Wortlaut); ändert sich die Einstufung beim Speichern eines Eintrags,
+werden die Meldungen zu dieser CVE neu berechnet. Dazu kommen die eingeschalteten Exploit-Sammlungen (`exploit_refs`,
+aus dem Speicher): Neue oder gestrichene CVEs einer Sammlung berechnen die Meldungen zu diesen CVEs sofort neu (bis
+2000 CVEs auf einmal); das erste Laden einer Sammlung, mehr Änderungen auf einmal und das Ein- oder Ausschalten einer
+Sammlung setzen `news_topics_v` zurück – der Themen-Job rechnet dann alle Meldungen in Blöcken neu. Mit der neuen
+Regel-Version (`news_topics_v` 2) berechnet der Themen-Job alle gespeicherten Meldungen einmal neu.
+
 ## Benachrichtigungen
 
 *Einstellungen → Kanäle & Regeln* hat zwei Reiter:
@@ -759,7 +922,8 @@ Feeds: `services.nvd.nist.gov` (für Meldungen mit CVE), sonst dieselben Hosts w
   Fehlern. Ganz oben die Zeile **E-Mail-Server** (Server:Port · eingerichtet / nicht eingerichtet, „Bearbeiten“ öffnet
   die Schublade mit den SMTP-Einstellungen und der Testmail). Ein neuer E-Mail-Kanal ohne eingerichteten Server fragt in
   seiner Schublade zuerst nach dem Server; E-Mail-Kanäle ohne Server zeigen „E-Mail-Server fehlt“.
-- **Regeln** – *was*: Name, an/aus, Schweregrade (z. B. nur Kritisch + Hoch), Quellen (leer = alle), Sprache und
+- **Regeln** – *was*: Name, an/aus, Schweregrade (z. B. nur Kritisch + Hoch), Quellen (leer = alle), bei News Themen
+  (`notify_rules.topics`, eines genügt, leer = jede Meldung), Sprache und
   **ein oder mehrere Kanäle**. Arten: News, Vendor News (Schwachstellen; neue Versionen und Support-Ende) und
   *Quelle gestört oder tot* ([Quellen-Gesundheit](#quellen-gesundheit) – Schweregrade und Quellen gelten dafür nicht).
 
@@ -775,10 +939,11 @@ Feeds: `services.nvd.nist.gov` (für Meldungen mit CVE), sonst dieselben Hosts w
 - Nach jeder Abrufrunde: jede Meldung **höchstens einmal pro Kanal** – auch wenn zwei Regeln sie an denselben Kanal
   schicken. Eine neue (oder wieder eingeschaltete) Regel und ein Kanal, der einer Regel später hinzugefügt wird, gelten
   nur für Meldungen, die **danach** eintreffen – kein Schwall alter Meldungen. Ebenso eine Regel, deren Filter erweitert
-  wird (mehr Schweregrade, Quellen oder Arten): was erst dadurch passt, kommt ab der Änderung (Eingangsnummer der
+  wird (mehr Schweregrade, Quellen, Themen oder Arten): was erst dadurch passt, kommt ab der Änderung (Eingangsnummer der
   Meldung, bei Vendor News der Zeitpunkt); was schon vorher passte und noch offen ist, kommt weiterhin.
 - Jede Runde schaut nur nach, wenn sich etwas getan hat: eine neue Meldung oder ein neues Vendor-News-Ereignis, ein
-  geänderter Kanal, eine geänderte Regel oder der E-Mail-Server, oder die Pause eines Kanals ist um. Sonst kostet sie
+  geänderter Kanal, eine geänderte Regel oder der E-Mail-Server, geänderte Themen einer Meldung (eine Regel mit Themen
+  verschickt eine Meldung, die ihr Thema erst später bekommt, dann – einmal), oder die Pause eines Kanals ist um. Sonst kostet sie
   zwei kleine Abfragen statt eines Durchgangs durch alle Regeln (bei großen Datenbanken bis zu einer Sekunde). Alle
   10 Minuten wird trotzdem alles angesehen – eine Meldung, die inzwischen höher eingestuft ist oder von einer weiteren
   Quelle kommt, folgt damit spätestens dann.
@@ -939,7 +1104,11 @@ Runde, mehr als eine Zusammenfassung; „Kritisch“ bleibt stehen, bis man sie 
   der mitgelieferte `backend/app/data/vendor_catalog.json`)
 - **`./data/secret.key`**: Schlüssel für gespeicherte Geheimnisse (fehlt er, müssen Webhook-URLs, SMTP-/Bind-Passwort
   und Entra-Geheimnis neu eingegeben werden). Besser: `SECRET_KEY` in der `.env` setzen und **getrennt** von der
-  Datensicherung aufbewahren – eine Sicherung ohne Passphrase enthält dann keine lesbaren Geheimnisse.
+  Datensicherung aufbewahren – eine Sicherung ohne Passphrase enthält dann keine lesbaren Geheimnisse. `SECRET_KEY`:
+  mindestens 32 zufällige Zeichen (`openssl rand -base64 32`). Ein kürzerer Schlüssel (oder einer aus weniger als
+  8 verschiedenen Zeichen, ebenso eine `secret.key` unter 32 Bytes) wird nicht abgelehnt – bestehende Installationen
+  laufen weiter –, aber beim Start als Warnung geloggt (`SECRET_KEY is short …`, nie der Schlüssel selbst) und unter
+  *Einstellungen → HTTPS & Zertifikat* angezeigt. Wechseln heißt: die gespeicherten Geheimnisse neu eingeben.
 - **`./data/news.db`**: die SQLite-Datei bis 0.1.15 – seit dem Umzug unverändert, der Weg zurück (siehe unten)
 - `./data` und alle Dateien darin sind nur für den App-Prozess lesbar (Verzeichnis 0700, Dateien 0600).
 - **Volume `cobe-news_tls`**: das selbstsignierte Zertifikat (bei `TLS_MODE=own` stattdessen `TLS_SOURCE`)
@@ -1195,7 +1364,20 @@ Widerrufene und abgelaufene bleiben 30 Tage in der Liste.
   `/api/v1/vendor/products`, `/api/v1/vendor/products/{key}`, `/api/v1/vendor/findings`. Die OpenAPI-Beschreibung gibt
   es im Reiter „Referenz“ (nur Admins); ein öffentliches `/docs` oder `/openapi.json` gibt es nicht.
 - **`/metrics`:** Prometheus-Textformat 0.0.4, 30 s zwischengespeichert: Zustand der Quellen, Kanäle (nur ID und Typ),
-  persönliche Zustellungen, Sicherung, Rücksicherungs-Test, Größe der Datenbank – keine personenbezogenen Daten.
+  persönliche Zustellungen, Sicherung, Rücksicherungs-Test, Größe der Datenbank, `cobe_news_update_available` – keine
+  personenbezogenen Daten.
+
+## Update-Hinweis
+
+`backend/app/update_check.py`: Admins sehen „Version x.y.z verfügbar – Changelog“, wenn GitHub ein neueres Release
+nennt (`https://api.github.com/repos/G0urmetD/Cobe-News/releases/latest`, ohne Anmeldung, höchstens alle 12 Stunden,
+auch nach Fehlern; ETag; 10 s Zeitlimit, 256 KB; über `news.download` mit Egress-Wächter, Weiterleitungen nur auf
+`api.github.com`). Nur fertige `x.y.z` höher als `app.__version__` zählen (Entwürfe, Vorabversionen, andere Tags nicht);
+der Link wird aus dem geprüften Tag gebaut, nie aus der Antwort übernommen. Schließen gilt je Admin und Version
+(`update_dismissals`). Schalter: Abschnitt `updates` `{"check": true}` (ab Werk an), im Benutzermenü *Version &
+Changelog*; aus: keine Anfrage, kein Hinweis. Zustand der letzten Prüfung in `settings` `updates_state`. Leser sehen
+nichts (die API `/api/admin/update` nur für Admins). `/metrics`: `cobe_news_update_available` (1/0, NaN aus oder ohne
+Antwort).
   `prometheus.yml`: `scheme: https`, `authorization: {type: Bearer, credentials_file: …}`, `tls_config: {ca_file: …}`
   beim selbstsignierten Zertifikat; auf demselben Host auch `http://127.0.0.1:8096`.
 
@@ -1257,6 +1439,8 @@ backend/app/csaf_providers.py CSAF-Anbieter der Hersteller (Liste des BSI, ROLIE
 backend/app/cvelist.py        cvelistV5: Änderungen dreimal am Tag und Tagesabschluss, einzelne Einträge bei Bedarf
 backend/app/epss.py           FIRST EPSS je CVE (Befunde, Meldungen)
 backend/app/osv.py            OSV.dev: Bereiche von Open-Source-Paketen, nur nach CVE-/Advisory-Nummer
+backend/app/exploits.py       Exploit-Hinweise: Metasploit, Exploit-DB, nuclei-templates – je CVE Liste und Link, täglich
+backend/app/update_check.py   Update-Hinweis für Admins: GitHubs neuestes Release, höchstens alle 12 Stunden
 backend/app/data/             mitgelieferter Katalog (python -m app.vendor_catalog <endoflife-dump.json> baut ihn neu)
 backend/app/webpush.py        Web Push: Verschlüsselung (RFC 8291), VAPID (RFC 8292), Versand nach jeder Runde
 frontend/public/sw.js         Service Worker – nur Push und Klick auf eine Benachrichtigung, kein Cache
@@ -1294,22 +1478,30 @@ Prüfen der Signatur:
 
 ```bash
 cosign verify ghcr.io/g0urmetd/cobe-news:0.1.47 \
-  --certificate-identity-regexp 'https://github.com/G0urmetD/Cobe-News/.github/workflows/release.yml@refs/tags/v.*' \
+  --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
+
+Das Image statt eines lokalen Builds betreiben: [Veröffentlichtes Image statt lokalem Build](#veröffentlichtes-image-statt-lokalem-build).
 
 ## Offene Punkte
 
 - Keine Wiederherstellungscodes für den zweiten Faktor (der Notfall-Admin wird über `app.cli` zurückgesetzt).
 - Ein App-Prozess: Fehlversuch-Zähler, Rate-Limits und der Hintergrundjob leben im Speicher (ein Neustart setzt die
   Zähler zurück – laufende Konto- und Adress-Sperren bleiben, Tabelle `auth_locks`).
+- AD/LDAP: der Servername wird vor der Verbindung geprüft (`netaddr.check_host`), aber nicht auf die geprüfte Adresse
+  festgenagelt (kein DNS-Pinning wie bei den Kanälen) – ein DNS, das zwischen Prüfung und Verbindung die Antwort
+  wechselt, könnte die Bind-Anfrage umlenken; LDAPS mit Zertifikatsprüfung schützt das Bind-Passwort trotzdem.
 - Vendor News: Cisco openVuln (mit Zugangsdaten) und Microsofts CVRF nicht eingebaut.
 - Katalog: Build-Tabellen fehlen noch für SEP (RU ↔ Build), Skype for Business (CU ↔ Build), LANCOM (SU/RU), Acronis
   (Build) und ManageEngine (nur Build-Nummern) – es gibt dafür keine offizielle Tabelle, die sich übernehmen ließe.
   Citrix hat keine maschinenlesbare Bulletin-Quelle (nur CVE-Daten). Ohne CPE in der NVD (nur News und
   Herstellerdaten): Matrix42 Empirum, Aagon ACMP, Datto RMM, Swyx, d.velop, ELO, DocuWare, ESET PROTECT, G DATA, NCP VPN
-  Server, SAProuter, INSYS icom, Fujitsu iRMC, HPE iLO 7, Dell iDRAC10, Drucker/MFP. Dovecot ist nicht an den
-  CSAF-Anbieter Open-Xchange angebunden (ein endoflife.date-Produkt ohne eigenen Herstellernamen im Katalog).
+  Server, SAProuter, INSYS icom, Fujitsu iRMC, HPE iLO 7, Drucker/MFP (Dell iDRAC10 hat seit Katalog 2026.11.03-1 die
+  CPE `o:dell:idrac10_firmware`). Dovecot ist an den CSAF-Anbieter Open-Xchange angebunden, dessen Dokumente
+  TLP:GREEN tragen – gelesen nur, wenn ein Admin TLP:GREEN für Open-Xchange zulässt (siehe „CSAF-Anbieter“). Dells CVE-Einträge für iDRAC9 nennen
+  14G und 15G/16G in einer Zeile „iDRAC9“ mit je eigener Grenze – ein 14G-Build über 7.00.00.18x gilt dort als betroffen
+  bis zur 15G/16G-Grenze (eine Generation steht nicht in der Version).
 - Weitere Quellen: OpenPGP-Signaturen der CSAF-Dokumente werden nicht geprüft (nur die Prüfsumme); Microsofts CSAF/VEX
   nicht eingetragen; gespeicherte Einträge von cvelistV5 und OSV werden (wie die der NVD) nicht aufgeräumt, wenn einem
   Produkt nicht mehr gefolgt wird; fehlen der App mehr als 3 Tage, holt cvelistV5 die Tage davor nicht nach (die NVD

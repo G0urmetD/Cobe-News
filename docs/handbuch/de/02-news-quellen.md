@@ -17,7 +17,9 @@ Jede Kachel zeigt:
   und das Menü **⋯** (gelesen/ungelesen, die CVEs der Meldung [stummschalten](/docs/benachrichtigungen#stummschalten)),
 - den Titel und den Anfang der Zusammenfassung,
 - falls bekannt, das betroffene Produkt („betrifft GitLab …“ bzw. „betrifft deine Systeme: …“),
-- unten die **Schwere**, die genannte CVE (oder „3 CVEs“) und das Alter der Meldung.
+- unten die **Schwere**, „Unser Produkt: …“ (wenn die Meldung ein gefolgtes Produkt betrifft, siehe
+  [Betrifft unsere Produkte](#unsere-produkte)), die [Themen](#themen), die genannte CVE (oder „3 CVEs“) und das Alter
+  der Meldung.
 
 Kritische Meldungen haben einen roten Rand. Ungelesene haben einen Punkt vor dem fett gesetzten Titel; stummgeschaltete
 (nur mit „Stummgeschaltete zeigen“ zu sehen) sind blass und tragen „Stumm“.
@@ -53,9 +55,11 @@ markieren“, „Artikel öffnen“ (der Originalartikel in einem neuen Tab) und
   Research, Presse, eigene Quellen). „Alle: Behörden & CERTs“ wählt eine ganze Gruppe – etwa für die Warnungen der
   Behörden.
 - **Schnellfilter** unter der Filterzeile: „Aktiv ausgenutzt“, „Zero-Day“ und „Ohne Patch“ mit einem Klick – derselbe
-  Filter wie *Thema*, mit der Zahl der Meldungen.
-- Quelle, Schwere und Thema merkt sich zusätzlich der Browser für dein Konto (wenn du keine Standard-Ansicht hast).
-- „Filter zurücksetzen“ hebt Quelle, Schwere und Thema auf.
+  Filter wie *Thema*, mit der Zahl der Meldungen. Daneben **„Betrifft unsere Produkte“**, sobald ihr in Vendor News
+  einem Produkt folgt ([mehr](#unsere-produkte)) – er gilt zusätzlich zu allen anderen Filtern.
+- Quelle, Schwere, Thema und „Betrifft unsere Produkte“ merkt sich zusätzlich der Browser für dein Konto (wenn du keine
+  Standard-Ansicht hast).
+- „Filter zurücksetzen“ hebt Quelle, Schwere, Thema und „Betrifft unsere Produkte“ auf.
 - **Nur ungelesene**: blendet Gelesenes aus. **Stummgeschaltete zeigen**: zeigt auch die Meldungen, deren CVEs du alle
   stummgeschaltet hast (blass) – sonst fehlen sie.
 - **Ansichten**: die Filter unter einem Namen speichern, als Standard setzen, als Link teilen
@@ -147,6 +151,7 @@ unter „Themen“ mit dem Grund („CISA KEV listet CVE-…“, „im Titel: �
 |---|---|
 | **Zero-Day** | „Zero-Day“, „0-day“ in Titel oder Anrisstext (nicht die Zero Day Initiative, nicht „Kein Zero-Day“). Eine Zero-Day-Meldung ist auch *aktiv ausgenutzt*. |
 | **Aktiv ausgenutzt** | ein Eintrag der Kataloge [CISA KEV](term:kev) oder [ENISA EUVD](term:euvd); eine CVE der Meldung steht im KEV (siehe unten); die [Details aus der Quelle](#details-aus-der-quelle) sagen „ausgenutzt“; Wörter wie „actively exploited“, „exploited in the wild“, „aktiv ausgenutzt“, „wird bereits ausgenutzt“ – nicht verneint, nicht als Meldepflicht ([Verneinungen](#verneinungen)) |
+| **Exploit veröffentlicht** | ein öffentlicher Exploit oder Proof of Concept ist bekannt: die CISA stuft eine CVE der Meldung in [SSVC](term:ssvc) mit „Exploitation: poc“ ein (aus der CVE-Liste, siehe unten); eine eingeschaltete Exploit-Sammlung (Metasploit, Exploit-DB, nuclei – [Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)) führt eine CVE der Meldung; Wörter wie „PoC exploit“, „proof-of-concept exploit released“, „Exploit-Code veröffentlicht“, „öffentlicher Exploit“ – nicht verneint („kein öffentlicher Exploit“, „ein Exploit ist nicht bekannt“). Noch kein Beleg für Angriffe – das ist *Aktiv ausgenutzt*. |
 | **Ransomware** | „Ransomware“, „Erpressertrojaner“, bekannte Gruppen (LockBit, Akira, Qilin, Black Basta, Cl0p); bei KEV-Einträgen der Hinweis der CISA auf Ransomware-Kampagnen |
 | **Ohne Patch** | „[UNGEPATCHT]“ im Titel einer BSI-Warnung; ein CSAF-Advisory mit „kein Fix verfügbar“ oder „kein Fix geplant“ und ohne Hersteller-Fix; wenige eindeutige Wendungen („no patch yet“, „noch kein Update“, „unpatched flaw“) |
 | **Vorfall/Datenleck** | „data breach“, „Datenleck“, „Datenpanne“, „Kundendaten“, „Cyberangriff auf …“, gestohlene oder offengelegte Daten |
@@ -167,6 +172,16 @@ alle Behörden auf einmal.
   ihr Titel oder Anrisstext diese CVE nennt oder sie höchstens drei CVEs nennt. Ein Patchday-Sammelartikel mit 80 CVEs
   wird nicht „aktiv ausgenutzt“, nur weil eine davon im KEV steht. Den Ransomware-Hinweis der CISA bekommt nur der
   KEV-Eintrag selbst, nicht jede Meldung zur selben CVE.
+- **Exploit veröffentlicht über die CVE:** Cobe News liest die SSVC-Einstufung der CISA aus den gespeicherten Einträgen
+  der CVE-Liste (cvelistV5 – Vendor News hält sie für die gefolgten Produkte und für die CVEs, die es für Meldungen und
+  Befunde nachschlägt). „poc“ macht die Meldung zu *Exploit veröffentlicht* – nach derselben Sammelartikel-Regel wie
+  beim KEV. „active“ (aktive Ausnutzung) ist kein PoC: Diese Meldung ist *Aktiv ausgenutzt*. Ändert die CISA ihre
+  Einstufung, folgen die Meldungen zu dieser CVE.
+- **Exploit veröffentlicht über die Exploit-Sammlungen:** Führt eine eingeschaltete Sammlung (Metasploit, Exploit-DB,
+  nuclei) eine CVE der Meldung, ist sie ebenfalls *Exploit veröffentlicht* (gleiche Sammelartikel-Regel); im Drawer
+  steht die Sammlung als Grund. Nimmt eine Sammlung eine CVE neu auf oder streicht sie, folgen die Meldungen zu dieser
+  CVE sofort; beim ersten Laden einer Sammlung, bei sehr vielen Änderungen auf einmal und beim Ein- oder Ausschalten
+  einer Sammlung rechnet Cobe News alle Meldungen im Hintergrund neu.
 - **Anzeigen** („heise-Angebot“, „Anzeige“, „Webinar:“, „(g+)“) bekommen keine Themen aus ihren Wörtern.
 - **Neu berechnet** wird, sobald sich etwas ändert: die Meldung wird aktualisiert, die Details aus der Quelle kommen
   an, eine CVE kommt neu in den KEV-Katalog oder eine KEV-Meldung zur selben CVE erscheint. Nach einem Update oder einer
@@ -181,7 +196,30 @@ alle Behörden auf einmal.
 - *Ohne Patch* erkennt nur ausdrücklich gesagte Fälle. Fehlt der Hinweis, heißt das nicht, dass es einen Patch gibt.
 - *Aktiv ausgenutzt* über den KEV setzt voraus, dass die Meldung die CVE nennt; Meldungen ohne CVE erkennt nur ihr
   Wortlaut.
-- Die Themen gelten (noch) nicht für Benachrichtigungsregeln, Desktop-Benachrichtigungen oder Web Push.
+- *Exploit veröffentlicht* kennt nur, was die CISA in SSVC einstuft, was eine eingeschaltete Exploit-Sammlung führt
+  und was Titel und Anrisstext sagen. Sind alle Sammlungen aus, zählen nur SSVC und der Wortlaut.
+- Die Themen gelten auch für [Benachrichtigungsregeln](/docs/benachrichtigungen#regel-themen) und für
+  [Desktop-Benachrichtigungen und Web Push](/docs/benachrichtigungen#desktop-einschalten).
+
+## Betrifft unsere Produkte {#unsere-produkte}
+
+Der Schnellfilter **„Betrifft unsere Produkte“** zeigt nur die Meldungen, die ein Produkt betreffen, dem ihr in
+[Vendor News](/docs/vendor-news#ueberblick) folgt. Auf der Kachel steht dann **„Unser Produkt: PAN-OS“** (bei mehreren
+„+n“, der Mauszeiger nennt alle). Die Zahl am Schalter sagt, wie viele Meldungen es bei den übrigen Filtern sind.
+
+- **Woher Cobe News das weiß:** aus den [Details aus der Quelle](#details-aus-der-quelle) – dem CSAF-Produktbaum, den
+  CPE-Angaben der NVD, den betroffenen Produkten der CVE-Liste –, beurteilt wie in Vendor News. Es ist dieselbe
+  Entscheidung wie „Betrifft deine Systeme“ in der geöffneten Meldung. **Nie aus Wörtern:** Ein Titel, der „Exchange“
+  nennt, macht eine Meldung nicht zu eurer.
+- **Versionen zählen:** Habt ihr Versionen eingetragen und ist keine davon betroffen, zählt die Meldung nicht. Ohne
+  eingetragene Version zählt jede Meldung zum Produkt.
+- **Mein Team:** Steht Vendor News bei dir auf [„Mein Team“](/docs/vendor-news#mein-team), zeigt der Filter nur die
+  Produkte deiner Teams („Betrifft unsere Produkte (Mein Team)“). Mit „Alle“ gelten alle gefolgten Produkte.
+- **Wann es sich ändert:** sobald die Details einer Meldung ankommen, und wenn ihr einem Produkt folgt, es entfolgt oder
+  seine Versionen ändert – Cobe News rechnet dann die gespeicherten Meldungen für dieses Produkt im Hintergrund neu
+  (in Blöcken von 500, meist innerhalb einer Minute). Nach dem Update auf diese Version geschieht das einmal für alle.
+- **Grenzen:** Meldungen ohne Details (ohne CVE, Presseartikel ohne Advisory) betreffen für den Filter kein Produkt –
+  auch wenn der Text es nennt. Der Schalter erscheint erst, wenn ihr mindestens einem Produkt folgt.
 
 ## Eingebaute Quellen {#eingebaute-quellen}
 
@@ -340,7 +378,7 @@ Jede News-Quelle, jede Quellen-Familie von Vendor News und jede der [weiteren Qu
 | **noch nicht abgerufen** | eingeschaltet, aber noch nie gefragt – passiert mit der nächsten Runde |
 | **tot** (rot) | HTTP 401/403/410 zweimal in Folge; HTTP 404 dreimal in Folge; seit **14 Tagen** kein erfolgreicher Abruf; nur News: seit **60 Tagen** keine neue Meldung, obwohl der Abruf klappt |
 | **gestört** (bernstein) | 3 Fehlschläge in Folge; ein aktueller Fehler, der nicht nur vorübergehend ist (z. B. falsche Adresse, Zertifikat, unlesbare Antwort) – die Quelle pausiert bis zum nächsten Versuch; eine unlesbare Antwort in den letzten 24 Stunden |
-| **langsam** (blau) | im Mittel der letzten 7 Tage über 5 Sekunden je Anfrage; häufige Zeitüberschreitungen (mindestens 3 und mindestens ein Viertel der Abrufe); oder ein vorübergehender Fehler, der gleich wiederholt wird |
+| **langsam** (blau) | im Mittel der letzten 7 Tage über 5 Sekunden je Anfrage (große Downloads über 1 MB je Anfrage zählen hier nicht – etwa der erste vollständige NVD-Abruf eines neu verfolgten Produkts); häufige Zeitüberschreitungen (mindestens 3 und mindestens ein Viertel der Abrufe); oder ein vorübergehender Fehler, der gleich wiederholt wird |
 | **gesund** (grün) | alles andere |
 
 Vorübergehend sind Zeitüberschreitungen, Verbindungsfehler, HTTP 5xx und „zu viele Anfragen“. Sie pausieren eine

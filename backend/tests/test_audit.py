@@ -266,6 +266,7 @@ def test_every_action_has_a_case_or_a_reason():
         "login.success",
         "login.locked",
         "login.ip_blocked",  # test_sign_in_and_lockouts
+        "login.emergency_slowed",  # test_sec_hardening.py: test_emergency_budget_exceeded_is_reported_once
         "setup.completed",  # test_setup_is_logged
         "team.group_removed",
         "team.products_changed",
@@ -400,6 +401,7 @@ REVIEWED_NOT_SECRET = {
     "sign_count": "a passkey's signature counter",
     "sign_count_warning_at": "a time",
     "auth_context": "an Entra authentication context id (C1–C99) – a name, not a secret",
+    "temp_password_days": "how many days a temporary password is valid (a number, settings section sessions)",
 }
 
 

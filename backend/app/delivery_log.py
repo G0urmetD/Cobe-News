@@ -33,6 +33,7 @@ from sqlalchemy import Integer, and_, case, delete, func, insert, literal, selec
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import DeliveryLog, NotifyChannel
+from app.news import TOPICS
 
 log = logging.getLogger("cobe_news.delivery_log")
 
@@ -156,7 +157,17 @@ def entry(
     if error is not None:
         raw = getattr(error, "detail", "") or ""
         detail = sanitize(raw, secrets) if raw and raw != category else None
-    listed = [{"kind": str(x.get("kind") or ""), "id": str(x.get("id") or ""), "title": title(x.get("title")), "severity": str(x.get("severity") or "")} for x in (items or [])[:ITEMS_MAX]]
+    listed = [
+        {
+            "kind": str(x.get("kind") or ""),
+            "id": str(x.get("id") or ""),
+            "title": title(x.get("title")),
+            "severity": str(x.get("severity") or ""),
+            # a news story's topics when it went out (what a rule asking for topics matched by)
+            **({"topics": [t for t in TOPICS if t in x["topics"]]} if isinstance(x.get("topics"), list) and x["topics"] else {}),
+        }
+        for x in (items or [])[:ITEMS_MAX]
+    ]
     prev = select(func.coalesce(func.max(DeliveryLog.attempt), 0)).where(DeliveryLog.ref == ref)
     prev = prev.where(DeliveryLog.channel_id == channel_id) if channel_id else prev.where(DeliveryLog.channel_id.is_(None), DeliveryLog.kind == kind)
     alive = select(NotifyChannel.id).where(NotifyChannel.id == channel_id).scalar_subquery() if channel_id else None

@@ -4,32 +4,68 @@
 # nginx hands the client's real address to the app in X-Forwarded-For – one a client sent itself is replaced, never
 # passed on, so nobody can choose their own address. The app trusts the header only from this container's fixed address.
 # Only ${NEWS_…} variables are filled in at start (NGINX_ENVSUBST_FILTER), nginx's own $variables stay as they are.
+# NEWS_SERVER_NAMES: the names Cobe News answers to – the host of BASE_URL, NEWS_HOSTNAME, TLS_NAMES, localhost,
+# 127.0.0.1 and [::1] (16-server-names.envsh). Any other Host header: on https a short plain-text 421 that says how to
+# add the name (an installation reached by an address or name not configured sees why – no page, no app, nothing about
+# it beyond that); on plain http nothing (444).
 
 server_tokens off;
 
-# plain http (only published with docker-compose.http.yml) only sends the browser to the https address
+# TLS for both https servers (the default one needs a certificate to answer at all)
+ssl_certificate     /etc/nginx/tls/cobe.crt;
+ssl_certificate_key /etc/nginx/tls/cobe.key;
+# Mozilla "intermediate": TLS 1.2 and 1.3, forward secrecy only
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+ssl_prefer_server_ciphers off;
+ssl_session_cache shared:cobenews:10m;
+ssl_session_timeout 1d;
+ssl_session_tickets off;
+
+# an unknown name (a scan by address, a foreign name pointed here): no page, no redirect – on plain http the
+# connection is closed
 server {
     listen 80 default_server;
     server_name _;
+    return 444;
+}
+
+# … on https: 421 Misdirected Request, a few words of plain text – the name is not one of this installation's (an
+# address or name used after an upgrade that BASE_URL / TLS_NAMES do not list yet). Never the app, never a redirect.
+server {
+    listen 443 ssl default_server;
+    http2 on;
+    server_name _;
+    # plain http sent to the https port with an unknown name: closed
+    error_page 497 @close;
+    location @close {
+        return 444;
+    }
+    location / {
+        default_type text/plain;
+        charset utf-8;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        return 421 "Unbekannter Hostname – in .env BASE_URL oder TLS_NAMES eintragen.\nUnknown host name – add it to BASE_URL or TLS_NAMES in .env.\n";
+    }
+}
+
+# plain http (only published with docker-compose.http.yml) only sends the browser to the https address
+server {
+    listen 80;
+    server_name ${NEWS_SERVER_NAMES};
     location / {
         return 301 https://$host:${NEWS_HTTPS_PORT}$request_uri;
     }
 }
 
 server {
-    listen 443 ssl default_server;
+    listen 443 ssl;
     http2 on;
-    server_name _;
+    server_name ${NEWS_SERVER_NAMES};
 
-    ssl_certificate     /etc/nginx/tls/cobe.crt;
-    ssl_certificate_key /etc/nginx/tls/cobe.key;
-    # Mozilla "intermediate": TLS 1.2 and 1.3, forward secrecy only
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:cobenews:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
+    # plain http sent to the https port (http://name:8095): the browser is sent to https instead of nginx's 400 page
+    error_page 497 =301 https://$host:${NEWS_HTTPS_PORT}$request_uri;
 
     client_max_body_size 1m;   # nothing big is uploaded here
     proxy_read_timeout 60s;

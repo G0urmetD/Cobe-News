@@ -36,12 +36,13 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Pill } from "@/components/cobe/badges"
+import { Pill, TlpPill } from "@/components/cobe/badges"
 import { EmptyState, MoreText, PageHeader } from "@/components/cobe/common"
 import { Field } from "@/components/cobe/form"
 import { Explained } from "@/components/cobe/explained"
 import { Term } from "@/components/cobe/glossary"
 import { EpssPill, SsvcPill } from "@/components/cobe/epss"
+import { ExploitHints } from "@/components/cobe/exploit"
 import { ScorePill } from "@/components/cobe/score"
 import { ForwardButton } from "@/components/cobe/forward"
 import { DrawerSkeleton, QueryError } from "@/components/cobe/query-state"
@@ -1241,6 +1242,8 @@ const FindingRow = memo(function FindingRow({
         )}
         {f.epss && <EpssPill e={f.epss} />}
         {f.ssvc && <SsvcPill s={f.ssvc} />}
+        {f.exploit && f.exploit.length > 0 && <ExploitHints hints={f.exploit} />}
+        {f.tlp === "GREEN" && <TlpPill />}
         {f.quiet && (
           <span title={t("vendor.quietHint")}>
             <Pill color="--muted-foreground">{t("vendor.quiet")}</Pill>

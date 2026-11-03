@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
 /** Security terms in plain words (from Cobe's glossary) – the ones Cobe News uses (and the Teams "Workflows-Webhook"): glossary.<key> / glossary.<key>Text. */
 export const TERMS = [
@@ -17,6 +18,7 @@ export const TERMS = [
   "tlp",
   "ssvc",
   "osv",
+  "exploit",
   "webhook",
   "revision",
   "ical",
@@ -30,14 +32,17 @@ export const TERMS = [
 export type TermKey = (typeof TERMS)[number]
 
 /** A term with its explanation on hover or focus – dotted underline, like an abbreviation. */
-export function Term({ k, children }: { k: TermKey; children: React.ReactNode }) {
+export function Term({ k, children, focusable = true, className }: { k: TermKey; children: React.ReactNode; focusable?: boolean; className?: string }) {
   const { t } = useTranslation()
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-          tabIndex={0}
-          className="cursor-help underline decoration-muted-foreground/60 decoration-dotted underline-offset-4 outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring/50"
+          tabIndex={focusable ? 0 : undefined}
+          className={cn(
+            "cursor-help underline decoration-muted-foreground/60 decoration-dotted underline-offset-4 outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring/50",
+            className,
+          )}
         >
           {children}
         </span>

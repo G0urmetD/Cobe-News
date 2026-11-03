@@ -12,7 +12,7 @@ from pydantic import ConfigDict, Field, field_validator
 from sqlalchemy import and_, select, update
 
 from app import advisory_changes as changes_svc
-from app import audit, catalog_check, reader, teams
+from app import audit, catalog_check, exploits, reader, teams
 from app import catalog_care as care
 from app import vendor as svc
 from app import vendor_catalog as catalog
@@ -173,7 +173,7 @@ async def _overview_row(
         # a "possibly affected" one must never stand at the top of a card whose versions have affected ones
         "latest": [
             {k: x[k] for k in ("id", "ident", "title", "headline", "severity", "exploited", "status", "published_at", "cvss")}
-            | {"score": _brief(x.get("score"))}
+            | {"score": _brief(x.get("score")), "tlp": x.get("tlp")}
             | ({"unread": rd.unread(f.product, x["id"]), "muted": rd.muted(f.product, x)} if rd is not None else {})
             for x in top[:3]
         ],
@@ -602,10 +602,20 @@ def _settings_out(cfg: dict) -> dict:
         "eol_every_h": int(cfg.get("eol_every_h") or 24),
         "nvd_key_set": bool(cfg.get("nvd_key_enc")),
         **{k: bool(cfg.get(k, True)) for k in STRUCTURED},
+        # the exploit lists (app/exploits.py), each on or off
+        **{k: bool(cfg.get(k, d)) for k, d in exploits.SWITCHES.items()},
         # Versionen prüfen: a version not confirmed for longer than this is "bitte prüfen" (0: off)
         "review_days": care.review_days_of(cfg),
+        # CSAF providers whose TLP:GREEN documents are allowed (default none – only TLP:CLEAR/WHITE)
+        "csaf_green": sorted(_green(cfg)),
         "rev": int(cfg.get("rev") or 0),  # the saved state (409 stale when another admin saved in between)
     }
+
+
+def _green(cfg: dict) -> frozenset[str]:
+    from app import csaf_providers
+
+    return csaf_providers.green_allowed(cfg)
 
 
 class VendorSettingsIn(_M):
@@ -619,8 +629,25 @@ class VendorSettingsIn(_M):
     cvelist: bool | None = None
     epss: bool | None = None
     osv: bool | None = None
+    exploit_metasploit: bool | None = None
+    exploit_exploitdb: bool | None = None
+    exploit_nuclei: bool | None = None
     review_days: int | None = None  # None: as it is
+    # the CSAF providers (csaf.yaml keys) whose TLP:GREEN documents are read (None: as it is)
+    csaf_green: list[Annotated[str, Field(min_length=1, max_length=40)]] | None = Field(default=None, max_length=100)
     rev: int | None = None  # the state the form was loaded with
+
+    @field_validator("csaf_green")
+    @classmethod
+    def _green_keys(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        from app import csaf_providers
+
+        known = {p["key"] for p in csaf_providers.providers()}
+        if bad := [k for k in v if k not in known]:
+            raise ValueError(f"unknown CSAF provider: {', '.join(bad[:3])}")
+        return sorted(set(v))
 
     @field_validator("review_days")
     @classmethod
@@ -642,8 +669,12 @@ async def admin_vendor(admin: Admin, db: Db) -> dict:
     needed = {x["key"] for x in csaf_providers.needed(products)}
     return {
         "structured": {
-            "csaf_providers": [{"key": x["key"], "name": x["name"], "domain": x["domain"], "vendors": x["vendors"], "needed": x["key"] in needed} for x in csaf_providers.providers()],
+            "csaf_providers": [
+                {"key": x["key"], "name": x["name"], "domain": x["domain"], "vendors": x["vendors"], "needed": x["key"] in needed, "green": x["key"] in _green(cfg)}
+                for x in csaf_providers.providers()
+            ],
             "osv_products": sum(1 for p in products if p.get("osv")),
+            "exploit_sources": [{"key": x.key, "name": x.name, "url": x.url, "licence": x.licence, "default": x.default} for x in exploits.SOURCES.values()],
         },
         "settings": _settings_out(cfg),
         "catalog": {"catalog_version": catalog.catalog_version(), "generated_at": cat.get("generated_at"), "eol_generated_at": cat.get("eol_generated_at"), "products": len(cat["products"]), "counts": cat.get("counts")},
@@ -659,13 +690,36 @@ async def put_vendor(body: VendorSettingsIn, request: Request, admin: Admin, db:
     cur = await svc.config(db)
     enc = "" if body.clear_nvd_key else encrypt_str(body.nvd_key) if body.nvd_key else cur.get("nvd_key_enc", "")
     switches = {k: bool(cur.get(k, True)) if getattr(body, k) is None else getattr(body, k) for k in STRUCTURED}
+    switches |= {k: bool(cur.get(k, d)) if getattr(body, k) is None else getattr(body, k) for k, d in exploits.SWITCHES.items()}
     review_days = care.review_days_of(cur) if body.review_days is None else body.review_days
-    value = {"enabled": body.enabled, "every_h": body.every_h, "eol_every_h": body.eol_every_h, "nvd_key_enc": enc, **switches, "review_days": review_days}
-    if changes := audit.diff(cur, value, value.keys()):
+    was_green = _green(cur)
+    green = sorted(was_green) if body.csaf_green is None else body.csaf_green
+    value = {"enabled": body.enabled, "every_h": body.every_h, "eol_every_h": body.eol_every_h, "nvd_key_enc": enc, **switches, "review_days": review_days, "csaf_green": green}
+    if changes := audit.diff({**cur, "csaf_green": sorted(was_green)}, value, value.keys()):
         audit.record(db, admin, "settings.changed", audit.target("settings", "vendor", "vendor"), {"changes": changes})
     out = await settings_store.put_rev(db, "vendor", value, body.rev)
-    if any(bool(cur.get(k, True)) != switches[k] for k in STRUCTURED):
+    exploit_moved = any(bool(cur.get(k, d)) != switches[k] for k, d in exploits.SWITCHES.items())
+    if any(bool(cur.get(k, True)) != switches[k] for k in STRUCTURED) or exploit_moved:
         svc.bump()  # a source switched off (or on again): its stored records leave (or join) the verdicts – svc.counts
+    if exploit_moved:
+        # the news' topic "poc" names the switched-on lists only (news.exploit_cves): every story's topics again, in the
+        # background (news.backfill_topics, in chunks)
+        from app import news
+
+        await news.topics_again(db)
+        await db.commit()
+    if set(green) != was_green:
+        from app import csaf_providers
+
+        for key in set(green) - was_green:
+            # allowed now: the provider's list is read again from the start (its GREEN documents were skipped before);
+            # what is older than a week comes as the first fill does – shown, not notified
+            st = await db.get(VendorFetch, f"csaf:{key}")
+            if st is not None:
+                st.cursor, st.next_fetch_at, st.etag, st.last_modified = None, None, None, None
+        await db.commit()
+        if was_green - set(green):
+            await csaf_providers.purge_green(db, frozenset(green))  # no longer allowed: gone now (the round checks again)
     _wake(request)
     return _settings_out(out)
 

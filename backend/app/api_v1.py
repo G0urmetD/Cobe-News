@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.dialects.postgresql import array as pg_array
 
-from app import __version__, epss
+from app import __version__, epss, exploits
 from app import news as news_svc
 from app import vendor as svc
 from app.api_tokens import ReadToken
@@ -29,10 +29,10 @@ from app.models import NewsItem, NewsSource
 
 router = APIRouter(prefix="/api/v1")
 Severity = Literal["critical", "high", "medium", "low", "info"]
-Topic = Literal["zeroday", "exploited", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]
+Topic = Literal["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]
 TOPIC_TEXT = (
     "Topics of a story, detected by rules in its title and teaser and from structured data (CISA KEV, the advisory): "
-    "`zeroday`, `exploited` (actively exploited), `ransomware`, `nopatch` (no patch available), `breach` (incident or "
+    "`zeroday`, `exploited` (actively exploited), `poc` (a public exploit or proof of concept), `ransomware`, `nopatch` (no patch available), `breach` (incident or "
     "data leak), `supply` (supply chain), `phishing` (phishing and social engineering), `ot` (OT/ICS)"
 )
 Status = Literal["affected", "possible", "service", "unversioned", "stale", "not_affected"]
@@ -76,8 +76,16 @@ class EpssScore(BaseModel):
     date: str | None = None
 
 
+class ExploitHint(BaseModel):
+    cve: str
+    source: Literal["metasploit", "exploitdb", "nuclei"] = Field(description="The list naming public exploit code (or a ready-made exploit check) for the CVE")
+    url: str = Field(description="The entry in that list")
+    first_seen: str | None = Field(default=None, description="When Cobe News first saw it there")
+
+
 class StoryDetail(Story):
     epss: list[EpssScore] = Field(default_factory=list, description="EPSS of the story's CVEs, likeliest first")
+    exploits: list[ExploitHint] = Field(default_factory=list, description="Public exploits for the story's CVEs (switched-on exploit lists)")
 
 
 class Version(BaseModel):
@@ -120,9 +128,11 @@ class Finding(BaseModel):
     exploited: bool = Field(description="Known to be exploited (CISA KEV or the vendor)")
     kev: Kev | None = None
     epss: EpssScore | None = None
+    exploits: list[ExploitHint] = Field(default_factory=list, description="Public exploits for the finding's CVEs (switched-on exploit lists)")
     status: Status = Field(description="The worst verdict over the versions entered")
     published_at: str | None = None
     versions: list[FindingVersion] = []
+    tlp: str | None = Field(None, description="\"GREEN\": from a CSAF provider's TLP:GREEN document (allowed by an admin) – share within your organisation or community only, never publicly")
 
 
 class ProductFinding(Finding):
@@ -203,7 +213,7 @@ async def list_news(
     db: Db,
     severity: Annotated[list[Severity], Query(description="Only these severities (repeat the parameter)")] = [],  # noqa: B006
     source: Annotated[list[str], Query(max_length=50, description="Only these sources, by key (repeat the parameter)")] = [],  # noqa: B006
-    topic: Annotated[list[Topic], Query(max_length=8, description="Only stories with one of these topics (repeat the parameter; OR within the topics)")] = [],  # noqa: B006
+    topic: Annotated[list[Topic], Query(max_length=9, description="Only stories with one of these topics (repeat the parameter; OR within the topics)")] = [],  # noqa: B006
     q: Annotated[str, Query(max_length=100, description="Words in title, summary or CVE ids (case and accents ignored)")] = "",
     since: Annotated[datetime | None, Query(description="Only stories published at or after this time (ISO 8601)")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -252,6 +262,8 @@ async def get_story(story_id: uuid.UUID, token: ReadToken, db: Db) -> dict:
     out = _story(i, s)
     scores = await epss.scores(db, [c.upper() for c in (i.cves or [])[:60]])
     out["epss"] = sorted(scores.values(), key=lambda e: -e["score"])[:12]
+    named = [c.upper() for c in (i.cves or [])[:60]]
+    out["exploits"] = exploits.brief(await exploits.of_cves(db, named), named, 12)
     return out
 
 
@@ -273,7 +285,9 @@ def _finding(x: dict) -> dict:
         **{k: x.get(k) for k in ("id", "source", "ident", "title", "headline", "url", "cvss", "severity", "kev", "epss", "status", "published_at")},
         "cves": list(x.get("cves") or []),
         "exploited": bool(x.get("exploited")),
+        "exploits": list(x.get("exploit") or []),
         "versions": [{"version": r.get("version"), "status": r.get("status"), "fixed": r.get("fixed")} for r in x.get("versions") or []],
+        "tlp": x.get("tlp") or None,
     }
 
 

@@ -238,7 +238,7 @@ function showSummary(count: number, open: () => void) {
 export async function poll(userId: string, open: (id: string | null) => void): Promise<void> {
   const raw = read(cursorKey(userId))
   const after = raw !== null && /^\d+$/.test(raw) ? raw : null
-  // the person's choice (severities, sources) is applied by the server – the count then is exactly what is new for them
+  // the person's choice (severities, sources, topics) is applied by the server – the count then is exactly what is new for them
   // a background request: the rounds of an open tab do not keep the session alive (lib/poll.ts)
   const res = await api.get<{ items: NewsItem[]; total: number; cursor: number }>(`/api/news/recent?mine=true${after !== null ? `&after=${after}` : ""}`, {
     background: true,
@@ -280,8 +280,9 @@ export async function tick(userId: string, open: (id: string | null) => void, ca
 }
 
 /**
- * Runs in every tab of a signed-in person. Its effect depends only on primitives (user, on/off and the chosen severities
- * and sources as a text) – the open() callback lives in a ref, so navigating never restarts the timer.
+ * Runs in every tab of a signed-in person. Its effect depends only on primitives (user, on/off and the chosen severities,
+ * sources and topics as a text) – the open() callback lives in a ref, so navigating never restarts the timer. The topics
+ * are those a story has when it arrives (the cursor moves on: a story that gets a topic only later is not shown then).
  */
 export function useDesktopNotifications(userId: string | undefined, prefs: DesktopPrefs | undefined, open: (id: string | null) => void) {
   const permission = useNotificationPermission()
@@ -290,7 +291,7 @@ export function useDesktopNotifications(userId: string | undefined, prefs: Deskt
   useEffect(() => {
     openRef.current = open
   }, [open])
-  const choice = prefs ? `${prefs.severities.join(",")}|${prefs.sources.join(",")}` : ""
+  const choice = prefs ? `${prefs.severities.join(",")}|${prefs.sources.join(",")}|${(prefs.topics ?? []).join(",")}` : ""
   useEffect(() => {
     if (!on || !userId) return
     let stopped = false

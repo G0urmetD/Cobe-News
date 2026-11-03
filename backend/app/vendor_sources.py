@@ -519,7 +519,21 @@ def _trim_configs(configs) -> list:
     return out[:50]
 
 
-def _trim_cna(affected) -> list:
+def _split_affected(affected, cna_source) -> tuple[list, list]:  # noqa: ANN001
+    """NVD copies the affected data of the CNA (mostly the vendor) and of the ADPs (CISA's Vulnrichment) side by side,
+    each with its `source`: (the CNA's, the others'). The ADP's rows are less precise – CISA writes defaultStatus
+    "affected" next to a range, which for the vendor's own words would mean every other version (GitLab CVE-2024-4835:
+    15.11 – < 17.0.1, so 19.5 "affected"). A block without a source, or a record without a sourceIdentifier, stays the
+    CNA's."""
+    cna, adp = [], []
+    for src in affected if isinstance(affected, list) else []:
+        s = src.get("source") if isinstance(src, dict) else None
+        (adp if cna_source and isinstance(s, str) and s and s != cna_source else cna).append(src)
+    return cna, adp
+
+
+def _trim_cna(affected, *, cpes: bool = False) -> list:  # noqa: ANN001
+    """The affected rows as Vendor News keeps them; `cpes`: with their CPEs (the ADP's rows name the product only so)."""
     out = []
     for src in affected if isinstance(affected, list) else []:
         rows = []
@@ -534,7 +548,10 @@ def _trim_cna(affected) -> list:
                     if ch:
                         row["changes"] = ch
                     versions.append(row)
-            rows.append({"vendor": _s(a.get("vendor"), 120), "product": _s(a.get("product"), 200), "defaultStatus": _s(a.get("defaultStatus"), 20), "versions": versions[:200]})
+            row = {"vendor": _s(a.get("vendor"), 120), "product": _s(a.get("product"), 200), "defaultStatus": _s(a.get("defaultStatus"), 20), "versions": versions[:200]}
+            if cpes:
+                row["cpes"] = [c for c in (_s(x, 300) for x in _l(a.get("cpes"))) if c.startswith("cpe:2.3:")][:20]
+            rows.append(row)
         if rows:
             out.append({"affectedData": rows[:60]})
     return out[:10]
@@ -577,6 +594,17 @@ def _nvd_one(item, rejected: list[str] | None) -> dict | None:
     score, given = _nvd_metrics(_d(c.get("metrics")))
     kev = _s(c.get("cisaExploitAdd"), 10)
     short = re.sub(r"\s+", " ", desc)
+    cna, adp = _split_affected(c.get("affected"), _s(c.get("sourceIdentifier"), 200))
+    data = {
+        "configs": _trim_configs(c.get("configurations")),
+        "cna": _trim_cna(cna),
+        "desc": desc[:1500],
+        "cwe": _cwes(c.get("weaknesses")),
+        "status": _s(c.get("vulnStatus"), 30),
+        "kev": {"added": kev, "due": _s(c.get("cisaActionDue"), 10)} if kev else None,
+    }
+    if adp_rows := _trim_cna(adp, cpes=True):
+        data["adp"] = adp_rows  # only where there is one: a record without stays as it was stored
     return {
         "id": f"nvd:{cid}",
         "source": "nvd",
@@ -590,14 +618,7 @@ def _nvd_one(item, rejected: list[str] | None) -> dict | None:
         "exploited": bool(kev),
         "published_at": _date(_s(c.get("published"), 40)),
         "updated_at": _date(_s(c.get("lastModified"), 40)),
-        "data": {
-            "configs": _trim_configs(c.get("configurations")),
-            "cna": _trim_cna(c.get("affected")),
-            "desc": desc[:1500],
-            "cwe": _cwes(c.get("weaknesses")),
-            "status": _s(c.get("vulnStatus"), 30),
-            "kev": {"added": kev, "due": _s(c.get("cisaActionDue"), 10)} if kev else None,
-        },
+        "data": data,
     }
 
 

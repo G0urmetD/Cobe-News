@@ -185,6 +185,11 @@ form refuses it and names the known lines and an example. Lines newer or older t
 without release lines are not checked for this; some have a fixed pattern instead (Exchange and SQL Server: build
 numbers, VMware Tools: `12.4.0`).
 
+Some products have only part of the lines: **Mozilla Firefox ESR** only the ESR lines (115, 128, 140, 153 …),
+**Jenkins LTS** only the LTS lines (2.555, 2.568 …). A version in between that is on none of them – `134.0` for
+Firefox ESR, `2.500.1` for Jenkins LTS – is refused by the form, which names the lines; mostly it is the other product
+(Mozilla Firefox, Jenkins weekly). A line newer than all known ones is fine here too.
+
 ### Split products {#getrennte-produkte}
 
 Products with two version lines under one name are split, because their advisories count them apart:
@@ -501,6 +506,30 @@ when it says more than "nothing known":
 When "SSVC: actively exploited" is shown, the separate "actively exploited" marker is left out (it says the same); a
 KEV entry is still shown as **KEV**.
 
+### Public exploit {#oeffentlicher-exploit}
+
+**“Public exploit code”** (orange) means: a public collection lists code that exploits the vulnerability, or a ready-made
+check that exploits it. Next to it, one link per collection opens its entry:
+
+| Collection | What it lists |
+|---|---|
+| **Metasploit** | an exploit module of the Metasploit Framework (only modules of type “exploit”, no mere scanners) |
+| **Exploit-DB** | an entry in OffSec's Exploit Database (proof of concept, exploit code) |
+| **nuclei** | a template of ProjectDiscovery's nuclei-templates – a ready-made check that finds the vulnerability on the network |
+
+Good to know:
+
+- This is **no statement about attacks**: a public exploit makes attacks easy, “actively exploited” means they happen.
+  If both are shown, “actively exploited” counts (also in the [urgency](#dringlichkeit-formel)).
+- Cobe News stores only the CVE, the collection, the link and when it first saw the entry – **never the code**.
+- The collections are loaded at most once a day; a new entry shows up by the next day at the latest. An admin decides
+  which collections are loaded ([Exploit hints](/docs/integrationen#exploit-hinweise)) – by default Metasploit and
+  nuclei, not Exploit-DB.
+- No hint only means: none of the switched-on collections lists the CVE. Exploits circulate elsewhere too.
+- The same hint is shown in a story's details next to its CVEs and in the list of
+  [watched CVEs](/docs/benachrichtigungen#cves-liste); when an exploit appears for a watched CVE, the notice **“Exploit
+  published”** comes once ([When a notice comes](/docs/benachrichtigungen#cves-meldungen)).
+
 ### Sorting by EPSS {#nach-epss-sortieren}
 
 In a product's drawer, tab "Vulnerabilities", the **"Sort"** choice appears when there is more than one vulnerability:
@@ -537,6 +566,7 @@ No model, no learning – fixed points, added up and kept between 0 and 100:
 | [EPSS](term:epss) percentile | 95 % and above +20 · 80 % and above +10 · 50 % and above +5 |
 | In the [KEV](term:kev) catalogue | +30 |
 | Otherwise known as exploited (vendor, [EUVD](term:euvd)) | +25 |
+| [Public exploit](#oeffentlicher-exploit) (Metasploit, Exploit-DB, nuclei) – only when the vulnerability is not already known as exploited | +10 |
 | Your version | affected +25 · possibly affected or no version given +5 · cloud service 0 · unclear old data −50 · not affected −70 |
 | No fix known (when affected or possibly affected) | +5 |
 | Age | published within the last 7 days +10 · within the last 30 days +5 |
@@ -548,7 +578,10 @@ Good to know:
 - If a finding concerns **several of your versions**, the most urgent one counts; the tooltip names it.
 - **Critical and affected** gives at least 60 (*Now*), **high and affected** 50 (*Soon*) – in line with the red and
   orange cards of the overview.
-- A slot for “public exploit known” is planned but **not used yet** (the data source is not approved).
+- **Public exploit +10** sits deliberately between “nothing known” (0) and “exploited” (+25/+30) – as
+  [SSVC](term:ssvc)'s “exploit code public” sits between “none” and “active”. If the vulnerability is already known as
+  exploited, only that counts; never both. So **high and affected** with a public exploit gives 60 (*Now*) instead of
+  50 – findings without an exploit keep their number.
 - The server computes the number from data Cobe News has anyway – no extra query. The age moves on daily, so a number
   can drop overnight.
 
@@ -661,8 +694,9 @@ A suggestion is answered exactly once. Addresses are only shown as text and link
 | CVE list (cvelistV5) | the vendor's data on a CVE and CISA's assessment ([SSVC](term:ssvc)) – above all while the NVD has not analysed a CVE yet |
 | FIRST [EPSS](term:epss) | probability of exploitation within 30 days |
 | [OSV](term:osv) | fixed versions of open-source packages (Tomcat, Jenkins, Django …) |
+| Metasploit, Exploit-DB, nuclei-templates | “Public exploit code” ([Public exploit](#oeffentlicher-exploit)) |
 
-Vendor advisories are only fetched when a product of that vendor is followed. An admin can switch off the last four
+Vendor advisories are only fetched when a product of that vendor is followed. An admin can switch off the last seven
 sources one by one ([More sources](/docs/integrationen#weitere-quellen)); only CVE numbers and public addresses leave
 the server, never your products or versions.
 

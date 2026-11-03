@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { ApiError, api } from "@/lib/api"
-import type { Epss } from "@/lib/vendor-api"
+import type { Epss, ExploitHint } from "@/lib/vendor-api"
 import type { PersonalWay } from "@/lib/teams-api"
 
 /** CVE beobachten (app/watch_api.py) and the calendar feed (app/calendar_feed.py) – the signed-in person's own. */
@@ -27,6 +27,8 @@ export interface WatchItem {
   advisories: number
   /** the advisory to open (the vendor's own first) – a web address */
   advisory: { source: string; ident: string; url: string } | null
+  /** public exploits listed for it (switched-on exploit lists) */
+  exploits?: ExploitHint[]
   /** the newest event since this person began watching */
   last_event: { what: WatchWhat; at: string } | null
   /** where it was watched from (the title as it was then); null: watched before 0.1.42 – counted with the manual ones */
@@ -53,7 +55,7 @@ export type WatchOrigin = { kind: "story"; id: string; title: string } | { kind:
 /** …and as a request names it: the server looks the title up itself (app/watch_api.py). */
 export type WatchOriginIn = { kind: "story"; id: string } | { kind: "finding"; product: string; advisory: string } | { kind: "manual" }
 
-export type WatchWhat = "kev" | "fix" | "epss" | "withdrawn"
+export type WatchWhat = "kev" | "fix" | "epss" | "withdrawn" | "exploit"
 export type WatchReason = "teams_off" | "no_way_allowed" | "no_way_on" | null
 
 export interface WatchList {
@@ -70,6 +72,7 @@ export type WatchEvent =
   | { what: "kev"; at: string; added: string; due: string; ransomware: boolean }
   | { what: "epss"; at: string; score: number | null; percentile: number | null; from: number | null; reasons: string[] }
   | { what: "withdrawn"; at: string; source: string; ident: string }
+  | { what: "exploit"; at: string; exploits: ExploitHint[] }
 
 export interface WatchEvents {
   cve: string

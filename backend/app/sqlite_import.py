@@ -37,7 +37,7 @@ MARKER = "sqlite_import"
 ROWID_INTO = {"news_item_sources": "n", "vendor_events": "n"}  # SQLite's rowid → the identity column standing for it
 # tables added after 0.1.15 (PostgreSQL only): not in the SQLite file – neither required nor imported. They start
 # empty; the backup and the tests see them like any other table (tables()).
-NOT_IN_SQLITE = frozenset({"source_fetch_stats", "source_health_events", "source_health_deliveries", "catalog_cpe_checks", "catalog_checks", "epss_scores", "teams", "team_groups", "team_members", "team_products", "team_product_members", "team_welcome", "notify_rule_teams", "person_routes", "person_notify", "person_deliveries", "vendor_advisory_state", "vendor_advisory_changes", "cve_watches", "cve_watch_state", "calendar_feeds", "person_absences", "team_weekly", "team_weekly_sends", "api_tokens", "audit_log", "delivery_log", "product_suggestions", "user_passkeys", "reader_state", "vendor_reads", "person_mutes", "saved_views", "auth_locks", "password_history"})
+NOT_IN_SQLITE = frozenset({"source_fetch_stats", "source_health_events", "source_health_deliveries", "catalog_cpe_checks", "catalog_checks", "epss_scores", "teams", "team_groups", "team_members", "team_products", "team_product_members", "team_welcome", "notify_rule_teams", "person_routes", "person_notify", "person_deliveries", "vendor_advisory_state", "vendor_advisory_changes", "cve_watches", "cve_watch_state", "calendar_feeds", "person_absences", "team_weekly", "team_weekly_sends", "api_tokens", "audit_log", "delivery_log", "product_suggestions", "user_passkeys", "reader_state", "vendor_reads", "person_mutes", "saved_views", "auth_locks", "password_history", "exploit_refs", "update_dismissals"})
 
 
 class ImportRefused(Exception):
@@ -86,6 +86,11 @@ COLUMNS_NOT_IN_SQLITE = frozenset(
         ("user_sessions", "passkey_id"),
         ("news_reads", "unread"),
         ("news_items", "topics"),
+        ("news_items", "quiet_topics"),  # 0.1.47: '[]' – the topics computed after the import are quiet (backfill)
+        ("news_items", "products"),  # 0.1.47: '[]' – the background job computes them after the import (story_details, PRODUCTS_V)
+        ("notify_rules", "topics"),  # 0.1.47: '[]' – a rule without topics, as before
+        ("vendor_advisory_products", "quiet"),  # 0.1.47: links of the relink after a catalogue change – false
+        ("users", "temp_password_at"),  # the import's time for a temporary password brought along (run), else NULL
     }
 )
 
@@ -280,6 +285,9 @@ async def run(path: Path, *, progress=None) -> Report:  # noqa: ANN001
                     text(f"SELECT setval(pg_get_serial_sequence('{name}', '{col}'), coalesce((SELECT max({col}) FROM {name}), 0) + 1, false)")  # noqa: S608
                 )
             report.checked = await _verify(conn, src, counts)
+            # a temporary password brought along counts from the import: 0.1.15 kept no issue time – counted from the
+            # account's creation it would have run out the moment it arrived (passwords.temp_expires_at)
+            await conn.execute(text("UPDATE users SET temp_password_at = now() WHERE must_change_password AND auth_source = 'local' AND temp_password_at IS NULL"))
             from app.models import Setting
 
             report.seconds = round(time.monotonic() - t0, 1)

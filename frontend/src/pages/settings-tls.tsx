@@ -53,6 +53,22 @@ export function TlsPane() {
       }
     >
       <div className="space-y-4 p-5 text-sm">
+        {(s.system ?? []).length > 0 && (
+          <ul className="space-y-1.5">
+            {(s.system ?? []).map((w) => (
+              <li key={w.code} className="flex gap-2 rounded-lg border border-warning/40 bg-warning/10 p-2.5 text-xs">
+                <AlertTriangle className="size-4 shrink-0 text-warning" />
+                {w.code === "secret_key_short" ? (
+                  <span>{t(`system.warning.secretKeyShort.${w.source}`, { min: w.min })}</span>
+                ) : (
+                  <span>
+                    {t("system.warning.emergencyFailures", { count: w.failures })} <Ts at={w.at} rel />
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
         {s.problems.length > 0 && (
           <ul className="space-y-1.5">
             {s.problems.map((p) => (

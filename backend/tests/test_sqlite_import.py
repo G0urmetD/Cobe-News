@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import column, create_engine, func, insert, select, table
 
 from app import db, news, sqlite_import
+from app.auth import passwords
 from app.models import NewsItem, NewsItemSource, NewsSource, Setting, StoryDetail, User, VendorAdvisory, VendorEvent, VendorFollow
 from tests.conftest import empty_tables
 
@@ -32,7 +33,7 @@ def make_old(path: Path, *, wal: bool = False) -> dict:
         con.execute("PRAGMA journal_mode=WAL")
     con.close()
     eng = create_engine(f"sqlite:///{path}")
-    ids = {"a": uuid.uuid4(), "b": uuid.uuid4(), "c": uuid.uuid4(), "item": uuid.uuid4(), "user": uuid.uuid4(), "follow": uuid.uuid4()}
+    ids = {"a": uuid.uuid4(), "b": uuid.uuid4(), "c": uuid.uuid4(), "item": uuid.uuid4(), "user": uuid.uuid4(), "temp": uuid.uuid4(), "follow": uuid.uuid4()}
 
     def cols(table_name: str, /, **row) -> tuple:  # noqa: ANN003
         return _table(table_name), row
@@ -68,6 +69,7 @@ def make_old(path: Path, *, wal: bool = False) -> dict:
         cols("settings", key="news", value={"enabled": True, "every_min": 30, "rev": 4}),
         cols("settings", key="setup", value={"completed": True, "token_hash": "", "token_expires": 0}),
         cols("users", id=ids["user"], username="anna", display_name="Anna", role="admin", auth_source="local", password_hash="$argon2id$x", must_change_password=False, totp_secret_enc="v1:abc", is_active=True, is_emergency=True, desktop={}, created_at=T0, version=3),
+        cols("users", id=ids["temp"], username="bert", display_name="Bert", role="reader", auth_source="local", password_hash="$argon2id$y", must_change_password=True, is_active=True, is_emergency=False, desktop={}, created_at=T0, version=1),
         cols(
             "story_details",
             item_id=ids["item"],
@@ -118,6 +120,10 @@ async def test_everything_is_moved_with_its_types(tmp_path, empty):
         det = await s.get(StoryDetail, ids["item"])
         assert det.data["nested"] == {"a": [1, 2.5, None, True]}
         assert (await s.get(User, ids["user"])).version == 3
+        # a temporary password brought along (an account made long ago): counted from the import, not run out on arrival
+        bert, anna = await s.get(User, ids["temp"]), await s.get(User, ids["user"])
+        assert anna.temp_password_at is None and datetime.now(UTC) - bert.temp_password_at < timedelta(minutes=5)
+        assert not passwords.temp_expired(bert, passwords.TEMP_DAYS) and passwords.temp_expired(bert, 1, datetime.now(UTC) + timedelta(days=2))
         assert (await s.get(VendorAdvisory, "nvd:CVE-2026-0001")).cvss == 9.8
         assert (await s.get(VendorFollow, ids["follow"])).tags == ["fw", "prod"]
         # the order the further sources came in (SQLite's rowid)

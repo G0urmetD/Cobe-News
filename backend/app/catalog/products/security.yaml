@@ -270,3 +270,22 @@
   example: "11.1"
   hint: nocpe
   where: web_about
+# ---------------------------------------------------------------- added 0.1.47
+- key: bloodhound
+  label: BloodHound (Community Edition)
+  vendor: SpecterOps
+  cpes: [a:bloodhound_project:bloodhound]  # the legacy BloodHound (up to 4.x); CE's CVEs have no CPE yet (checked 2026-11-03)
+  cna: [[SpecterOps, BloodHound]]  # CE from 5.0: VulnCheck and VulDB name it so
+  kw: [BloodHound]
+  example: "9.9.0"
+- key: velociraptor
+  label: Velociraptor
+  vendor: Rapid7 (Velocidex)
+  cpes: [a:rapid7:velociraptor]
+  cna: [[Rapid7, Velociraptor], [Velocidex, velociraptor]]  # Rapid7 is the CNA and names it both ways (checked 2026-11-03)
+  # no osv: Go's vulndb (www.velocidex.com/golang/velociraptor) has GO-2026-5078/-5174/-5438 with "introduced 0" and no
+  # fix (the fix only in custom_ranges) – every version would read as affected; the CNA rows carry the fixes
+  kw: [Velociraptor]
+  example: "0.77.3"
+  version_cmd: velociraptor version
+  where: web_about

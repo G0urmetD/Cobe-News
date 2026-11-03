@@ -278,7 +278,7 @@ async def test_api_filter_facets_and_drawer(reader_client):
     ids = await _seed()
     r = await reader_client.get("/api/news", params={"state": "all"})
     page = r.json()
-    assert page["counts"]["topics"] == {"zeroday": 1, "exploited": 1, "ransomware": 1, "nopatch": 0, "breach": 1, "supply": 0, "phishing": 0, "ot": 0}
+    assert page["counts"]["topics"] == {"zeroday": 1, "exploited": 1, "poc": 0, "ransomware": 1, "nopatch": 0, "breach": 1, "supply": 0, "phishing": 0, "ot": 0}
     assert {i["title"]: i["topics"] for i in page["items"]}["Chrome-Zero-Day geschlossen"] == ["zeroday", "exploited"]
     # OR within the topics, AND with the severity; the facets ignore the topic filter, follow the others
     got = (await reader_client.get("/api/news", params=[("state", "all"), ("topic", "zeroday"), ("topic", "breach")])).json()

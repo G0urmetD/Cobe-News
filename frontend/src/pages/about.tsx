@@ -1,11 +1,18 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { ChevronRight, CircleMinus, FileQuestion, type LucideIcon, Server, ShieldCheck, Sparkles, TrendingUp, Wrench } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { EmptyState, PageHeader, Section } from "@/components/cobe/common"
 import { Pill } from "@/components/cobe/badges"
 import { Explained } from "@/components/cobe/explained"
 import { Pending } from "@/components/cobe/query-state"
+import { ToggleRow } from "@/components/cobe/form"
+import { Ts } from "@/components/cobe/time"
+import { useAuth } from "@/lib/auth"
+import { errorText } from "@/lib/errors"
+import { UPDATE_KEY, releaseLink, saveUpdateCheck, useUpdateStatus } from "@/lib/update-api"
 import { type ChangeKind, type ChangelogEntry, entryGroups, inlineTokens, kindCounts, splitChangelog, useChangelog } from "@/lib/changelog"
 import { cn } from "@/lib/utils"
 
@@ -47,6 +54,8 @@ export function AboutPage() {
         </div>
       </div>
 
+      <UpdateCheck />
+
       {i18n.language === "en" && entries.length > 0 && <p className="mb-3 text-xs text-muted-foreground">{t("about.notesLanguage")}</p>}
 
       {current ? (
@@ -83,6 +92,58 @@ export function AboutPage() {
           ))}
         </section>
       )}
+    </div>
+  )
+}
+
+/** Admins only: the switch of the update notice (app/update_check.py) and what the last check found. */
+function UpdateCheck() {
+  const { t } = useTranslation()
+  const { isAdmin } = useAuth()
+  const qc = useQueryClient()
+  const q = useUpdateStatus(isAdmin)
+  const [busy, setBusy] = useState(false)
+  if (!isAdmin || !q.data) return null
+  const s = q.data
+  const toggle = async (check: boolean) => {
+    setBusy(true)
+    try {
+      qc.setQueryData(UPDATE_KEY, await saveUpdateCheck(check, s.rev))
+      toast.success(t("common.saved"))
+    } catch (e) {
+      toast.error(errorText(t, e))
+      void qc.invalidateQueries({ queryKey: UPDATE_KEY })
+    } finally {
+      setBusy(false)
+    }
+  }
+  const link = releaseLink(s) // an https address only, as the shell's notice
+  return (
+    <div className="mb-6 rounded-xl border bg-card px-5 py-1">
+      <ToggleRow label={t("update.check")} description={t("update.checkHint")} checked={s.enabled} disabled={busy} onCheckedChange={(v) => void toggle(v)}>
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">{t("update.latest")}</dt>
+          <dd className="min-w-0">
+            {s.latest ? (
+              <span className="font-mono tabular-nums">
+                {s.latest}{" "}
+                {s.available && link ? (
+                  <a href={link} target="_blank" rel="noopener noreferrer" className="font-sans text-primary hover:underline">
+                    {t("update.available", { version: s.latest })}
+                  </a>
+                ) : (
+                  <span className="font-sans text-muted-foreground">· {t(s.ahead ? "update.ahead" : "update.upToDate", { version: s.current })}</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">{t("update.none")}</span>
+            )}
+          </dd>
+          <dt className="text-muted-foreground">{t("update.checked")}</dt>
+          <dd className="min-w-0">{s.checked_at ? <Ts at={s.checked_at} rel /> : <span className="text-muted-foreground">–</span>}</dd>
+          {s.error && <dd className="col-span-2 text-warning [overflow-wrap:anywhere]">{t("update.error", { error: s.error })}</dd>}
+        </dl>
+      </ToggleRow>
     </div>
   )
 }

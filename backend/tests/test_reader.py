@@ -92,7 +92,7 @@ async def test_watermark_and_sparse_marks(reader_client):
     # read one (what opening the drawer does): one row, the numbers follow
     assert (await reader_client.post(f"/api/news/{a}/read")).status_code == 200
     assert (await _counts(reader_client))["news"] == 2
-    assert (await _list(reader_client))["counts"] == {"new": 2, "read": 1, "topics": ANY}
+    assert (await _list(reader_client))["counts"] == {"new": 2, "read": 1, "topics": ANY, "ours": 0}
     # "Alle gelesen" without a filter: the watermark moves, no row per story – the marks below it go
     assert (await reader_client.post("/api/news/read-all", json={})).json() == {"marked": 2}
     async with db.session() as s:
@@ -108,7 +108,7 @@ async def test_watermark_and_sparse_marks(reader_client):
     # what arrives after the watermark is new again
     await _stories("Delta")
     assert (await _counts(reader_client))["news"] == 1
-    assert (await _list(reader_client, state="read"))["counts"] == {"new": 1, "read": 3, "topics": ANY}
+    assert (await _list(reader_client, state="read"))["counts"] == {"new": 1, "read": 3, "topics": ANY, "ours": 0}
     # a story that is gone: 404 for both marks
     assert (await reader_client.post(f"/api/news/{uuid.uuid4()}/read")).status_code == 404
     assert (await reader_client.delete(f"/api/news/{uuid.uuid4()}/read")).status_code == 404

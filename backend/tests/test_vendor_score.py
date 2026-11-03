@@ -1,5 +1,5 @@
 """Dringlichkeit (app/vendor_score.py): one number 0–100 per finding from fixed points – severity, EPSS percentile, KEV /
-exploited, the own version's verdict, no fix, age; the slot for "öffentlicher Exploit" stays unused. The weights are
+exploited, the own version's verdict, no fix, age, a public exploit (only without exploitation). The weights are
 pinned here (the handbook explains the same numbers), the breakdown says each factor, the value is kept between 0 and
 100; computed once per cached view and day; the overview and the drawer carry it."""
 
@@ -30,10 +30,25 @@ def test_weights_are_pinned():
     assert vs.VERSION == {"affected": 25, "possible": 5, "unversioned": 5, "service": 0, "stale": -50, "not_affected": -70}
     assert vs.AGE == ((7, 10), (30, 5))
     assert vs.LEVELS == ((60, "now"), (35, "soon"))
-    # reserved for "öffentlicher Exploit bekannt" – the source is not approved: never counted
-    assert vs.PUBLIC_EXPLOIT == 15 and vs.USE_PUBLIC_EXPLOIT is False
-    s = _s(cvss=9.8, public_exploit=True)
-    assert "public_exploit" not in _parts(s) and s["value"] == 60
+    # "öffentlicher Exploit bekannt" (app/exploits.py): +10, only while not known as exploited
+    assert vs.PUBLIC_EXPLOIT == 10
+
+
+def test_public_exploit_counts_only_without_exploitation():
+    # high, affected, a public exploit: 25+25+10 = 60 – "Sofort" (without it: 50, "Bald")
+    s = _s(cvss=7.5, public_exploit=True)
+    assert _parts(s) == {"severity": 25, "version": 25, "public_exploit": 10} and (s["value"], s["level"]) == (60, "now")
+    # known as exploited (KEV, vendor, EUVD): that says more – the two never add up
+    assert "public_exploit" not in _parts(_s(cvss=7.5, public_exploit=True, kev=True))
+    assert "public_exploit" not in _parts(_s(cvss=7.5, public_exploit=True, exploited=True))
+    assert _s(cvss=7.5, public_exploit=True, kev=True)["value"] == _s(cvss=7.5, kev=True)["value"]
+    # a version not affected stays below "Bald"
+    assert _s(cvss=9.8, public_exploit=True, status="not_affected")["level"] == "watch"
+    # nothing listed: the number as before
+    assert _s(cvss=7.5)["value"] == _s(cvss=7.5, public_exploit=False)["value"] == 50
+    # of_finding reads the finding's exploit hints
+    f = {"cvss": 7.5, "severity": "high", "exploit": [{"cve": "CVE-2026-1", "source": "metasploit", "url": "https://x"}], "versions": [{"version": "1", "status": "affected", "fixed": "2"}]}
+    assert {p["factor"] for p in vs.of_finding(f, TODAY)["parts"]} >= {"public_exploit"}
 
 
 def test_formula_and_breakdown():

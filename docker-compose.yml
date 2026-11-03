@@ -50,6 +50,7 @@ services:
       # the password is set; empty: no restore test). docs/BETRIEB.md: Rücksicherungs-Test
       POSTGRES_RESTORE_PASSWORD: ${POSTGRES_RESTORE_PASSWORD:-}
       SQLITE_IMPORT: ${SQLITE_IMPORT:-1}              # 0: never move data/news.db (up to 0.1.15) into an empty database (docs/BETRIEB.md)
+      MAX_BODY_BYTES: ${MAX_BODY_BYTES:-}             # largest request body the app takes (empty: 1 MiB, behind nginx's 1 MB)
     ports:
       # plain http, this machine only: health checks and emergency access. Users come through the proxy (https).
       - "127.0.0.1:${APP_PORT:-8096}:8000"
@@ -157,12 +158,20 @@ services:
     pids_limit: 64
     environment:
       NEWS_HTTPS_PORT: ${PORT:-8095}
+      # the names nginx answers to (16-server-names.envsh): BASE_URL's host, NEWS_HOSTNAME, TLS_NAMES, localhost – any
+      # other Host header gets a short 421 "Unbekannter Hostname" (docs/BETRIEB.md: HTTPS, Host-Namen)
+      NEWS_BASE_URL: ${BASE_URL:-https://localhost:8095}
+      NEWS_TLS_HOSTNAME: ${NEWS_HOSTNAME:-}
+      NEWS_TLS_NAMES: ${TLS_NAMES:-}
+      # only for a warning at the start: published to the network while BASE_URL still names localhost
+      NEWS_BIND: ${BIND:-127.0.0.1}
       NGINX_ENVSUBST_FILTER: "^NEWS_"
     ports:
       # with a sign-in in front, BIND=0.0.0.0 may open it to the network (docs/BETRIEB.md)
       - "${BIND:-127.0.0.1}:${PORT:-8095}:443"
     volumes:
       - ./deploy/nginx/cobe-news.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./deploy/nginx/16-server-names.envsh:/docker-entrypoint.d/16-server-names.envsh:ro
       - ./deploy/nginx/40-cert-watch.sh:/docker-entrypoint.d/40-cert-watch.sh:ro
       - ${TLS_SOURCE:-tls}:/etc/nginx/tls:ro
     networks:

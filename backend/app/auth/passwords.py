@@ -3,6 +3,7 @@
 import asyncio
 import re
 import secrets
+from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -57,6 +58,32 @@ def temp_password() -> str:
     """A temporary password an admin hands over – changed at the next sign-in."""
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
     return "-".join("".join(secrets.choice(alphabet) for _ in range(5)) for _ in range(4))
+
+
+TEMP_DAYS = 7  # default of `temp_password_days` (settings section "sessions"), 1–30
+
+
+def temp_days(cfg: dict) -> int:
+    """How many days a temporary password is valid (the "sessions" section; out of range: the default)."""
+    try:
+        days = int(cfg.get("temp_password_days", TEMP_DAYS))
+    except (TypeError, ValueError):
+        return TEMP_DAYS
+    return days if 1 <= days <= 30 else TEMP_DAYS
+
+
+def temp_expires_at(user, days: int) -> datetime | None:  # noqa: ANN001 - a models.User
+    """When the account's temporary password stops being accepted – None: it has none (a local account only). The issue
+    time is `temp_password_at`; an account without one (made before it was stored) counts from its creation."""
+    if not (user.must_change_password and user.auth_source == "local"):
+        return None
+    issued = user.temp_password_at or user.created_at
+    return issued + timedelta(days=days) if issued else None
+
+
+def temp_expired(user, days: int, now: datetime | None = None) -> bool:  # noqa: ANN001
+    end = temp_expires_at(user, days)
+    return end is not None and end <= (now or datetime.now(UTC))
 
 
 _slots: asyncio.Semaphore | None = None

@@ -41,6 +41,20 @@ const aboutEn: Record<string, string> = {
   "about.noChangelog": "No changelog found",
   "about.noChangelogText": "This build does not include a changelog. The version above is correct all the same.",
   "about.notesLanguage": "The notes are written in German.",
+  "update.notice": "Version {{version}} available",
+  "update.changelog": "changelog",
+  "update.dismiss": "Close the notice about version {{version}}",
+  "update.title": "New versions",
+  "update.check": "Check for new versions",
+  "update.checkHint":
+    "Asks GitHub's public release API (api.github.com) at most every 12 hours whether a newer Cobe News version is published – only admins see the notice. Only the request itself is sent, with Cobe News' version identifier (User-Agent) – no data of this installation. Only a notice: nothing is updated by itself. Default: on.",
+  "update.latest": "Latest release",
+  "update.none": "no answer yet",
+  "update.checked": "Last checked",
+  "update.upToDate": "up to date",
+  "update.ahead": "up to date – this installation ({{version}}) is newer, not released yet",
+  "update.available": "{{version}} available",
+  "update.error": "Last check failed: {{error}}",
 }
 
 export default aboutEn

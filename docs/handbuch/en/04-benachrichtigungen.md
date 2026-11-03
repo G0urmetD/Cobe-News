@@ -40,8 +40,14 @@ The settings apply to your account. The state (permission, push) applies to the 
 1. Open Cobe News at its https address, e.g. {{base_url}}.
 2. Go to [*Settings → Notifications*](/settings/notifications).
 3. Switch on "Desktop notifications". The browser asks for permission – allow it.
-4. Choose the **severities** (critical and high by default) and the **sources**. Empty means: all.
+4. Choose the **severities** (critical and high by default), the **sources** and the **topics**. Empty means: all.
 5. Click "Save".
+
+**Topics** ([what they mean](/docs/news-quellen#themen)): one of the chosen ones is enough, together with severity and
+source – "Actively exploited, Exploit published" with all severities reports every story with one of the two topics.
+What counts is the topic a story has **when it arrives** (from title, teaser, source and the KEV catalogue). A topic
+that is added only later – e.g. from the details from the source – triggers no desktop notification any more; for that
+there are [rules](#regel-themen), which send such a story then. The open tab and push with the tab closed filter alike.
 
 Below, the card "State in this browser" shows:
 
@@ -290,10 +296,12 @@ and are listed under “Added one by one”.
     the story or the finding. The group watched last comes first, *Added one by one* last. Older links with
     `?groups=1` open this grouping.
 - **Rows:** the CVE id (copyable) with its title, severity, KEV (since when; ransomware in the tooltip),
-  [EPSS](term:epss) (the percentile as a bar) and the first fixed version (“+2”: two more). A CVE no source knows yet
-  says “No source knows it yet”.
+  [EPSS](term:epss) (the percentile as a bar) and the first fixed version (“+2”: two more). “Public exploit code” next to the
+  CVE id: a collection lists an exploit ([Public exploit](/docs/vendor-news#oeffentlicher-exploit)); the links are in the
+  opened row. A CVE no source knows yet says “No source knows it yet”.
 - **Open a row** (click it or the arrow): the **history** since you started watching, newest first – a fixed version
-  appeared (in which advisory), added to KEV, EPSS rose, an advisory withdrawn; at the bottom since when you watch it.
+  appeared (in which advisory), added to KEV, EPSS rose, exploit published, an advisory withdrawn; at the bottom since
+  when you watch it.
   Below: *Stories (n)* (the story list searching for the CVE), *Open advisory* (the vendor's page, else CSAF or NVD) and
   *Stop watching*. “Undo” in the confirmation takes that back – the CVE is then watched anew from that moment.
 - **New since your last visit:** Cobe News remembers when you last opened the list. Whatever happened to a CVE after
@@ -335,6 +343,12 @@ A notice comes when something important happens to the CVE:
 | CISA KEV | the CVE is added to the catalogue of actively exploited vulnerabilities |
 | EPSS | the percentile reaches **0.9** (among the 10 % likeliest) or the score rises by **0.1** (10 percentage points) since the last notice; at most one notice a day |
 | Withdrawn | an advisory about the CVE is withdrawn (e.g. NVD rejects the CVE) |
+| Exploit published | a switched-on collection (Metasploit, Exploit-DB, nuclei) lists an exploit for the CVE for the first time ([Public exploit](/docs/vendor-news#oeffentlicher-exploit)); **once** per CVE |
+
+“Exploit published” comes only for entries that appear after a collection was first loaded: what a collection brings
+the first time (or after it was switched off or not needed) is shown in the list but not notified. A failed download
+does not count: what is new afterwards is notified. Severity of the notice: the
+CVE's, at least *high*.
 
 EPSS has a small margin: once a percentile above 0.9 was reported, the next such notice comes only after it fell below
 0.85 – swinging around 0.9 makes no series of notices. The rise by 0.1 counts from the last reported value (or the
@@ -763,7 +777,7 @@ Fields of a story in `stories`:
 | `published_at` | Publication (for Vendor News and source events: time of the event). |
 | `cves` | CVE numbers, if known. |
 | `kind` | `news`, `vendor.vuln`, `vendor.version`, `vendor.eol`, `vendor.change` or `source.health`. |
-| `topics` | the story's [topics](/docs/news-quellen#themen): `zeroday`, `exploited`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` (since 0.1.46; for Vendor News `exploited` when actively exploited). |
+| `topics` | the story's [topics](/docs/news-quellen#themen): `zeroday`, `exploited`, `poc` (exploit published), `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` (since 0.1.46; for Vendor News `exploited` when actively exploited). |
 | `product` | the product when reliably known (like the field "Product" of the [cards](#nachrichten-format)), else empty (since 0.1.46). |
 
 For `vendor.*`, `link` opens the product on the Vendor News page; `source` is "Vendor News". For `source.health`, `url`
@@ -1150,7 +1164,7 @@ Rules decide *what* goes to which channels. You find them under [*Settings → C
 5. Choose the **channels** – at least one, several are possible. "Create a new channel" leads to the channels.
 6. Under "What is sent?", switch on one or more kinds (see below).
 7. Choose the **severities** (critical and high by default; empty = all) and, for security stories, the **sources**
-   (empty = all).
+   (empty = all) and the **topics** (empty = every story, see [Topics in rules](#regel-themen)).
 8. Save.
 
 In the list, the switch on the right turns a rule on and off; the pencil opens it, the bin deletes it. A rule without a
@@ -1191,7 +1205,7 @@ and source state changes, with the same logic as the real sending (as if a chann
 result:
 
 - the number of matches and a list of the newest (title, time, severity and why it matches: kind, severity, source,
-  team),
+  topic, team),
 - how many **messages** that would have been – what arrives within the same minute comes in one round, from 4 stories on
   as one [summary](#einmal-pro-kanal) –, on average a day and on the busiest day,
 - the warning **"This channel would be flooded"** when one day would have had more than 20 messages.
@@ -1199,6 +1213,30 @@ result:
 The dry run sends nothing and writes nothing: no "sent" mark, no change to rule or channel. It runs read-only and with a
 time limit; if it takes too long, choose a shorter period. If the form changes afterwards, the result fades – just run
 it again. Admins only.
+
+### Topics in rules {#regel-themen}
+
+For security stories a rule can also require **topics** ([what they mean](/docs/news-quellen#themen)), e.g. "Critical
+to SOC" only for *Actively exploited* and *Exploit published*.
+
+- **One is enough:** the story needs one of the chosen topics – **and** must also match severities and sources. Empty
+  means: every story, as before. Existing rules have no topics and behave unchanged.
+- **Topic comes later:** many topics are settled only after arrival – the CVE is added to the KEV catalogue, the
+  [details from the source](/docs/news-quellen#details-aus-der-quelle) say "exploited" or "no fix", CISA rates "poc".
+  A story that arrived after the rule was saved and gets a required topic only afterwards is sent **then** – with the
+  next round, **once** per channel, never twice (not even when another topic is added later). Older stories stay out,
+  as described under [Only new stories](#nur-neues).
+- **No flood from a recompute:** when many stories get a topic at once because every story's topics are computed
+  again – an exploit collection is switched on or loaded for the first time, an update changes the topic rules –, Cobe
+  News shows the topic on them (filter, badge) but does **not** send them for it. The same goes for "Exploit published"
+  that rests only on a collection's initial load. A topic from an event of the story's own (a new KEV entry, a new
+  entry of a collection, details arriving) is still sent once.
+- **Security stories only:** topics do not apply to Vendor News events and source health.
+- **Widening:** removing topics or choosing more is a [widened filter](#nur-neues) – what only matches because of it
+  comes from the change on.
+- The [dry run](#probelauf) checks the topics too and names, for each match, the topic it matches by; the
+  [delivery log](#protokoll-inhalt) shows the topics of every story sent, the [audit log](/docs/betrieb#protokoll) every
+  change of a rule's topics.
 
 ### Limiting to teams {#regel-teams}
 
@@ -1213,7 +1251,7 @@ A rule only sends what arrives **after** it was saved or switched on. Older stor
 
 - **New or re-enabled rule:** counts from that moment. What arrived while it was off does not come.
 - **Channel added to a rule later:** gets only what arrives afterwards.
-- **Widened filter** (more severities, sources or kinds): what only matches because of it comes from the change on.
+- **Widened filter** (more severities, sources, topics or kinds): what only matches because of it comes from the change on.
   What matched before and is still open keeps coming.
 - **Newly switched-on source:** the older stories it brings with its first fetch are not sent – only what arrives fresh
   afterwards.
@@ -1249,7 +1287,8 @@ In the channel list a small badge shows the last 24 hours: "Last delivery ok 3 h
 | Test | "Test" of a channel |
 
 Per delivery: the channel (with the name it had then – also after it was deleted), what was sent (story, event or
-finding with its title; for a summary the listed ones and how many in all), the rules, time, attempt and outcome:
+finding with its title, stories with their topics; for a summary the listed ones and how many in all), the rules, time,
+attempt and outcome:
 
 | Outcome | Meaning |
 |---|---|

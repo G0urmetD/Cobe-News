@@ -97,6 +97,18 @@ export interface Epss {
   date: string
 }
 
+/** The exploit lists (server: app/exploits.py) – public exploit code or a ready-made exploit check for a CVE */
+export const EXPLOIT_SOURCES = ["metasploit", "exploitdb", "nuclei"] as const
+export type ExploitSource = (typeof EXPLOIT_SOURCES)[number]
+
+/** One list naming a CVE: the entry's address and when Cobe News first saw it there */
+export interface ExploitHint {
+  cve?: string
+  source: ExploitSource
+  url: string
+  first_seen?: string | null
+}
+
 /** CISA's SSVC decision points (cvelistV5, ADP container) */
 export interface Ssvc {
   exploitation: "none" | "poc" | "active" | string
@@ -125,8 +137,12 @@ export interface Finding {
   euvd: boolean
   epss?: Epss | null
   ssvc?: Ssvc | null
+  /** public exploits for its CVEs (switched-on exploit lists) */
+  exploit?: ExploitHint[]
   /** brought by a CSAF provider's first fill: shown, never notified */
   quiet?: boolean
+  /** "GREEN": from a CSAF provider's TLP:GREEN document (allowed by an admin) – share internally only */
+  tlp?: "GREEN" | null
   /** the newest revision of the advisory (or one of its CVE records) within the last 30 days – "Geändert" */
   changed?: AdvisoryChange | null
   published_at: string | null
@@ -262,7 +278,7 @@ export interface OverviewItem {
   same_data?: string[]
   /** revised advisories of the product within the last 30 days; `impact`: one changed the verdict of a version entered */
   changed?: { count: number; at: string; impact: boolean } | null
-  latest: (Pick<Finding, "id" | "ident" | "title" | "severity" | "exploited" | "status" | "published_at" | "cvss"> & {
+  latest: (Pick<Finding, "id" | "ident" | "title" | "severity" | "exploited" | "status" | "published_at" | "cvss" | "tlp"> & {
     headline?: string
     score?: ScoreBrief | null
     unread?: boolean
@@ -355,20 +371,30 @@ export interface CatalogCheckVerdict {
 export const STRUCTURED_SOURCES = ["csaf", "cvelist", "epss", "osv"] as const
 export type StructuredSource = (typeof STRUCTURED_SOURCES)[number]
 
-export interface VendorSettings extends Record<StructuredSource, boolean> {
+/** The settings switch of an exploit list: exploit_<source> */
+export const exploitSwitch = (s: ExploitSource) => `exploit_${s}` as const
+export type ExploitSwitch = ReturnType<typeof exploitSwitch>
+
+export interface VendorSettings extends Record<StructuredSource, boolean>, Partial<Record<ExploitSwitch, boolean>> {
   enabled: boolean
   every_h: number
   eol_every_h: number
   nvd_key_set: boolean
   /** Versionen prüfen: days after which an entered version is "bitte prüfen" (0: off) */
   review_days?: number
+  /** CSAF providers whose TLP:GREEN documents are read (default none: only TLP:CLEAR/WHITE) */
+  csaf_green?: string[]
   /** the saved state the form was loaded with (409 "stale" when another admin saved in between) */
   rev?: number
 }
 
 export interface VendorAdmin {
   settings: VendorSettings
-  structured?: { csaf_providers: { key: string; name: string; domain: string; vendors: string[]; needed: boolean }[]; osv_products: number }
+  structured?: {
+    csaf_providers: { key: string; name: string; domain: string; vendors: string[]; needed: boolean; green?: boolean }[]
+    osv_products: number
+    exploit_sources?: { key: ExploitSource; name: string; url: string; licence: string; default: boolean }[]
+  }
   catalog: { generated_at: string; eol_generated_at: string | null; products: number; counts: Record<string, number> }
   sources: { key: string; last_ok_at: string | null; last_fetch_at: string | null; next_fetch_at: string | null; error: string | null; items: number }[]
 }

@@ -55,7 +55,14 @@ the same list once they have signed in (with their origin *Local*, *Active Direc
 3. Click "Create". Creating an admin account asks you to [confirm](#erneut-bestaetigen) who you are.
 4. Cobe News shows a temporary password **once** (four groups of five characters with hyphens). Copy it, hand it over
    safely and close with "Noted". It cannot be shown again.
-5. At the first sign-in the person chooses their own password. Until then the account is marked *Temporary password*.
+5. At the first sign-in the person chooses their own password. Until then the account is marked *Temporary password
+   expires on …*.
+
+A temporary password is valid for **7 days** from issue (adjustable from 1 to 30 days, [Timeouts](#sitzungen-zeitlimits))
+– also one from "Reset password" and from `reset-emergency`. After that Cobe News refuses the sign-in with it ("Temporary
+password expired – ask an admin for a new one"), and the list shows *Temporary password expired*. An admin then issues a
+new one with "Reset password". A longer setting applies to passwords already issued too (counted from their issue). A
+person's own password never expires.
 
 Password rules: at least 12 characters, no common password, not containing the user name, and none of the account's
 **last five passwords** (the current one and the four before it) – "one of the last five passwords". For this
@@ -193,6 +200,11 @@ The emergency admin is the local admin account from the initial setup. It
 - is never touched by the directory sync,
 - is never locked by failed attempts – its **correct** password with TOTP is accepted even from a blocked address. As a
   brake, after 20 failed attempts in one hour every check waits 3 seconds, and only one runs at a time.
+- reports when someone guesses its password: once the failed attempts pass the 20 in an hour, Cobe News writes a warning
+  to the app's log ("emergency admin: … failed sign-in checks"), an entry to the [audit log](/docs/betrieb#protokoll)
+  ("Emergency admin: failure budget exceeded") and shows a notice under
+  [Settings → HTTPS & certificate](/settings/https) for 24 hours – at most once an hour, so an attacker can flood neither
+  the log nor the audit log with it.
 
 Keep the emergency admin's password and TOTP access offline (password vault).
 
@@ -234,7 +246,8 @@ The command
   set up still lets them in,
 - ends all sessions of the account and lifts a lock.
 
-Then sign in with the temporary password, choose a new password and set up TOTP again. More commands:
+Then sign in with the temporary password, choose a new password and set up TOTP again. Like every temporary password it
+is valid for 7 days ([adjustable](#sitzungen-zeitlimits)); after that simply run the command again. More commands:
 [Command line](/docs/betrieb#cli).
 
 ## Active Directory / LDAP {#ad-ldap}
@@ -798,6 +811,7 @@ Signing out ends the session at once.
 |---|---|---|
 | Sign out after inactivity | 5–480 minutes without action | 60 minutes |
 | Sign in again at the latest after | 1–72 hours, even when active | 12 hours |
+| Temporary password valid for | 1–30 days from issuing a temporary password ([Create](#benutzer-anlegen)) | 7 days |
 
 A shorter limit applies at once to running sessions too. Saving requires [confirmation](#erneut-bestaetigen).
 
@@ -883,6 +897,10 @@ applies to:
 - Failed attempts count separately per origin: a refused AD sign-in never locks the local account of the same name.
 - Every failed attempt delays the next check a little.
 - The emergency admin is never locked ([Emergency admin](#notfall-admin)).
+- **Failed CSRF check**: a write without or with a wrong CSRF token (another site, a script – the browser with Cobe News
+  always sends it) is refused and written to the app's log as a warning ("csrf check failed", with method, path and
+  address or /64 network, never with the token or cookie). At most one line per address and minute; what came in
+  between is counted in the next line.
 
 ### Shared addresses {#geteilte-adressen}
 

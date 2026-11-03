@@ -73,7 +73,7 @@ class _Strict(BaseModel):
 
 
 # app/version_input.py: product rules for typed versions (a display form → the form advisories use)
-NORMALIZERS = ("two_digit_year", "netscaler", "ise_patch", "office_build", "nginx_plus", "checkpoint", "horizon_yymm")
+NORMALIZERS = ("two_digit_year", "netscaler", "ise_patch", "office_build", "nginx_plus", "checkpoint", "horizon_yymm", "leading_zeros")
 Regex = Annotated[str, StringConstraints(min_length=1, max_length=300)]
 
 
@@ -131,6 +131,15 @@ class Product(_Strict):
     belongs: list[Belongs] | None = Field(None, max_length=4, description="Typed versions of another product's form (split products).")
     editions: list[Edition] | None = Field(None, max_length=12, description="Editions sharing version numbers – a record's row for one edition decides only for its builds.")
     line_depth: int | None = Field(None, ge=2, le=6, description="Parts that name a line with its own rows in CVE records (Exchange: 15.2.1748 = 2019 CU15).")
+    excluded_names: list[Text] | None = Field(
+        None,
+        max_length=8,
+        description="Product names in advisories (CSAF entries, CNA rows) that are another product although CPE or name match – Dovecot: 'OX Dovecot Pro' (Open-Xchange's commercial line, same CPE).",
+    )
+    lines_only: Literal["lts", "all"] | None = Field(
+        None,
+        description="Only some release lines are the product's (Firefox ESR, Jenkins LTS: 'lts' – the lines endoflife.date marks LTS; 'all': every listed line): a typed version between them on none of them is refused.",
+    )
     cpe_editions: list[Annotated[list[Text], Field(min_length=2, max_length=2)]] | None = Field(
         None, max_length=8, description="[cpe, sw_edition]: only NVD CPE matches of these editions count for that CPE (Firefox '-' vs 'esr', Jenkins 'lts')."
     )
@@ -387,7 +396,7 @@ def load(directory: Path | None = None) -> Catalog:
     )
 
 
-LABELLESS = {"key", "cpes", "scheme", "hint", "osv", "pattern", "pattern_hint", "normalize", "belongs", "cpe_editions", "aliases", "replaces"}
+LABELLESS = {"key", "cpes", "scheme", "hint", "osv", "pattern", "pattern_hint", "normalize", "belongs", "cpe_editions", "aliases", "replaces", "lines_only"}
 
 
 def _check_rules(p: Product, where: str, texts: TextsFile) -> None:
