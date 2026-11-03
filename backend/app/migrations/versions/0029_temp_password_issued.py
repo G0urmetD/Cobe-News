@@ -7,7 +7,7 @@ stays valid for the configured days from now on (an older one does not become in
 drops the column.
 
 Revision ID: 0029
-Revises: 0025
+Revises: 0028
 Create Date: 2026-11-03
 """
 
@@ -18,7 +18,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0029"
-down_revision: str | None = "0025"
+down_revision: str | None = "0028"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
