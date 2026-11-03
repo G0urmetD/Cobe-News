@@ -628,7 +628,7 @@ async def test_read_all_marks_everything(reader_client):
         )
         await s.commit()
     assert (await reader_client.post("/api/news/read-all", json={})).json() == {"marked": 5200}
-    assert (await reader_client.get("/api/news")).json()["counts"] == {"new": 0, "read": 5200, "topics": ANY}
+    assert (await reader_client.get("/api/news")).json()["counts"] == {"new": 0, "read": 5200, "topics": ANY, "ours": 0}
     assert (await reader_client.post("/api/news/read-all", json={})).json() == {"marked": 0}  # idempotent
     async with db.session() as s:
         # the watermark moved – no mark per story (app/reader.py)
