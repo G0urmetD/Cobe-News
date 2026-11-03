@@ -1316,6 +1316,7 @@ const de: Record<string, string> = {
   "watch.what.kev": "CISA nimmt die CVE in den Katalog der aktiv ausgenutzten Schwachstellen auf.",
   "watch.what.epss": "Das Perzentil erreicht 0,9 (unter den 10 % wahrscheinlichsten) oder der Wert steigt um 0,1 (10 Prozentpunkte). Höchstens eine Meldung am Tag.",
   "watch.what.withdrawn": "Ein Advisory zur CVE wird zurückgezogen.",
+  "watch.what.exploit": "Eine Exploit-Liste (Metasploit, Exploit-DB, nuclei) nennt erstmals öffentlichen Exploit-Code – einmal je CVE.",
   "watch.onlyNew":
     "Nur Neues ab dem Beobachten, jede Meldung genau einmal. Cobe News fragt für beobachtete CVEs keinen Dienst extra ab: Was die Quellen ohnehin liefern, zählt. EPSS gibt es nur für CVEs aus Befunden und Meldungen.",
   "watch.add": "CVE hinzufügen",
@@ -1373,6 +1374,7 @@ const de: Record<string, string> = {
   "watch.tl.epssFrom": "{{from}} → {{score}}",
   "watch.tl.epssNow": "jetzt {{score}}",
   "watch.tl.withdrawn": "Advisory zurückgezogen: {{ident}}",
+  "watch.tl.exploit": "Exploit veröffentlicht",
   "watch.tl.since": "Beobachtet",
   "watch.tl.empty": "Seit dem Beobachten ist nichts passiert.",
   "watch.storiesN_one": "{{count}} Meldung",

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useSearchParams } from "react-router"
 import { useQueryClient } from "@tanstack/react-query"
-import { Activity, CheckCircle2, ClipboardCheck, Layers, Library, Loader2, RefreshCw, Settings2, ShieldAlert, Stethoscope, XCircle } from "lucide-react"
+import { Activity, Bug, CheckCircle2, ClipboardCheck, Layers, Library, Loader2, RefreshCw, Settings2, ShieldAlert, Stethoscope, XCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,7 +22,17 @@ import { errorText } from "@/lib/errors"
 import { HEALTH_KEY } from "@/lib/source-health"
 import { confirmDiscard } from "@/lib/unsaved"
 import { cn } from "@/lib/utils"
-import { STRUCTURED_SOURCES, type StructuredSource, type VendorAdmin, type VendorSettings, useVendorAdmin } from "@/lib/vendor-api"
+import {
+  EXPLOIT_SOURCES,
+  type ExploitSource,
+  type ExploitSwitch,
+  STRUCTURED_SOURCES,
+  type StructuredSource,
+  type VendorAdmin,
+  type VendorSettings,
+  exploitSwitch,
+  useVendorAdmin,
+} from "@/lib/vendor-api"
 import { REVIEW_CHOICES } from "@/lib/version-review"
 import { ConfigureLabel, IntegrationSheetContent, NumberField, SaveBar, SheetActions, SheetBody, SheetLoading } from "@/pages/settings-shared"
 
@@ -453,7 +463,7 @@ function VendorForm({ data }: { data: VendorAdmin }) {
 
 const STRUCTURED_PREFIX: Record<StructuredSource, string> = { csaf: "csaf:", cvelist: "cvelist:", epss: "epss:", osv: "osv:" }
 const STRUCTURED_TERM: Partial<Record<StructuredSource, [TermKey, string]>> = { csaf: ["csaf", "CSAF"], epss: ["epss", "EPSS"], osv: ["osv", "OSV"] }
-const isStructured = (key: string) => Object.values(STRUCTURED_PREFIX).some((p) => key.startsWith(p))
+const isStructured = (key: string) => [...Object.values(STRUCTURED_PREFIX), "exploit:"].some((p) => key.startsWith(p))
 
 /** One query's state, as in the settings tab: the error with the next try, else the last success. */
 function QueryState({ s }: { s: VendorAdmin["sources"][number] }) {
@@ -483,12 +493,22 @@ function QueryState({ s }: { s: VendorAdmin["sources"][number] }) {
   return <p className="text-xs text-muted-foreground">{t("settings.news.never")}</p>
 }
 
-/** Weitere Quellen: the structured sources (CSAF providers, cvelistV5, EPSS, OSV), each on or off, what leaves the
- *  machine, the state of their queries. Saved with the same settings (and their `rev`) as the main tab. */
+// the exploit lists (app/exploits.py): the default when the server does not say, and where the file lies
+const EXPLOIT_DEFAULT: Record<ExploitSource, boolean> = { metasploit: true, exploitdb: false, nuclei: true }
+const EXPLOIT_HOST: Record<ExploitSource, "exploitGithub" | "exploitGitlab"> = { metasploit: "exploitGithub", exploitdb: "exploitGitlab", nuclei: "exploitGithub" }
+
+/** Weitere Quellen: the structured sources (CSAF providers, cvelistV5, EPSS, OSV) and the exploit lists (Metasploit,
+ *  Exploit-DB, nuclei), each on or off, what leaves the machine, the state of their queries. Saved with the same
+ *  settings (and their `rev`) as the main tab. */
 function SourcesForm({ data }: { data: VendorAdmin }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const initial = Object.fromEntries(STRUCTURED_SOURCES.map((k) => [k, data.settings[k] ?? true])) as Record<StructuredSource, boolean>
+  const meta = new Map((data.structured?.exploit_sources ?? []).map((x) => [x.key, x]))
+  const exploitDefault = (k: ExploitSource) => meta.get(k)?.default ?? EXPLOIT_DEFAULT[k]
+  const initial = {
+    ...Object.fromEntries(STRUCTURED_SOURCES.map((k) => [k, data.settings[k] ?? true])),
+    ...Object.fromEntries(EXPLOIT_SOURCES.map((k) => [exploitSwitch(k), data.settings[exploitSwitch(k)] ?? exploitDefault(k)])),
+  } as Record<StructuredSource | ExploitSwitch, boolean>
   const [v, setV] = useState(initial)
   const [busy, setBusy] = useState(false)
   const dirty = JSON.stringify(v) !== JSON.stringify(initial)
@@ -559,6 +579,58 @@ function SourcesForm({ data }: { data: VendorAdmin }) {
                   </div>
                 )}
                 {k === "osv" && data.structured && <p className="text-xs text-muted-foreground">{t("vendor.src.osvProducts", { count: data.structured.osv_products })}</p>}
+                {queries.length > 0 && (
+                  <ul className="divide-y rounded-lg border" aria-label={t("vendor.src.queries")}>
+                    {queries.map((s) => (
+                      <li key={s.key} className="px-3 py-2">
+                        <p className="truncate font-mono text-[11px]" title={s.key}>
+                          {s.key}
+                        </p>
+                        <QueryState s={s} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </ToggleRow>
+            )
+          })}
+        </LockedFields>
+        <section className="space-y-1 pt-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <Bug className="size-4 text-primary" /> {t("vendor.src.exploitTitle")}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            <Term k="exploit">{t("glossary.exploit")}</Term> – <MoreText>{t("vendor.src.exploitIntro")}</MoreText>
+          </p>
+        </section>
+        <LockedFields locked={!data.settings.enabled} className="divide-y rounded-lg border px-3.5">
+          {EXPLOIT_SOURCES.map((k) => {
+            const sw = exploitSwitch(k)
+            const queries = data.sources.filter((s) => s.key === `exploit:${k}`)
+            const m = meta.get(k)
+            return (
+              <ToggleRow
+                key={k}
+                label={
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    {t(`vendor.src.exploit.${k}`)}
+                    <Pill color="--muted-foreground">{t(exploitDefault(k) ? "vendor.src.default.on" : "vendor.src.default.off")}</Pill>
+                  </span>
+                }
+                description={
+                  <>
+                    {t(`vendor.src.exploit.${k}Hint`)}
+                    <span className="mt-1 block text-foreground/80">{t("vendor.src.leaves", { what: t(`vendor.src.leaves.${EXPLOIT_HOST[k]}`) })}</span>
+                    {m?.url && (
+                      <span className="mt-0.5 block truncate font-mono text-[11px]" title={m.url}>
+                        {m.url}
+                      </span>
+                    )}
+                  </>
+                }
+                checked={v[sw]}
+                onCheckedChange={(x) => setV({ ...v, [sw]: x })}
+              >
                 {queries.length > 0 && (
                   <ul className="divide-y rounded-lg border" aria-label={t("vendor.src.queries")}>
                     {queries.map((s) => (

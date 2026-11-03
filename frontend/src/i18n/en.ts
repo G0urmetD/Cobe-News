@@ -1298,6 +1298,7 @@ const en: Record<string, string> = {
   "watch.what.kev": "CISA adds the CVE to its catalogue of actively exploited vulnerabilities.",
   "watch.what.epss": "The percentile reaches 0.9 (among the 10 % likeliest) or the score rises by 0.1 (10 percentage points). At most one notice a day.",
   "watch.what.withdrawn": "An advisory about the CVE is withdrawn.",
+  "watch.what.exploit": "An exploit list (Metasploit, Exploit-DB, nuclei) names public exploit code for the first time – once per CVE.",
   "watch.onlyNew":
     "Only what is new after you start watching, each notice exactly once. Cobe News asks no service extra for watched CVEs: what the sources bring anyway counts. EPSS exists only for CVEs of findings and stories.",
   "watch.add": "Add a CVE",
@@ -1355,6 +1356,7 @@ const en: Record<string, string> = {
   "watch.tl.epssFrom": "{{from}} → {{score}}",
   "watch.tl.epssNow": "now {{score}}",
   "watch.tl.withdrawn": "Advisory withdrawn: {{ident}}",
+  "watch.tl.exploit": "Exploit published",
   "watch.tl.since": "Watched",
   "watch.tl.empty": "Nothing has happened since you started watching.",
   "watch.storiesN_one": "{{count}} story",

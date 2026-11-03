@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryKey } from "@tanstack/react-query"
 import { api, DETAIL_TIMEOUT_MS, detailRetry } from "@/lib/api"
 import { polledPages } from "@/lib/poll"
-import type { Epss, Ssvc } from "@/lib/vendor-api"
+import type { Epss, ExploitHint, Ssvc } from "@/lib/vendor-api"
 import type { AdvisoryChange } from "@/lib/advisory-changes"
 
 export type NewsSeverity = "critical" | "high" | "medium" | "low" | "info"
@@ -154,6 +154,8 @@ export interface NewsDetail extends NewsItem {
   epss?: Epss[]
   /** the revisions of the advisory behind the story (Vendor News keeps them), newest first */
   changes?: AdvisoryChange[]
+  /** public exploits for the story's CVEs (switched-on exploit lists – app/exploits.py) */
+  exploits?: ExploitHint[]
 }
 
 export interface NewsPage {

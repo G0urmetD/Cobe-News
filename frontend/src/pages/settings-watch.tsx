@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   Ban,
+  Bug,
   BellOff,
   CalendarDays,
   CalendarPlus,
@@ -41,6 +42,7 @@ import { confirmAction } from "@/components/cobe/confirm"
 import { HelpLink } from "@/components/cobe/doc-markdown"
 import { Field } from "@/components/cobe/form"
 import { Term } from "@/components/cobe/glossary"
+import { ExploitHints } from "@/components/cobe/exploit"
 import { Ts } from "@/components/cobe/time"
 import { MuteButton, useMuteOf } from "@/components/cobe/mute-menu"
 import { copyWithToast } from "@/lib/clipboard"
@@ -239,6 +241,9 @@ function WhatHelp() {
             <Term k="epss">EPSS</Term>: {t("watch.what.epss")}
           </li>
           <li>{t("watch.what.withdrawn")}</li>
+          <li>
+            <Term k="exploit">{t("exploit.pill")}</Term>: {t("watch.what.exploit")}
+          </li>
         </ul>
         <p className="text-muted-foreground">{t("watch.onlyNew")}</p>
         <p className="text-muted-foreground">{t("watch.footer")}</p>
@@ -838,6 +843,7 @@ function WatchRow({
                 </Pill>
               </span>
             )}
+            {w.exploits && w.exploits.length > 0 && <ExploitHints hints={w.exploits.map((x) => ({ ...x, cve: w.cve }))} links={false} />}
             <OtherProducts w={w} withLabel={groupBy !== "product"} />
           </div>
           <p className="truncate text-xs text-muted-foreground" title={w.known ? w.title : undefined}>
@@ -956,6 +962,7 @@ function WatchDetails({ w, onChanged }: { w: WatchItem; onChanged: () => void })
             </a>
           </Button>
         )}
+        {w.exploits && w.exploits.length > 0 && <ExploitHints hints={w.exploits.map((x) => ({ ...x, cve: w.cve }))} />}
         <MuteButton targets={[{ kind: "cve", key: w.cve, label: w.cve }]} size="sm" />
         <Button variant="ghost" size="sm" className="ml-auto text-destructive" disabled={busy} onClick={() => void remove()}>
           {busy ? <Loader2 className="animate-spin" /> : <Trash2 />} {t("watch.unwatchButton")}
@@ -1006,6 +1013,11 @@ function TimelineEntry({ e }: { e: WatchEvent }) {
       </>
     )
     sub = e.from !== null ? t("watch.tl.epssFrom", { from: pct(e.from), score: pct(e.score) }) : t("watch.tl.epssNow", { score: pct(e.score) })
+  } else if (e.what === "exploit") {
+    icon = Bug
+    tone = "--sev-high"
+    text = t("watch.tl.exploit")
+    sub = <ExploitHints hints={e.exploits} />
   } else {
     icon = Ban
     tone = "--warning"

@@ -710,7 +710,7 @@ function NewsDrawer({
                   dangerouslySetInnerHTML={{ __html: d.content_html }}
                 />
               )}
-              {d.cves.length > 0 && <StoryCves d={d} />}
+              {(d.cves.length > 0 || (d.exploits?.length ?? 0) > 0) && <StoryCves d={d} />}
             </>
           )}
         </div>

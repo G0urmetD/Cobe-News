@@ -5,6 +5,8 @@ import { AlertTriangle, Globe, History, ShieldAlert, ShieldCheck, Wrench } from 
 import { Pill } from "@/components/cobe/badges"
 import { Mono } from "@/components/cobe/common"
 import { EpssPill, SsvcPill } from "@/components/cobe/epss"
+import { ExploitHints } from "@/components/cobe/exploit"
+import { exploitsOf } from "@/lib/exploits"
 import { Term } from "@/components/cobe/glossary"
 import { Ts } from "@/components/cobe/time"
 import { CveChips, WatchAllButton } from "@/components/cobe/watch-all"
@@ -208,12 +210,15 @@ export function DetailHint({ n }: { n: NewsItem }) {
   )
 }
 
-/** The story's CVEs with their EPSS (as far as FIRST was asked): the likeliest to be exploited first. */
+/** The story's CVEs with their EPSS (as far as FIRST was asked): the likeliest to be exploited first – and the public
+ *  exploits the switched-on exploit lists name for them (those of the details' CVEs below). */
 export function StoryCves({ d }: { d: NewsDetail }) {
   const { t } = useTranslation()
   const scores = new Map((d.epss ?? []).map((e) => [e.cve, e]))
   const cves = [...d.cves].sort((a, b) => (scores.get(b)?.score ?? -1) - (scores.get(a)?.score ?? -1))
   const origin = { kind: "story", id: d.id } as const
+  const own = new Set(cves.map((c) => c.toUpperCase()))
+  const others = [...new Set((d.exploits ?? []).map((x) => (x.cve ?? "").toUpperCase()).filter((c) => c && !own.has(c)))]
   return (
     <section className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -225,14 +230,25 @@ export function StoryCves({ d }: { d: NewsDetail }) {
         {cves.map((c) => {
           const e = scores.get(c)
           return (
-            <li key={c} className="flex items-center gap-1.5">
+            <li key={c} className="flex flex-wrap items-center gap-1.5">
               <Mono value={c} />
               <WatchStar cve={c} origin={origin} />
               {e && <EpssPill e={e} />}
+              <ExploitHints hints={exploitsOf(d.exploits, c)} />
             </li>
           )
         })}
       </ul>
+      {others.length > 0 && (
+        <ul className="space-y-1">
+          {others.map((c) => (
+            <li key={c} className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="font-mono">{c}</span>
+              <ExploitHints hints={exploitsOf(d.exploits, c)} />
+            </li>
+          ))}
+        </ul>
+      )}
       {scores.size > 0 && <p className="text-[11px] text-muted-foreground">{t("details.epss")}</p>}
     </section>
   )

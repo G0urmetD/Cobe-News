@@ -17,6 +17,7 @@ export const TERMS = [
   "tlp",
   "ssvc",
   "osv",
+  "exploit",
   "webhook",
   "revision",
   "ical",

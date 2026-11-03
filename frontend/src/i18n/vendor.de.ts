@@ -534,6 +534,9 @@ const vendorDe: Record<string, string> = {
   "glossary.ssvc": "SSVC (Stakeholder-Specific Vulnerability Categorization)",
   "glossary.ssvcText":
     "Einstufung der CISA je CVE: ob die Lücke ausgenutzt wird (keine / Exploit-Code öffentlich / aktiv), ob sich ein Angriff automatisieren lässt und wie schwer die Folgen sind.",
+  "glossary.exploit": "Öffentlicher Exploit",
+  "glossary.exploitText":
+    "Eine öffentliche Sammlung führt fertigen Angriffscode oder eine fertige Prüfung für die Lücke (Metasploit-Modul, Exploit-DB-Eintrag, nuclei-Vorlage). Das heißt nicht, dass sie schon ausgenutzt wird – aber dass es jeder leicht kann. Cobe News speichert nur den Verweis, nie den Code.",
   "glossary.osv": "OSV (Open Source Vulnerabilities)",
   "glossary.osvText":
     "Datenbank von osv.dev mit betroffenen und behobenen Versionen von Open-Source-Paketen (Maven, PyPI, Go, npm …). Cobe News fragt sie nur mit der CVE- bzw. Advisory-Nummer ab.",
@@ -610,6 +613,24 @@ const vendorDe: Record<string, string> = {
   "vendor.src.osvProducts_other": "{{count}} gefolgte Produkte mit OSV-Paketen",
   "vendor.src.queries": "Zustand",
   "vendor.src.health": "Verlauf unter Gesundheit",
+  "vendor.src.exploitTitle": "Exploit-Hinweise",
+  "vendor.src.exploitIntro":
+    "Zeigt bei Funden, Meldungen und beobachteten CVEs, ob öffentlicher Exploit-Code existiert, und zählt in die Dringlichkeit (+10, solange die Lücke nicht schon als ausgenutzt bekannt ist). Jede Liste wird höchstens einmal am Tag geladen, nur wenn sie sich geändert hat. Gespeichert wird je CVE nur der Verweis auf den Eintrag – nie Code.",
+  "vendor.src.exploit.metasploit": "Metasploit Framework",
+  "vendor.src.exploit.metasploitHint": "Die Modulliste von Rapid7 (BSD-3-Clause): etwa 11 MB, komprimiert etwa 1,4 MB je Abruf; es zählen nur Exploit-Module.",
+  "vendor.src.exploit.exploitdb": "Exploit-DB",
+  "vendor.src.exploit.exploitdbHint": "Der Index von OffSec (GitLab, GPL-2.0): etwa 10 MB je Abruf, unkomprimiert – die größte Liste.",
+  "vendor.src.exploit.nuclei": "nuclei-templates",
+  "vendor.src.exploit.nucleiHint": "Der CVE-Index von ProjectDiscovery (MIT): etwa 2,3 MB, komprimiert etwa 0,5 MB je Abruf – Vorlagen, die eine Lücke gezielt prüfen.",
+  "vendor.src.leaves.exploitGithub": "der Abruf einer öffentlichen Datei bei GitHub (raw.githubusercontent.com) – für jede Installation dieselbe",
+  "vendor.src.leaves.exploitGitlab": "der Abruf einer öffentlichen Datei bei GitLab (gitlab.com) – für jede Installation dieselbe",
+  "vendor.src.default.on": "Standard: an",
+  "vendor.src.default.off": "Standard: aus",
+  "exploit.pill": "Exploit öffentlich",
+  "exploit.open": "{{source}}-Eintrag zu {{cve}} öffnen",
+  "exploit.source.metasploit": "Metasploit",
+  "exploit.source.exploitdb": "Exploit-DB",
+  "exploit.source.nuclei": "nuclei",
   "details.viaCvelist": "ergänzt aus der CVE-Liste (cvelistV5)",
   "details.epss": "Ausnutzung in 30 Tagen",
 }
