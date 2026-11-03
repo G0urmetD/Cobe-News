@@ -3,15 +3,28 @@
 # 20-envsubst-on-templates.sh). Sets NEWS_SERVER_NAMES – the host names and addresses Cobe News answers to: the host of
 # BASE_URL, NEWS_HOSTNAME, every entry of TLS_NAMES (the names of the self-signed certificate as well), and always
 # localhost, 127.0.0.1 and [::1] (the local access on this machine). A request for any other name (Host header) is
-# answered by the default server of cobe-news.conf.template with nothing (444): somebody scanning addresses, or a
-# foreign name pointed at this server, gets no page.
+# answered by the default servers of cobe-news.conf.template: on https a short plain-text 421 ("Unbekannter Hostname –
+# in .env BASE_URL oder TLS_NAMES eintragen"), on plain http nothing (444) – somebody scanning addresses, or a foreign
+# name pointed at this server, gets no page.
 # Only names made of letters, digits, dots, hyphens, colons, brackets and "*." in front are taken (they go into the
-# nginx configuration – nothing else may get there); a name with other characters (an umlaut domain: write its xn--
-# form) is left out and said so in the log. Sourced with the entrypoint's `set -e`: no command here may fail.
+# nginx configuration – nothing else may get there; a line break never); a name with other characters (an umlaut
+# domain: write its xn-- form) is left out and said so in the log. Sourced with the entrypoint's `set -e`: no command
+# here may fail.
+# A warning at the start when the proxy is published beyond this machine (BIND, as NEWS_BIND) while BASE_URL still
+# names localhost: whoever comes by the machine's address or name gets the 421 until it is added.
 
 _cn_names="localhost 127.0.0.1 [::1]"
+_cn_nl='
+'
+_cn_cr=$(printf '\r')
 
 _cn_add() {
+    case "$1" in
+        *"$_cn_nl"* | *"$_cn_cr"*)
+            echo "cobe-news: a server name with a line break left out"
+            return 0
+            ;;
+    esac
     _n=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
     _n=${_n%.}
     [ -n "$_n" ] || return 0
@@ -59,5 +72,28 @@ IFS=$_cn_old_ifs
 
 export NEWS_SERVER_NAMES="$_cn_names"
 echo "cobe-news: answering to $NEWS_SERVER_NAMES"
-unset _cn_names _cn_host _cn_old_ifs _cn_x _n _rest _wild
+
+# published beyond this machine, BASE_URL still on localhost: the names the network uses are missing
+_cn_bind=$(printf '%s' "${NEWS_BIND:-127.0.0.1}" | tr 'A-Z' 'a-z')
+_cn_base=$(printf '%s' "$_cn_host" | tr 'A-Z' 'a-z')
+case "$_cn_bind" in
+    127.* | localhost | ::1 | "[::1]") ;;
+    *)
+        case "$_cn_base" in
+            "" | localhost | 127.* | "[::1]")
+                echo "cobe-news: WARNING – BIND=$_cn_bind publishes Cobe News to the network, but BASE_URL names localhost: a browser coming by this machine's address or name gets \"421 Unbekannter Hostname\". Set BASE_URL (or TLS_NAMES) in .env to the name or address used, then: docker compose up -d"
+                ;;
+        esac
+        case "$_cn_bind" in
+            0.0.0.0 | :: | "[::]") ;;
+            *)
+                case " $_cn_names " in
+                    *" $_cn_bind "* | *" [$_cn_bind] "*) ;;
+                    *) echo "cobe-news: WARNING – BIND=$_cn_bind is not among the names above: add it to TLS_NAMES in .env if browsers use that address" ;;
+                esac
+                ;;
+        esac
+        ;;
+esac
+unset _cn_names _cn_host _cn_old_ifs _cn_x _n _rest _wild _cn_nl _cn_cr _cn_bind _cn_base
 unset -f _cn_add

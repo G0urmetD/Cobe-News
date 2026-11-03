@@ -5,7 +5,9 @@
 # passed on, so nobody can choose their own address. The app trusts the header only from this container's fixed address.
 # Only ${NEWS_…} variables are filled in at start (NGINX_ENVSUBST_FILTER), nginx's own $variables stay as they are.
 # NEWS_SERVER_NAMES: the names Cobe News answers to – the host of BASE_URL, NEWS_HOSTNAME, TLS_NAMES, localhost,
-# 127.0.0.1 and [::1] (16-server-names.envsh). Any other Host header: the default servers below answer nothing (444).
+# 127.0.0.1 and [::1] (16-server-names.envsh). Any other Host header: on https a short plain-text 421 that says how to
+# add the name (an installation reached by an address or name not configured sees why – no page, no app, nothing about
+# it beyond that); on plain http nothing (444).
 
 server_tokens off;
 
@@ -20,24 +22,31 @@ ssl_session_cache shared:cobenews:10m;
 ssl_session_timeout 1d;
 ssl_session_tickets off;
 
-# an unknown name (a scan by address, a foreign name pointed here): no page, no redirect – the connection is closed
+# an unknown name (a scan by address, a foreign name pointed here): no page, no redirect – on plain http the
+# connection is closed
 server {
     listen 80 default_server;
     server_name _;
     return 444;
 }
 
+# … on https: 421 Misdirected Request, a few words of plain text – the name is not one of this installation's (an
+# address or name used after an upgrade that BASE_URL / TLS_NAMES do not list yet). Never the app, never a redirect.
 server {
     listen 443 ssl default_server;
     http2 on;
     server_name _;
-    # plain http sent to the https port with an unknown name: closed as well
+    # plain http sent to the https port with an unknown name: closed
     error_page 497 @close;
     location @close {
         return 444;
     }
     location / {
-        return 444;
+        default_type text/plain;
+        charset utf-8;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        return 421 "Unbekannter Hostname – in .env BASE_URL oder TLS_NAMES eintragen.\nUnknown host name – add it to BASE_URL or TLS_NAMES in .env.\n";
     }
 }
 

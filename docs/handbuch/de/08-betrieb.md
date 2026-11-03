@@ -336,10 +336,17 @@ Der mitgelieferte nginx liefert Cobe News nur unter den Namen aus, die zur Insta
 - `localhost`, `127.0.0.1` und `[::1]` – der Zugang auf dem Server selbst geht immer.
 
 Eine Anfrage mit einem anderen Namen im `Host`-Header – jemand, der Adressbereiche absucht, oder ein fremder DNS-Name,
-der auf euren Server zeigt – bekommt keine Antwort: nginx schließt die Verbindung (Code 444 im Log des Proxys). Öffnet
-jemand die Seite über einen weiteren Namen oder eine IP-Adresse, diesen in `TLS_NAMES` eintragen und
+der auf euren Server zeigt – bekommt keine Seite: über https nur die Zeile „Unbekannter Hostname – in .env BASE_URL
+oder TLS_NAMES eintragen.“ (HTTP 421), über http nichts (nginx schließt die Verbindung, Code 444 im Log des Proxys).
+Öffnet jemand die Seite über einen weiteren Namen oder eine IP-Adresse, diesen in `TLS_NAMES` eintragen und
 `docker compose up -d` – beim selbstsignierten Zertifikat kommt er damit auch ins Zertifikat. Welche Namen gelten,
-steht beim Start im Log: `docker compose logs proxy | grep "answering to"`. Namen mit Umlauten in der
+steht beim Start im Log: `docker compose logs proxy | grep "answering to"`. Ist Cobe News ins Netz geöffnet
+(`BIND=0.0.0.0`), `BASE_URL` aber noch `localhost`, steht dort zusätzlich eine Warnung.
+
+> **Beim Update auf 0.1.47:** Frühere Versionen haben auf jeden Namen geantwortet. Öffnet ihr Cobe News über eine
+> IP-Adresse oder einen Namen, der nicht in `BASE_URL`, `NEWS_HOSTNAME` oder `TLS_NAMES` steht, zeigt der Browser nach
+> dem Update „Unbekannter Hostname“. Vorher die Adresse aus der Adresszeile in `TLS_NAMES` eintragen (oder `BASE_URL`
+> richtig setzen), dann `docker compose up -d`. Namen mit Umlauten in der
 `xn--`-Schreibweise eintragen; ein Eintrag mit anderen Zeichen als Buchstaben, Ziffern, `.`, `-`, `:`, `[`, `]` (und
 `*.` am Anfang) wird übergangen und im Log genannt.
 

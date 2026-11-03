@@ -326,10 +326,20 @@ leitet nginx ebenfalls auf https um (`error_page 497`) statt der Fehlerseite „
 `NEWS_HOSTNAME`, den Einträgen aus `TLS_NAMES` sowie `localhost`, `127.0.0.1` und `[::1]` (lokaler Zugang,
 selbstsigniert, Health-Checks auf dem Server). `deploy/nginx/16-server-names.envsh` bildet daraus beim Start des
 Proxys `NEWS_SERVER_NAMES` (`server_name` im Template; nur Zeichen `a-z 0-9 . - : [ ]` und ein führendes `*.` – alles
-andere wird übergangen und geloggt, es kommt nichts anderes in die Konfiguration; IPv6 in eckigen Klammern). Für jeden
-anderen `Host` antworten die `default_server`-Blöcke (80 und 443) mit `444` (Verbindung zu). Wer die Seite über eine IP
+andere wird übergangen und geloggt, ein Wert mit Zeilenumbruch ganz; es kommt nichts anderes in die Konfiguration;
+IPv6 in eckigen Klammern). Für jeden anderen `Host` antwortet der `default_server` auf 443 mit `421 Misdirected
+Request` und einer kurzen Textzeile („Unbekannter Hostname – in .env BASE_URL oder TLS_NAMES eintragen.“, kein Name der
+Installation, nie die App), Port 80 und Klartext an den https-Port mit `444` (Verbindung zu). Wer die Seite über eine IP
 oder einen weiteren Namen öffnet, trägt ihn in `TLS_NAMES` ein. Welche Namen gelten:
-`docker compose logs proxy | grep "answering to"`. Mit `TLS_MODE=external` (eigener Proxy) gilt das für den eigenen
+`docker compose logs proxy | grep "answering to"`. Steht `BIND` nicht auf dieser Maschine (`0.0.0.0` o. Ä.), `BASE_URL`
+aber noch auf `localhost`, warnt der Proxy beim Start (`WARNING – BIND=… publishes Cobe News to the network`), ebenso
+bei einer festen `BIND`-Adresse, die unter den Namen fehlt (`NEWS_BIND` in `docker-compose.yml`, nur dafür).
+
+**Upgrade auf 0.1.47 (Host-Namen):** Ältere Versionen haben jeden `Host` ausgeliefert. Wer Cobe News bisher über eine IP
+oder einen Namen öffnet, der weder in `BASE_URL` noch in `NEWS_HOSTNAME` oder `TLS_NAMES` steht, sieht nach dem Update
+„Unbekannter Hostname“ (HTTP 421). Vor dem Update prüfen: Steht die Adresse aus der Adresszeile des Browsers in `.env`?
+Sonst in `TLS_NAMES` ergänzen (z. B. `TLS_NAMES=10.0.0.5,news.intern`) bzw. `BASE_URL` auf den richtigen Namen setzen
+und `docker compose up -d`. Mit `TLS_MODE=external` (eigener Proxy) gilt das für den eigenen
 Proxy nicht – dort selbst ein `server_name` und einen Default-Server setzen.
 
 **Größe der Anfragen:** nginx nimmt höchstens 1 MB (`client_max_body_size 1m`), die App selbst ebenso

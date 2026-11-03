@@ -159,10 +159,12 @@ services:
     environment:
       NEWS_HTTPS_PORT: ${PORT:-8095}
       # the names nginx answers to (16-server-names.envsh): BASE_URL's host, NEWS_HOSTNAME, TLS_NAMES, localhost – any
-      # other Host header gets no answer (docs/BETRIEB.md: HTTPS, Host-Namen)
+      # other Host header gets a short 421 "Unbekannter Hostname" (docs/BETRIEB.md: HTTPS, Host-Namen)
       NEWS_BASE_URL: ${BASE_URL:-https://localhost:8095}
       NEWS_TLS_HOSTNAME: ${NEWS_HOSTNAME:-}
       NEWS_TLS_NAMES: ${TLS_NAMES:-}
+      # only for a warning at the start: published to the network while BASE_URL still names localhost
+      NEWS_BIND: ${BIND:-127.0.0.1}
       NGINX_ENVSUBST_FILTER: "^NEWS_"
     ports:
       # with a sign-in in front, BIND=0.0.0.0 may open it to the network (docs/BETRIEB.md)

@@ -334,10 +334,16 @@ The bundled nginx serves Cobe News only under the names that belong to the insta
 - `localhost`, `127.0.0.1` and `[::1]` – access on the server itself always works.
 
 A request with another name in the `Host` header – someone scanning address ranges, or a foreign DNS name pointing at
-your server – gets no answer: nginx closes the connection (code 444 in the proxy's log). If someone opens the page by a
-further name or an IP address, put it into `TLS_NAMES` and run `docker compose up -d` – with the self-signed
-certificate it then goes into the certificate as well. Which names apply is in the log at the start:
-`docker compose logs proxy | grep "answering to"`. Enter names with umlauts in their `xn--` form; an entry with
+your server – gets no page: over https only the line "Unbekannter Hostname – in .env BASE_URL oder TLS_NAMES
+eintragen. / Unknown host name – add it to BASE_URL or TLS_NAMES in .env." (HTTP 421), over http nothing (nginx closes
+the connection, code 444 in the proxy's log). If someone opens the page by a further name or an IP address, put it
+into `TLS_NAMES` and run `docker compose up -d` – with the self-signed certificate it then goes into the certificate as
+well. Which names apply is in the log at the start: `docker compose logs proxy | grep "answering to"`. When Cobe News
+is opened to the network (`BIND=0.0.0.0`) while `BASE_URL` still names `localhost`, a warning is there as well.
+
+> **Upgrading to 0.1.47:** earlier versions answered to any name. If you open Cobe News by an IP address or a name that
+> is not in `BASE_URL`, `NEWS_HOSTNAME` or `TLS_NAMES`, the browser shows "Unknown host name" after the update. Before
+> it, put the address from the address bar into `TLS_NAMES` (or set `BASE_URL` correctly), then `docker compose up -d`. Enter names with umlauts in their `xn--` form; an entry with
 characters other than letters, digits, `.`, `-`, `:`, `[`, `]` (and a leading `*.`) is skipped and named in the log.
 
 ## Own reverse proxy {#reverse-proxy}
