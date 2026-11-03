@@ -279,6 +279,18 @@ async def _fail(
     # not each failure (anyone can send them) – the lock it started, the block of the address (a few per address at most)
     if f.locked_for:
         audit.record(db, audit.SYSTEM, "login.locked", await _lock_target(db, key), {"locked_for_s": f.locked_for}, ip=ip)
+    if f.emergency_alert:
+        # the emergency admin is never locked – its checks are slowed down beyond the budget (bruteforce.emergency_brake);
+        # that somebody is guessing its password is worth a line and an entry (once an hour at most: bruteforce)
+        log.warning(
+            "emergency admin: %d failed sign-in checks in the last hour (budget %d) – its checks are slowed down now; last from %s",
+            f.emergency_alert,
+            bruteforce.EMERGENCY_BUDGET,
+            bruteforce.source_key(ip),
+        )
+        audit.record(
+            db, audit.SYSTEM, "login.emergency_slowed", await _lock_target(db, key), {"failures_1h": f.emergency_alert, "budget": bruteforce.EMERGENCY_BUDGET}, ip=ip
+        )
     if f.ip_blocked:
         audit.record(db, audit.SYSTEM, "login.ip_blocked", audit.target("ip", bruteforce.source_key(ip), bruteforce.source_key(ip)), {"blocked_for_s": bruteforce.IP_BLOCK}, ip=ip)
     revoked = False
@@ -337,6 +349,11 @@ async def login(body: LoginIn, request: Request, response: Response, db: Db):
         ok = await passwords.averify_password(user.password_hash if user else None, body.password)
         if not ok or user is None or not user.is_active:
             return await _fail(db, key, ip, emergency=emergency)
+        if passwords.temp_expired(user, passwords.temp_days(await settings_store.get(db, "sessions"))):
+            # the right temporary password, but issued too long ago: an admin issues a new one (the emergency admin:
+            # python -m app.cli reset-emergency) – no session, and not counted (nothing was guessed)
+            log.info("sign-in of %s refused: temporary password expired", user.username)
+            raise api_error(401, "temp_password_expired")
         if user.password_hash and passwords.needs_rehash(user.password_hash):
             user.password_hash = await passwords.ahash_password(body.password)
         sess, _ = await sessions.create(db, user, "pre", ip, user_agent(request), method="password")
@@ -464,7 +481,7 @@ async def _set_password(db, user: User, pw: str) -> None:
     new_hash = await passwords.ahash_password(pw)
     await passwords.remember(db, user)
     user.password_hash = new_hash
-    user.must_change_password = False
+    user.must_change_password, user.temp_password_at = False, None
 
 
 @router.post("/auth/password")

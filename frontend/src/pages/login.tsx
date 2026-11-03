@@ -17,6 +17,12 @@ import { PasskeyError, passkeySupport } from "@/lib/webauthn"
 
 type Step = "credentials" | "mfa" | "password" | "enroll"
 
+/** The error code the Entra redirect put into the address (/?login_error=…) – only one shaped like a code. */
+function redirectError(): string | null {
+  const code = new URLSearchParams(window.location.search).get("login_error")
+  return code && /^[a-z_]{3,40}$/.test(code) ? code : null
+}
+
 function MicrosoftIcon() {
   return (
     <svg viewBox="0 0 21 21" className="size-4" aria-hidden>
@@ -50,7 +56,11 @@ export function LoginPage({ resume }: { resume?: Step }) {
   const [step, setStep] = useState<Step>(resume ?? "credentials")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState<{ title: string; text: string; blocked?: boolean } | null>(null)
+  // an error handed over by the Entra redirect (/?login_error=…, only known codes) is there from the first render
+  const [error, setError] = useState<{ title: string; text: string; blocked?: boolean } | null>(() => {
+    const code = redirectError()
+    return code ? { title: t("auth.failed"), text: t(`errors.${code}`, { defaultValue: t("errors.generic") }) } : null
+  })
   const [loading, setLoading] = useState(false)
   const [otp, setOtp] = useState("")
   const [newPassword, setNewPassword] = useState<string | null>(null)
@@ -72,17 +82,14 @@ export function LoginPage({ resume }: { resume?: Step }) {
     }
   }
 
-  // errors handed over by the Entra redirect (/?login_error=…) – only known codes, then gone from the address
+  // … and then gone from the address (the browser's history is the outside world here)
   useEffect(() => {
+    if (!redirectError()) return
     const params = new URLSearchParams(window.location.search)
-    const code = params.get("login_error")
-    if (code && /^[a-z_]{3,40}$/.test(code)) {
-      setError({ title: t("auth.failed"), text: t(`errors.${code}`, { defaultValue: t("errors.generic") }) })
-      params.delete("login_error")
-      const q = params.toString()
-      window.history.replaceState(null, "", window.location.pathname + (q ? `?${q}` : ""))
-    }
-  }, [t])
+    params.delete("login_error")
+    const q = params.toString()
+    window.history.replaceState(null, "", window.location.pathname + (q ? `?${q}` : ""))
+  }, [])
 
   const handle = useCallback(
     (res: LoginStep) => {

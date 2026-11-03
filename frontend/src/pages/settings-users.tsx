@@ -40,7 +40,7 @@ import { type UserRow, isBlocked, useUsers } from "@/lib/admin-api"
 import { withReauth } from "@/lib/reauth"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
-import { initials } from "@/lib/format"
+import { fmtDate, fmtDateTime, initials } from "@/lib/format"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { PasskeyList, SessionList } from "@/components/cobe/security"
 import { type Passkey, type SessionRow, useUserPasskeys, useUserSessions } from "@/lib/security-api"
@@ -147,7 +147,16 @@ export function UsersPane() {
                       </Pill>
                     )}
                     {!u.is_active && <OffPill reason={u.deactivated_reason} />}
-                    {u.must_change_password && <Pill color="--warning">{t("users.tempPending")}</Pill>}
+                    {u.must_change_password &&
+                      (u.temp_password_expired ? (
+                        <Pill color="--sev-critical" title={t("users.tempExpiredHint")}>
+                          {t("users.tempExpired")}
+                        </Pill>
+                      ) : (
+                        <Pill color="--warning" title={u.temp_password_expires_at ? fmtDateTime(u.temp_password_expires_at) : undefined}>
+                          {u.temp_password_expires_at ? t("users.tempUntil", { date: fmtDate(u.temp_password_expires_at) }) : t("users.tempPending")}
+                        </Pill>
+                      ))}
                     {u.locked_for > 0 && <Pill color="--sev-critical">{t("users.locked", { minutes: Math.ceil(u.locked_for / 60) })}</Pill>}
                     {u.welcome === "no_address" && (
                       <Pill color="--warning" title={t("users.welcomeNoAddressHint")}>

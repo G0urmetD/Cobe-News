@@ -171,6 +171,9 @@ class User(Base):
     external_id: Mapped[str | None] = mapped_column(Text)  # objectGUID (AD) / object id (Entra)
     password_hash: Mapped[str | None] = mapped_column(Text)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    # when the temporary password was issued (admin, CLI reset-emergency): valid for `temp_password_days` (settings
+    # section "sessions") – a sign-in with it after that is refused (auth_api.temp_password_expired)
+    temp_password_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     totp_secret_enc: Mapped[str | None] = mapped_column(Text)
     totp_last_step: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

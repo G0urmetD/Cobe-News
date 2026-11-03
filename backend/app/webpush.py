@@ -45,6 +45,7 @@ from app import settings as settings_store
 from app.config import get_config
 from app.crypto import decrypt_str, encrypt_str
 from app.models import PushSubscription, User
+from app.plaintext import neutral
 
 log = logging.getLogger("cobe_news.push")
 
@@ -219,8 +220,8 @@ def story_payload(story: dict, lang: str) -> dict:
         "v": 1,
         "kind": "story",
         "id": story["id"],
-        "title": story["title"][:200],
-        "body": f"{lb['sev'].get(story['severity'], story['severity'])} · {story['source'][:80]}",
+        "title": neutral(story["title"])[:200],
+        "body": f"{lb['sev'].get(story['severity'], story['severity'])} · {neutral(story['source'])[:80]}",
         "severity": story["severity"],
         "url": f"/?story={story['id']}",
     }
@@ -234,8 +235,8 @@ def vendor_payload(event_id: str, title: str, product: str, severity: str, path:
         "v": 1,
         "kind": "vendor",
         "id": f"vendor-{event_id}",
-        "title": title[:200],
-        "body": f"{lb['sev'].get(severity, severity)} · {product[:80]}",
+        "title": neutral(title)[:200],
+        "body": f"{lb['sev'].get(severity, severity)} · {neutral(product)[:80]}",
         "severity": severity,
         "url": path if path.startswith("/") else "/vendor",
     }

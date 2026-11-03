@@ -8,7 +8,7 @@ of an older state is refused (409 stale) instead of silently undoing another adm
 
 import asyncio
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Query, Response
@@ -17,13 +17,13 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import set_committed_value
 
-from app import audit, passkeys_api, tls
+from app import audit, crypto, passkeys_api, tls
 from app import settings as settings_store
 from app.auth import bruteforce, directory, entra, ldap_dir, lock_store, passwords, sessions
 from app.auth_api import admins_count, user_out
 from app.crypto import encrypt_str
 from app.deps import ActiveSession, Admin, Db, NoNul, api_error, require_reauth
-from app.models import GroupMapping, Team, TeamMember, User, UserPasskey, UserSession
+from app.models import AuditEntry, GroupMapping, Team, TeamMember, User, UserPasskey, UserSession
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 Role = Literal["admin", "reader"]
@@ -36,17 +36,25 @@ class _M(NoNul):
 # ---------------------------------------------------------------- users
 
 
-def _user_row(u: User) -> dict:
+def _user_row(u: User, temp_days: int = passwords.TEMP_DAYS) -> dict:
+    end = passwords.temp_expires_at(u, temp_days)
     return {
         **user_out(u),
         "is_active": u.is_active,
         "deactivated_reason": u.deactivated_reason,
         "must_change_password": u.must_change_password,
+        # the temporary password's end (passwords.temp_expires_at) – after it the sign-in with it is refused
+        "temp_password_expires_at": end.isoformat() if end else None,
+        "temp_password_expired": bool(end and end <= datetime.now(UTC)),
         "locked_for": bruteforce.locked_for(bruteforce.lock_key(u)),
         "version": u.version or 1,
         "created_at": u.created_at.isoformat(),
         "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
     }
+
+
+async def _temp_days(db) -> int:  # noqa: ANN001
+    return passwords.temp_days(await settings_store.get(db, "sessions"))
 
 
 @router.get("/users")
@@ -61,7 +69,8 @@ async def users(admin: Admin, db: Db) -> list[dict]:
         names.setdefault(uid, []).append(name)
     # passkeys per account (app/passkeys_api.py) – shown next to TOTP
     keys = dict((await db.execute(select(UserPasskey.user_id, func.count()).group_by(UserPasskey.user_id))).all())
-    return [{**_user_row(u), "teams": names.get(u.id, []), "welcome": welcome.get(u.id), "passkeys": int(keys.get(u.id, 0))} for u in rows]
+    days = await _temp_days(db)
+    return [{**_user_row(u, days), "teams": names.get(u.id, []), "welcome": welcome.get(u.id), "passkeys": int(keys.get(u.id, 0))} for u in rows]
 
 
 class UserIn(_M):
@@ -102,6 +111,7 @@ async def create_user(body: UserIn, admin: Admin, sess: ActiveSession, db: Db) -
         auth_source="local",
         password_hash=await passwords.ahash_password(pw),
         must_change_password=True,
+        temp_password_at=datetime.now(UTC),
     )
     db.add(u)
     audit.record(db, admin, "user.created", audit.user_target(u), {"role": u.role, "auth_source": "local", "display_name": u.display_name, "email": u.email})
@@ -110,7 +120,7 @@ async def create_user(body: UserIn, admin: Admin, sess: ActiveSession, db: Db) -
     except IntegrityError as exc:  # the same name created in parallel
         await db.rollback()
         raise api_error(409, "username_taken") from exc
-    return {**_user_row(u), "temp_password": pw}
+    return {**_user_row(u, await _temp_days(db)), "temp_password": pw}
 
 
 class UserPatch(_M):
@@ -169,7 +179,7 @@ async def patch_user(uid: uuid.UUID, body: UserPatch, admin: Admin, sess: Active
     if before["is_active"] != u.is_active:
         audit.record(db, admin, "user.activated" if u.is_active else "user.deactivated", who, {"sessions_ended": not u.is_active})
     await db.commit()
-    return _user_row(u)
+    return _user_row(u, await _temp_days(db))
 
 
 class BlockIn(_M):
@@ -202,7 +212,7 @@ async def block_user(uid: uuid.UUID, body: BlockIn, admin: Admin, sess: ActiveSe
         u.deactivated_reason = "sync:unblocked"
     audit.record(db, admin, "user.blocked" if body.blocked else "user.unblocked", audit.user_target(u), {"is_active": u.is_active, "reason": u.deactivated_reason})
     await db.commit()
-    return _user_row(u)
+    return _user_row(u, await _temp_days(db))
 
 
 class ResetIn(_M):
@@ -230,7 +240,7 @@ async def reset_user(uid: uuid.UUID, body: ResetIn, admin: Admin, sess: ActiveSe
         pw = passwords.temp_password()
         new_hash = await passwords.ahash_password(pw)
         await passwords.remember(db, u)  # the person's own password stays refused after the reset (not the temporary one)
-        u.password_hash, u.must_change_password = new_hash, True
+        u.password_hash, u.must_change_password, u.temp_password_at = new_hash, True, datetime.now(UTC)
         out["temp_password"] = pw
     if body.totp:
         u.totp_secret_enc, u.totp_last_step = None, None
@@ -243,7 +253,7 @@ async def reset_user(uid: uuid.UUID, body: ResetIn, admin: Admin, sess: ActiveSe
     if gone:
         audit.record(db, admin, "passkey.removed", audit.user_target(u), {"by_admin": True, "reset": True, "count": gone})
     await db.commit()
-    return {**_user_row(u), **out}
+    return {**_user_row(u, await _temp_days(db)), **out}
 
 
 @router.post("/users/{uid}/unlock")
@@ -254,7 +264,7 @@ async def unlock_user(uid: uuid.UUID, admin: Admin, db: Db) -> dict:
     await lock_store.write(db, bruteforce.take_dirty())  # the stored lock goes with it (it would come back at a restart)
     audit.record(db, admin, "user.unlocked", audit.user_target(u), {"was_locked_s": locked})
     await db.commit()
-    return _user_row(u)
+    return _user_row(u, await _temp_days(db))
 
 
 @router.delete("/users/{uid}")
@@ -282,20 +292,24 @@ _put_section = settings_store.put_rev
 class SessionsIn(_M):
     idle_min: int = Field(ge=5, le=480)
     absolute_h: int = Field(ge=1, le=72)
+    temp_password_days: int | None = Field(default=None, ge=1, le=30)  # None: an older client – the stored value stays
     rev: int | None = None
 
 
 @router.get("/auth/sessions")
 async def get_sessions(admin: Admin, db: Db) -> dict:
     cfg = await settings_store.get(db, "sessions")
-    return {**cfg, "rev": int(cfg.get("rev") or 0)}
+    return {**cfg, "temp_password_days": passwords.temp_days(cfg), "rev": int(cfg.get("rev") or 0)}
 
 
 @router.put("/auth/sessions")
 async def put_sessions(body: SessionsIn, admin: Admin, sess: ActiveSession, db: Db) -> dict:
     require_reauth(sess, admin)
+    current = await settings_store.get(db, "sessions")
     new = body.model_dump(exclude={"rev"})
-    if changes := audit.diff(await settings_store.get(db, "sessions"), new, new.keys()):
+    if new["temp_password_days"] is None:
+        new["temp_password_days"] = passwords.temp_days(current)
+    if changes := audit.diff(current, new, new.keys()):
         audit.record(db, admin, "signin.config_changed", audit.target("signin", "sessions", "sessions"), {"changes": changes})
     out = await _put_section(db, "sessions", new, body.rev)
     # a shorter absolute lifetime holds for the sessions already running too (sessions.load checks it as well)
@@ -596,9 +610,27 @@ async def delete_mapping(mid: uuid.UUID, admin: Admin, sess: ActiveSession, db: 
 # ---------------------------------------------------------------- HTTPS
 
 
+EMERGENCY_ALERT_SHOWN = timedelta(hours=24)
+
+
+async def system_warnings(db) -> list[dict]:  # noqa: ANN001
+    """What needs an admin's look besides the certificate (shown above it, Einstellungen → HTTPS): a short master key
+    (crypto.key_weakness – "env" SECRET_KEY / "file" secret.key) and, for 24 hours, that the emergency admin's failure
+    budget was exceeded (the audit entry login.emergency_slowed – it survives a restart)."""
+    out: list[dict] = []
+    if weak := await asyncio.to_thread(crypto.key_weakness):
+        out.append({"code": "secret_key_short", "source": weak, "min": crypto.MIN_STRONG_KEY})
+    since = datetime.now(UTC) - EMERGENCY_ALERT_SHOWN
+    last = await db.scalar(select(AuditEntry).where(AuditEntry.action == "login.emergency_slowed", AuditEntry.at >= since).order_by(AuditEntry.at.desc()).limit(1))
+    if last is not None:
+        out.append({"code": "emergency_failures", "at": last.at.isoformat(), "failures": int((last.details or {}).get("failures_1h") or 0)})
+    return out
+
+
 @router.get("/tls")
-async def tls_status(admin: Admin) -> dict:
-    return await asyncio.to_thread(tls.status)
+async def tls_status(admin: Admin, db: Db) -> dict:
+    out = await asyncio.to_thread(tls.status)
+    return {**out, "system": await system_warnings(db)}
 
 
 @router.get("/tls/cobe.crt")

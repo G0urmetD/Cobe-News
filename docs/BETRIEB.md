@@ -99,8 +99,13 @@ Version konnte auf halbem Weg stehen bleiben), gibt es beim nächsten Start bzw.
   – auch die richtige – erst 3 Sekunden, und es läuft nur eine gleichzeitig, über alle Adressen (parallele Versuche
   bekommen sofort „zu viele Versuche“). Raten von vielen Adressen aus schafft so höchstens einen Versuch alle paar Sekunden, der Besitzer kommt (etwas
   langsamer) immer hinein,
+- meldet sich, wenn jemand rät: Überschreiten die Fehlversuche das Budget, schreibt die App eine Warnung ins Log
+  (`emergency admin: N failed sign-in checks in the last hour …`, mit der letzten Adresse bzw. ihrem /64), einen
+  Protokolleintrag `login.emergency_slowed` und zeigt 24 Stunden lang einen Hinweis unter *Einstellungen → HTTPS &
+  Zertifikat* – höchstens einmal pro Stunde (wer weiter rät, flutet weder Log noch Protokoll),
 - Passwort/TOTP verloren: auf dem Server zurücksetzen –
-  `docker compose exec app python -m app.cli reset-emergency` (gibt ein temporäres Passwort aus, TOTP wird neu eingerichtet).
+  `docker compose exec app python -m app.cli reset-emergency` (gibt ein temporäres Passwort aus, TOTP wird neu eingerichtet;
+  das Passwort gilt wie jedes temporäre 7 Tage, siehe [Lokale Konten](#lokale-konten)).
 
 Zugangsdaten des Notfall-Admins offline aufbewahren (Passwort-Tresor).
 
@@ -134,6 +139,10 @@ Optional **„Zweiter Faktor für alle Pflicht“** (aus ab Werk): dann richten 
 Sitzungs- und CSRF-Cookie heißen mit HTTPS `__Host-cobe_news_session` / `__Host-cobe_news_csrf` (nur diese Origin, nur
 über HTTPS – keine Subdomain und keine http-Seite kann sie setzen). Ein kürzeres absolutes Timeout gilt sofort auch für
 laufende Sitzungen. Zweiten Faktor ersetzen oder entfernen verlangt den aktuellen Code (ohne TOTP: das Passwort).
+Ein schreibender Aufruf ohne oder mit falschem CSRF-Token wird mit 403 `csrf_failed` abgelehnt und als Warnung geloggt
+(`cobe_news.security: csrf check failed: <Methode> <Pfad> from <Adresse bzw. /64> (<was fehlte>)` – nie Token oder
+Cookie); höchstens eine Zeile pro Herkunft und Minute und 30 pro Minute insgesamt, die zurückgehaltenen zählt die
+nächste Zeile mit. Kein Protokolleintrag (niemand angemeldet, keine Aktion an etwas).
 
 **Erneut bestätigen** – heikle Änderungen verlangen, dass sich der Admin in den letzten 10 Minuten ausgewiesen hat (die
 Anmeldung selbst zählt): Anmelde-Einstellungen (AD, Entra, Sitzungen), Rollen-Zuordnungen, einen Admin anlegen, eine
@@ -151,7 +160,13 @@ mitschicken; ohne `rev` wird nicht geprüft). Trifft das Speichern eines Kanals 
 ### Lokale Konten
 
 *Einstellungen → Benutzer & Rollen → Lokalen Benutzer anlegen*: Name, Rolle → ein **temporäres Passwort** erscheint einmal und muss bei der
-ersten Anmeldung ersetzt werden. Admins müssen TOTP einrichten, für Reader ist es freiwillig (*Profil & Sicherheit* im Benutzermenü unten links).
+ersten Anmeldung ersetzt werden. Es gilt `temp_password_days` Tage ab Vergabe (*Einstellungen → Anmeldung → Sitzungen*,
+„Startpasswort gültig für“, 1–30, Standard 7) – ebenso eines aus „Passwort zurücksetzen“ und aus `reset-emergency`;
+gespeichert ist die Vergabezeit (`users.temp_password_at`, Migration 0029 – Konten, die beim Update noch auf ihre erste
+Passwortänderung warten, zählen ab dem Update). Danach lehnt die Anmeldung das richtige temporäre Passwort mit
+`temp_password_expired` ab („Startpasswort abgelaufen – Admin um ein neues bitten“, keine Sitzung, kein Fehlversuch);
+die Benutzerliste zeigt „Startpasswort läuft ab am …“ bzw. „Startpasswort abgelaufen“. Die Einstellung gilt für schon
+vergebene Passwörter mit (gerechnet ab ihrer Vergabe); ihre Änderung steht im Protokoll (`signin.config_changed`). Admins müssen TOTP einrichten, für Reader ist es freiwillig (*Profil & Sicherheit* im Benutzermenü unten links).
 Admins können Konten deaktivieren, die Rolle ändern, Passwort und/oder TOTP zurücksetzen, entsperren und löschen.
 
 ### Active Directory (LDAP)
@@ -304,7 +319,24 @@ server {
 ```
 
 **http → https:** standardmäßig gibt es keinen http-Port. Mit `COMPOSE_FILE=docker-compose.yml:docker-compose.http.yml`
-in `.env` leitet zusätzlich `HTTP_PORT` (Standard 8094) auf https um.
+in `.env` leitet zusätzlich `HTTP_PORT` (Standard 8094) auf https um. Plain http an den https-Port (`http://name:8095`)
+leitet nginx ebenfalls auf https um (`error_page 497`) statt der Fehlerseite „plain HTTP request was sent to HTTPS port“.
+
+**Host-Namen:** nginx liefert Cobe News nur unter den Namen der Installation aus – dem Host aus `BASE_URL`,
+`NEWS_HOSTNAME`, den Einträgen aus `TLS_NAMES` sowie `localhost`, `127.0.0.1` und `[::1]` (lokaler Zugang,
+selbstsigniert, Health-Checks auf dem Server). `deploy/nginx/16-server-names.envsh` bildet daraus beim Start des
+Proxys `NEWS_SERVER_NAMES` (`server_name` im Template; nur Zeichen `a-z 0-9 . - : [ ]` und ein führendes `*.` – alles
+andere wird übergangen und geloggt, es kommt nichts anderes in die Konfiguration; IPv6 in eckigen Klammern). Für jeden
+anderen `Host` antworten die `default_server`-Blöcke (80 und 443) mit `444` (Verbindung zu). Wer die Seite über eine IP
+oder einen weiteren Namen öffnet, trägt ihn in `TLS_NAMES` ein. Welche Namen gelten:
+`docker compose logs proxy | grep "answering to"`. Mit `TLS_MODE=external` (eigener Proxy) gilt das für den eigenen
+Proxy nicht – dort selbst ein `server_name` und einen Default-Server setzen.
+
+**Größe der Anfragen:** nginx nimmt höchstens 1 MB (`client_max_body_size 1m`), die App selbst ebenso
+(`MAX_BODY_BYTES`, Standard 1 MiB, 16 KiB bis 64 MiB; reine ASGI-Middleware `app/bodylimit.py`): `Content-Length`
+darüber → sofort `413 body_too_large`; ohne `Content-Length` (chunked) wird mitgezählt und beim Überschreiten
+abgebrochen – mit denselben Sicherheits-Headern wie jede Antwort. Kein Endpunkt braucht mehr (es gibt keinen Upload:
+Sicherungen entstehen und werden eingespielt auf dem Server).
 
 Der mitgelieferte nginx (`nginx:1.30-alpine`) läuft schreibgeschützt mit `tmpfs`, ohne Capabilities außer den für
 Zertifikat und Port nötigen, TLS 1.2/1.3 mit Forward Secrecy, HTTP/2; ein vom Client mitgeschicktes `X-Forwarded-For`
@@ -317,7 +349,9 @@ Neuladen fehl (halb geschriebene Dateien, Schlüssel passt noch nicht), versucht
 Standard ist `BIND=127.0.0.1` – erreichbar nur von diesem Rechner. Seit es eine Anmeldung gibt, darf
 `BIND=0.0.0.0` den Port ins Netz öffnen. Die Voreinstellung bleibt trotzdem lokal: Ein Dienst, der neu aufgesetzt wird,
 soll nicht schon im Netz hängen, bevor der erste Admin (Setup-Token) angelegt, TOTP eingerichtet und ein vertrauenswürdiges
-Zertifikat hinterlegt ist. Danach `BIND=0.0.0.0` und `BASE_URL`/`NEWS_HOSTNAME` passend setzen.
+Zertifikat hinterlegt ist. Danach `BIND=0.0.0.0` und `BASE_URL`/`NEWS_HOSTNAME` passend setzen – und jeden weiteren
+Namen bzw. jede IP, über die die Seite geöffnet wird, in `TLS_NAMES`: nginx antwortet nur auf bekannte Namen
+([HTTPS](#https), Host-Namen).
 
 **Docker Desktop / Colima (Mac, Windows)**: Dort gehen die echten Client-Adressen schon bei Dockers Port-Weiterleitung
 verloren – nginx sieht jede Anfrage vom Docker-Gateway (z. B. `172.31.250.1`). Was man dann sieht: im Access-Log der App
@@ -1049,7 +1083,11 @@ Runde, mehr als eine Zusammenfassung; „Kritisch“ bleibt stehen, bis man sie 
   der mitgelieferte `backend/app/data/vendor_catalog.json`)
 - **`./data/secret.key`**: Schlüssel für gespeicherte Geheimnisse (fehlt er, müssen Webhook-URLs, SMTP-/Bind-Passwort
   und Entra-Geheimnis neu eingegeben werden). Besser: `SECRET_KEY` in der `.env` setzen und **getrennt** von der
-  Datensicherung aufbewahren – eine Sicherung ohne Passphrase enthält dann keine lesbaren Geheimnisse.
+  Datensicherung aufbewahren – eine Sicherung ohne Passphrase enthält dann keine lesbaren Geheimnisse. `SECRET_KEY`:
+  mindestens 32 zufällige Zeichen (`openssl rand -base64 32`). Ein kürzerer Schlüssel (oder einer aus weniger als
+  8 verschiedenen Zeichen, ebenso eine `secret.key` unter 32 Bytes) wird nicht abgelehnt – bestehende Installationen
+  laufen weiter –, aber beim Start als Warnung geloggt (`SECRET_KEY is short …`, nie der Schlüssel selbst) und unter
+  *Einstellungen → HTTPS & Zertifikat* angezeigt. Wechseln heißt: die gespeicherten Geheimnisse neu eingeben.
 - **`./data/news.db`**: die SQLite-Datei bis 0.1.15 – seit dem Umzug unverändert, der Weg zurück (siehe unten)
 - `./data` und alle Dateien darin sind nur für den App-Prozess lesbar (Verzeichnis 0700, Dateien 0600).
 - **Volume `cobe-news_tls`**: das selbstsignierte Zertifikat (bei `TLS_MODE=own` stattdessen `TLS_SOURCE`)
@@ -1430,6 +1468,9 @@ Das Image statt eines lokalen Builds betreiben: [Veröffentlichtes Image statt l
 - Keine Wiederherstellungscodes für den zweiten Faktor (der Notfall-Admin wird über `app.cli` zurückgesetzt).
 - Ein App-Prozess: Fehlversuch-Zähler, Rate-Limits und der Hintergrundjob leben im Speicher (ein Neustart setzt die
   Zähler zurück – laufende Konto- und Adress-Sperren bleiben, Tabelle `auth_locks`).
+- AD/LDAP: der Servername wird vor der Verbindung geprüft (`netaddr.check_host`), aber nicht auf die geprüfte Adresse
+  festgenagelt (kein DNS-Pinning wie bei den Kanälen) – ein DNS, das zwischen Prüfung und Verbindung die Antwort
+  wechselt, könnte die Bind-Anfrage umlenken; LDAPS mit Zertifikatsprüfung schützt das Bind-Passwort trotzdem.
 - Vendor News: Cisco openVuln (mit Zugangsdaten) und Microsofts CVRF nicht eingebaut.
 - Katalog: Build-Tabellen fehlen noch für SEP (RU ↔ Build), Skype for Business (CU ↔ Build), LANCOM (SU/RU), Acronis
   (Build) und ManageEngine (nur Build-Nummern) – es gibt dafür keine offizielle Tabelle, die sich übernehmen ließe.

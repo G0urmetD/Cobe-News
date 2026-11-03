@@ -18,7 +18,8 @@ DEFAULTS: dict[str, dict] = {
     # The exploit lists (app/exploits.py – the same public file for everyone, daily, conditional): Metasploit and the
     # nuclei templates on (small, compressed), Exploit-DB off (~10 MB a day, uncompressed)
     "vendor": {"enabled": True, "nvd_key_enc": "", "every_h": 6, "eol_every_h": 24, "csaf": True, "cvelist": True, "epss": True, "osv": True, "exploit_metasploit": True, "exploit_exploitdb": False, "exploit_nuclei": True, "review_days": 90, "csaf_green": []},
-    "sessions": {"idle_min": 60, "absolute_h": 12},
+    # temp_password_days: how long a temporary password (an admin's, the CLI reset-emergency's) is valid – 1 to 30
+    "sessions": {"idle_min": 60, "absolute_h": 12, "temp_password_days": 7},
     # passkeys (WebAuthn) for local accounts: on – nobody has one until they register it themselves (after re-confirming
     # who they are), and only while BASE_URL is an https host name (app/auth/webauthn.availability)
     "passkeys": {"enabled": True},

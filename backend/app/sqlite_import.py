@@ -86,7 +86,10 @@ COLUMNS_NOT_IN_SQLITE = frozenset(
         ("user_sessions", "passkey_id"),
         ("news_reads", "unread"),
         ("news_items", "topics"),
+        ("news_items", "products"),  # 0.1.47: '[]' – the background job computes them after the import (story_details, PRODUCTS_V)
+        ("notify_rules", "topics"),  # 0.1.47: '[]' – a rule without topics, as before
         ("vendor_advisory_products", "quiet"),  # 0.1.47: links of the relink after a catalogue change – false
+        ("users", "temp_password_at"),  # NULL: a temporary password counts from the account's creation (passwords.temp_expires_at)
     }
 )
 

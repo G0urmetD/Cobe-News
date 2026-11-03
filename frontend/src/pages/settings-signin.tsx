@@ -547,7 +547,7 @@ function SecondFactorForm({ initial }: { initial: MfaSettings }) {
 // ---------------------------------------------------------------- group → role
 
 export function MappingsPane() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const q = useMappings()
   const ldap = useLdap().data
@@ -555,25 +555,39 @@ export function MappingsPane() {
   const [source, setSource] = useState<"ldap" | "entra">("ldap")
   const [role, setRole] = useState<Role>("reader")
   const [query, setQuery] = useState("")
-  const [groups, setGroups] = useState<DirectoryGroup[] | null>(null)
   const [searching, setSearching] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
   const [picked, setPicked] = useState<DirectoryGroup | null>(null)
   const usable = source === "ldap" ? !!ldap?.usable : !!entra?.usable
+  // the answer of the last search, with what it was asked for: a new query or source empties it where it is typed or
+  // chosen; the source becoming (un)usable or another language makes it the answer to something else – not shown
+  const asked = `${source}\n${query}\n${usable}\n${i18n.language}`
+  const [found, setFound] = useState<{ asked: string; groups?: DirectoryGroup[]; error?: string } | null>(null)
+  const current = found?.asked === asked ? found : null
+  const groups = current?.groups ?? null
+  const searchError = current?.error ?? null
+  const typeQuery = (v: string) => {
+    if (v === query) return
+    setQuery(v)
+    setFound(null)
+  }
+  const chooseSource = (v: "ldap" | "entra") => {
+    setPicked(null)
+    if (v === source) return
+    setSource(v)
+    setFound(null)
+  }
 
   // live search, debounced – in the directory itself, never a list kept here
   useEffect(() => {
-    setGroups(null)
-    setSearchError(null)
     if (!usable) return
     let alive = true
     const id = setTimeout(async () => {
       setSearching(true)
       try {
         const r = await api.get<DirectoryGroup[]>(`/api/admin/auth/${source}/groups?q=${encodeURIComponent(query)}`)
-        if (alive) setGroups(r)
+        if (alive) setFound({ asked, groups: r })
       } catch (e) {
-        if (alive) setSearchError(errorText(t, e))
+        if (alive) setFound({ asked, error: errorText(t, e) })
       } finally {
         if (alive) setSearching(false)
       }
@@ -582,7 +596,7 @@ export function MappingsPane() {
       alive = false
       clearTimeout(id)
     }
-  }, [query, source, usable, t])
+  }, [query, source, usable, t, asked])
 
   const add = async () => {
     if (!picked) return
@@ -637,7 +651,7 @@ export function MappingsPane() {
           <p className="text-sm font-medium">{t("signin.map.addTitle")}</p>
           <div className="grid gap-3 sm:grid-cols-[1fr_2fr]">
             <Field label={t("signin.map.source")}>
-              <Select value={source} onValueChange={(x) => (setSource(x as "ldap" | "entra"), setPicked(null))}>
+              <Select value={source} onValueChange={(x) => chooseSource(x as "ldap" | "entra")}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -650,7 +664,7 @@ export function MappingsPane() {
             <Field label={t("signin.map.search")}>
               <div className="relative">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("signin.map.searchPlaceholder")} className="pl-8" disabled={!usable} />
+                <Input value={query} onChange={(e) => typeQuery(e.target.value)} placeholder={t("signin.map.searchPlaceholder")} className="pl-8" disabled={!usable} />
               </div>
             </Field>
           </div>
@@ -743,7 +757,7 @@ function SessionsForm({ initial }: { initial: SessionSettings }) {
   const qc = useQueryClient()
   const [v, setV] = useState(initial)
   const [busy, setBusy] = useState(false)
-  const valid = v.idle_min >= 5 && v.idle_min <= 480 && v.absolute_h >= 1 && v.absolute_h <= 72
+  const valid = v.idle_min >= 5 && v.idle_min <= 480 && v.absolute_h >= 1 && v.absolute_h <= 72 && v.temp_password_days >= 1 && v.temp_password_days <= 30
   const save = async () => {
     setBusy(true)
     try {
@@ -776,6 +790,15 @@ function SessionsForm({ initial }: { initial: SessionSettings }) {
           min={1}
           max={72}
           onChange={(x) => setV({ ...v, absolute_h: x })}
+        />
+        <NumberField
+          label={t("signin.sessions.tempDays")}
+          hint={t("signin.sessions.tempDaysHint")}
+          value={v.temp_password_days}
+          unit={t("settings.news.days")}
+          min={1}
+          max={30}
+          onChange={(x) => setV({ ...v, temp_password_days: x })}
         />
         <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("signin.sessions.about")}</p>
       </SheetBody>
