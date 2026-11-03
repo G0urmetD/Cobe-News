@@ -404,3 +404,37 @@ def test_cve5_exact_version_with_status_unknown_is_not_cleared():
     assert eval_cna(product, aff, parse("generic", "2.0")).status == "possible"
     assert eval_cna(product, aff, parse("generic", "1.0")).status == "affected"
     assert eval_cna(product, aff, parse("generic", "1.5")).status == "not_affected"
+
+
+# ---------------------------------------------------------------- NVD: the CNA's data and CISA's ADP kept apart
+
+
+def test_nvd_cisa_adp_default_is_not_the_vendors_word(cat):
+    """GitLab CVE-2024-4835: GitLab's own rows (15.11 – < 16.10.6, 16.11 – < 16.11.3, 17.0 – < 17.0.1, default
+    unaffected) and CISA's ADP (15.11 – < 17.0.1, default *affected*), which NVD lists side by side. CISA's default
+    once made every later version "affected" – "laut Hersteller alle anderen Versionen betroffen" for 19.5.3."""
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    data = advs[0]["data"]
+    assert [r["vendor"] for b in data["cna"] for r in b["affectedData"]] == ["GitLab"]
+    assert [r["vendor"] for b in data["adp"] for r in b["affectedData"]] == ["gitlab"]
+    assert data["adp"][0]["affectedData"][0]["cpes"] == ["cpe:2.3:a:gitlab:gitlab:*:*:*:*:*:*:*:*"]
+    gl = cat["gitlab"]
+    assert evaluate(gl, "nvd", data, "19.5.3").status == "not_affected"
+    assert evaluate(gl, "nvd", data, "16.11.2").status == "affected"
+    assert evaluate(gl, "nvd", data, "17.0.0").status == "affected"
+    assert evaluate(gl, "nvd", data, "16.10.6").status == "not_affected"
+
+
+def test_nvd_adp_only_where_the_cna_does_not_name_the_product(cat):
+    """CISA's rows still count where the CNA's do not name the product (as for cvelistV5) – and a record without
+    sources (stored before) keeps every block as the CNA's."""
+    adp_block = {"source": "134c704f-9b21-4f2e-91b3-4a467353bcc0", "affectedData": [{"vendor": "gitlab", "product": "gitlab", "cpes": ["cpe:2.3:a:gitlab:gitlab:*:*:*:*:*:*:*:*"], "defaultStatus": "unknown", "versions": [{"version": "15.0", "lessThan": "17.0.1", "status": "affected", "versionType": "custom"}]}]}
+    cna_block = {"source": "cve@example.org", "affectedData": [{"vendor": "Example", "product": "Other thing", "defaultStatus": "unaffected", "versions": [{"version": "1.0", "lessThan": "1.2", "status": "affected"}]}]}
+    cna, adp = src._split_affected([cna_block, adp_block], "cve@example.org")
+    assert cna == [cna_block] and adp == [adp_block]
+    assert src._split_affected([cna_block, adp_block], "") == ([cna_block, adp_block], [])
+    assert src._split_affected([{"affectedData": []}], "cve@example.org") == ([{"affectedData": []}], [])
+    data = {"configs": [], "desc": "", "cna": src._trim_cna(cna), "adp": src._trim_cna(adp, cpes=True)}
+    gl = cat["gitlab"]
+    assert evaluate(gl, "nvd", data, "16.0.0").status == "affected"
+    assert evaluate(gl, "nvd", data, "17.0.1").status == "not_affected"

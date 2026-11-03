@@ -205,6 +205,7 @@ def facts_of(source: str, severity: str | None, cvss: float | None, cves: list |
             _configs(data["configs"], out)
         else:
             _cna(data.get("cna"), out)
+            _cna(data.get("adp"), out)  # kept apart since 0.1.47 – the same facts as before
     elif source == "cvelist":
         _cna(data.get("cna"), out)
         _cna(data.get("adp"), out)

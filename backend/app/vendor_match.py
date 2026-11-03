@@ -942,6 +942,8 @@ def eval_nvd(product: dict, data: dict, v: V | None) -> Verdict | None:
         return None
     a = eval_configs(product, data.get("configs") or [], v)
     b = eval_cna(product, data.get("cna") or [], v)
+    if b is None and data.get("adp") and product.get("cpes"):
+        b = eval_cna(_adp_product(product), data.get("adp") or [], v)  # CISA's ADP only where the CNA does not name it (as cvelistV5)
     if a is None or b is None:
         return a or b
     if a.status == "affected" or b.status == "affected":

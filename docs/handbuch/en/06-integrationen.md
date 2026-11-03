@@ -337,7 +337,7 @@ When several sources name the same vulnerability, this order decides for each ve
 1. the vendor's own advisory (Palo Alto, Fortinet, Veeam, CSAF providers),
 2. the NVD where it has analysed the CVE (CPE configuration),
 3. cvelistV5 – the vendor's (CNA's) data; only if it does not name the product, CISA's (ADP),
-4. the NVD's copy of the vendor's data,
+4. the NVD's copy of the vendor's data – here too CISA's (ADP) only where the vendor does not name the product,
 5. OSV last: it only decides a "possibly affected" and adds a missing fixed version, but never changes a clear verdict.
 
 ### Switching a source off {#weitere-quellen-aus}

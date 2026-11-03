@@ -352,7 +352,7 @@ Nennen mehrere Quellen dieselbe Schwachstelle, entscheidet je Version diese Reih
 1. der eigene Hinweis des Herstellers (Palo Alto, Fortinet, Veeam, CSAF-Anbieter),
 2. die NVD, wo sie die CVE analysiert hat (CPE-Konfiguration),
 3. cvelistV5 – die Angaben des Herstellers (CNA), nur wenn die das Produkt nicht nennen die der CISA (ADP),
-4. die Kopie der Herstellerangaben in der NVD,
+4. die Kopie der Herstellerangaben in der NVD – auch hier die der CISA (ADP) nur, wenn der Hersteller das Produkt nicht nennt,
 5. OSV zuletzt: es entscheidet nur ein „möglicherweise betroffen“ und ergänzt eine fehlende Fix-Version, ändert aber
    kein eindeutiges Urteil.
 
