@@ -24,6 +24,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 - **CPEs mit Doppelpunkt im Namen** (z. B. mailcow) werden beim Abgleich richtig erkannt.
 - **Meldungsdetails** nutzen nur noch frei weitergebbare Dokumente.
 - **Falsches „betroffen“ durch CISAs Ergänzung**: NVD liefert neben den Angaben des Herstellers auch CISAs Ergänzung (ADP) mit. Beide standen bisher ununterscheidbar nebeneinander, und CISAs Vorgabe „alle anderen Versionen betroffen“ galt als Aussage des Herstellers (GitLab 19.5.3 bei CVE-2024-4835). Jetzt entscheidet der Hersteller; CISAs Angaben zählen nur, wo er das Produkt nicht nennt. Die gespeicherten NVD-Einträge werden beim nächsten fälligen Abruf je Produkt vollständig neu geholt.
+- **„Möglicherweise betroffen“ trotz NVD-Analyse**: Schreibt der Hersteller die betroffenen Versionen nur als Text („versions prior to v22.09“), entscheidet jetzt die Analyse der NVD statt eines offenen „möglicherweise“ (BookStack CVE-2022-40690).
 - **„Langsam“ in der Quellen-Gesundheit** kam auch von einem einzelnen großen Download, etwa dem ersten vollständigen NVD-Abruf eines neu verfolgten Produkts (GitLab: 6 MB in 4 Seiten). Downloads über 1 MB je Anfrage zählen dafür nicht mehr; die angezeigte mittlere Antwortzeit enthält sie weiter.
 
 ### Sicherheit

@@ -438,3 +438,14 @@ def test_nvd_adp_only_where_the_cna_does_not_name_the_product(cat):
     gl = cat["gitlab"]
     assert evaluate(gl, "nvd", data, "16.0.0").status == "affected"
     assert evaluate(gl, "nvd", data, "17.0.1").status == "not_affected"
+
+
+def test_nvd_analysis_decides_where_the_cna_wrote_prose(cat):
+    """BookStack CVE-2022-40690: JPCERT's row says "versions prior to v22.09" (no range anyone can read), NVD's analysis
+    says < 22.09 – a later version is not affected, not "possibly"."""
+    _, advs = src.parse_nvd((FIX / "nvd_bookstack_prose.json").read_bytes())
+    data, bs = advs[0]["data"], cat["bookstack"]
+    assert evaluate(bs, "nvd", data, "22.08").status == "affected"
+    assert evaluate(bs, "nvd", data, "22.09").status == "not_affected"
+    assert evaluate(bs, "nvd", data, "26.09.2").status == "not_affected"
+    assert evaluate(bs, "nvd", {**data, "configs": []}, "26.09.2").status == "possible"  # without the analysis: still open

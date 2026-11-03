@@ -950,6 +950,8 @@ def eval_nvd(product: dict, data: dict, v: V | None) -> Verdict | None:
         return a if a.status == "affected" else b
     if b.status == "not_affected" and a.status in ("possible", "not_affected"):
         return b  # the CNA (mostly the vendor itself) decides where NVD's CPEs are less precise
+    if a.status == "not_affected" and b.status == "possible" and b.reason == "unparsed_data":
+        return a  # the CNA wrote prose ("versions prior to v22.09"): NVD's analysed ranges decide (BookStack CVE-2022-40690)
     return worst(a, b)
 
 

@@ -1,0 +1,81 @@
+{
+ "resultsPerPage": 1,
+ "startIndex": 0,
+ "totalResults": 1,
+ "format": "NVD_CVE",
+ "version": "2.0",
+ "vulnerabilities": [
+  {
+   "cve": {
+    "id": "CVE-2022-40690",
+    "sourceIdentifier": "vultures@jpcert.or.jp",
+    "published": "2022-10-24T14:15:52.197",
+    "lastModified": "2026-06-17T05:01:50.720",
+    "vulnStatus": "Modified",
+    "descriptions": [
+     {
+      "lang": "en",
+      "value": "Cross-site scripting vulnerability in BookStack versions prior to v22.09 allows a remote authenticated attacker to inject an arbitrary script."
+     }
+    ],
+    "affected": [
+     {
+      "source": "vultures@jpcert.or.jp",
+      "affectedData": [
+       {
+        "vendor": "BookStack",
+        "product": "BookStack",
+        "versions": [
+         {
+          "version": "versions prior to v22.09",
+          "status": "affected"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "weaknesses": [
+     {
+      "source": "nvd@nist.gov",
+      "type": "Primary",
+      "description": [
+       {
+        "lang": "en",
+        "value": "CWE-79"
+       }
+      ]
+     },
+     {
+      "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+      "type": "Secondary",
+      "description": [
+       {
+        "lang": "en",
+        "value": "CWE-79"
+       }
+      ]
+     }
+    ],
+    "configurations": [
+     {
+      "nodes": [
+       {
+        "operator": "OR",
+        "negate": false,
+        "cpeMatch": [
+         {
+          "vulnerable": true,
+          "criteria": "cpe:2.3:a:bookstackapp:bookstack:*:*:*:*:*:*:*:*",
+          "versionEndExcluding": "22.09",
+          "matchCriteriaId": "83039D98-8A2F-461B-8732-611F78DF2C48"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}
