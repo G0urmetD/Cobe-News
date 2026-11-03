@@ -751,6 +751,19 @@ Feeds: `services.nvd.nist.gov` (für Meldungen mit CVE), sonst dieselben Hosts w
 (`wid.cert-bund.de`, `cert-portal.siemens.com`, `sec.cloudapps.cisco.com`, `filestore.fortinet.com`,
 `security.paloaltonetworks.com`).
 
+**Gefolgte Produkte einer Meldung** (`news_items.products`, Filter „Betrifft unsere Produkte“): berechnet, sobald die
+Details einer Meldung ankommen (dieselbe Prüfung wie „Betrifft deine Systeme“), und im selben Hintergrundtask nach jeder
+Details-Runde für die Produkte, deren Folgen oder Versionen sich geändert haben – erkannt an einem Fingerabdruck je
+Produkt in der Einstellungszeile `news_products`. Entfolgte Produkte gehen per SQL aus allen Listen, geänderte werden in
+Blöcken von 500 Meldungen neu bewertet (abseits der Ereignisschleife). Nach dem Update auf die Version mit Migration 0026
+läuft das einmal für alle gespeicherten Meldungen. Kein zusätzlicher Abruf. Neu berechnen erzwingen:
+`DELETE FROM settings WHERE key = 'news_products';` – die nächste Runde rechnet alles neu.
+
+**Themen** (`news_items.topics`): Das Thema „Exploit veröffentlicht“ (`poc`) kommt aus der SSVC-Einstufung der CISA in
+den gespeicherten cvelistV5-Einträgen (und dem Wortlaut); ändert sich die Einstufung beim Speichern eines Eintrags,
+werden die Meldungen zu dieser CVE neu berechnet. Mit der neuen Regel-Version (`news_topics_v` 2) berechnet der
+Themen-Job alle gespeicherten Meldungen einmal neu.
+
 ## Benachrichtigungen
 
 *Einstellungen → Kanäle & Regeln* hat zwei Reiter:
@@ -759,7 +772,8 @@ Feeds: `services.nvd.nist.gov` (für Meldungen mit CVE), sonst dieselben Hosts w
   Fehlern. Ganz oben die Zeile **E-Mail-Server** (Server:Port · eingerichtet / nicht eingerichtet, „Bearbeiten“ öffnet
   die Schublade mit den SMTP-Einstellungen und der Testmail). Ein neuer E-Mail-Kanal ohne eingerichteten Server fragt in
   seiner Schublade zuerst nach dem Server; E-Mail-Kanäle ohne Server zeigen „E-Mail-Server fehlt“.
-- **Regeln** – *was*: Name, an/aus, Schweregrade (z. B. nur Kritisch + Hoch), Quellen (leer = alle), Sprache und
+- **Regeln** – *was*: Name, an/aus, Schweregrade (z. B. nur Kritisch + Hoch), Quellen (leer = alle), bei News Themen
+  (`notify_rules.topics`, eines genügt, leer = jede Meldung), Sprache und
   **ein oder mehrere Kanäle**. Arten: News, Vendor News (Schwachstellen; neue Versionen und Support-Ende) und
   *Quelle gestört oder tot* ([Quellen-Gesundheit](#quellen-gesundheit) – Schweregrade und Quellen gelten dafür nicht).
 
@@ -775,10 +789,11 @@ Feeds: `services.nvd.nist.gov` (für Meldungen mit CVE), sonst dieselben Hosts w
 - Nach jeder Abrufrunde: jede Meldung **höchstens einmal pro Kanal** – auch wenn zwei Regeln sie an denselben Kanal
   schicken. Eine neue (oder wieder eingeschaltete) Regel und ein Kanal, der einer Regel später hinzugefügt wird, gelten
   nur für Meldungen, die **danach** eintreffen – kein Schwall alter Meldungen. Ebenso eine Regel, deren Filter erweitert
-  wird (mehr Schweregrade, Quellen oder Arten): was erst dadurch passt, kommt ab der Änderung (Eingangsnummer der
+  wird (mehr Schweregrade, Quellen, Themen oder Arten): was erst dadurch passt, kommt ab der Änderung (Eingangsnummer der
   Meldung, bei Vendor News der Zeitpunkt); was schon vorher passte und noch offen ist, kommt weiterhin.
 - Jede Runde schaut nur nach, wenn sich etwas getan hat: eine neue Meldung oder ein neues Vendor-News-Ereignis, ein
-  geänderter Kanal, eine geänderte Regel oder der E-Mail-Server, oder die Pause eines Kanals ist um. Sonst kostet sie
+  geänderter Kanal, eine geänderte Regel oder der E-Mail-Server, geänderte Themen einer Meldung (eine Regel mit Themen
+  verschickt eine Meldung, die ihr Thema erst später bekommt, dann – einmal), oder die Pause eines Kanals ist um. Sonst kostet sie
   zwei kleine Abfragen statt eines Durchgangs durch alle Regeln (bei großen Datenbanken bis zu einer Sekunde). Alle
   10 Minuten wird trotzdem alles angesehen – eine Meldung, die inzwischen höher eingestuft ist oder von einer weiteren
   Quelle kommt, folgt damit spätestens dann.

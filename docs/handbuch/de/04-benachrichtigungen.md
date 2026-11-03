@@ -40,8 +40,15 @@ Die Einstellungen gelten für dein Konto. Der Zustand (Berechtigung, Push) gilt 
 1. Öffne Cobe News über die https-Adresse, z. B. {{base_url}}.
 2. Gehe zu [*Einstellungen → Benachrichtigungen*](/settings/notifications).
 3. Schalte „Desktop-Benachrichtigungen“ ein. Der Browser fragt nach der Erlaubnis – stimme zu.
-4. Wähle die **Schweregrade** (ab Werk Kritisch und Hoch) und die **Quellen**. Leer heißt: alle.
+4. Wähle die **Schweregrade** (ab Werk Kritisch und Hoch), die **Quellen** und die **Themen**. Leer heißt: alle.
 5. Klicke „Speichern“.
+
+**Themen** ([was sie bedeuten](/docs/news-quellen#themen)): Eines der gewählten genügt, zusammen mit Schwere und
+Quelle – „Aktiv ausgenutzt, Exploit veröffentlicht“ mit allen Schweregraden meldet jede Meldung mit einem der beiden
+Themen. Es zählt das Thema, das die Meldung **beim Eintreffen** hat (aus Titel, Anrisstext, Quelle und dem
+KEV-Katalog). Ein Thema, das erst später dazukommt – etwa aus den Details aus der Quelle –, löst keine
+Desktop-Benachrichtigung mehr aus; dafür gibt es [Regeln](#regel-themen), die so eine Meldung dann nachreichen. Der
+offene Tab und Push bei geschlossenem Tab filtern gleich.
 
 Darunter zeigt die Karte „Zustand in diesem Browser“:
 
@@ -787,7 +794,7 @@ Felder einer Meldung in `stories`:
 | `published_at` | Veröffentlichung (bei Vendor News und Quellen-Ereignissen: Zeitpunkt des Ereignisses). |
 | `cves` | CVE-Nummern, falls bekannt. |
 | `kind` | `news`, `vendor.vuln`, `vendor.version`, `vendor.eol`, `vendor.change` oder `source.health`. |
-| `topics` | die [Themen](/docs/news-quellen#themen) der Meldung: `zeroday`, `exploited`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` (seit 0.1.46; bei Vendor News `exploited`, wenn aktiv ausgenutzt). |
+| `topics` | die [Themen](/docs/news-quellen#themen) der Meldung: `zeroday`, `exploited`, `poc` (Exploit veröffentlicht), `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` (seit 0.1.46; bei Vendor News `exploited`, wenn aktiv ausgenutzt). |
 | `product` | das Produkt, wenn sicher bekannt (wie das Feld „Produkt“ der [Karten](#nachrichten-format)), sonst leer (seit 0.1.46). |
 
 Bei `vendor.*` öffnet `link` das Produkt auf der Seite Vendor News; `source` ist „Vendor News“. Bei `source.health`
@@ -1179,7 +1186,7 @@ Reiter „Regeln“. Lege zuerst mindestens einen Kanal an.
 5. **Kanäle** wählen – mindestens einer, mehrere sind möglich. „Neuen Kanal anlegen“ führt zu den Kanälen.
 6. Bei „Was wird gesendet?“ eine oder mehrere Arten einschalten (siehe unten).
 7. **Schweregrade** wählen (ab Werk Kritisch und Hoch; leer = alle) und bei Security-Meldungen die **Quellen**
-   (leer = alle).
+   (leer = alle) und die **Themen** (leer = jede Meldung, siehe [Themen in Regeln](#regel-themen)).
 8. Speichern.
 
 In der Liste schaltest du eine Regel mit dem Schalter rechts ein und aus; der Stift öffnet sie, der Papierkorb löscht
@@ -1219,7 +1226,7 @@ Meldungen, Vendor-News-Ereignisse und Zustandswechsel der Quellen, mit derselben
 wäre ein Kanal die ganze Zeit verbunden gewesen). Das Ergebnis:
 
 - die Zahl der Treffer und eine Liste der neuesten (Titel, Zeit, Schwere und warum sie passt: Art, Schwere, Quelle,
-  Team),
+  Thema, Team),
 - wie viele **Nachrichten** daraus geworden wären – was in derselben Minute eintrifft, kommt in einer Runde, ab 4
   Meldungen als eine [Sammelnachricht](#einmal-pro-kanal) –, im Schnitt pro Tag und am stärksten Tag,
 - die Warnung **„Dieser Kanal würde geflutet“**, wenn es an einem Tag mehr als 20 Nachrichten gewesen wären.
@@ -1227,6 +1234,25 @@ wäre ein Kanal die ganze Zeit verbunden gewesen). Das Ergebnis:
 Der Probelauf sendet nichts und schreibt nichts: keine Markierung „verschickt“, keine Änderung an Regel oder Kanal. Er
 läuft lesend und mit Zeitlimit; dauert er zu lange, wähle einen kürzeren Zeitraum. Ändert sich das Formular danach,
 wird das Ergebnis blass – einfach erneut starten. Nur Admins.
+
+### Themen in Regeln {#regel-themen}
+
+Bei Security-Meldungen kann eine Regel zusätzlich **Themen** verlangen ([was sie bedeuten](/docs/news-quellen#themen)),
+z. B. „Kritisch an SOC“ nur für *Aktiv ausgenutzt* und *Exploit veröffentlicht*.
+
+- **Eines genügt:** Die Meldung braucht eines der gewählten Themen – **und** passt außerdem zu Schweregraden und
+  Quellen. Leer heißt: jede Meldung, wie bisher. Bestehende Regeln haben keine Themen und verhalten sich unverändert.
+- **Thema kommt später:** Viele Themen stehen erst nach dem Eintreffen fest – die CVE kommt in den KEV-Katalog, die
+  [Details aus der Quelle](/docs/news-quellen#details-aus-der-quelle) sagen „ausgenutzt“ oder „kein Fix“, die CISA
+  stuft auf „poc“. Eine Meldung, die nach dem Speichern der Regel eintraf und ein verlangtes Thema erst danach bekommt,
+  wird **dann** verschickt – mit der nächsten Runde, **einmal** pro Kanal, nie doppelt (auch nicht, wenn später ein
+  weiteres Thema dazukommt). Ältere Meldungen bleiben, wie unter [Nur Neues](#nur-neues) beschrieben, außen vor.
+- **Nur Security-Meldungen:** Für Vendor-News-Ereignisse und Quellen-Gesundheit gelten die Themen nicht.
+- **Erweitern:** Themen entfernen oder weitere wählen ist ein [erweiterter Filter](#nur-neues) – was erst dadurch
+  passt, kommt ab der Änderung.
+- Der [Probelauf](#probelauf) prüft die Themen mit und nennt bei jedem Treffer das Thema, über das er passt; das
+  [Zustellprotokoll](#protokoll-inhalt) zeigt die Themen jeder verschickten Meldung, das
+  [Protokoll](/docs/betrieb#protokoll) jede Änderung der Themen einer Regel.
 
 ### Auf Teams beschränken {#regel-teams}
 
@@ -1243,7 +1269,7 @@ nachgeschickt.
 
 - **Neue oder wieder eingeschaltete Regel:** zählt ab diesem Moment. Was eintraf, während sie aus war, kommt nicht.
 - **Kanal, der einer Regel später hinzugefügt wird:** bekommt nur, was danach eintrifft.
-- **Erweiterter Filter** (mehr Schweregrade, Quellen oder Arten): Was erst dadurch passt, kommt ab der Änderung. Was
+- **Erweiterter Filter** (mehr Schweregrade, Quellen, Themen oder Arten): Was erst dadurch passt, kommt ab der Änderung. Was
   schon vorher passte und noch offen ist, kommt weiterhin.
 - **Neu eingeschaltete Quelle:** Die älteren Meldungen, die sie beim ersten Abruf mitbringt, werden nicht verschickt –
   nur, was danach frisch dazukommt.
@@ -1280,8 +1306,8 @@ oder „3 Fehler in 24 Std.“ (gelb, wenn danach etwas durchging; rot, wenn nic
 | Test | „Testen“ eines Kanals |
 
 Pro Zustellung: Kanal (mit dem Namen, den er damals hatte – auch nach dem Löschen), was verschickt wurde (Meldung,
-Ereignis oder Befund mit Titel; bei einer Sammelnachricht die aufgeführten und wie viele insgesamt), die Regeln, Zeit,
-Versuch und Ergebnis:
+Ereignis oder Befund mit Titel, bei Meldungen mit ihren Themen; bei einer Sammelnachricht die aufgeführten und wie viele
+insgesamt), die Regeln, Zeit, Versuch und Ergebnis:
 
 | Ergebnis | Bedeutung |
 |---|---|

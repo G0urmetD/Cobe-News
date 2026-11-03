@@ -213,7 +213,7 @@ Alle Endpunkte sind `GET`, die Antworten JSON. Die Felder im Einzelnen beschreib
 
 | Endpunkt | Inhalt | Parameter |
 |---|---|---|
-| `/api/v1/news` | Meldungen der eingeschalteten Quellen, neueste zuerst; Antwort `{items, next}` | `severity` (mehrfach: `critical`, `high`, `medium`, `low`, `info`), `source` (Schlüssel der Quelle, mehrfach), `topic` (mehrfach, eines genügt: `zeroday`, `exploited`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` – siehe [Themen](/docs/news-quellen#themen)), `q` (Wörter in Titel, Zusammenfassung, CVE), `since` (Zeit nach ISO 8601), `limit` (1–200, Standard 50), `before` (`next` der vorigen Seite). Jede Meldung trägt `topics`. |
+| `/api/v1/news` | Meldungen der eingeschalteten Quellen, neueste zuerst; Antwort `{items, next}` | `severity` (mehrfach: `critical`, `high`, `medium`, `low`, `info`), `source` (Schlüssel der Quelle, mehrfach), `topic` (mehrfach, eines genügt: `zeroday`, `exploited`, `poc`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` – siehe [Themen](/docs/news-quellen#themen)), `q` (Wörter in Titel, Zusammenfassung, CVE), `since` (Zeit nach ISO 8601), `limit` (1–200, Standard 50), `before` (`next` der vorigen Seite). Jede Meldung trägt `topics`. |
 | `/api/v1/news/sources` | die eingeschalteten Quellen mit Schlüssel und Name | – |
 | `/api/v1/news/{id}` | eine Meldung, dazu [EPSS](term:epss) ihrer CVEs | – |
 | `/api/v1/vendor/products` | die gefolgten Produkte mit Versionen, Anzahl der Befunde je Art und Dringlichkeit | – |

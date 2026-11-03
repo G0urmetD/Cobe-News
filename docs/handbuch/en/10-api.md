@@ -209,7 +209,7 @@ All endpoints are `GET`, the answers JSON. The OpenAPI file in the **"Reference"
 
 | Endpoint | Content | Parameters |
 |---|---|---|
-| `/api/v1/news` | stories of the switched-on sources, newest first; answer `{items, next}` | `severity` (repeatable: `critical`, `high`, `medium`, `low`, `info`), `source` (key of the source, repeatable), `topic` (repeatable, any one matches: `zeroday`, `exploited`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` – see [Topics](/docs/news-quellen#themen)), `q` (words in title, summary, CVE), `since` (time in ISO 8601), `limit` (1–200, default 50), `before` (`next` of the previous page). Every story carries `topics`. |
+| `/api/v1/news` | stories of the switched-on sources, newest first; answer `{items, next}` | `severity` (repeatable: `critical`, `high`, `medium`, `low`, `info`), `source` (key of the source, repeatable), `topic` (repeatable, any one matches: `zeroday`, `exploited`, `poc`, `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` – see [Topics](/docs/news-quellen#themen)), `q` (words in title, summary, CVE), `since` (time in ISO 8601), `limit` (1–200, default 50), `before` (`next` of the previous page). Every story carries `topics`. |
 | `/api/v1/news/sources` | the switched-on sources with key and name | – |
 | `/api/v1/news/{id}` | one story, with the [EPSS](term:epss) of its CVEs | – |
 | `/api/v1/vendor/products` | the followed products with versions, number of findings of each kind and urgency | – |
