@@ -3,13 +3,15 @@ reaches the app's own port or comes through a proxy of one's own (TLS_MODE=exter
 
 Pure ASGI (no buffering): a Content-Length above the limit is answered 413 before the route runs; a body without one
 (Transfer-Encoding: chunked) is counted while the route reads it – the moment it passes the limit the answer is 413 and
-the route sees the client gone (http.disconnect); whatever it still answers is dropped. No endpoint takes more than a
+the route sees the client gone (http.disconnect); whatever it still answers is dropped – and a route that reads the
+raw body (Starlette raises ClientDisconnect then) ends quietly with that 413, no traceback. No endpoint takes more than a
 few kilobytes (there is no upload: backups are made and restored on the host – docs/BETRIEB.md) – one limit for all,
 MAX_BODY_BYTES (default 1 MiB). Inside the app's guard (main.py): the 413 carries the same security headers as every
 answer and is in the access log."""
 
 import json
 
+from starlette.requests import ClientDisconnect
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 DEFAULT = 1024 * 1024  # 1 MiB – what nginx lets through (client_max_body_size 1m)
@@ -71,7 +73,13 @@ class BodyLimit:
                     return {"type": "http.disconnect"}
             return message
 
-        await self.app(scope, counted_receive, guarded_send)
+        try:
+            await self.app(scope, counted_receive, guarded_send)
+        except ClientDisconnect:
+            if not state["refused"]:
+                raise  # the client really went – not ours to hide
+            # the route read on after the refusal: the 413 that went out is the answer
+            return
 
     @staticmethod
     async def _refuse(send: Send, limit: int) -> None:

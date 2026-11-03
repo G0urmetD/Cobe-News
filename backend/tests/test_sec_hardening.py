@@ -4,6 +4,7 @@ SECRET_KEY, throttled log lines for suspicious events, control characters in mai
 from datetime import UTC, datetime, timedelta
 
 import pyotp
+import pytest
 from conftest import PASSWORD, add_user, make_client
 from sqlalchemy import select, update
 
@@ -163,6 +164,42 @@ async def test_body_limit_asgi_streaming_and_content_length():
     ran.clear()
     out = await call([], [b"x" * 50, b"x" * 50])
     assert out[0]["status"] == 200 and ran == [100]
+
+
+async def test_a_route_reading_the_raw_body_after_the_refusal_ends_quietly_with_413():
+    """Starlette's request.body() raises ClientDisconnect once the middleware said the client is gone: caught there –
+    the one 413 is the answer, no traceback; a client that really went still raises."""
+    from fastapi import FastAPI, Request
+    from starlette.requests import ClientDisconnect
+
+    from app.bodylimit import BodyLimit
+
+    app = FastAPI()
+
+    @app.post("/raw")
+    async def raw(request: Request) -> dict:
+        return {"n": len(await request.body())}
+
+    async def call(parts: list[bytes], gone: bool = False) -> list[dict]:
+        msgs = [{"type": "http.request", "body": p, "more_body": True} for p in parts]
+        out: list[dict] = []
+
+        async def receive():  # noqa: ANN202
+            return msgs.pop(0) if msgs else {"type": "http.disconnect"}
+
+        async def send(m):  # noqa: ANN001, ANN202
+            out.append(m)
+
+        scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "POST", "scheme": "http", "path": "/raw", "raw_path": b"/raw",
+                 "query_string": b"", "root_path": "", "headers": [(b"host", b"t")], "client": ("1.2.3.4", 1), "server": ("t", 80)}  # fmt: skip
+        await BodyLimit(app, limit=1000)(scope, receive, send)
+        return out
+
+    out = await call([b"a" * 600, b"a" * 600])  # chunked, past the limit: no exception out of the app
+    assert [m["status"] for m in out if m["type"] == "http.response.start"] == [413]
+    assert sum(1 for m in out if m["type"] == "http.response.body") == 1
+    with pytest.raises(ClientDisconnect):
+        await call([b"a" * 10])  # under the limit, then the client went: not hidden
 
 
 def test_max_body_bytes_from_the_environment(monkeypatch):
