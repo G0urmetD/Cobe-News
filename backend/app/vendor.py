@@ -2255,7 +2255,17 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
     exploited" for a finding notified before without it. Returns how many events (not baseline) were created. Only
     products whose view or versions changed since the last evaluation are looked at (all of them hourly); each
     product's events are read by their scope and written in a short transaction of its own."""
+    from app import csaf_providers
+
     now = datetime.now(UTC)
+    # TLP:GREEN of a provider no longer allowed (switched off while the round read its documents): gone before any event
+    # is made of it – never stored as news, never sent
+    try:
+        if await csaf_providers.purge_green(db, csaf_providers.green_allowed(await config(db))):
+            await db.commit()
+    except Exception:  # noqa: BLE001 - tried again with the next round (the round's own first step does it as well)
+        await db.rollback()
+        log.exception("vendor: removing TLP:GREEN advisories failed")
     fs = await follows(db)
     vers = await versions_of(db, [f.id for f in fs])
     kev, euvd = await kev_index(db), await euvd_cves(db)
@@ -2266,8 +2276,6 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
     created = 0
     answered = await _answered(db)
     if not (await config(db)).get("csaf", True):
-        from app import csaf_providers
-
         answered |= {f"csaf:{x['key']}" for x in csaf_providers.providers()}  # switched off: nothing to wait for
     for f in fs:
         p = product_of(f)

@@ -7,9 +7,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app import csaf_providers, db, forward, notify, story_details, vendor
+from app import settings as settings_store
 from app.models import AuditEntry, VendorAdvisory, VendorEvent, VendorFetch
 from app.news import NewsError
 from tests.test_api_tokens import get, make_token
@@ -127,19 +128,53 @@ async def test_green_end_to_end(net, structured_on, admin_client, reader_client,
     assert all(x["id"] != ADV_ID for x in d["findings"])
 
 
+async def _allow_green(keys: list[str]) -> None:
+    """The setting written directly (the admin API would remove the documents at once)."""
+    async with db.session() as s:
+        cfg = await settings_store.get(s, "vendor")
+        await settings_store.put(s, "vendor", {**cfg, "csaf_green": keys})
+        await s.commit()
+
+
 async def test_the_round_removes_green_of_a_provider_no_longer_allowed(net, structured_on, admin_client):  # noqa: F811
     _cisco_routes(net, csv_=_csv(), doc=_labelled("GREEN"))
     await _follow(admin_client, "cisco-asa", "9.20.2")
+    await _allow_green(["cisco"])
     async with db.session() as s:
         ix = await vendor.current_index(s)
         prods = [vendor.product_of(f) for f in await vendor.follows(s)]
         await csaf_providers.sync_all(s, prods, timedelta(hours=6), ix, True, frozenset({"cisco"}))
         assert await s.get(VendorAdvisory, ADV_ID) is not None
+    await _allow_green([])
+    async with db.session() as s:
         # the setting says nothing is allowed (the default): the round's first step removes it, silently
         out = await vendor.sync_structured(s, await vendor.config(s), prods, timedelta(hours=6), ix, False)
         assert out.get("csaf:tlp_green_removed") == 1
         assert await s.get(VendorAdvisory, ADV_ID, populate_existing=True) is None
         assert await csaf_providers.purge_green(s, frozenset()) == 0
+
+
+async def test_a_provider_taken_off_while_the_round_runs_gets_nothing_stored_or_sent(net, structured_on, admin_client):  # noqa: F811
+    _cisco_routes(net, csv_=_csv(), doc=_labelled("GREEN"))
+    await _follow(admin_client, "cisco-asa", "9.20.2")
+    # the round began with Cisco allowed (its `green`), the admin took it off meanwhile: the document is not stored
+    async with db.session() as s:
+        ix = await vendor.current_index(s)
+        prods = [vendor.product_of(f) for f in await vendor.follows(s)]
+        await csaf_providers.sync_all(s, prods, timedelta(hours=6), ix, True, frozenset({"cisco"}))
+        assert await s.get(VendorAdvisory, ADV_ID) is None
+    # stored a moment before the switch (the per-document check passed): the evaluation removes it before any event
+    await _allow_green(["cisco"])
+    async with db.session() as s:
+        await s.execute(update(VendorFetch).where(VendorFetch.key == "csaf:cisco").values(cursor=None, next_fetch_at=None, etag=None, last_modified=None))
+        await s.commit()
+        await csaf_providers.sync_all(s, prods, timedelta(hours=6), ix, True, frozenset({"cisco"}))
+        assert await s.get(VendorAdvisory, ADV_ID) is not None
+    await _allow_green([])
+    async with db.session() as s:
+        await vendor.evaluate_events(s, full=True)
+        assert await s.get(VendorAdvisory, ADV_ID, populate_existing=True) is None
+        assert (await s.scalars(select(VendorEvent).where(VendorEvent.key.endswith(":" + ADV_ID), VendorEvent.baseline.is_(False)))).first() is None
 
 
 # ---------------------------------------------------------------- every renderer labels it

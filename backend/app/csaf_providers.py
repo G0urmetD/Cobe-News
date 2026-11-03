@@ -387,6 +387,14 @@ async def _document(db: AsyncSession, provider: dict, entry: dict, cur: dict) ->
     return body, None
 
 
+async def _green_now(db: AsyncSession, key: str) -> bool:
+    """Whether the provider's TLP:GREEN documents are allowed now – the settings as saved this moment, not as the round
+    began (rare: only asked for a GREEN document)."""
+    from app import vendor
+
+    return key in green_allowed(await vendor.config(db))
+
+
 def _retry_list(cur: dict) -> dict[str, dict]:
     r = cur.get("retry")
     return {k: v for k, v in r.items() if isinstance(v, dict) and isinstance(k, str)} if isinstance(r, dict) else {}
@@ -423,6 +431,10 @@ async def sync_provider(db: AsyncSession, provider: dict, hosts: dict[str, str],
             if ok is False:
                 raise NewsError("format", "hash mismatch")
             adv = await asyncio.to_thread(advisory, body, provider, e, green)
+            if adv is not None and adv["data"].get("tlp") == GREEN and not await _green_now(db, provider["key"]):
+                # an admin took the provider off the TLP:GREEN list while this round read it: not stored (allowed
+                # again, its list is read from the start)
+                raise NewsError("blocked", "TLP:GREEN no longer allowed")
             if adv is not None:
                 # the first fill: what is older than FRESH_FILL is shown, never notified; a fresh one is (M7)
                 if first_fill and e["ts"] < (now - FRESH_FILL).strftime("%Y-%m-%dT%H:%M:%SZ"):
