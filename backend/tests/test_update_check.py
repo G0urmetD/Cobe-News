@@ -102,7 +102,8 @@ async def test_equal_older_prerelease_garbage(monkeypatch, admin_client, tag, ex
     gh = GitHub(_release(f"v{tag}", **extra))
     monkeypatch.setattr(update_check, "transport", httpx.MockTransport(gh.handler))
     await _check()
-    assert (await admin_client.get("/api/admin/update")).json()["available"] is available
+    body = (await admin_client.get("/api/admin/update")).json()
+    assert body["available"] is available and body["ahead"] is (tag == OLDER)  # older release: this build is ahead
 
 
 async def test_errors_are_kept_and_not_retried_before_the_time(monkeypatch, admin_client):

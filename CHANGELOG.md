@@ -9,7 +9,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 - **Neues Thema „Exploit veröffentlicht“** in News, aus CISA-Einstufung und den Exploit-Listen; beobachtete CVEs melden sich, wenn ein Exploit erscheint.
 - **Themen in Benachrichtigungsregeln** sowie für Desktop- und Push-Benachrichtigungen.
 - **„Betrifft unsere Produkte“** als Schnellfilter in News mit Anzahl und Plakette „Unser Produkt: …“ auf den Karten.
-- **Update-Hinweis für Admins**, wenn auf GitHub eine neuere Version erschienen ist (abschaltbar).
+- **Update-Hinweis für Admins**, wenn auf GitHub eine neuere Version erschienen ist (abschaltbar). Nur ein Hinweis – aktualisiert wird nichts von selbst. Läuft eine Version, die noch nicht veröffentlicht ist, steht das unter *Über Cobe News* so da.
 - **TLP:GREEN je CSAF-Quelle zulassen** (aus ab Werk); solche Inhalte sind überall als „TLP:GREEN – nur intern weitergeben“ gekennzeichnet.
 - **Fertiges Image nutzen**: optional `docker-compose.image.yml` mit dem signierten Image von ghcr.io statt lokalem Bauen.
 
@@ -23,6 +23,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 ### Fixes
 - **CPEs mit Doppelpunkt im Namen** (z. B. mailcow) werden beim Abgleich richtig erkannt.
 - **Meldungsdetails** nutzen nur noch frei weitergebbare Dokumente.
+- **Falsches „betroffen“ durch CISAs Ergänzung**: NVD liefert neben den Angaben des Herstellers auch CISAs Ergänzung (ADP) mit. Beide standen bisher ununterscheidbar nebeneinander, und CISAs Vorgabe „alle anderen Versionen betroffen“ galt als Aussage des Herstellers (GitLab 19.5.3 bei CVE-2024-4835). Jetzt entscheidet der Hersteller; CISAs Angaben zählen nur, wo er das Produkt nicht nennt. Die gespeicherten NVD-Einträge werden beim nächsten fälligen Abruf je Produkt vollständig neu geholt.
 - **„Langsam“ in der Quellen-Gesundheit** kam auch von einem einzelnen großen Download, etwa dem ersten vollständigen NVD-Abruf eines neu verfolgten Produkts (GitLab: 6 MB in 4 Seiten). Downloads über 1 MB je Anfrage zählen dafür nicht mehr; die angezeigte mittlere Antwortzeit enthält sie weiter.
 
 ### Sicherheit

@@ -132,7 +132,7 @@ function UpdateCheck() {
                     {t("update.available", { version: s.latest })}
                   </a>
                 ) : (
-                  <span className="font-sans text-muted-foreground">· {t("update.upToDate")}</span>
+                  <span className="font-sans text-muted-foreground">· {t(s.ahead ? "update.ahead" : "update.upToDate", { version: s.current })}</span>
                 )}
               </span>
             ) : (

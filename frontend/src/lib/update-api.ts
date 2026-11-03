@@ -10,6 +10,8 @@ export interface UpdateStatus {
   latest: string | null
   /** latest is newer than current */
   available: boolean
+  /** current is newer than latest – a build not released yet */
+  ahead: boolean
   /** this admin closed the notice for `latest` */
   dismissed: boolean
   /** the release on GitHub (made by the server from the tag) */

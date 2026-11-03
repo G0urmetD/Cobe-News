@@ -161,6 +161,7 @@ async def status(s: AsyncSession, user_id=None) -> dict:  # noqa: ANN001
         "current": __version__,
         "latest": latest,
         "available": available,
+        "ahead": newer(__version__, latest) if latest else False,  # this installation is newer than the latest release (built before its tag)
         "dismissed": dismissed,
         "url": release_url(str(state.get("tag") or "")) if available else None,
         "published_at": state.get("published_at") if available else None,

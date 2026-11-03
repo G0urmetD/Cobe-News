@@ -115,6 +115,7 @@ describe("AboutPage", () => {
       current: "0.1.46",
       latest: "0.1.48",
       available: true,
+      ahead: false,
       dismissed: false,
       url: "https://github.com/G0urmetD/Cobe-News/releases/tag/v0.1.48",
       published_at: null,
@@ -134,6 +135,10 @@ describe("AboutPage", () => {
       const bad = render(data, { ...update, url: "javascript:alert(1)" })
       expect(bad).not.toContain("javascript:")
       expect(bad).not.toContain("0.1.48 verfügbar</a>")
+      // a build newer than the latest release (installed before its tag): no "verfügbar", but said so
+      const ahead = render({ ...data, version: "0.1.47" }, { ...update, current: "0.1.47", latest: "0.1.46", available: false, ahead: true, url: null })
+      expect(ahead).toContain("diese Installation (0.1.47) ist neuer")
+      expect(ahead).not.toContain("verfügbar")
     } finally {
       auth.isAdmin = false
     }
