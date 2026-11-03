@@ -13,7 +13,9 @@ Plus 24.11 typed for pfSense CE) and which release lines exist at all. `check` a
 6. ``pattern``   the catalogue's regular expression for the product (Exchange: builds only)
 7. plausibility  the major version must be on a release line the product has (endoflife.date's lines and latest
                  releases): "2019 CU15", "2411", "12416" or "2024.005.20320" are far beyond every line of
-                 Exchange (15), Office (16), VMware Tools (13) or Acrobat (25) → refused: implausible
+                 Exchange (15), Office (16), VMware Tools (13) or Acrobat (25) → refused: implausible. A product
+                 marked ``lines_only`` (Firefox ESR, Jenkins LTS: ``lts``) has only some of the lines – a version
+                 between them that is on none ("134.0" for Firefox ESR: 115, 128, 140, 153) is refused as well
 
 What is stored is the result (`value`); the form says what it became ("→ 15.2.1748.24"). Stored versions are evaluated
 through `effective` – the same steps, so a version stored before a rule existed is compared as it is meant
@@ -149,6 +151,14 @@ def _horizon_yymm(t: str) -> str:
     return t
 
 
+def _leading_zeros(t: str) -> str:
+    """Exchange: ExSetup.exe's FileVersion (and Microsoft's CVE records) write "15.02.1748.024" – the build tables, the
+    advisories' ranges and the form write 15.2.1748.24. Only a version of numbers alone."""
+    if re.fullmatch(r"\d{1,6}(?:\.\d{1,6}){1,4}", t):
+        return ".".join(str(int(x)) for x in t.split("."))
+    return t
+
+
 NORMALIZE = {
     "two_digit_year": _two_digit_year,
     "netscaler": _netscaler,
@@ -157,6 +167,7 @@ NORMALIZE = {
     "nginx_plus": _nginx_plus,
     "checkpoint": _checkpoint,
     "horizon_yymm": _horizon_yymm,
+    "leading_zeros": _leading_zeros,
 }
 
 
@@ -199,6 +210,57 @@ def example_for(product: dict) -> str:
     return EXAMPLES.get(scheme, "")
 
 
+def _line_key(scheme: str, name: str) -> tuple[int, ...] | None:
+    """The numbers of a line's name ("153" → (153,), "2.568" → (2, 568)) – None for a name without them."""
+    from app import vendor_catalog
+
+    v = parse(scheme, name) or parse("generic", name)
+    if v is None and (lead := vendor_catalog.lead(name)):
+        v = parse("generic", lead)
+    return tuple(v.key) if v is not None and v.key else None
+
+
+def own_lines(product: dict) -> tuple[list[tuple[int, ...]], list[str], tuple[int, ...] | None]:
+    """`lines_only`: the product's own lines of its release data (`lts`: those endoflife.date marks LTS – Firefox ESR's
+    115/128/140/153 among all Firefox lines, Jenkins' 2.568/2.555/… among the weekly line; `all`: every listed line),
+    their names (newest first) and the newest line of the release data at all (the upper end of what the data knows)."""
+    from app import vendor_catalog
+
+    mode = product.get("lines_only")
+    if mode not in ("lts", "all"):
+        return [], [], None
+    scheme = product.get("scheme") or "generic"
+    rels = vendor_catalog.releases(product.get("eol"))
+    keys, names, every = [], [], []
+    for r in rels:
+        k = _line_key(scheme, str(r.get("name") or ""))
+        if k is None:
+            continue
+        every.append(k)
+        if mode == "all" or r.get("isLts"):
+            keys.append(k)
+            names.append(str(r["name"]))
+    return keys, names, (max(every) if every else None)
+
+
+def _on_own_line(product: dict, v) -> tuple[bool, tuple[str, ...]]:  # noqa: ANN001
+    """A version of a `lines_only` product: on one of its lines – or outside what the release data knows (older than
+    its oldest line, newer than its newest: a line endoflife.date does not list yet is never refused)."""
+    keys, names, newest = own_lines(product)
+    if not keys:
+        return True, ()
+    vk = tuple(v.key)
+    if any(vk[: len(k)] == k for k in keys):
+        return True, ()
+    depth = max(len(k) for k in keys)
+    at = vk[:depth]
+    lowest = min(keys)
+    top = max([*keys, *([newest[:depth]] if newest else [])])
+    if at < lowest[: len(at)] or at > top:
+        return True, ()
+    return False, tuple(names[:6])
+
+
 def plausible(product: dict, value: str) -> tuple[bool, tuple[str, ...]]:
     scheme = product.get("scheme") or "generic"
     if scheme in NO_LINES or product.get("source") == "custom":
@@ -209,9 +271,11 @@ def plausible(product: dict, value: str) -> tuple[bool, tuple[str, ...]]:
         return True, ()
     top = max(majors)
     major = v.key[0]
-    if major in majors or major <= max(top * PLAUSIBLE_FACTOR, top + PLAUSIBLE_MARGIN):
-        return True, ()
-    return False, tuple(names)
+    if not (major in majors or major <= max(top * PLAUSIBLE_FACTOR, top + PLAUSIBLE_MARGIN)):
+        return False, tuple(names)
+    if product.get("lines_only"):
+        return _on_own_line(product, v)
+    return True, ()
 
 
 # ---------------------------------------------------------------- the check
@@ -277,7 +341,7 @@ def _effective(scheme: str, rules_json: str, text: str) -> str | None:
     return _prepare(product, _clean(text))
 
 
-RULE_FIELDS = ("key", "label", "vendor", "scheme", "eol", "source", "aliases", "kw", "belongs", "normalize", "pattern", "pattern_hint")
+RULE_FIELDS = ("key", "label", "vendor", "scheme", "eol", "source", "aliases", "kw", "belongs", "normalize", "pattern", "pattern_hint", "lines_only")
 
 
 def effective(product: dict, text: str | None) -> str | None:

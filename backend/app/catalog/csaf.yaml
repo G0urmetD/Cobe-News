@@ -25,4 +25,4 @@ providers:
   - key: openxchange
     name: Open-Xchange GmbH
     domain: www.open-xchange.com       # listed in the BSI aggregator; directories on documentation.open-xchange.com (App Suite, Dovecot)
-    vendors: [Open-Xchange]
+    vendors: [Open-Xchange, Dovecot (Open-Xchange)]   # Dovecot belongs to Open-Xchange (its advisories: oxdc-adv-…)

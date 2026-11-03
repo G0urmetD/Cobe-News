@@ -175,7 +175,8 @@ def parse_csaf(data: bytes, kind: str, max_products: int = MAX_PRODUCTS) -> dict
         e = products.setdefault((p.get("vendor") or "", name), {"vendor": p.get("vendor") or "", "name": name, "cpe": "", "affected": set(), "fixed": set(), "not_affected": set()})
         cpe = p.get("cpe") or ""
         if cpe and not e["cpe"]:
-            parts = cpe.replace("cpe:2.3:", "").replace("cpe:/", "").split(":")
+            # split only between fields: an escaped colon belongs to its field (a:mailcow:mailcow\\:_dockerized)
+            parts = re.split(r"(?<!\\):", cpe.replace("cpe:2.3:", "").replace("cpe:/", ""))
             e["cpe"] = ":".join(parts[:3]) if len(parts) >= 3 else ""
         return e
 

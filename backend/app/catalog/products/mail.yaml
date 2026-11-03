@@ -45,8 +45,17 @@
 # ---------------------------------------------------------------- mail, mail security
 - key: postfix
   cpes: [a:postfix:postfix]
-- key: dovecot
-  cpes: [a:dovecot:dovecot]
+- key: dovecot  # endoflife.date's product; Open-Xchange publishes Dovecot's advisories (CNA "OX", CSAF provider openxchange)
+  label: Dovecot
+  vendor: Dovecot (Open-Xchange)  # csaf.yaml: the openxchange provider speaks for it; its documents list Dovecot in the vendor branch "Open-Xchange GmbH"
+  # OX's CSAF documents name every Dovecot as a:open-xchange:dovecot; NVD has that CPE only with sw_edition "pro"
+  # (checked 2026-11-03, 40 entries) – the community edition is a:dovecot:dovecot. This product is Dovecot CE
+  # (endoflife.date's lines 2.3, 2.4): NVD's Pro edition does not count, nor OX's "OX Dovecot Pro" entries and rows
+  cpes: [a:dovecot:dovecot, a:open-xchange:dovecot]
+  cpe_editions: [[a:open-xchange:dovecot, "*"], [a:open-xchange:dovecot, "-"], [a:open-xchange:dovecot, ce], [a:open-xchange:dovecot, community]]
+  cna: [[Open-Xchange GmbH, OX Dovecot CE], [Open-Xchange GmbH, Dovecot], [Dovecot, Dovecot]]
+  excluded_names: [OX Dovecot Pro]
+  kw: [Dovecot]
 - key: pigeonhole
 - key: exim
   cpes: [a:exim:exim]

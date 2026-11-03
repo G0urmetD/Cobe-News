@@ -148,7 +148,7 @@ def test_bounds_with_alternatives_and_lines():
         ("msexchange", "2019 CU15", "15.2.1748"),  # the line: every build of CU15
         ("msexchange", "SE RTM Oct26SU", "15.2.2562.56"),
         ("msexchange", "Subscription Edition RTM", "15.2.2562"),
-        ("msexchange", "15.02.1748.037", "15.02.1748.037"),
+        ("msexchange", "15.02.1748.037", "15.2.1748.37"),  # ExSetup's FileVersion: the leading zeros go
         ("mssqlserver", "2022 CU16", "16.0.4165.4"),
         ("mssqlserver", "SQL Server 2022 CU16", "16.0.4165.4"),
         ("mssqlserver", "KB5059390", "16.0.4205.1"),
@@ -402,7 +402,7 @@ async def test_stored_version_compared_as_meant_and_flagged(admin_client):
 def test_release_values_stay_comparable(cat):
     """The compatibility check of 0.1.44: every latest release endoflife.date names – the forms admins copy – is still
     compared under the stricter rules. Left out on purpose: a version of the other half of a split product (Jenkins'
-    weekly line under Jenkins LTS and back) and GlobalProtect builds no release notes map to a hotfix – compared as a
+    weekly line under Jenkins LTS and back, Firefox's release channel under Firefox ESR) and GlobalProtect builds no release notes map to a hotfix – compared as a
     build they decided wrongly ("6.3.3-c1199" is newer than every 6.3.3-hN)."""
     lost = []
     for key, p in cat.items():
@@ -410,6 +410,8 @@ def test_release_values_stay_comparable(cat):
             text = r.get("latest")
             if not text or parse(p.get("scheme") or "generic", text) is None:
                 continue
+            if p.get("lines_only") == "lts" and not r.get("isLts"):
+                continue  # not one of the product's lines (Firefox ESR: a release-channel version) – refused on purpose
             if version_input.effective(p, text) is None:
                 c = version_input.check(p, text)
                 if c.reason == "other_product" or (key == "pangp" and c.reason == "unknown_name"):

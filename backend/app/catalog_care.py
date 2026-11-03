@@ -223,7 +223,7 @@ def cpe_short(cpe: str | None) -> str | None:
     """'cpe:2.3:a:vendor:product:*:…' or 'a:vendor:product' → 'a:vendor:product' (what "add by CPE" takes)."""
     if not cpe:
         return None
-    parts = cpe.removeprefix("cpe:2.3:").split(":")
+    parts = re.split(r"(?<!\\):", cpe.removeprefix("cpe:2.3:"))  # an escaped colon stays in its field (mailcow\\:_dockerized)
     return ":".join(parts[:3]).lower() if len(parts) >= 3 else None
 
 

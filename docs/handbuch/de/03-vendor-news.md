@@ -195,6 +195,11 @@ Firefox, `2019` bei nginx. Das Formular lehnt sie ab und nennt die bekannten Lin
 die bekannten und ältere gehen. Produkte ohne Release-Linien prüft Vendor News darauf nicht; manche haben stattdessen
 ein festes Muster (Exchange und SQL Server: Build-Nummern, VMware Tools: `12.4.0`).
 
+Manche Produkte haben nur einen Teil der Linien: **Mozilla Firefox ESR** nur die ESR-Linien (115, 128, 140, 153 …),
+**Jenkins LTS** nur die LTS-Linien (2.555, 2.568 …). Eine Version dazwischen, die auf keiner davon liegt – `134.0` bei
+Firefox ESR, `2.500.1` bei Jenkins LTS –, lehnt das Formular ab und nennt die Linien; meist ist es das andere Produkt
+(Mozilla Firefox, Jenkins weekly). Eine Linie, die neuer ist als alle bekannten, geht auch hier.
+
 ### Getrennte Produkte {#getrennte-produkte}
 
 Produkte mit zwei Versionslinien unter einem Namen sind getrennt, weil ihre Hinweise getrennt rechnen:

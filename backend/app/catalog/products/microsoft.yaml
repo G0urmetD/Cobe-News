@@ -18,6 +18,7 @@
   pattern: '\d{1,2}\.\d{1,2}\.\d{1,4}(?:\.\d{1,4})?'  # a build – names (2019 CU15 …) are looked up first
   pattern_hint: exchange_names
   line_depth: 3  # Microsoft's records have one row per CU (15.2.1748 = 2019 CU15), each from 15.02.0 on
+  normalize: [leading_zeros]  # ExSetup's FileVersion 15.02.1748.024 → 15.2.1748.24 (the build table's form)
 - key: sharepoint
   label: Microsoft SharePoint Server
   vendor: Microsoft
