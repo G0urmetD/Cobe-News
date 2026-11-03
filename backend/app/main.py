@@ -21,7 +21,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from app import __version__, api_tokens, api_v1, audit, audit_api, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, reader, restore_test, sessions_api, source_health, sqlite_import, teams, tls, vendor, webpush
+from app import __version__, api_tokens, api_v1, audit, audit_api, bodylimit, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, reader, restore_test, sessions_api, source_health, sqlite_import, teams, tls, vendor, webpush
 from app import news as news_svc
 from app.admin_api import router as admin_router
 from app.api import router
@@ -357,6 +357,10 @@ def create_app() -> FastAPI:
     @app.exception_handler(api_tokens.TokenError)
     async def _token_refused(request: Request, exc: api_tokens.TokenError) -> JSONResponse:
         return exc.response
+
+    # the request body limit – inside the guard below (added first: Starlette's last added middleware is the outermost),
+    # so its 413 gets the security headers and the access log line like every answer
+    app.add_middleware(bodylimit.BodyLimit, limit=cfg.max_body_bytes)
 
     @app.middleware("http")
     async def _guard(request: Request, call_next):

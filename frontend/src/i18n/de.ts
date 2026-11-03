@@ -282,6 +282,7 @@ const de: Record<string, string> = {
   "errors.header_value_missing": "Zum Header-Namen fehlt der Wert.",
   "errors.hmac_too_short": "Das Geheimnis ist zu kurz (mindestens 16 Zeichen).",
   "errors.invalid": "Ungültige Eingabe.",
+  "errors.body_too_large": "Die Anfrage ist zu groß.",
   "errors.invalid_code": "Der Code ist ungültig oder wurde bereits verwendet.",
   "errors.invalid_credentials": "Benutzername oder Passwort falsch.",
   "errors.temp_password_expired": "Startpasswort abgelaufen – Admin um ein neues bitten.",

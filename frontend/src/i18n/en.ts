@@ -277,6 +277,7 @@ const en: Record<string, string> = {
     "Not a valid header name: letters, digits and hyphens only (not first), at most 64 characters; Host, Content-Type, Cookie and other reserved headers as well as X-Cobe-… are not allowed.",
   "errors.header_value_missing": "The header name has no value.",
   "errors.hmac_too_short": "The secret is too short (at least 16 characters).",
+  "errors.body_too_large": "The request is too large.",
   "errors.invalid": "Invalid input.",
   "errors.invalid_code": "The code is invalid or was already used.",
   "errors.invalid_credentials": "Wrong user name or password.",

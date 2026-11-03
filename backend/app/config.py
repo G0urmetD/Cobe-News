@@ -19,6 +19,15 @@ def _flag(name: str, default: bool = False) -> bool:
     return default if v is None or not v.strip() else v.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _int(name: str, default: int, low: int, high: int) -> int:
+    """A whole number from the environment – empty, not a number or out of range: the default."""
+    try:
+        v = int((os.environ.get(name) or "").strip().replace("_", ""))
+    except ValueError:
+        return default
+    return v if low <= v <= high else default
+
+
 def _list(name: str) -> tuple[str, ...]:
     return tuple(x.strip().lower() for x in (os.environ.get(name) or "").split(",") if x.strip())
 
@@ -76,6 +85,8 @@ class Config:
     restore_db_name: str = "cobe_news_restore_test"
     restore_db_user: str = "cobe_news_restore"
     restore_db_password: str = field(default="", repr=False)
+    # the largest request body the app takes (app/bodylimit.py) – behind nginx's 1 MB; MAX_BODY_BYTES
+    max_body_bytes: int = 1024 * 1024
 
     @property
     def restore_url(self) -> URL | None:
@@ -162,6 +173,7 @@ def get_config() -> Config:
         restore_db_name=(os.environ.get("POSTGRES_RESTORE_DB") or "cobe_news_restore_test").strip(),
         restore_db_user=(os.environ.get("POSTGRES_RESTORE_USER") or "cobe_news_restore").strip(),
         restore_db_password=os.environ.get("POSTGRES_RESTORE_PASSWORD") or "",
+        max_body_bytes=_int("MAX_BODY_BYTES", 1024 * 1024, 16 * 1024, 64 * 1024 * 1024),
     )
 
 
