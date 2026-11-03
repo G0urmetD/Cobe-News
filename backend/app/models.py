@@ -74,6 +74,8 @@ class NewsItem(Base):
         Index("ix_news_items_search_trgm", "search", postgresql_using="gin", postgresql_ops={"search": "gin_trgm_ops"}),
         # the topic filter (topics ?| …) and "which stories name these CVEs" (KEV changes, a new KEV story) – migration 0024
         Index("ix_news_items_topics", "topics", postgresql_using="gin"),
+        # "Betrifft unsere Produkte" (products ?| the followed ones) – migration 0026
+        Index("ix_news_items_products", "products", postgresql_using="gin"),
         Index("ix_news_items_cves", "cves", postgresql_using="gin"),
     )
 
@@ -107,6 +109,10 @@ class NewsItem(Base):
     # the story's topics (news.topics_of: zeroday, exploited, ransomware, nopatch, breach, supply, phishing, ot) – from
     # title, stored teaser, source, CVEs, details and the KEV; recomputed when any of them changes (news.retopic)
     topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    # the followed products (catalogue keys) the story's details concern – story_details.matches, as the drawer's
+    # "Betrifft deine Systeme": from the advisory's structured data, never from words. Recomputed when the details arrive
+    # and when a follow or its versions change (story_details.products_round); "Betrifft unsere Produkte" on News
+    products: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
 
 
 class NewsItemSource(Base):
@@ -315,6 +321,8 @@ class NotifyRule(Base):
     # so a wider rule starts from then instead of sending everything older that newly matches (notify.widened)
     earlier: Mapped[list] = mapped_column(Json, default=list)
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")  # optimistic concurrency, as channels
+    # news only: stories with one of these topics (news.TOPICS; empty = any) – AND with severities and sources
+    topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
 
 
 class NotifyRuleChannel(Base):

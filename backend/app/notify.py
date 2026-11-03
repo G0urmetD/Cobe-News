@@ -378,6 +378,7 @@ CARD_LABELS = {
         "topics": {
             "zeroday": "Zero-Day",
             "exploited": "Aktiv ausgenutzt",
+            "poc": "Exploit veröffentlicht",
             "ransomware": "Ransomware",
             "nopatch": "Ohne Patch",
             "breach": "Vorfall/Datenleck",
@@ -404,6 +405,7 @@ CARD_LABELS = {
         "topics": {
             "zeroday": "Zero-day",
             "exploited": "Actively exploited",
+            "poc": "Exploit published",
             "ransomware": "Ransomware",
             "nopatch": "No patch",
             "breach": "Incident/data leak",
@@ -1253,8 +1255,8 @@ def card_product(data: dict | None, matched: list[dict]) -> str:
 
 # ---------------------------------------------------------------- what a rule lets through (the live round and the dry run)
 #
-# The filters below are the one matcher of the rules: built from the rule's fields only (severities, sources, kinds,
-# teams) – no channel, no "sent" marks, no time. The live round (pending / vendor_pending / health_pending) adds the
+# The filters below are the one matcher of the rules: built from the rule's fields only (severities, sources, topics,
+# kinds, teams) – no channel, no "sent" marks, no time. The live round (pending / vendor_pending / health_pending) adds the
 # time since the rule (and the link) and what the channel got already; the dry run (dry_run) adds only the time window.
 
 
@@ -1268,10 +1270,19 @@ def news_filter(rule: NotifyRule) -> list:
     ]
     if rule.severities:
         where.append(NewsItem.severity.in_(list(rule.severities)))
+    # topics: one of them (OR within the topics, AND with the rest) – a story that gets one only later (the KEV,
+    # its details) matches from then on and is sent then, once (pending: not sent to the channel yet)
+    if topics := rule_topics(rule):
+        where.append(news_svc.has_topic(topics))
     # carried by a switched-on source (of the rule's, when it names some) – also as a further source ("also in")
     ids = news_svc._ids(rule.sources)
     where.append(news_svc.visible(ids) if ids or not rule.sources else false())  # only unreadable ids: nothing, not "all"
     return where
+
+
+def rule_topics(rule: NotifyRule) -> list[str]:
+    """The rule's topics as news.TOPICS knows them (in their order) – empty: every story, whatever its topics."""
+    return [t for t in news_svc.TOPICS if t in (getattr(rule, "topics", None) or [])]
 
 
 def _teams_clause(teams) -> ColumnElement:  # noqa: ANN001
@@ -1316,19 +1327,20 @@ EARLIER_MAX = 10  # filters kept per rule; more: the two oldest become one (stri
 
 
 def rule_filter(rule: NotifyRule, teams: list | None = None) -> dict:
-    """What a rule lets through, normalised: severities / sources / teams None = all (a rule's empty list). `teams`: the
-    rule's team filter (notify_rule_teams – not on the rule row)."""
+    """What a rule lets through, normalised: severities / sources / topics / teams None = all (a rule's empty list).
+    `teams`: the rule's team filter (notify_rule_teams – not on the rule row)."""
     return {
         "severities": sorted(rule.severities or []) or None,
         "sources": sorted(str(x) for x in rule.sources or []) or None,
+        "topics": sorted(rule_topics(rule)) or None,
         "kinds": sorted(rule_kinds(rule)),
         "teams": sorted(str(x) for x in teams or []) or None,
     }
 
 
 def widens(old: dict, new: dict) -> bool:
-    """`new` lets through something `old` did not: another severity, source, kind or team (or "all" instead of a
-    choice)."""
+    """`new` lets through something `old` did not: another severity, source, topic, kind or team (or "all" instead of a
+    choice). A filter of before topics existed has none (`topics` missing: all)."""
 
     def more(a: list | None, b: list | None) -> bool:
         return a is not None and (b is None or bool(set(b) - set(a)))
@@ -1336,6 +1348,7 @@ def widens(old: dict, new: dict) -> bool:
     return (
         more(old["severities"], new["severities"])
         or more(old["sources"], new["sources"])
+        or more(old.get("topics"), new.get("topics"))
         or bool(set(new["kinds"]) - set(old["kinds"]))
         or more(old.get("teams"), new.get("teams"))
     )
@@ -1360,6 +1373,7 @@ def widened(rule: NotifyRule, before: dict, seq: int, at: datetime) -> None:
         merged = {
             "severities": _both(a["severities"], b["severities"]),
             "sources": _both(a["sources"], b["sources"]),
+            "topics": _both(a.get("topics"), b.get("topics")),
             "kinds": sorted(set(a["kinds"]) & set(b["kinds"])),
             "teams": _both(a.get("teams"), b.get("teams")),
         }
@@ -1377,6 +1391,9 @@ def _earlier_news(rule: NotifyRule) -> list:
         if x["sources"] is not None:
             ids = news_svc._ids(x["sources"])
             match.append(news_svc.carried(ids) if ids else false())
+        if x.get("topics") is not None:
+            want = [t for t in x["topics"] if t in news_svc.TOPICS]
+            match.append(news_svc.has_topic(want) if want else false())
         if match:
             out.append(or_(NewsItem.seq > int(x["seq"]), and_(*match)))
     return out
@@ -1744,7 +1761,7 @@ class Message:
         """What the delivery log keeps of it: the listed stories by reference and title, the rules, what a resend sends."""
         return {
             "ref": delivery_log.ref_of(self.key),
-            "items": [{"kind": x.kind, "id": x.id, "title": x.title, "severity": x.severity} for x in self.stories],
+            "items": [{"kind": x.kind, "id": x.id, "title": x.title, "severity": x.severity, "topics": list(x.topics or []) if x.kind == "news" else []} for x in self.stories],
             "total": self.total,
             "rules": self.by,
             "refs": [f"{kind}:{item}:{rule}" for kind, item, rule in self.items],
@@ -2129,7 +2146,8 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
     now = now or datetime.now(UTC)
     since = now - timedelta(days=days)
     lang = rule.lang if rule.lang in LABELS else "de"
-    restricted = {"severity": bool(rule.severities), "source": bool(rule.sources), "teams": bool(teams)}
+    restricted = {"severity": bool(rule.severities), "source": bool(rule.sources), "topic": bool(rule_topics(rule)), "teams": bool(teams)}
+    wanted = set(rule_topics(rule))
     items: list[dict] = []
     buckets: dict[datetime, int] = {}
     total = 0
@@ -2146,7 +2164,11 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
                 total += int(n)
             stmt = select(NewsItem, NewsSource).join(NewsSource, NewsSource.id == NewsItem.source_id).where(*where).order_by(NewsItem.fetched_at.desc()).limit(DRY_LIMIT)
             for i, src in (await db.execute(stmt)).all():
-                items.append({"kind": "news", "id": str(i.id), "title": i.title, "severity": i.severity, "at": i.fetched_at.isoformat(), "source": src.name, "match": {"kind": "news", **restricted, "teams": False}})
+                # the topics it matched by (the rule's that the story has) – shown as "Thema: …"
+                hit = [t for t in news_svc.TOPICS if t in wanted and t in (i.topics or [])]
+                items.append(
+                    {"kind": "news", "id": str(i.id), "title": i.title, "severity": i.severity, "at": i.fetched_at.isoformat(), "source": src.name, "topics": hit, "match": {"kind": "news", **restricted, "teams": False}}
+                )
         match = vendor_filter(rule, list(teams))
         if match is not None:
             where = [VendorEvent.created_at > since, VendorEvent.created_at <= now, *match]
@@ -2158,7 +2180,17 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
                 st = vendor_story(ev, lang)
                 kind = {"vuln": "vendor_vuln", "change": "vendor_change"}.get(ev.kind, "vendor_version")
                 severity_counts = ev.kind in SEVERITY_KINDS and restricted["severity"]
-                items.append({"kind": kind, "id": str(ev.id), "title": st.title, "severity": ev.severity, "at": ev.created_at.isoformat(), "source": st.source, "match": {"kind": kind, "severity": severity_counts, "source": False, "teams": restricted["teams"]}})
+                items.append(
+                    {
+                        "kind": kind,
+                        "id": str(ev.id),
+                        "title": st.title,
+                        "severity": ev.severity,
+                        "at": ev.created_at.isoformat(),
+                        "source": st.source,
+                        "match": {"kind": kind, "severity": severity_counts, "source": False, "topic": False, "teams": restricted["teams"]},
+                    }
+                )
         match = health_filter(rule)
         if match is not None:
             where = [SourceHealthEvent.created_at > since, SourceHealthEvent.created_at <= now, *match]
@@ -2168,7 +2200,7 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
                 total += int(n)
             for hv in await db.scalars(select(SourceHealthEvent).where(*where).order_by(SourceHealthEvent.created_at.desc()).limit(DRY_LIMIT)):
                 st = health_story(hv, lang)
-                items.append({"kind": "source_health", "id": str(hv.id), "title": st.title, "severity": st.severity, "at": hv.created_at.isoformat(), "source": st.source, "match": {"kind": "source_health", "severity": False, "source": False, "teams": False}})
+                items.append({"kind": "source_health", "id": str(hv.id), "title": st.title, "severity": st.severity, "at": hv.created_at.isoformat(), "source": st.source, "match": {"kind": "source_health", "severity": False, "source": False, "topic": False, "teams": False}})
     finally:
         await db.rollback()
     per_day: dict[str, dict] = {}

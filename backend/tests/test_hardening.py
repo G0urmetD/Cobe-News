@@ -592,7 +592,7 @@ async def test_paging_by_cursor_neither_repeats_nor_skips(reader_client):
             s.add(NewsItem(source_id=src.id, url=f"https://p.example.org/{n}", url_key=f"p{n}", title=f"Story {n}", title_key=f"p{n}", summary="Lücke", published_at=now - timedelta(minutes=n), fetched_at=now, severity="low", search=news.search_text(f"Story {n}", "Lücke", [])))
         await s.commit()
     first = (await reader_client.get("/api/news", params={"limit": 10})).json()
-    assert first["counts"] == {"new": 25, "read": 0, "topics": ANY} and first["more"] and first["next"]
+    assert first["counts"] == {"new": 25, "read": 0, "topics": ANY, "ours": 0} and first["more"] and first["next"]
     # meanwhile: a new story arrives and two of the first page are read
     async with db.session() as s:
         s.add(NewsItem(source_id=src.id, url="https://p.example.org/x", url_key="px", title="Fresh", title_key="px", published_at=datetime.now(UTC), fetched_at=datetime.now(UTC), severity="low", search="fresh"))

@@ -851,6 +851,8 @@ class DesktopIn(_M):
     severities: list[Literal["critical", "high", "medium", "low", "info"]] = Field(default_factory=lambda: ["critical", "high"], max_length=5)
     # source ids (UUIDs): each one short – the choice is stored on the account and read by every push round
     sources: list[Annotated[str, Field(max_length=64)]] = Field(default_factory=list, max_length=50)
+    # topics (news.TOPICS): only stories with one of them – empty: every story (as before)
+    topics: list[Literal["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]] = Field(default_factory=list, max_length=9)
 
 
 @router.get("/me/desktop")

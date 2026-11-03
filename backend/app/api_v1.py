@@ -29,10 +29,10 @@ from app.models import NewsItem, NewsSource
 
 router = APIRouter(prefix="/api/v1")
 Severity = Literal["critical", "high", "medium", "low", "info"]
-Topic = Literal["zeroday", "exploited", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]
+Topic = Literal["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]
 TOPIC_TEXT = (
     "Topics of a story, detected by rules in its title and teaser and from structured data (CISA KEV, the advisory): "
-    "`zeroday`, `exploited` (actively exploited), `ransomware`, `nopatch` (no patch available), `breach` (incident or "
+    "`zeroday`, `exploited` (actively exploited), `poc` (a public exploit or proof of concept), `ransomware`, `nopatch` (no patch available), `breach` (incident or "
     "data leak), `supply` (supply chain), `phishing` (phishing and social engineering), `ot` (OT/ICS)"
 )
 Status = Literal["affected", "possible", "service", "unversioned", "stale", "not_affected"]
@@ -203,7 +203,7 @@ async def list_news(
     db: Db,
     severity: Annotated[list[Severity], Query(description="Only these severities (repeat the parameter)")] = [],  # noqa: B006
     source: Annotated[list[str], Query(max_length=50, description="Only these sources, by key (repeat the parameter)")] = [],  # noqa: B006
-    topic: Annotated[list[Topic], Query(max_length=8, description="Only stories with one of these topics (repeat the parameter; OR within the topics)")] = [],  # noqa: B006
+    topic: Annotated[list[Topic], Query(max_length=9, description="Only stories with one of these topics (repeat the parameter; OR within the topics)")] = [],  # noqa: B006
     q: Annotated[str, Query(max_length=100, description="Words in title, summary or CVE ids (case and accents ignored)")] = "",
     since: Annotated[datetime | None, Query(description="Only stories published at or after this time (ISO 8601)")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,

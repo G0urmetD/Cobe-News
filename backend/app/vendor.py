@@ -306,6 +306,7 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
     touched: set[str] = set()  # the products whose view changes (linked before or now)
     known_keys = [p["key"] for p in ix.products]
     targets: dict[str, dict] | None = None  # the followed products and versions – read once, when a stored one comes again
+    poc_moved: list[str] = []  # CVEs whose SSVC "poc" came or went: the news naming them get their topics again
     for i in range(0, len(advs), STORE_BATCH):
         part = list({a["id"]: a for a in advs[i : i + STORE_BATCH]}.values())
         ids = [a["id"] for a in part]
@@ -360,10 +361,22 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
                     skipped.append(str(a.get("id")))
                 continue
             changed += 1
+            if a.get("source") == "cvelist" and _ssvc_poc(olds[a["id"]].data if a["id"] in olds else None) != _ssvc_poc(a.get("data")):
+                poc_moved.append(str(a.get("ident") or ""))
         await db.commit()
     if changed:
         bump(touched)
+    if poc_moved:
+        from app import news
+
+        await news.retopic_cves(db, poc_moved)  # "Exploit veröffentlicht" (news.exploit_cves)
+        await db.commit()
     return changed
+
+
+def _ssvc_poc(data: dict | None) -> bool:
+    ssvc = (data or {}).get("ssvc") if isinstance(data, dict) else None
+    return isinstance(ssvc, dict) and str(ssvc.get("exploitation") or "").lower() == "poc"
 
 
 async def change_targets(db: AsyncSession) -> dict[str, dict]:
@@ -2390,6 +2403,13 @@ class VendorLoop:
                         await story_details.enrich_round(db)
                     except Exception:  # noqa: BLE001 - the details never stop Vendor News
                         log.exception("story details round failed")
+                    # the stories' products ("Betrifft unsere Produkte"): once after the upgrade, then for the products
+                    # whose follow or versions changed – after the details, in the same loop (never both at once)
+                    try:
+                        await story_details.products_round(db)
+                    except Exception:  # noqa: BLE001 - never stops Vendor News
+                        await db.rollback()
+                        log.exception("story products round failed")
                     cfg = await config(db)
                     if cfg.get("enabled", True):
                         await after_round(db, cfg, force)
