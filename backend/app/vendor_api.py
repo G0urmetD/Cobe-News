@@ -698,8 +698,16 @@ async def put_vendor(body: VendorSettingsIn, request: Request, admin: Admin, db:
     if changes := audit.diff({**cur, "csaf_green": sorted(was_green)}, value, value.keys()):
         audit.record(db, admin, "settings.changed", audit.target("settings", "vendor", "vendor"), {"changes": changes})
     out = await settings_store.put_rev(db, "vendor", value, body.rev)
-    if any(bool(cur.get(k, True)) != switches[k] for k in STRUCTURED) or any(bool(cur.get(k, d)) != switches[k] for k, d in exploits.SWITCHES.items()):
+    exploit_moved = any(bool(cur.get(k, d)) != switches[k] for k, d in exploits.SWITCHES.items())
+    if any(bool(cur.get(k, True)) != switches[k] for k in STRUCTURED) or exploit_moved:
         svc.bump()  # a source switched off (or on again): its stored records leave (or join) the verdicts – svc.counts
+    if exploit_moved:
+        # the news' topic "poc" names the switched-on lists only (news.exploit_cves): every story's topics again, in the
+        # background (news.backfill_topics, in chunks)
+        from app import news
+
+        await news.topics_again(db)
+        await db.commit()
     if set(green) != was_green:
         from app import csaf_providers
 

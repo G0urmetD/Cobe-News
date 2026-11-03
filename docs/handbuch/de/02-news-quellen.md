@@ -151,7 +151,7 @@ unter „Themen“ mit dem Grund („CISA KEV listet CVE-…“, „im Titel: �
 |---|---|
 | **Zero-Day** | „Zero-Day“, „0-day“ in Titel oder Anrisstext (nicht die Zero Day Initiative, nicht „Kein Zero-Day“). Eine Zero-Day-Meldung ist auch *aktiv ausgenutzt*. |
 | **Aktiv ausgenutzt** | ein Eintrag der Kataloge [CISA KEV](term:kev) oder [ENISA EUVD](term:euvd); eine CVE der Meldung steht im KEV (siehe unten); die [Details aus der Quelle](#details-aus-der-quelle) sagen „ausgenutzt“; Wörter wie „actively exploited“, „exploited in the wild“, „aktiv ausgenutzt“, „wird bereits ausgenutzt“ – nicht verneint, nicht als Meldepflicht ([Verneinungen](#verneinungen)) |
-| **Exploit veröffentlicht** | ein öffentlicher Exploit oder Proof of Concept ist bekannt: die CISA stuft eine CVE der Meldung in [SSVC](term:ssvc) mit „Exploitation: poc“ ein (aus der CVE-Liste, siehe unten); Wörter wie „PoC exploit“, „proof-of-concept exploit released“, „Exploit-Code veröffentlicht“, „öffentlicher Exploit“ – nicht verneint („kein öffentlicher Exploit“, „ein Exploit ist nicht bekannt“). Noch kein Beleg für Angriffe – das ist *Aktiv ausgenutzt*. |
+| **Exploit veröffentlicht** | ein öffentlicher Exploit oder Proof of Concept ist bekannt: die CISA stuft eine CVE der Meldung in [SSVC](term:ssvc) mit „Exploitation: poc“ ein (aus der CVE-Liste, siehe unten); eine eingeschaltete Exploit-Sammlung (Metasploit, Exploit-DB, nuclei – [Öffentlicher Exploit](/docs/vendor-news#oeffentlicher-exploit)) führt eine CVE der Meldung; Wörter wie „PoC exploit“, „proof-of-concept exploit released“, „Exploit-Code veröffentlicht“, „öffentlicher Exploit“ – nicht verneint („kein öffentlicher Exploit“, „ein Exploit ist nicht bekannt“). Noch kein Beleg für Angriffe – das ist *Aktiv ausgenutzt*. |
 | **Ransomware** | „Ransomware“, „Erpressertrojaner“, bekannte Gruppen (LockBit, Akira, Qilin, Black Basta, Cl0p); bei KEV-Einträgen der Hinweis der CISA auf Ransomware-Kampagnen |
 | **Ohne Patch** | „[UNGEPATCHT]“ im Titel einer BSI-Warnung; ein CSAF-Advisory mit „kein Fix verfügbar“ oder „kein Fix geplant“ und ohne Hersteller-Fix; wenige eindeutige Wendungen („no patch yet“, „noch kein Update“, „unpatched flaw“) |
 | **Vorfall/Datenleck** | „data breach“, „Datenleck“, „Datenpanne“, „Kundendaten“, „Cyberangriff auf …“, gestohlene oder offengelegte Daten |
@@ -177,6 +177,11 @@ alle Behörden auf einmal.
   Befunde nachschlägt). „poc“ macht die Meldung zu *Exploit veröffentlicht* – nach derselben Sammelartikel-Regel wie
   beim KEV. „active“ (aktive Ausnutzung) ist kein PoC: Diese Meldung ist *Aktiv ausgenutzt*. Ändert die CISA ihre
   Einstufung, folgen die Meldungen zu dieser CVE.
+- **Exploit veröffentlicht über die Exploit-Sammlungen:** Führt eine eingeschaltete Sammlung (Metasploit, Exploit-DB,
+  nuclei) eine CVE der Meldung, ist sie ebenfalls *Exploit veröffentlicht* (gleiche Sammelartikel-Regel); im Drawer
+  steht die Sammlung als Grund. Nimmt eine Sammlung eine CVE neu auf oder streicht sie, folgen die Meldungen zu dieser
+  CVE sofort; beim ersten Laden einer Sammlung, bei sehr vielen Änderungen auf einmal und beim Ein- oder Ausschalten
+  einer Sammlung rechnet Cobe News alle Meldungen im Hintergrund neu.
 - **Anzeigen** („heise-Angebot“, „Anzeige“, „Webinar:“, „(g+)“) bekommen keine Themen aus ihren Wörtern.
 - **Neu berechnet** wird, sobald sich etwas ändert: die Meldung wird aktualisiert, die Details aus der Quelle kommen
   an, eine CVE kommt neu in den KEV-Katalog oder eine KEV-Meldung zur selben CVE erscheint. Nach einem Update oder einer
@@ -191,8 +196,8 @@ alle Behörden auf einmal.
 - *Ohne Patch* erkennt nur ausdrücklich gesagte Fälle. Fehlt der Hinweis, heißt das nicht, dass es einen Patch gibt.
 - *Aktiv ausgenutzt* über den KEV setzt voraus, dass die Meldung die CVE nennt; Meldungen ohne CVE erkennt nur ihr
   Wortlaut.
-- *Exploit veröffentlicht* kennt nur, was die CISA in SSVC einstuft oder was Titel und Anrisstext sagen. Exploit-Sammlungen
-  wie Exploit-DB oder Metasploit liest Cobe News dafür (noch) nicht.
+- *Exploit veröffentlicht* kennt nur, was die CISA in SSVC einstuft, was eine eingeschaltete Exploit-Sammlung führt
+  und was Titel und Anrisstext sagen. Sind alle Sammlungen aus, zählen nur SSVC und der Wortlaut.
 - Die Themen gelten auch für [Benachrichtigungsregeln](/docs/benachrichtigungen#regel-themen) und für
   [Desktop-Benachrichtigungen und Web Push](/docs/benachrichtigungen#desktop-einschalten).
 

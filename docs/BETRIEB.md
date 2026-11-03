@@ -890,8 +890,11 @@ läuft das einmal für alle gespeicherten Meldungen. Kein zusätzlicher Abruf. N
 
 **Themen** (`news_items.topics`): Das Thema „Exploit veröffentlicht“ (`poc`) kommt aus der SSVC-Einstufung der CISA in
 den gespeicherten cvelistV5-Einträgen (und dem Wortlaut); ändert sich die Einstufung beim Speichern eines Eintrags,
-werden die Meldungen zu dieser CVE neu berechnet. Mit der neuen Regel-Version (`news_topics_v` 2) berechnet der
-Themen-Job alle gespeicherten Meldungen einmal neu.
+werden die Meldungen zu dieser CVE neu berechnet. Dazu kommen die eingeschalteten Exploit-Sammlungen (`exploit_refs`,
+aus dem Speicher): Neue oder gestrichene CVEs einer Sammlung berechnen die Meldungen zu diesen CVEs sofort neu (bis
+2000 CVEs auf einmal); das erste Laden einer Sammlung, mehr Änderungen auf einmal und das Ein- oder Ausschalten einer
+Sammlung setzen `news_topics_v` zurück – der Themen-Job rechnet dann alle Meldungen in Blöcken neu. Mit der neuen
+Regel-Version (`news_topics_v` 2) berechnet der Themen-Job alle gespeicherten Meldungen einmal neu.
 
 ## Benachrichtigungen
 

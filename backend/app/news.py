@@ -1293,15 +1293,20 @@ async def exploit_cves(db: AsyncSession, ids) -> dict[str, str]:  # noqa: ANN001
     reason in the drawer). Today: CISA's SSVC "exploitation: poc" in the stored cvelistV5 records (Vendor News keeps
     those of the followed products and the ones looked up for stories and findings – app/cvelist.py).
 
-    The hook for further exploit hints (Nuclei templates, Metasploit modules, Exploit-DB entries): a source that stores
-    them per CVE adds its CVEs here (and calls retopic_cves for the CVEs it newly learns) – topics_of takes whatever
-    this returns."""
+    And the exploit lists (app/exploits.py – Metasploit modules, Exploit-DB entries, nuclei templates; switched-on
+    lists only, from memory): CVE → the list's name, where SSVC says nothing. A list that learns or drops CVEs calls
+    retopic_cves for them (exploits.retopic_changed) – topics_of takes whatever this returns."""
+    from app import exploits as exploit_lists  # exploits imports this module
+
     want = sorted({str(c).upper() for c in ids or [] if c})
     got: dict[str, str] = {}
     for i in range(0, len(want), 1000):
         keys = [f"cvelist:{c}" for c in want[i : i + 1000]]
         rows = await db.scalars(select(VendorAdvisory.ident).where(VendorAdvisory.id.in_(keys), _ssvc_poc()))
         got |= {str(c).upper(): SSVC_LABEL for c in rows}
+    if want:
+        for c, label in (await exploit_lists.labels(db, want)).items():
+            got.setdefault(c, label)
     return got
 
 
@@ -1311,8 +1316,13 @@ def _ssvc_poc():  # noqa: ANN202
 
 async def exploit_all(db: AsyncSession) -> dict[str, str]:
     """exploit_cves for every stored record – for the backfill."""
+    from app import exploits as exploit_lists
+
     rows = await db.scalars(select(VendorAdvisory.ident).where(VendorAdvisory.source == "cvelist", _ssvc_poc()))
-    return {str(c).upper(): SSVC_LABEL for c in rows}
+    got = {str(c).upper(): SSVC_LABEL for c in rows}
+    for c, label in (await exploit_lists.labels(db)).items():
+        got.setdefault(c, label)
+    return got
 
 
 RETOPIC_BATCH = 500

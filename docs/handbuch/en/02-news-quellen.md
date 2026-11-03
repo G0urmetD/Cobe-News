@@ -149,7 +149,7 @@ the reason ("CISA KEV lists CVE-…", "in the title: ‘actively exploited’") 
 |---|---|
 | **Zero-day** | "zero-day", "0-day" in title or teaser (not the Zero Day Initiative, not "Kein Zero-Day"). A zero-day story is also *actively exploited*. |
 | **Actively exploited** | an entry of the [CISA KEV](term:kev) or [ENISA EUVD](term:euvd) catalogues; a CVE of the story is in the KEV (see below); the [details from the source](#details-aus-der-quelle) say "exploited"; words such as "actively exploited", "exploited in the wild", "aktiv ausgenutzt", "wird bereits ausgenutzt" – not denied, not as a duty to report ([negations](#verneinungen)) |
-| **Exploit published** | a public exploit or proof of concept is known: CISA rates a CVE of the story in [SSVC](term:ssvc) with "Exploitation: poc" (from the CVE list, see below); words such as "PoC exploit", "proof-of-concept exploit released", "Exploit-Code veröffentlicht", "public exploit" – not denied ("no public exploit", "a public exploit is not known"). No evidence of attacks yet – that is *Actively exploited*. |
+| **Exploit published** | a public exploit or proof of concept is known: CISA rates a CVE of the story in [SSVC](term:ssvc) with "Exploitation: poc" (from the CVE list, see below); a switched-on exploit collection (Metasploit, Exploit-DB, nuclei – [Public exploit](/docs/vendor-news#oeffentlicher-exploit)) lists a CVE of the story; words such as "PoC exploit", "proof-of-concept exploit released", "Exploit-Code veröffentlicht", "public exploit" – not denied ("no public exploit", "a public exploit is not known"). No evidence of attacks yet – that is *Actively exploited*. |
 | **Ransomware** | "ransomware", "Erpressertrojaner", known gangs (LockBit, Akira, Qilin, Black Basta, Cl0p); for KEV entries CISA's note on ransomware campaigns |
 | **No patch** | "[UNGEPATCHT]" in the title of a BSI warning; a CSAF advisory with "no fix available" or "no fix planned" and no vendor fix; a few unambiguous phrases ("no patch yet", "noch kein Update", "unpatched flaw") |
 | **Incident/data leak** | "data breach", "Datenleck", "Datenpanne", "Kundendaten", "cyberattack on …", stolen or exposed data |
@@ -174,6 +174,11 @@ authorities at once.
   Vendor News keeps them for the followed products and for the CVEs it looks up for stories and findings). "poc" makes
   the story *Exploit published* – by the same round-up rule as for the KEV. "active" (active exploitation) is no PoC:
   that story is *Actively exploited*. When CISA changes its rating, the stories about that CVE follow.
+- **Exploit published by the exploit collections:** when a switched-on collection (Metasploit, Exploit-DB, nuclei)
+  lists a CVE of the story, it is *Exploit published* as well (same round-up rule); the drawer names the collection as
+  the reason. When a collection adds or drops a CVE, the stories about that CVE follow at once; on a collection's first
+  load, with very many changes at once and when a collection is switched on or off, Cobe News recomputes all stories in
+  the background.
 - **Ads** ("heise-Angebot", "Anzeige", "Webinar:", "(g+)") get no topics from their words.
 - **Recomputed** whenever something changes: the story is updated, the details from the source arrive, a CVE is newly
   added to the KEV catalogue or a KEV story about the same CVE appears. After an update or a change of the rules
@@ -188,8 +193,8 @@ authorities at once.
 - *No patch* recognises only cases said explicitly. No such note does not mean that a patch exists.
 - *Actively exploited* via the KEV needs the story to name the CVE; stories without a CVE are recognised by their
   wording only.
-- *Exploit published* knows only what CISA rates in SSVC or what title and teaser say. Exploit collections such as
-  Exploit-DB or Metasploit are not (yet) read for it.
+- *Exploit published* knows only what CISA rates in SSVC, what a switched-on exploit collection lists and what title
+  and teaser say. With all collections off, only SSVC and the wording count.
 - Topics also apply to [notification rules](/docs/benachrichtigungen#regel-themen) and to
   [desktop notifications and Web Push](/docs/benachrichtigungen#desktop-einschalten).
 
