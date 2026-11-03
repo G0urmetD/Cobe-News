@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { api, type ApiUser, type Role } from "@/lib/api"
-import type { NewsSeverity } from "@/lib/news-api"
+import type { NewsSeverity, NewsTopic } from "@/lib/news-api"
 
 // ---------------------------------------------------------------- notifications
 
@@ -85,6 +85,8 @@ export interface NotifyRule {
   channels: string[]
   severities: NewsSeverity[]
   sources: string[]
+  /** news only: stories with one of these topics ([] = any story) */
+  topics?: NewsTopic[]
   lang: "de" | "en"
   /** what it sends: stories, Vendor News vulnerabilities of followed products, newer versions / EOL */
   kinds: RuleKind[]
@@ -106,6 +108,7 @@ export interface RuleIn {
   channels: string[]
   severities: NewsSeverity[]
   sources: string[]
+  topics: NewsTopic[]
   lang: "de" | "en"
   kinds: RuleKind[]
   teams: string[]

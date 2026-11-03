@@ -92,13 +92,20 @@ describe("the log's query", () => {
 describe("the dry run", () => {
   const form = { severities: ["critical" as const], sources: ["s1"], lang: "de" as const, kinds: ["vendor_vuln" as const], teams: ["t1"] }
   it("sends only what decides the matches – sources only with news", () => {
-    expect(dryRunBody(form, 7)).toEqual({ severities: ["critical"], sources: [], lang: "de", kinds: ["vendor_vuln"], teams: ["t1"], days: 7 })
+    expect(dryRunBody(form, 7)).toEqual({ severities: ["critical"], sources: [], topics: [], lang: "de", kinds: ["vendor_vuln"], teams: ["t1"], days: 7 })
     expect(dryRunBody({ ...form, kinds: ["news"] }, 1).sources).toEqual(["s1"])
+  })
+  it("sends the topics only with news", () => {
+    expect(dryRunBody({ ...form, topics: ["poc"] }, 7).topics).toEqual([])
+    expect(dryRunBody({ ...form, kinds: ["news", "vendor_vuln"], topics: ["poc", "zeroday"] }, 7).topics).toEqual(["poc", "zeroday"])
   })
   it("says why an item matched", () => {
     const x: DryRunItem = { kind: "news", id: "1", title: "x", severity: "high", at: "", source: "Feed", match: { kind: "news", severity: true, source: true, teams: false } }
     expect(matchParts(t, x)).toEqual(["notify.kind.news", 'dlog.dry.bySeverity{"sev":"news.sev.high"}', 'dlog.dry.bySource{"source":"Feed"}'])
     expect(matchParts(t, { ...x, match: { kind: "vendor_vuln", severity: false, source: false, teams: true } })).toEqual(["notify.kind.vendor_vuln", "dlog.dry.byTeams"])
+    // a rule with topics: the story's topics it matched by
+    const byTopic = matchParts(t, { ...x, topics: ["exploited", "poc"], match: { kind: "news", severity: false, source: false, topic: true, teams: false } })
+    expect(byTopic).toEqual(["notify.kind.news", 'dlog.dry.byTopic{"topics":"news.topic.exploited, news.topic.poc"}'])
   })
   it("messages a day on average", () => {
     expect(perDay({ messages: 31, days: 7 })).toBe(4.4)

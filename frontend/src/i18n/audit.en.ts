@@ -181,6 +181,7 @@ const auditEn: Record<string, string> = {
   "audit.field.tenant_id": "Tenant ID",
   "audit.field.client_id": "Client ID",
   "audit.field.severities": "Severities",
+  "audit.field.topics": "Topics",
   "audit.field.sources": "Sources",
   "audit.field.channels": "Channels",
   "audit.field.teams": "Teams",

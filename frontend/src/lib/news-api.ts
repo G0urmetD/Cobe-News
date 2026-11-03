@@ -16,13 +16,14 @@ export const NEWS_SEV_COLOR: Record<NewsSeverity, string> = {
 
 /** The topics of a story (backend news.TOPICS – detected in title and teaser and from structured data). The order is
  *  the order of a card's badges: the first two are shown. */
-export type NewsTopic = "zeroday" | "exploited" | "ransomware" | "nopatch" | "breach" | "supply" | "phishing" | "ot"
-export const NEWS_TOPICS: NewsTopic[] = ["zeroday", "exploited", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]
+export type NewsTopic = "zeroday" | "exploited" | "poc" | "ransomware" | "nopatch" | "breach" | "supply" | "phishing" | "ot"
+export const NEWS_TOPICS: NewsTopic[] = ["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]
 /** The quick filters above the list (one click, also on a phone). */
 export const QUICK_TOPICS: NewsTopic[] = ["exploited", "zeroday", "nopatch"]
 export const NEWS_TOPIC_COLOR: Record<NewsTopic, string> = {
   zeroday: "--sev-critical",
   exploited: "--sev-critical",
+  poc: "--sev-high",
   ransomware: "--sev-high",
   nopatch: "--sev-high",
   breach: "--sev-medium",
@@ -61,6 +62,8 @@ export interface NewsItem {
   also_in: string[]
   /** the story's topics (NEWS_TOPICS order) */
   topics?: NewsTopic[]
+  /** the followed products the story's details concern ("Unser Produkt: PAN-OS") – lists and the drawer */
+  products?: { key: string; label: string }[]
   read_at: string | null
   /** unread for me (app/reader.py: the watermark, my marks, the age) – absent where it is not asked (/news/recent) */
   unread?: boolean | null
@@ -139,7 +142,7 @@ export interface StoryAffects {
  *  kev_flag (CISA: ransomware campaigns) */
 export interface TopicReason {
   topic: NewsTopic
-  kind: "catalog" | "kev" | "details" | "csaf" | "source" | "title" | "teaser" | "zeroday" | "kev_flag"
+  kind: "catalog" | "kev" | "details" | "csaf" | "source" | "title" | "teaser" | "zeroday" | "kev_flag" | "exploit" | "ssvc"
   value: string
 }
 
@@ -161,8 +164,11 @@ export interface NewsPage {
   more: boolean
   /** cursor of the next page (time and id of this page's last story) */
   next: string | null
-  /** only on the first page; `topics`: stories per topic with every other filter (not the topic filter itself) */
-  counts?: { new: number; read: number; topics?: Partial<Record<NewsTopic, number>> }
+  /** only on the first page; `topics`: stories per topic with every other filter (not the topic filter itself);
+   *  `ours`: the stories about our products with every other filter */
+  counts?: { new: number; read: number; topics?: Partial<Record<NewsTopic, number>>; ours?: number }
+  /** anything followed (in the scope asked) – "Betrifft unsere Produkte" has something to show */
+  ours_on?: boolean
   enabled: boolean
   /** the arrival number of the newest story stored when this page was read – "all read" marks up to it */
   upto?: number
@@ -170,11 +176,15 @@ export interface NewsPage {
 
 /** The body of "Alle als gelesen": the list's filter, and only what had arrived when its first page was loaded (a
  *  story arriving meanwhile was not counted in the dialog and was never seen – it stays new). */
-export function readAllBody(f: { sources: string[]; severities: string[]; topics?: string[]; q: string; muted?: boolean }, first: NewsPage | undefined) {
+export function readAllBody(
+  f: { sources: string[]; severities: string[]; topics?: string[]; q: string; muted?: boolean; ours?: boolean; scope?: "all" | "team" },
+  first: NewsPage | undefined,
+) {
   return {
     source: f.sources,
     severity: f.severities,
     ...(f.topics?.length ? { topic: f.topics } : {}),
+    ...(f.ours ? { ours: true, scope: f.scope ?? "all" } : {}),
     q: f.q,
     ...(f.muted ? { muted: true } : {}),
     ...(first?.upto !== undefined ? { upto: first.upto } : {}),
@@ -191,6 +201,9 @@ export interface NewsFilter {
   q?: string
   /** also the stories whose CVEs I all muted (dimmed) */
   muted?: boolean
+  /** "Betrifft unsere Produkte": only stories about a followed product – of my teams under "Mein Team" */
+  ours?: boolean
+  scope?: "all" | "team"
 }
 
 const PAGE = 60
@@ -207,6 +220,9 @@ export function newsQuery(f: NewsFilter, before: string | null) {
   for (const s of f.topics ?? []) p.append("topic", s)
   if (f.q?.trim()) p.set("q", f.q.trim().slice(0, 100))
   if (f.muted) p.set("muted", "true")
+  if (f.ours) p.set("ours", "true")
+  // the scope counts for "Betrifft unsere Produkte" (the filter and its number on the chip)
+  if (f.scope === "team") p.set("scope", "team")
   return `/api/news?${p.toString()}`
 }
 
@@ -397,25 +413,27 @@ export const useAdminNews = () => useQuery({ queryKey: ["admin-news"], queryFn: 
 
 const filterKey = (userId: string) => `cobe-news.filter.${userId}`
 
-/** The filter a person chose (sources, severities, topics) – kept in this browser for that person, not asked again each time. */
-export function loadNewsFilter(userId: string | undefined): { sources: string[]; severities: NewsSeverity[]; topics: NewsTopic[] } {
+/** The filter a person chose (sources, severities, topics, "Betrifft unsere Produkte") – kept in this browser for that
+ *  person, not asked again each time. */
+export function loadNewsFilter(userId: string | undefined): { sources: string[]; severities: NewsSeverity[]; topics: NewsTopic[]; ours: boolean } {
   try {
     const raw = userId ? localStorage.getItem(filterKey(userId)) : null
-    const v = raw ? (JSON.parse(raw) as { sources?: unknown; severities?: unknown; topics?: unknown }) : {}
+    const v = raw ? (JSON.parse(raw) as { sources?: unknown; severities?: unknown; topics?: unknown; ours?: unknown }) : {}
     return {
       sources: Array.isArray(v.sources) ? v.sources.filter((x): x is string => typeof x === "string") : [],
       severities: Array.isArray(v.severities) ? v.severities.filter((x): x is NewsSeverity => NEWS_SEVERITIES.includes(x as NewsSeverity)) : [],
       topics: Array.isArray(v.topics) ? [...new Set(v.topics.filter(isTopic))] : [],
+      ours: v.ours === true,
     }
   } catch {
-    return { sources: [], severities: [], topics: [] }
+    return { sources: [], severities: [], topics: [], ours: false }
   }
 }
 
-export function saveNewsFilter(userId: string | undefined, f: { sources: string[]; severities: NewsSeverity[]; topics?: NewsTopic[] }) {
+export function saveNewsFilter(userId: string | undefined, f: { sources: string[]; severities: NewsSeverity[]; topics?: NewsTopic[]; ours?: boolean }) {
   if (!userId) return
   try {
-    localStorage.setItem(filterKey(userId), JSON.stringify({ sources: f.sources, severities: f.severities, topics: f.topics ?? [] }))
+    localStorage.setItem(filterKey(userId), JSON.stringify({ sources: f.sources, severities: f.severities, topics: f.topics ?? [], ours: !!f.ours }))
   } catch {
     /* private window: the filter just is not kept */
   }
@@ -432,6 +450,8 @@ export interface DesktopPrefs {
   enabled: boolean
   severities: NewsSeverity[]
   sources: string[]
+  /** only stories with one of these topics ([] = every story); older answers lack it */
+  topics?: NewsTopic[]
 }
 
 export const useDesktopPrefs = (enabled = true) => useQuery({ queryKey: ["me", "desktop"], queryFn: () => api.get<DesktopPrefs>("/api/me/desktop"), enabled, staleTime: 60_000 })

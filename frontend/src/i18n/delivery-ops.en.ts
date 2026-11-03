@@ -132,6 +132,7 @@ const deliveryOpsEn: Record<string, string> = {
   "dlog.dry.because": "because: {{parts}}",
   "dlog.dry.bySeverity": "severity {{sev}}",
   "dlog.dry.bySource": "source {{source}}",
+  "dlog.dry.byTopic": "topic {{topics}}",
   "dlog.dry.byTeams": "product of a chosen team",
   "dlog.dry.truncated": "The newest {{shown}} of {{count}} matches are listed.",
 }

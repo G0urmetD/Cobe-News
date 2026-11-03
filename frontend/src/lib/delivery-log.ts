@@ -2,7 +2,7 @@ import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 import { polledPages } from "@/lib/poll"
 import type { ChannelDelivery, ChannelType, RuleKind } from "@/lib/admin-api"
-import type { NewsSeverity } from "@/lib/news-api"
+import type { NewsSeverity, NewsTopic } from "@/lib/news-api"
 
 // The delivery log (Zustellprotokoll, backend app/delivery_log.py) and the rule's dry run (Probelauf) – types, queries
 // and the pure helpers the pages use (tested in delivery-log.test.ts).
@@ -21,6 +21,8 @@ export interface DeliveryItem {
   id: string
   title: string
   severity: string
+  /** a news story's topics when it went out */
+  topics?: NewsTopic[]
 }
 
 export interface DeliveryAttempt {
@@ -145,6 +147,7 @@ export type DryDays = (typeof DRY_DAYS)[number]
 export interface DryRunIn {
   severities: NewsSeverity[]
   sources: string[]
+  topics: NewsTopic[]
   lang: "de" | "en"
   kinds: RuleKind[]
   teams: string[]
@@ -158,7 +161,9 @@ export interface DryRunItem {
   severity: NewsSeverity
   at: string
   source: string
-  match: { kind: RuleKind; severity: boolean; source: boolean; teams: boolean }
+  /** a story: the rule's topics it has (what it matched by) */
+  topics?: NewsTopic[]
+  match: { kind: RuleKind; severity: boolean; source: boolean; topic?: boolean; teams: boolean }
 }
 
 export interface DryRunResult {
@@ -175,8 +180,12 @@ export interface DryRunResult {
 }
 
 /** The body of the dry run: the form as it is now (not saved) – only what decides what the rule brings. */
-export function dryRunBody(v: { severities: NewsSeverity[]; sources: string[]; lang: "de" | "en"; kinds: RuleKind[]; teams: string[] }, days: DryDays): DryRunIn {
-  return { severities: v.severities, sources: v.kinds.includes("news") ? v.sources : [], lang: v.lang, kinds: v.kinds, teams: v.teams, days }
+export function dryRunBody(
+  v: { severities: NewsSeverity[]; sources: string[]; topics?: NewsTopic[]; lang: "de" | "en"; kinds: RuleKind[]; teams: string[] },
+  days: DryDays,
+): DryRunIn {
+  const news = v.kinds.includes("news")
+  return { severities: v.severities, sources: news ? v.sources : [], topics: news ? (v.topics ?? []) : [], lang: v.lang, kinds: v.kinds, teams: v.teams, days }
 }
 
 /** Why an item matched, as short parts: its kind, and severity / source / team where the rule chose some. */
@@ -184,6 +193,7 @@ export function matchParts(t: T, x: DryRunItem): string[] {
   const out = [t(`notify.kind.${x.match.kind}`)]
   if (x.match.severity) out.push(t("dlog.dry.bySeverity", { sev: t(`news.sev.${x.severity}`) }))
   if (x.match.source) out.push(t("dlog.dry.bySource", { source: x.source }))
+  if (x.match.topic && x.topics?.length) out.push(t("dlog.dry.byTopic", { topics: x.topics.map((k) => t(`news.topic.${k}`)).join(", ") }))
   if (x.match.teams) out.push(t("dlog.dry.byTeams"))
   return out
 }

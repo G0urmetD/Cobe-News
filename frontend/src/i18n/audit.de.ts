@@ -182,6 +182,7 @@ const auditDe: Record<string, string> = {
   "audit.field.tenant_id": "Tenant-ID",
   "audit.field.client_id": "Client-ID",
   "audit.field.severities": "Schweregrade",
+  "audit.field.topics": "Themen",
   "audit.field.sources": "Quellen",
   "audit.field.channels": "Kanäle",
   "audit.field.teams": "Teams",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { InfiniteData } from "@tanstack/react-query"
 import {
+  NEWS_TOPICS,
   cardTopics,
   findStory,
   loadNewsFilter,
@@ -115,6 +116,20 @@ describe("topics", () => {
     // without topics nothing changes in the body
     expect(readAllBody({ sources: [], severities: [], topics: [], q: "" }, undefined)).toEqual({ source: [], severity: [], q: "" })
   })
+  it("knows the topic Exploit veröffentlicht right after Aktiv ausgenutzt", () => {
+    expect(NEWS_TOPICS.indexOf("poc")).toBe(NEWS_TOPICS.indexOf("exploited") + 1)
+    expect(cardTopics(["poc", "ransomware", "exploited"])).toEqual({ shown: ["exploited", "poc"], more: 1 })
+  })
+  it("asks for our products in the scope and sends them with read-all", () => {
+    const p = new URL(newsQuery({ state: "all", sources: [], severities: [], ours: true, scope: "team" }, null), "https://n.example.com").searchParams
+    expect(p.get("ours")).toBe("true")
+    expect(p.get("scope")).toBe("team")
+    const plain = new URL(newsQuery({ state: "all", sources: [], severities: [] }, null), "https://n.example.com").searchParams
+    expect(plain.has("ours")).toBe(false)
+    expect(plain.has("scope")).toBe(false)
+    expect(readAllBody({ sources: [], severities: [], q: "", ours: true, scope: "team" }, undefined)).toEqual({ source: [], severity: [], q: "", ours: true, scope: "team" })
+    expect(readAllBody({ sources: [], severities: [], q: "", ours: false, scope: "team" }, undefined)).toEqual({ source: [], severity: [], q: "" })
+  })
   it("a card shows two in badge order and counts the rest", () => {
     expect(cardTopics(["ot", "exploited", "zeroday", "breach"])).toEqual({ shown: ["zeroday", "exploited"], more: 2 })
     expect(cardTopics(["nopatch", "ransomware"])).toEqual({ shown: ["ransomware", "nopatch"], more: 0 })
@@ -126,12 +141,14 @@ describe("topics", () => {
     const m = new Map<string, string>()
     globalThis.localStorage = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) } as unknown as Storage
     saveNewsFilter("u1", { sources: [], severities: ["critical"], topics: ["nopatch"] })
-    expect(loadNewsFilter("u1")).toEqual({ sources: [], severities: ["critical"], topics: ["nopatch"] })
+    expect(loadNewsFilter("u1")).toEqual({ sources: [], severities: ["critical"], topics: ["nopatch"], ours: false })
+    saveNewsFilter("u1", { sources: [], severities: [], topics: ["poc"], ours: true })
+    expect(loadNewsFilter("u1")).toEqual({ sources: [], severities: [], topics: ["poc"], ours: true })
     localStorage.setItem("cobe-news.filter.u2", JSON.stringify({ sources: [], severities: [], topics: ["ot", "x", "ot"] }))
     expect(loadNewsFilter("u2").topics).toEqual(["ot"])
     // an older entry without topics
     localStorage.setItem("cobe-news.filter.u3", JSON.stringify({ sources: ["a"], severities: [] }))
-    expect(loadNewsFilter("u3")).toEqual({ sources: ["a"], severities: [], topics: [] })
+    expect(loadNewsFilter("u3")).toEqual({ sources: ["a"], severities: [], topics: [], ours: false })
     globalThis.localStorage = before
   })
   it("the source filter is grouped by the kind of source, authorities first", () => {

@@ -44,6 +44,8 @@ export interface NewsUrlFilter {
   q: string
   unread: boolean
   muted: boolean
+  /** "Betrifft unsere Produkte" */
+  ours: boolean
 }
 
 const on = (v: string | null) => v === "1" || v === "true"
@@ -53,7 +55,7 @@ export function readNewsFilter(p: URLSearchParams): NewsUrlFilter {
   const sources = [...new Set(p.getAll("source").filter((x) => UUID.test(x)))].slice(0, 50)
   const severities = [...new Set(p.getAll("severity"))].filter((x): x is NewsSeverity => NEWS_SEVERITIES.includes(x as NewsSeverity))
   const topics = [...new Set(p.getAll("topic"))].filter(isTopic)
-  return { sources, severities, topics, q: (p.get("q") ?? "").slice(0, 100), unread: on(p.get("unread")), muted: on(p.get("muted")) }
+  return { sources, severities, topics, q: (p.get("q") ?? "").slice(0, 100), unread: on(p.get("unread")), muted: on(p.get("muted")), ours: on(p.get("ours")) }
 }
 
 /** The filter written into an address – the other parameters (the drawer's, unknown ones) stay as they are. */
@@ -75,7 +77,7 @@ export function writeNewsFilter(p: URLSearchParams, f: Partial<NewsUrlFilter>): 
     if (f.q.trim()) next.set("q", f.q.trim().slice(0, 100))
     else next.delete("q")
   }
-  for (const k of ["unread", "muted"] as const)
+  for (const k of ["unread", "muted", "ours"] as const)
     if (f[k] !== undefined) {
       if (f[k]) next.set(k, "1")
       else next.delete(k)
@@ -122,9 +124,9 @@ export function writeVendorFilter(p: URLSearchParams, f: Partial<VendorUrlFilter
   return next
 }
 
-/** Filters of the News page only: on Vendor News they are no filter (a `topic` there is neither a view nor a reason to
- *  skip the default view – readVendorFilter ignores it as well). */
-export const NEWS_ONLY_PARAMS = ["topic"] as const
+/** Filters of the News page only: on Vendor News they are no filter (a `topic` or `ours` there is neither a view nor a
+ *  reason to skip the default view – readVendorFilter ignores them as well). */
+export const NEWS_ONLY_PARAMS = ["topic", "ours"] as const
 
 const notAFilter = (k: string, page?: ViewPage) => (DRAWER_PARAMS as readonly string[]).includes(k) || (page === "vendor" && (NEWS_ONLY_PARAMS as readonly string[]).includes(k))
 

@@ -26,7 +26,7 @@ import { useTeams, useTeamsSettings } from "@/lib/teams-api"
 import { errorText, isStale } from "@/lib/errors"
 import { cn } from "@/lib/utils"
 import { confirmDiscard } from "@/lib/unsaved"
-import { NEWS_SEVERITIES, type DesktopPrefs, type NewsSeverity, useAdminNews, useDesktopPrefs, useNewsSources } from "@/lib/news-api"
+import { NEWS_SEVERITIES, NEWS_TOPICS, type DesktopPrefs, type NewsSeverity, type NewsTopic, useAdminNews, useDesktopPrefs, useNewsSources } from "@/lib/news-api"
 import { ChannelIcon, ChannelsPane } from "@/pages/settings-channels"
 import { DeliveryLogPane } from "@/pages/settings-delivery-log"
 import { DryRunPanel } from "@/pages/settings-dry-run"
@@ -42,6 +42,22 @@ function SeverityPicker({ value, onChange }: { value: NewsSeverity[]; onChange: 
       value={value}
       onChange={(v) => onChange(NEWS_SEVERITIES.filter((x) => v.includes(x)))}
       searchable={false}
+    />
+  )
+}
+
+/** Topics of a story (OR) – none chosen: every story, whatever its topics. Each with its explanation. */
+function TopicPicker({ value, onChange }: { value: NewsTopic[]; onChange: (v: NewsTopic[]) => void }) {
+  const { t } = useTranslation()
+  return (
+    <MultiSelect
+      variant="field"
+      label={t("notify.allTopics")}
+      options={NEWS_TOPICS.map((x) => ({ value: x, label: t(`news.topic.${x}`), description: t(`news.topicHint.${x}`) }))}
+      value={value}
+      onChange={(v) => onChange(NEWS_TOPICS.filter((x) => v.includes(x)))}
+      searchable={false}
+      contentClassName="w-80"
     />
   )
 }
@@ -98,6 +114,7 @@ const toBody = (r: NotifyRule, patch: Partial<RuleIn> = {}): RuleIn => ({
   channels: r.channels,
   severities: r.severities,
   sources: r.sources,
+  topics: r.topics ?? [],
   lang: r.lang,
   kinds: r.kinds,
   teams: r.teams ?? [],
@@ -238,6 +255,7 @@ function RuleList({ onEdit, onChannels }: { onEdit: (r: NotifyRule | "new") => v
                         (r.severities.length ? r.severities.map((s) => t(`news.sev.${s}`)).join(", ") : t("notify.allSeverities")) +
                         " · " +
                         (names.length ? names.join(", ") : t("notify.allSources")) +
+                        (r.topics?.length && r.kinds.includes("news") ? " · " + t("notify.topicsList", { names: r.topics.map((x) => t(`news.topic.${x}`)).join(", ") }) : "") +
                         (ruleTeams(r).length ? " · " + t("notify.teamsList", { names: ruleTeams(r).join(", ") }) : "") +
                         " · " +
                         (r.lang === "en" ? "English" : "Deutsch")}
@@ -300,6 +318,7 @@ function RuleEditor({
           channels: channels.length === 1 ? [channels[0].id] : [],
           severities: ["critical", "high"],
           sources: [],
+          topics: [],
           lang: uiLang(i18n.language),
           kinds: ["news"],
           teams: [],
@@ -392,6 +411,11 @@ function RuleEditor({
               <SourcePicker value={v.sources} onChange={(x) => setV({ ...v, sources: x })} options={sources} />
             </Field>
           )}
+          {v.kinds.includes("news") && (
+            <Field label={<Explained label={t("notify.topics")} text={t("notify.topicsExplain")} />} hint={t("notify.topicsHint")} className="sm:col-span-2">
+              <TopicPicker value={v.topics} onChange={(x) => setV({ ...v, topics: x })} />
+            </Field>
+          )}
         </div>
         {(teamsOn || v.teams.length > 0) && (
           <Field label={<Explained label={t("notify.teams")} text={t("notify.teamsExplain")} />} hint={t(vendorKinds ? "notify.teamsHint" : "notify.teamsHintNoVendor")}>
@@ -469,6 +493,9 @@ function DesktopForm({ initial }: { initial: DesktopPrefs }) {
           </Field>
           <Field label={t("notify.sources")} hint={t("notify.sourcesHint")}>
             <SourcePicker value={v.sources} onChange={(x) => setV({ ...v, sources: x })} options={sources} />
+          </Field>
+          <Field label={<Explained label={t("notify.topics")} text={t("desktop.topicsExplain")} />} hint={t("desktop.topicsHint")} className="sm:col-span-2">
+            <TopicPicker value={v.topics ?? []} onChange={(x) => setV({ ...v, topics: x })} />
           </Field>
         </LockedFields>
         <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("desktop.about")}</p>
