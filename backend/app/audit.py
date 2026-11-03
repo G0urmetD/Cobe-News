@@ -178,6 +178,7 @@ NOT_SECRET = frozenset(
         "bind_password_set",
         "client_secret_set",
         "nvd_key_set",
+        "temp_password_days",  # how many days a temporary password is valid (a number)
     }
 )
 SECRET_MARK = {"secret": True, "changed": True}

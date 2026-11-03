@@ -25,6 +25,7 @@ import asyncio
 import contextlib
 import shutil
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import select
@@ -63,7 +64,7 @@ async def _account(cmd: str) -> int:
                 return 1
             pw = passwords.temp_password()
             await passwords.remember(s, u)  # its own password stays refused after the reset (not a temporary one)
-            u.password_hash, u.must_change_password = passwords.hash_password(pw), True
+            u.password_hash, u.must_change_password, u.temp_password_at = passwords.hash_password(pw), True, datetime.now(UTC)
             u.totp_secret_enc = u.totp_last_step = None
             u.is_active, u.deactivated_reason = True, None
             # its passkeys go too: the reset is the way back in after a takeover – none the other person registered stays

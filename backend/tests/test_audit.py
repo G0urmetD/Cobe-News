@@ -400,6 +400,7 @@ REVIEWED_NOT_SECRET = {
     "sign_count": "a passkey's signature counter",
     "sign_count_warning_at": "a time",
     "auth_context": "an Entra authentication context id (C1–C99) – a name, not a secret",
+    "temp_password_days": "how many days a temporary password is valid (a number, settings section sessions)",
 }
 
 

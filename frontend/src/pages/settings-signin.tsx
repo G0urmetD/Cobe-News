@@ -743,7 +743,7 @@ function SessionsForm({ initial }: { initial: SessionSettings }) {
   const qc = useQueryClient()
   const [v, setV] = useState(initial)
   const [busy, setBusy] = useState(false)
-  const valid = v.idle_min >= 5 && v.idle_min <= 480 && v.absolute_h >= 1 && v.absolute_h <= 72
+  const valid = v.idle_min >= 5 && v.idle_min <= 480 && v.absolute_h >= 1 && v.absolute_h <= 72 && v.temp_password_days >= 1 && v.temp_password_days <= 30
   const save = async () => {
     setBusy(true)
     try {
@@ -776,6 +776,15 @@ function SessionsForm({ initial }: { initial: SessionSettings }) {
           min={1}
           max={72}
           onChange={(x) => setV({ ...v, absolute_h: x })}
+        />
+        <NumberField
+          label={t("signin.sessions.tempDays")}
+          hint={t("signin.sessions.tempDaysHint")}
+          value={v.temp_password_days}
+          unit={t("settings.news.days")}
+          min={1}
+          max={30}
+          onChange={(x) => setV({ ...v, temp_password_days: x })}
         />
         <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("signin.sessions.about")}</p>
       </SheetBody>

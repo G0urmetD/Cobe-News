@@ -16,7 +16,8 @@ DEFAULTS: dict[str, dict] = {
     # sources (CSAF providers, cvelistV5, EPSS, OSV) are on as well: each asks only for what followed products (EPSS: also
     # the stories) need, and only public addresses or CVE ids leave the machine (docs/BETRIEB.md: Weitere Quellen)
     "vendor": {"enabled": True, "nvd_key_enc": "", "every_h": 6, "eol_every_h": 24, "csaf": True, "cvelist": True, "epss": True, "osv": True, "review_days": 90},
-    "sessions": {"idle_min": 60, "absolute_h": 12},
+    # temp_password_days: how long a temporary password (an admin's, the CLI reset-emergency's) is valid – 1 to 30
+    "sessions": {"idle_min": 60, "absolute_h": 12, "temp_password_days": 7},
     # passkeys (WebAuthn) for local accounts: on – nobody has one until they register it themselves (after re-confirming
     # who they are), and only while BASE_URL is an https host name (app/auth/webauthn.availability)
     "passkeys": {"enabled": True},

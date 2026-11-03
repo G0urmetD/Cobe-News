@@ -169,6 +169,7 @@ const auditEn: Record<string, string> = {
   "audit.field.description": "Description",
   "audit.field.idle_min": "Idle (minutes)",
   "audit.field.absolute_h": "Maximum (hours)",
+  "audit.field.temp_password_days": "Temporary password valid (days)",
   "audit.field.keep_days": "Retention (days)",
   "audit.field.keep": "Backups kept",
   "audit.field.servers": "Servers",

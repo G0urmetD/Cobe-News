@@ -170,6 +170,7 @@ const auditDe: Record<string, string> = {
   "audit.field.description": "Beschreibung",
   "audit.field.idle_min": "Leerlauf (Minuten)",
   "audit.field.absolute_h": "Höchstdauer (Stunden)",
+  "audit.field.temp_password_days": "Startpasswort gültig (Tage)",
   "audit.field.keep_days": "Aufbewahrung (Tage)",
   "audit.field.keep": "Sicherungen behalten",
   "audit.field.servers": "Server",

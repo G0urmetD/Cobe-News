@@ -180,6 +180,10 @@ export interface UserRow extends ApiUser {
   is_active: boolean
   deactivated_reason: string | null
   must_change_password: boolean
+  /** when the temporary password stops being accepted (null: none) – set up by an admin or the CLI reset */
+  temp_password_expires_at?: string | null
+  /** … and whether that time has passed: a sign-in with it is refused, a new one has to be issued */
+  temp_password_expired?: boolean
   locked_for: number
   created_at: string
   last_login_at: string | null
@@ -255,6 +259,8 @@ export interface DirectoryGroup {
 export interface SessionSettings {
   idle_min: number
   absolute_h: number
+  /** how many days a temporary password is valid (1–30, default 7) */
+  temp_password_days: number
   rev?: number
 }
 
