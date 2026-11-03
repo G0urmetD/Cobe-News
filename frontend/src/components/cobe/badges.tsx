@@ -17,3 +17,13 @@ export function Pill({ color, children, className, dot = false, title }: { color
     </span>
   )
 }
+
+/** A finding from a CSAF provider's TLP:GREEN document (an admin allowed it): share within the organisation /
+ *  community only – the badge says it, its tooltip explains it. */
+export function TlpPill({ hint }: { hint: string }) {
+  return (
+    <span tabIndex={0} title={hint} aria-label={`TLP:GREEN – ${hint}`} className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+      <Pill color="--success">TLP:GREEN</Pill>
+    </span>
+  )
+}

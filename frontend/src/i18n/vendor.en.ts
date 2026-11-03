@@ -527,7 +527,10 @@ const vendorEn: Record<string, string> = {
   "glossary.csafText":
     "Machine-readable format for security advisories (version 2.0). Vendors publish affected and fixed versions per product in it – Cobe News reads them straight from the vendor.",
   "glossary.tlp": "TLP (Traffic Light Protocol)",
-  "glossary.tlpText": "Marks who may share a piece of information. Cobe News only reads TLP:CLEAR or TLP:WHITE (public) – never GREEN, AMBER or RED.",
+  "glossary.tlpText":
+    "Marks who may share a piece of information. Cobe News reads TLP:CLEAR or TLP:WHITE (public); TLP:GREEN only where an admin allows it for a CSAF provider – such findings carry the mark “TLP:GREEN”. Never AMBER or RED.",
+  "vendor.tlpGreenHint": "TLP:GREEN: share only within your organisation/community, not publicly.",
+  "vendor.src.allowGreen": "Allow TLP:GREEN",
   "glossary.ssvc": "SSVC (Stakeholder-Specific Vulnerability Categorization)",
   "glossary.ssvcText":
     "CISA's rating per CVE: whether the flaw is exploited (none / public exploit code / active), whether an attack can be automated and how severe the impact is.",
@@ -583,7 +586,7 @@ const vendorEn: Record<string, string> = {
   "vendor.src.offVendor": "Vendor News is off – none of these sources asks anything.",
   "vendor.src.csaf": "Vendors' CSAF providers",
   "vendor.src.csafHint":
-    "Advisories straight from Siemens, Cisco, Schneider Electric and Open-Xchange (CSAF 2.0, TLP:CLEAR/WHITE only, checksum checked) once you follow a product of the vendor. Found via the BSI's list or the vendor's standard address. What the first fetch brings that is older (over 7 days) is shown, but not notified; a vendor's advisory only counts for that vendor's own products.",
+    "Advisories straight from Siemens, Cisco, Schneider Electric and Open-Xchange (CSAF 2.0, TLP:CLEAR/WHITE – TLP:GREEN only where you allow it per provider –, checksum checked) once you follow a product of the vendor. Found via the BSI's list or the vendor's standard address. What the first fetch brings that is older (over 7 days) is shown, but not notified; a vendor's advisory only counts for that vendor's own products.",
   "vendor.src.cvelist": "cvelistV5 (CVE list)",
   "vendor.src.cvelistHint":
     "Three times a day (after 5, 11 and 17 h UTC) and once after the day change only the changed CVE records (a zip from GitHub, about 10 MB a day in all, never the whole list) and single older records where the NVD has not analysed yet: the vendor's (CNA) affected versions and CISA's rating (CVSS, SSVC, KEV). Only what concerns followed products is kept.",

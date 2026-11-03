@@ -123,6 +123,7 @@ class Finding(BaseModel):
     status: Status = Field(description="The worst verdict over the versions entered")
     published_at: str | None = None
     versions: list[FindingVersion] = []
+    tlp: str | None = Field(None, description="\"GREEN\": from a CSAF provider's TLP:GREEN document (allowed by an admin) – share within your organisation or community only, never publicly")
 
 
 class ProductFinding(Finding):
@@ -274,6 +275,7 @@ def _finding(x: dict) -> dict:
         "cves": list(x.get("cves") or []),
         "exploited": bool(x.get("exploited")),
         "versions": [{"version": r.get("version"), "status": r.get("status"), "fixed": r.get("fixed")} for r in x.get("versions") or []],
+        "tlp": x.get("tlp") or None,
     }
 
 

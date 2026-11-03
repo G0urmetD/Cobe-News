@@ -15,7 +15,7 @@ DEFAULTS: dict[str, dict] = {
     # Vendor News: on – but nothing is requested until somebody follows a product (docs/BETRIEB.md: Vendor News). The structured
     # sources (CSAF providers, cvelistV5, EPSS, OSV) are on as well: each asks only for what followed products (EPSS: also
     # the stories) need, and only public addresses or CVE ids leave the machine (docs/BETRIEB.md: Weitere Quellen)
-    "vendor": {"enabled": True, "nvd_key_enc": "", "every_h": 6, "eol_every_h": 24, "csaf": True, "cvelist": True, "epss": True, "osv": True, "review_days": 90},
+    "vendor": {"enabled": True, "nvd_key_enc": "", "every_h": 6, "eol_every_h": 24, "csaf": True, "cvelist": True, "epss": True, "osv": True, "review_days": 90, "csaf_green": []},
     "sessions": {"idle_min": 60, "absolute_h": 12},
     # passkeys (WebAuthn) for local accounts: on – nobody has one until they register it themselves (after re-confirming
     # who they are), and only while BASE_URL is an https host name (app/auth/webauthn.availability)

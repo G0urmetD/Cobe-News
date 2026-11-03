@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet } from "@/components/ui/sheet"
+import { Switch } from "@/components/ui/switch"
 import { Pill } from "@/components/cobe/badges"
 import { EnableCard, Field, LockedFields, ToggleRow } from "@/components/cobe/form"
 import { Explained } from "@/components/cobe/explained"
@@ -490,13 +491,16 @@ function SourcesForm({ data }: { data: VendorAdmin }) {
   const qc = useQueryClient()
   const initial = Object.fromEntries(STRUCTURED_SOURCES.map((k) => [k, data.settings[k] ?? true])) as Record<StructuredSource, boolean>
   const [v, setV] = useState(initial)
+  const initialGreen = [...(data.settings.csaf_green ?? [])].sort()
+  const [green, setGreen] = useState<string[]>(initialGreen)
   const [busy, setBusy] = useState(false)
-  const dirty = JSON.stringify(v) !== JSON.stringify(initial)
+  const dirty = JSON.stringify(v) !== JSON.stringify(initial) || JSON.stringify(green) !== JSON.stringify(initialGreen)
+  const setProviderGreen = (key: string, on: boolean) => setGreen((g) => (on ? [...new Set([...g, key])].sort() : g.filter((x) => x !== key)))
   const save = async () => {
     setBusy(true)
     try {
       const st = data.settings
-      await api.put("/api/admin/vendor", { enabled: st.enabled, every_h: st.every_h, eol_every_h: st.eol_every_h, ...v, rev: st.rev })
+      await api.put("/api/admin/vendor", { enabled: st.enabled, every_h: st.every_h, eol_every_h: st.eol_every_h, ...v, csaf_green: green, rev: st.rev })
       toast.success(t("common.saved"))
       void qc.invalidateQueries({ queryKey: ["vendor"] })
       void qc.invalidateQueries({ queryKey: HEALTH_KEY })
@@ -553,6 +557,15 @@ function SourcesForm({ data }: { data: VendorAdmin }) {
                           <Pill color={p.needed && v.csaf ? "--success" : "--muted-foreground"} dot>
                             {p.needed ? t("vendor.src.providerActive") : t("vendor.src.providerIdle")}
                           </Pill>
+                          <label className="ml-auto inline-flex items-center gap-1.5">
+                            <Switch
+                              size="sm"
+                              checked={green.includes(p.key)}
+                              onCheckedChange={(on) => setProviderGreen(p.key, on)}
+                              aria-label={`${p.name}: ${t("vendor.src.allowGreen")}`}
+                            />
+                            <Explained label={t("vendor.src.allowGreen")} text={t("vendor.tlpGreenHint")} />
+                          </label>
                         </li>
                       ))}
                     </ul>

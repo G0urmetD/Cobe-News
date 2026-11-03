@@ -36,6 +36,7 @@
           &nbsp;<span style="font-size:12px;color:#5b6175;">{{ s.source }} · {{ s.date }}</span>
         </td></tr>
         <tr><td style="padding:4px 16px 2px;font-size:16px;font-weight:600;line-height:1.35;">{% if s.url %}<a href="{{ s.url }}" style="color:#1f2330;text-decoration:none;">{{ s.title }}</a>{% else %}{{ s.title }}{% endif %}</td></tr>
+        {% if s.tlp %}<tr><td style="padding:4px 16px 0;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e6f4ea;color:#1e6b34;font-size:11px;font-weight:700;">{{ s.tlp }}</span></td></tr>{% endif %}
         {% if s.summary %}<tr><td style="padding:6px 16px 4px;font-size:14px;line-height:1.55;color:#4a5066;">{{ s.summary }}</td></tr>{% endif %}
         <tr><td style="padding:6px 16px 14px;font-size:13px;">{% if s.url %}<a href="{{ s.url }}" style="color:#3d55d4;">{{ labels.article }}</a> &nbsp;·&nbsp; {% endif %}<a href="{{ s.link }}" style="color:#3d55d4;">{{ labels.open }}</a></td></tr>
       </table>

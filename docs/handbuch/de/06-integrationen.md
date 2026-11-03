@@ -165,9 +165,10 @@ Anbieter einzutragen ist Katalogpflege: ein Eintrag in `backend/app/catalog/csaf
    `https://<domain>/.well-known/csaf/provider-metadata.json`.
 2. **Liste der Dokumente:** ein ROLIE-Feed oder die Datei `changes.csv` eines Verzeichnisses – bedingt abgerufen,
    unverändert kostet sie nur eine kurze Nachfrage.
-3. **Nur öffentliche Dokumente:** gelesen werden nur Feeds und Dokumente mit [TLP](term:tlp):WHITE oder TLP:CLEAR.
-   Ein Dokument ohne Kennzeichnung nur aus einer Verteilung, die nicht anders gekennzeichnet ist. TLP:GREEN, AMBER und
-   RED werden nie gelesen.
+3. **Öffentliche Dokumente – TLP:GREEN nur auf Wunsch:** gelesen werden Feeds und Dokumente mit
+   [TLP](term:tlp):WHITE oder TLP:CLEAR. Ein Dokument ohne Kennzeichnung nur aus einer Verteilung, die nicht anders
+   gekennzeichnet ist. TLP:GREEN nur, wenn ein Admin es für diesen Anbieter zulässt ([unten](#tlp-green)); AMBER,
+   AMBER+STRICT und RED werden nie gelesen.
 4. **Prüfsumme:** Bietet der Anbieter eine Prüfsumme an (`.sha512` oder `.sha256`), muss sie stimmen – sonst wird das
    Dokument übergangen (unter *Gesundheit* als unlesbar gezählt). Nennt der Feed eine Prüfsumme, die sich gerade nicht
    abrufen lässt, wird das Dokument in dieser Runde nicht übernommen und später erneut versucht. Hat ein Anbieter gar
@@ -185,6 +186,33 @@ Anbieter einzutragen ist Katalogpflege: ein Eintrag in `backend/app/catalog/csaf
 diese Signatur nicht: Der Schlüssel dafür liegt auf demselben Server wie das Dokument. Wer dort ein Dokument ändern
 könnte, könnte auch den Schlüssel tauschen – mehr Schutz als TLS und Prüfsumme brächte die Signatur nur mit einem
 Schlüssel, der unabhängig davon hinterlegt ist.
+
+### TLP:GREEN je Anbieter zulassen {#tlp-green}
+
+**TLP:GREEN** heißt: Weitergabe nur innerhalb eurer Organisation bzw. Community, nicht öffentlich. Manche Anbieter
+kennzeichnen so auch Hinweise, die sie frei abrufbar ins Netz stellen – bekannt ist **Open-Xchange** (OX App Suite
+und Dovecot, alle Dokumente TLP:GREEN). Ab Werk liest Cobe News solche Dokumente nicht.
+
+Unter *Einstellungen → Integrationen → Vendor News → Weitere Quellen* hat jeder CSAF-Anbieter den Schalter
+**TLP:GREEN zulassen** (aus ab Werk). Eingeschaltet:
+
+- Die TLP:GREEN-Dokumente dieses Anbieters werden gelesen; seine Liste wird dafür einmal von vorn gelesen. Was älter als
+  7 Tage ist, erscheint wie beim ersten Abruf auf der Seite, wird aber nicht gemeldet.
+- Jeder Befund daraus trägt das Zeichen **TLP:GREEN** (mit Erklärung beim Darüberfahren) – auf der Produktkarte, in
+  der Schublade, in E-Mails und Chat-Nachrichten (Feld „TLP: TLP:GREEN – nur intern weitergeben“, `[TLP:GREEN]` vor dem
+  Titel), beim Weiterleiten an ein Team, im Wochenbericht, im Webhook (`"tlp": "GREEN"`) und in der API
+  (`/api/v1`, Feld `tlp`). Wohin eure Kanäle gehen, entscheidet ihr – ein Kanal nach außen sollte solche Meldungen
+  nicht bekommen.
+- AMBER, AMBER+STRICT und RED bleiben immer abgelehnt.
+
+Wieder ausgeschaltet, entfernt Cobe News die gespeicherten TLP:GREEN-Hinweise dieses Anbieters sofort (und jede Runde
+noch einmal) – ohne Meldung „zurückgezogen“; noch nicht verschickte Meldungen daraus gehen nicht mehr hinaus. Entfernt
+statt nur ausgeblendet, weil ihr damit entschieden habt, solche Inhalte nicht zu halten: sie stünden sonst weiter in
+der Datenbank, in Sicherungen und Exporten. Jede Änderung des Schalters steht im Audit-Log
+(„Einstellungen geändert“, Feld `csaf_green`).
+
+Hinweise zu Meldungen aus News (BSI, Siemens, Cisco) werden nur aus öffentlichen Dokumenten (TLP:CLEAR/WHITE)
+angezeigt – ein TLP:GREEN-Dokument dort wird nicht verwendet.
 
 ### Regeln für CSAF-Dokumente {#csaf-regeln}
 

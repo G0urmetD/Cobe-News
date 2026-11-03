@@ -602,6 +602,11 @@ async def build(db: AsyncSession, item: NewsItem, source: NewsSource, prev: dict
             body = await vendor.get(url, db=db, conditional=False, limit=CSAF_LIMIT)
             # all products for Vendor News (the same advisory from its CSAF provider is stored alike), the first ones shown
             d = await asyncio.to_thread(parse_csaf, body or b"{}", kind, STORE_PRODUCTS)
+            if d.get("tlp") and d["tlp"] not in ("WHITE", "CLEAR"):
+                # a story's document is shown to every reader and stored for Vendor News: only a public one (TLP:GREEN
+                # only from a CSAF provider an admin allows it for – csaf_providers, labelled there)
+                log.info("details: %s document labelled TLP:%s – not used", kind, d["tlp"][:20])
+                return None
             if not d["cvss"] and d["cves"]:
                 advs = [a for c in d["cves"][:MAX_CVES] if (a := await _nvd_cve(db, c, key, budget))]
                 if advs:

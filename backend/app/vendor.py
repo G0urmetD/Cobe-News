@@ -1312,8 +1312,16 @@ async def sync_structured(db: AsyncSession, cfg: dict, products: list[dict], eve
     from app import csaf_providers, cvelist
 
     out: dict[str, int] = {}
+    green = csaf_providers.green_allowed(cfg)
+    try:
+        # TLP:GREEN of a provider no longer allowed to bring it: gone before anything else is read (also with CSAF off)
+        if n := await csaf_providers.purge_green(db, green):
+            out["csaf:tlp_green_removed"] = n
+    except Exception:  # noqa: BLE001 - tried again next round
+        await db.rollback()
+        log.exception("vendor: removing TLP:GREEN advisories failed")
     if cfg.get("csaf", True):
-        for k, n in (await csaf_providers.sync_all(db, products, every, ix, force)).items():
+        for k, n in (await csaf_providers.sync_all(db, products, every, ix, force, green)).items():
             out[k] = n
     if cfg.get("cvelist", True):
         if (r := await cvelist.sync_delta(db, products, ix, force)) is not None:
@@ -1526,6 +1534,8 @@ def findings(
                 # an advisory a CSAF provider brought with its first fill: shown, never notified (csaf_providers) –
                 # as a finding only links of the relink after a catalogue change make (relink_catalog)
                 "quiet": bool(data.get("initial")) or all(getattr(x, "quiet", False) for x in all_advs),
+                # from a CSAF provider's TLP:GREEN document (allowed per provider): labelled wherever it is shown or sent
+                "tlp": "GREEN" if any((x.data or {}).get("tlp") == "GREEN" for x in all_advs) else None,
                 "published_at": (a.published_at or a.updated_at).isoformat() if (a.published_at or a.updated_at) else None,
                 "status": worst.status,
                 "versions": [
@@ -2276,6 +2286,7 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                 "cvss": fd["cvss"],
                 "exploited": fd["exploited"],
                 "published_at": fd["published_at"],
+                **({"tlp": fd["tlp"]} if fd.get("tlp") else {}),
             }
             key = f"{scope}:{fd['id']}"[:400]
             if key not in known and not (cves & known_cves[scope]):

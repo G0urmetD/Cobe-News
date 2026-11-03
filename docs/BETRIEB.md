@@ -646,8 +646,24 @@ Eingetragen: Siemens, Cisco, Schneider Electric, Open-Xchange (0.1.45; seit Kata
 Hersteller `Dovecot (Open-Xchange)`: die Dokumente `oxdc-adv-…` führen „OX Dovecot CE“ und „OX Dovecot Pro“ im Zweig
 „Open-Xchange GmbH“ mit der CPE `a:open-xchange:dovecot`; der Katalog-Eintrag ist Dovecot CE, „OX Dovecot Pro“ zählt
 nicht, `excluded_names`). Open-Xchange kennzeichnet seine CSAF-Dokumente (App Suite und Dovecot, geprüft 03.11.2026)
-mit **TLP:GREEN** – gelesen wird nur TLP:WHITE/CLEAR, solche Dokumente werden abgelehnt (Quellen-Gesundheit: „blocked“).
-Dovecots Befunde kommen bis dahin aus den CVE-Einträgen (CNA „OX“: „Open-Xchange GmbH / OX Dovecot CE“) und der NVD. Citrix/NetScaler hat keinen CSAF-Anbieter und
+mit **TLP:GREEN** (Weitergabe nur innerhalb der Organisation/Community, nicht öffentlich). Ab Werk wird nur
+TLP:WHITE/CLEAR gelesen, solche Dokumente werden abgelehnt (Quellen-Gesundheit: „blocked“); Dovecots Befunde kommen
+dann aus den CVE-Einträgen (CNA „OX“: „Open-Xchange GmbH / OX Dovecot CE“) und der NVD.
+
+**TLP:GREEN je Anbieter** – *Integrationen → Vendor News → Weitere Quellen*, Schalter „TLP:GREEN zulassen“ je
+Anbieter (Einstellung `vendor.csaf_green`, Liste der Anbieter-Schlüssel, ab Werk leer; Audit: `settings.changed`).
+Eingeschaltet liest der Anbieter auch TLP:GREEN-Feeds und -Dokumente (seine Liste wird dafür einmal von vorn gelesen,
+Älteres als 7 Tage still wie beim ersten Abruf); jeder solche Hinweis trägt `data.tlp = "GREEN"`, der Befund `tlp`,
+und jede Ausgabe kennzeichnet ihn: Karte und Schublade (Zeichen „TLP:GREEN“), Mail/Chat/ntfy/Gotify/Mattermost (Feld
+„TLP“, `[TLP:GREEN]` vor dem Titel, auch Web Push), Weiterleiten an Teams, Wochenbericht, Webhook (`tlp`, in
+`news.stories` und `news.forward`) und `/api/v1` (`tlp`). AMBER, AMBER+STRICT und RED werden nie gelesen. Öffentliche
+Wege gibt es nicht; der Kalender-Feed enthält keine Hinweise (nur Support-Enden). Die Details zu News-Meldungen nehmen
+nur öffentliche Dokumente (ein Dokument mit anderem TLP als CLEAR/WHITE wird dort nicht verwendet). Wieder
+ausgeschaltet: die gespeicherten TLP:GREEN-Hinweise des Anbieters werden sofort entfernt (und in jeder Runde erneut
+geprüft, `csaf_providers.purge_green`), ohne Revision und ohne „zurückgezogen“; noch nicht verschickte Ereignisse
+daraus werden still (baseline), verschickte bleiben in der Historie mit Kennzeichnung. Entfernt statt versteckt: wer
+TLP:GREEN abschaltet, will solche Inhalte nicht halten – versteckt stünden sie weiter in Datenbank, Sicherung und
+Export, und jeder Ausgabeweg bräuchte einen eigenen Filter. Citrix/NetScaler hat keinen CSAF-Anbieter und
 keinen Feed der Security Bulletins (geprüft 02.11.2026: BSI-Liste, `/.well-known/csaf/` von citrix.com, netscaler.com,
 cloud.com, support.citrix.com; der alte RSS-Feed liefert nur die Webseite) – Citrix-Produkte laufen über die CNA-Daten
 der CVE-Liste und NVD, die Webseiten werden nicht ausgelesen.
@@ -1362,8 +1378,8 @@ Das Image statt eines lokalen Builds betreiben: [Veröffentlichtes Image statt l
   Citrix hat keine maschinenlesbare Bulletin-Quelle (nur CVE-Daten). Ohne CPE in der NVD (nur News und
   Herstellerdaten): Matrix42 Empirum, Aagon ACMP, Datto RMM, Swyx, d.velop, ELO, DocuWare, ESET PROTECT, G DATA, NCP VPN
   Server, SAProuter, INSYS icom, Fujitsu iRMC, HPE iLO 7, Drucker/MFP (Dell iDRAC10 hat seit Katalog 2026.11.03-1 die
-  CPE `o:dell:idrac10_firmware`). Dovecot ist an den CSAF-Anbieter Open-Xchange angebunden, dessen Dokumente aber
-  TLP:GREEN tragen und deshalb nicht gelesen werden (siehe „CSAF-Anbieter“). Dells CVE-Einträge für iDRAC9 nennen
+  CPE `o:dell:idrac10_firmware`). Dovecot ist an den CSAF-Anbieter Open-Xchange angebunden, dessen Dokumente
+  TLP:GREEN tragen – gelesen nur, wenn ein Admin TLP:GREEN für Open-Xchange zulässt (siehe „CSAF-Anbieter“). Dells CVE-Einträge für iDRAC9 nennen
   14G und 15G/16G in einer Zeile „iDRAC9“ mit je eigener Grenze – ein 14G-Build über 7.00.00.18x gilt dort als betroffen
   bis zur 15G/16G-Grenze (eine Generation steht nicht in der Version).
 - Weitere Quellen: OpenPGP-Signaturen der CSAF-Dokumente werden nicht geprüft (nur die Prüfsumme); Microsofts CSAF/VEX
