@@ -23,6 +23,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 ### Fixes
 - **CPEs mit Doppelpunkt im Namen** (z. B. mailcow) werden beim Abgleich richtig erkannt.
 - **Meldungsdetails** nutzen nur noch frei weitergebbare Dokumente.
+- **„Langsam“ in der Quellen-Gesundheit** kam auch von einem einzelnen großen Download, etwa dem ersten vollständigen NVD-Abruf eines neu verfolgten Produkts (GitLab: 6 MB in 4 Seiten). Downloads über 1 MB je Anfrage zählen dafür nicht mehr; die angezeigte mittlere Antwortzeit enthält sie weiter.
 
 ### Sicherheit
 - **Startpasswörter laufen nach 7 Tagen ab** (einstellbar 1–30).

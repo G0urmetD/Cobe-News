@@ -482,7 +482,7 @@ Pause bis zum nächsten Versuch.
 | noch nicht abgerufen | eingeschaltet, aber noch nie gefragt |
 | **tot** (rot) | HTTP 401/403/410 zweimal in Folge, HTTP 404 dreimal in Folge; seit **14 Tagen** kein erfolgreicher Abruf (gezählt ab dem letzten Erfolg bzw. dem Einschalten); nur News: seit **60 Tagen** keine neue Meldung, obwohl der Abruf klappt – erst bewertet, wenn Meldungen und Statistik die 60 Tage abdecken |
 | **gestört** (bernstein) | 3 Fehlschläge in Folge; ein aktueller Fehler, der nicht nur vorübergehend ist (alles außer Zeitüberschreitung, Verbindungsfehler, HTTP 5xx, „zu viele Anfragen“) – die Quelle pausiert bis zum nächsten Versuch; eine unlesbare Antwort in den letzten 24 Stunden |
-| **langsam** (blau – ein Hinweis, nichts zu tun) | im Mittel der letzten 7 Tage über 5 s je Anfrage (mind. 3 Anfragen), mind. 3 Zeitüberschreitungen und mind. ein Viertel der Abrufe, oder ein vorübergehender Fehler, der gleich wiederholt wird |
+| **langsam** (blau – ein Hinweis, nichts zu tun) | im Mittel der letzten 7 Tage über 5 s je Anfrage (mind. 3 Anfragen; Downloads über 1 MB je Anfrage zählen nicht), mind. 3 Zeitüberschreitungen und mind. ein Viertel der Abrufe, oder ein vorübergehender Fehler, der gleich wiederholt wird |
 | **gesund** (grün) | alles andere |
 
 - **Gespeichert** wird je Abruf eine Zeile (`source_fetch_stats`): Zeit, Erfolg, HTTP-Status, Fehlerart (Zeitüberschreitung,

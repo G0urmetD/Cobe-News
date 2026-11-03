@@ -268,6 +268,21 @@ async def test_overview_numbers_and_sparkline():
     assert row["last_error"]["category"] == "timeout" and row["error"] is None and row["state"] == "healthy"
 
 
+async def test_big_downloads_do_not_make_a_source_slow():
+    """A first full NVD fetch (several MB in a few pages) takes long by nature – it is shown in the average, but "slow"
+    is judged without it."""
+    await set_news(enabled=True)
+    await _source(last_fetch_at=NOW, last_ok_at=NOW)
+    await _add_stats(
+        {"at": NOW - timedelta(hours=2), "duration_ms": 26000, "requests": 4, "bytes": 6_000_000},
+        {"at": NOW - timedelta(hours=1), "duration_ms": 600, "requests": 1, "bytes": 70_000},
+    )
+    row = await _row()
+    assert row["state"] == "healthy" and row["avg_ms"] == 5320  # the shown average still counts the big fetch
+    await _add_stats(*({"at": NOW - timedelta(minutes=m), "duration_ms": 7000, "requests": 1, "bytes": 70_000} for m in (10, 20, 30)))
+    assert (await _row())["state"] == "slow"  # small answers that take long still do
+
+
 # ---------------------------------------------------------------- retention, API, queries
 
 

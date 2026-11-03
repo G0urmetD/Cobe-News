@@ -378,7 +378,7 @@ Jede News-Quelle, jede Quellen-Familie von Vendor News und jede der [weiteren Qu
 | **noch nicht abgerufen** | eingeschaltet, aber noch nie gefragt – passiert mit der nächsten Runde |
 | **tot** (rot) | HTTP 401/403/410 zweimal in Folge; HTTP 404 dreimal in Folge; seit **14 Tagen** kein erfolgreicher Abruf; nur News: seit **60 Tagen** keine neue Meldung, obwohl der Abruf klappt |
 | **gestört** (bernstein) | 3 Fehlschläge in Folge; ein aktueller Fehler, der nicht nur vorübergehend ist (z. B. falsche Adresse, Zertifikat, unlesbare Antwort) – die Quelle pausiert bis zum nächsten Versuch; eine unlesbare Antwort in den letzten 24 Stunden |
-| **langsam** (blau) | im Mittel der letzten 7 Tage über 5 Sekunden je Anfrage; häufige Zeitüberschreitungen (mindestens 3 und mindestens ein Viertel der Abrufe); oder ein vorübergehender Fehler, der gleich wiederholt wird |
+| **langsam** (blau) | im Mittel der letzten 7 Tage über 5 Sekunden je Anfrage (große Downloads über 1 MB je Anfrage zählen hier nicht – etwa der erste vollständige NVD-Abruf eines neu verfolgten Produkts); häufige Zeitüberschreitungen (mindestens 3 und mindestens ein Viertel der Abrufe); oder ein vorübergehender Fehler, der gleich wiederholt wird |
 | **gesund** (grün) | alles andere |
 
 Vorübergehend sind Zeitüberschreitungen, Verbindungsfehler, HTTP 5xx und „zu viele Anfragen“. Sie pausieren eine

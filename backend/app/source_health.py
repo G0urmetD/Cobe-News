@@ -21,7 +21,9 @@ States (classify(), thresholds below; precedence top down):
 - disturbed (gestört) – DISTURBED_FAILURES failures in a row, a current failure that is no passing one (anything but
   a timeout, a lost connection, HTTP 5xx or "too many requests" – the source pauses until its next try), or an
   unreadable answer within PARSE_WINDOW;
-- slow (langsam) – answers take more than SLOW_MS on average (last WINDOW, at least SLOW_MIN_REQUESTS requests), many
+- slow (langsam) – answers take more than SLOW_MS on average (last WINDOW, at least SLOW_MIN_REQUESTS requests; big
+  downloads of more than BIG_BYTES a request – a first full NVD fetch, a whole list – are left out, they take long by
+  nature), many
   timeouts (TIMEOUTS_MIN and TIMEOUT_SHARE of the fetches), or a passing failure being retried;
 - healthy (gesund) – everything else.
 A Vendor News family takes the worst state of its queries (the drawer lists them one by one).
@@ -75,6 +77,7 @@ WINDOW = timedelta(days=7)  # averages, timeouts, parse errors
 WEEKS = 4
 SLOW_MS = 5000
 SLOW_MIN_REQUESTS = 3
+BIG_BYTES = 1_000_000  # per request on average: a fetch this big does not count for "slow"
 TIMEOUTS_MIN = 3
 TIMEOUT_SHARE = 0.25
 
@@ -335,6 +338,8 @@ SELECT kind, key,
   count(*) FILTER (WHERE at >= :w1) AS fetches,
   coalesce(sum(duration_ms) FILTER (WHERE at >= :w1 AND ok), 0) AS ms,
   coalesce(sum(requests) FILTER (WHERE at >= :w1 AND ok), 0) AS requests,
+  coalesce(sum(duration_ms) FILTER (WHERE at >= :w1 AND ok AND bytes <= :big * greatest(requests, 1)), 0) AS ms_paced,
+  coalesce(sum(requests) FILTER (WHERE at >= :w1 AND ok AND bytes <= :big * greatest(requests, 1)), 0) AS requests_paced,
   coalesce(sum(bytes) FILTER (WHERE at >= :w1 AND ok AND NOT not_modified), 0) AS bytes,
   count(*) FILTER (WHERE at >= :w1 AND ok AND NOT not_modified) AS bodies,
   count(*) FILTER (WHERE at >= :w1 AND not_modified) AS not_modified,
@@ -371,7 +376,7 @@ SELECT source_id, max(fetched_at) AS at FROM (
 
 async def _stats(db: AsyncSession, now: datetime) -> dict[tuple[str, str], dict]:
     w = {f"w{i}": now - WINDOW * i for i in range(1, WEEKS + 1)}
-    rows = (await db.execute(_STATS_SQL, {**w, "p": now - PARSE_WINDOW, "keep": now - KEEP})).mappings().all()
+    rows = (await db.execute(_STATS_SQL, {**w, "p": now - PARSE_WINDOW, "keep": now - KEEP, "big": BIG_BYTES})).mappings().all()
     return {(r["kind"], r["key"]): dict(r) for r in rows}
 
 
@@ -417,8 +422,9 @@ def _facts(*, active: bool, last_fetch_at, last_ok_at, since, failures: int, err
     f = Facts(active=active, last_fetch_at=last_fetch_at, last_ok_at=last_ok_at, since=since, failures=int(failures or 0), error=cat if failures else None, status=status if failures else None)
     if st:
         f.fetches, f.timeouts, f.parse_fails = int(st["fetches"]), int(st["timeouts"]), int(st["parse_fails"])
-        f.measured = int(st["requests"])
-        f.avg_ms = int(st["ms"]) // f.measured if f.measured else None
+        # "slow" is judged without the big downloads (the shown average keeps them: ms / requests)
+        f.measured = int(st["requests_paced"])
+        f.avg_ms = int(st["ms_paced"]) // f.measured if f.measured else None
     return f
 
 

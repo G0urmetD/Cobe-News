@@ -373,7 +373,7 @@ Every news source, every source family of Vendor News and each of the [more sour
 | **not fetched yet** | switched on but never asked – happens with the next round |
 | **dead** (red) | HTTP 401/403/410 twice in a row; HTTP 404 three times in a row; no successful fetch for **14 days**; news only: no new story for **60 days** although fetching works |
 | **disturbed** (amber) | 3 failures in a row; a current failure that is not just passing (e.g. wrong address, certificate, unreadable answer) – the source pauses until its next try; an unreadable answer within the last 24 hours |
-| **slow** (blue) | more than 5 seconds per request on average over the last 7 days; frequent timeouts (at least 3 and at least a quarter of the fetches); or a passing failure about to be retried |
+| **slow** (blue) | more than 5 seconds per request on average over the last 7 days (big downloads of more than 1 MB per request do not count here – such as the first full NVD fetch of a product just followed); frequent timeouts (at least 3 and at least a quarter of the fetches); or a passing failure about to be retried |
 | **healthy** (green) | everything else |
 
 Passing failures are timeouts, connection errors, HTTP 5xx and "too many requests". They pause a source for at most
