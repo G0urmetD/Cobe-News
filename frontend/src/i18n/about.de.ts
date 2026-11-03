@@ -48,7 +48,7 @@ const aboutDe: Record<string, string> = {
   "update.title": "Neue Versionen",
   "update.check": "Nach neuen Versionen suchen",
   "update.checkHint":
-    "Fragt höchstens alle 12 Stunden die öffentliche Release-Schnittstelle von GitHub (api.github.com), ob eine neuere Cobe-News-Version veröffentlicht ist – nur Admins sehen den Hinweis. Über diese Installation geht nichts hinaus. Standard: an.",
+    "Fragt höchstens alle 12 Stunden die öffentliche Release-Schnittstelle von GitHub (api.github.com), ob eine neuere Cobe-News-Version veröffentlicht ist – nur Admins sehen den Hinweis. Gesendet wird nur die Anfrage selbst mit der Versionskennung von Cobe News (User-Agent) – keine Daten dieser Installation. Standard: an.",
   "update.latest": "Neueste Version",
   "update.none": "noch keine Antwort",
   "update.checked": "Zuletzt geprüft",

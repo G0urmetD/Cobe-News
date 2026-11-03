@@ -47,7 +47,7 @@ const aboutEn: Record<string, string> = {
   "update.title": "New versions",
   "update.check": "Check for new versions",
   "update.checkHint":
-    "Asks GitHub's public release API (api.github.com) at most every 12 hours whether a newer Cobe News version is published – only admins see the notice. Nothing about this installation leaves the machine. Default: on.",
+    "Asks GitHub's public release API (api.github.com) at most every 12 hours whether a newer Cobe News version is published – only admins see the notice. Only the request itself is sent, with Cobe News' version identifier (User-Agent) – no data of this installation. Default: on.",
   "update.latest": "Latest version",
   "update.none": "no answer yet",
   "update.checked": "Last checked",

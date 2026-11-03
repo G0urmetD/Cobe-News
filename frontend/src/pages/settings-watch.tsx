@@ -829,7 +829,7 @@ function WatchRow({
         }}
       >
         <div className="w-full min-w-0 space-y-0.5 lg:w-auto">
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 gap-y-1">
             <Mono value={w.cve} className="font-medium" />
             {isNew && (
               <span title={t("watch.newHint")}>

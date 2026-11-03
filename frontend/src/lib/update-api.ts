@@ -29,7 +29,12 @@ export const useUpdateStatus = (isAdmin: boolean) =>
 export const dismissUpdate = (version: string) => api.post<UpdateStatus>("/api/admin/update/dismiss", { version })
 export const saveUpdateCheck = (check: boolean, rev: number) => api.put<UpdateStatus>("/api/admin/update/settings", { check, rev })
 
+/** The release link, only when it is an https address – otherwise none (shell notice and About page alike). */
+export function releaseLink(s: Pick<UpdateStatus, "url"> | undefined): string | null {
+  return s && typeof s.url === "string" && s.url.startsWith("https://") ? s.url : null
+}
+
 /** Whether the shell shows the notice: a newer release, not closed, with its link (an https address). */
 export function showUpdateNotice(s: UpdateStatus | undefined): s is UpdateStatus & { latest: string; url: string } {
-  return !!s && s.enabled && s.available && !s.dismissed && !!s.latest && typeof s.url === "string" && s.url.startsWith("https://")
+  return !!s && s.enabled && s.available && !s.dismissed && !!s.latest && releaseLink(s) !== null
 }

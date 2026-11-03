@@ -364,6 +364,7 @@ const en: Record<string, string> = {
   "news.allSources": "All sources",
   "news.alsoIn": "also at {{list}}",
   "news.cveTitle": "CVEs mentioned",
+  "news.cveOfDetails": "CVEs from “Affected versions”:",
   "news.cves_one": "{{count}} CVE",
   "news.cves_other": "{{count}} CVEs",
   "news.description": "Security news from the sources switched on – every story once, with an estimate of its severity.",
@@ -814,8 +815,8 @@ const en: Record<string, string> = {
     "SECRET_KEY is short (under {{min}} characters or only a few different ones) – a longer random key is advised. A new key means entering the stored secrets again (operations guide).",
   "system.warning.secretKeyShort.file":
     "The key in DATA_DIR/secret.key is short (under {{min}} characters or only a few different ones) – a longer random key is advised. A new key means entering the stored secrets again (operations guide).",
-  "system.warning.emergencyFailures_one": "Emergency admin: {{count}} failed attempt within an hour – its sign-in is slowed down. Check the audit log; last",
-  "system.warning.emergencyFailures_other": "Emergency admin: {{count}} failed attempts within an hour – its sign-in is slowed down. Check the audit log; last",
+  "system.warning.emergencyFailures_one": "Emergency admin: {{count}} failed attempt within an hour – its sign-in is slowed down. Check the audit log; most recent:",
+  "system.warning.emergencyFailures_other": "Emergency admin: {{count}} failed attempts within an hour – its sign-in is slowed down. Check the audit log; most recent:",
   "tls.daysLeft_one": "{{count}} day left",
   "tls.daysLeft_other": "{{count}} days left",
   "tls.download": "Download certificate",

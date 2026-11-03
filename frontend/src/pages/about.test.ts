@@ -130,6 +130,10 @@ describe("AboutPage", () => {
       expect(html).toContain("0.1.48 verfügbar")
       expect(html).toContain('href="https://github.com/G0urmetD/Cobe-News/releases/tag/v0.1.48"')
       expect(html).toContain('rel="noopener noreferrer"')
+      // the release link only as an https address – as the shell's notice (no link otherwise)
+      const bad = render(data, { ...update, url: "javascript:alert(1)" })
+      expect(bad).not.toContain("javascript:")
+      expect(bad).not.toContain("0.1.48 verfügbar</a>")
     } finally {
       auth.isAdmin = false
     }

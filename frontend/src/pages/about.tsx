@@ -12,7 +12,7 @@ import { ToggleRow } from "@/components/cobe/form"
 import { Ts } from "@/components/cobe/time"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
-import { UPDATE_KEY, saveUpdateCheck, useUpdateStatus } from "@/lib/update-api"
+import { UPDATE_KEY, releaseLink, saveUpdateCheck, useUpdateStatus } from "@/lib/update-api"
 import { type ChangeKind, type ChangelogEntry, entryGroups, inlineTokens, kindCounts, splitChangelog, useChangelog } from "@/lib/changelog"
 import { cn } from "@/lib/utils"
 
@@ -117,6 +117,7 @@ function UpdateCheck() {
       setBusy(false)
     }
   }
+  const link = releaseLink(s) // an https address only, as the shell's notice
   return (
     <div className="mb-6 rounded-xl border bg-card px-5 py-1">
       <ToggleRow label={t("update.check")} description={t("update.checkHint")} checked={s.enabled} disabled={busy} onCheckedChange={(v) => void toggle(v)}>
@@ -126,8 +127,8 @@ function UpdateCheck() {
             {s.latest ? (
               <span className="font-mono tabular-nums">
                 {s.latest}{" "}
-                {s.available && s.url ? (
-                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-sans text-primary hover:underline">
+                {s.available && link ? (
+                  <a href={link} target="_blank" rel="noopener noreferrer" className="font-sans text-primary hover:underline">
                     {t("update.available", { version: s.latest })}
                   </a>
                 ) : (

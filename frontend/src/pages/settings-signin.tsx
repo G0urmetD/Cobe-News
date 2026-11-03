@@ -595,6 +595,7 @@ export function MappingsPane() {
     return () => {
       alive = false
       clearTimeout(id)
+      setSearching(false) // a search left behind (another query, source or the pane closed) is no longer running
     }
   }, [query, source, usable, t, asked])
 
