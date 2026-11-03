@@ -27,6 +27,7 @@ Everything about the installation itself (address, certificate, network, databas
 | `APP_PORT` | http port of the app, always bound to `127.0.0.1`: for the health check, Prometheus on the same host ([Metrics](/docs/api#prometheus-konfiguration)) and your own reverse proxy on the same host | `8096` |
 | `COMPOSE_FILE` | `docker-compose.yml:docker-compose.http.yml` switches on the redirect from http to https ([HTTPS](#http-umleitung)) | not set |
 | `HTTP_PORT` | http port that only redirects to https (only with `COMPOSE_FILE` as above) | `8094` |
+| `COBE_NEWS_IMAGE` | the released, signed image instead of the local build, e.g. `ghcr.io/g0urmetd/cobe-news:0.1.46` – only with `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; verify the signature with cosign first (docs/BETRIEB.md) | not set (local build) |
 
 ### Certificate {#env-zertifikat}
 

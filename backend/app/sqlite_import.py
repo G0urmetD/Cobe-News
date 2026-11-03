@@ -86,6 +86,7 @@ COLUMNS_NOT_IN_SQLITE = frozenset(
         ("user_sessions", "passkey_id"),
         ("news_reads", "unread"),
         ("news_items", "topics"),
+        ("vendor_advisory_products", "quiet"),  # 0.1.47: links of the relink after a catalogue change – false
     }
 )
 

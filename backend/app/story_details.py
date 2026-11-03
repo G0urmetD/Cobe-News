@@ -179,7 +179,8 @@ def parse_csaf(data: bytes, kind: str, max_products: int = MAX_PRODUCTS) -> dict
         e = products.setdefault((p.get("vendor") or "", name), {"vendor": p.get("vendor") or "", "name": name, "cpe": "", "affected": set(), "fixed": set(), "not_affected": set()})
         cpe = p.get("cpe") or ""
         if cpe and not e["cpe"]:
-            parts = cpe.replace("cpe:2.3:", "").replace("cpe:/", "").split(":")
+            # split only between fields: an escaped colon belongs to its field (a:mailcow:mailcow\\:_dockerized)
+            parts = re.split(r"(?<!\\):", cpe.replace("cpe:2.3:", "").replace("cpe:/", ""))
             e["cpe"] = ":".join(parts[:3]) if len(parts) >= 3 else ""
         return e
 
@@ -605,6 +606,11 @@ async def build(db: AsyncSession, item: NewsItem, source: NewsSource, prev: dict
             body = await vendor.get(url, db=db, conditional=False, limit=CSAF_LIMIT)
             # all products for Vendor News (the same advisory from its CSAF provider is stored alike), the first ones shown
             d = await asyncio.to_thread(parse_csaf, body or b"{}", kind, STORE_PRODUCTS)
+            if d.get("tlp") and d["tlp"] not in ("WHITE", "CLEAR"):
+                # a story's document is shown to every reader and stored for Vendor News: only a public one (TLP:GREEN
+                # only from a CSAF provider an admin allows it for – csaf_providers, labelled there)
+                log.info("details: %s document labelled TLP:%s – not used", kind, d["tlp"][:20])
+                return None
             if not d["cvss"] and d["cves"]:
                 advs = [a for c in d["cves"][:MAX_CVES] if (a := await _nvd_cve(db, c, key, budget))]
                 if advs:

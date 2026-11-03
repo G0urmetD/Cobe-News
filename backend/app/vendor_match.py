@@ -526,6 +526,21 @@ def _cpe_parts(criteria: str) -> list[str]:
     return re.split(r"(?<!\\):", criteria)
 
 
+def cpe_fields(cpe: str) -> list[str]:
+    """The fields of a CPE – "cpe:2.3:a:vendor:product:…", "cpe:/a:vendor:product" or the catalogue's "a:vendor:product"
+    – split only at the colons between fields (NVD escapes one inside a field: a:mailcow:mailcow\\:_dockerized is the
+    product "mailcow:_dockerized"), NVD's escapes removed."""
+    t = str(cpe or "")
+    t = t[8:] if t.startswith("cpe:2.3:") else t[5:] if t.startswith("cpe:/") else t
+    return [re.sub(r"\\(.)", r"\1", f) for f in _cpe_parts(t)]
+
+
+def cpe_vendor_product(cpe: str) -> str:
+    """"vendor:product" of a CPE in any of the forms cpe_fields reads ("" when it has no product)."""
+    f = cpe_fields(cpe)
+    return f"{f[1]}:{f[2]}" if len(f) >= 3 and f[1] and f[2] else ""
+
+
 WINDOWS_RELEASE_CPE = re.compile(r"^o:microsoft:windows(?:_|$)")
 
 
@@ -653,7 +668,7 @@ def _cna_names(product: dict) -> list[tuple[str, str]]:
         return names
     out = []
     for c in product.get("cpes") or []:
-        parts = c.replace("\\", "").split(":")
+        parts = cpe_fields(c)
         if len(parts) == 3:
             out.append((parts[1].replace("_", " "), parts[2].replace("_", " ")))
     return out
@@ -689,6 +704,8 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
             vendor, prod = str(a.get("vendor") or ""), str(a.get("product") or "")
             if not any(name_matches(prod, want, vendor) and (_norm(vendor)[:1] == _norm(wv)[:1] or name_matches(vendor, wv)) for wv, want in names):
                 continue
+            if any(name_matches(prod, n, vendor) for n in product.get("excluded_names") or []):
+                continue  # another product the names would take (Dovecot: OX Dovecot Pro)
             versions = [x for x in a.get("versions") or [] if isinstance(x, dict)]
             if not any(x.get("status") == "affected" for x in versions) and a.get("defaultStatus") != "affected":
                 continue
@@ -722,6 +739,8 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                     # NetScaler: version "14.1", lessThan "8.50" – the build within the line: below 14.1-8.50
                     end_text = f"{base}-{str(end_text).strip()}"
                 if end_text:
+                    # Dell: lessThan "7.30.10.50 or later" – fixed in that version (or a later one): below it is affected
+                    end_text = re.sub(r"(?i)\s+or\s+later\s*$", "", str(end_text))
                     line = str(end_text).strip().endswith(".*")
                     start = _cna_version(scheme, _FLAVOUR.sub("", str(start_text or "")).strip(" -") if flavour else start_text)
                     end = None if str(end_text).strip() == "*" else _cna_version(scheme, end_text)
@@ -843,7 +862,7 @@ def _adp_product(product: dict) -> dict:
     rows carry CPE names, not the CNA's."""
     names = []
     for c in product.get("cpes") or []:
-        parts = c.replace("\\", "").split(":")
+        parts = cpe_fields(c)
         if len(parts) == 3:
             names.append((parts[1].replace("_", " "), parts[2].replace("_", " ")))
     return {**product, "cna": names}
@@ -1128,15 +1147,18 @@ def entries_for(product: dict, data: dict) -> list[dict]:
     if not csaf_speaks_for(product, data):
         return []
     own = str(product.get("vendor") or "") if data.get("provider") else ""
-    cpes = {":".join(c.replace("\\", "").split(":")[1:3]) for c in product.get("cpes") or []}
+    cpes = {cpe_vendor_product(c) for c in product.get("cpes") or []} - {""}
     names = [(str(a), str(b)) for a, b in product.get("cna") or []] + [("", str(product.get("label") or ""))]
     names += [("", re.sub(r"\s*\(.*?\)\s*$", "", str(product.get("label") or "")))]
+    excluded = [str(n) for n in product.get("excluded_names") or []]
     out = []
     for e in data.get("products") or []:
         if own and not any(_same_vendor(str(e.get("vendor") or ""), o) for o in _vendor_names(own)):
             continue  # another vendor's branch in a provider's document
+        if excluded and any(name_matches(str(e.get("name") or ""), n, str(e.get("vendor") or "")) for n in excluded):
+            continue  # another product under the same CPE (Dovecot: OX Dovecot Pro)
         cpe = e.get("cpe") or ""
-        if cpe and ":".join(cpe.split(":")[1:3]) in cpes:
+        if cpe and cpe_vendor_product(cpe) in cpes:  # an escaped colon stays in its field (mailcow:_dockerized)
             out.append(e)
             continue
         if not cpe and any(w and name_matches(str(e.get("name") or ""), w, str(e.get("vendor") or "")) for _, w in names):

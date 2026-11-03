@@ -141,6 +141,8 @@ export interface Finding {
   exploit?: ExploitHint[]
   /** brought by a CSAF provider's first fill: shown, never notified */
   quiet?: boolean
+  /** "GREEN": from a CSAF provider's TLP:GREEN document (allowed by an admin) – share internally only */
+  tlp?: "GREEN" | null
   /** the newest revision of the advisory (or one of its CVE records) within the last 30 days – "Geändert" */
   changed?: AdvisoryChange | null
   published_at: string | null
@@ -276,7 +278,7 @@ export interface OverviewItem {
   same_data?: string[]
   /** revised advisories of the product within the last 30 days; `impact`: one changed the verdict of a version entered */
   changed?: { count: number; at: string; impact: boolean } | null
-  latest: (Pick<Finding, "id" | "ident" | "title" | "severity" | "exploited" | "status" | "published_at" | "cvss"> & {
+  latest: (Pick<Finding, "id" | "ident" | "title" | "severity" | "exploited" | "status" | "published_at" | "cvss" | "tlp"> & {
     headline?: string
     score?: ScoreBrief | null
     unread?: boolean
@@ -380,6 +382,8 @@ export interface VendorSettings extends Record<StructuredSource, boolean>, Parti
   nvd_key_set: boolean
   /** Versionen prüfen: days after which an entered version is "bitte prüfen" (0: off) */
   review_days?: number
+  /** CSAF providers whose TLP:GREEN documents are read (default none: only TLP:CLEAR/WHITE) */
+  csaf_green?: string[]
   /** the saved state the form was loaded with (409 "stale" when another admin saved in between) */
   rev?: number
 }
@@ -387,7 +391,7 @@ export interface VendorSettings extends Record<StructuredSource, boolean>, Parti
 export interface VendorAdmin {
   settings: VendorSettings
   structured?: {
-    csaf_providers: { key: string; name: string; domain: string; vendors: string[]; needed: boolean }[]
+    csaf_providers: { key: string; name: string; domain: string; vendors: string[]; needed: boolean; green?: boolean }[]
     osv_products: number
     exploit_sources?: { key: ExploitSource; name: string; url: string; licence: string; default: boolean }[]
   }

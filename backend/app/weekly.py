@@ -397,7 +397,8 @@ async def content(db: AsyncSession, team_id: uuid.UUID, until: datetime) -> dict
         if ev.kind == "vuln":
             vulns.setdefault((ev.product, str(d.get("ident") or ev.key)), ev)  # once per finding (it may hit several versions)
         elif ev.kind == "change" and d.get("impact"):
-            changes.append({"product": labels.get(ev.product, ev.product), "ident": str(d.get("ident") or d.get("advisory") or ""), "title": str(d.get("title") or ""), "severity": ev.severity, "link": base + personal.event_path(ev)})
+            green = notify.TLP_PREFIX if d.get("tlp") == "GREEN" else ""  # a TLP:GREEN document: labelled
+            changes.append({"product": labels.get(ev.product, ev.product), "ident": str(d.get("ident") or d.get("advisory") or ""), "title": green + str(d.get("title") or ""), "severity": ev.severity, "link": base + personal.event_path(ev)})
         elif ev.kind == "version":
             versions.append({"product": labels.get(ev.product, ev.product), "version": str(d.get("version") or ""), "latest": str(d.get("latest") or ""), "link": base + personal.event_path(ev)})
     by_sev = {s: 0 for s in notify.RANK}
@@ -408,7 +409,7 @@ async def content(db: AsyncSession, team_id: uuid.UUID, until: datetime) -> dict
             "severity": ev.severity if ev.severity in by_sev else "info",
             "product": labels.get(ev.product, ev.product),
             "ident": str((ev.data or {}).get("ident") or ""),
-            "title": str((ev.data or {}).get("headline") or (ev.data or {}).get("title") or ""),
+            "title": (notify.TLP_PREFIX if (ev.data or {}).get("tlp") == "GREEN" else "") + str((ev.data or {}).get("headline") or (ev.data or {}).get("title") or ""),
             "link": base + personal.event_path(ev),
         }
         for ev in list(vulns.values())[:LIST]

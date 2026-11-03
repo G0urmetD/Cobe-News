@@ -368,6 +368,8 @@ async def record(
                     "cves": list(adv.get("cves") or [])[:30],
                     "revision": revision,
                     "doc_rev": str(((adv.get("data") or {}).get("rev")) or "")[:40],
+                    # a CSAF provider's TLP:GREEN document (csaf_providers): sent with its label
+                    **({"tlp": "GREEN"} if (adv.get("data") or {}).get("tlp") == "GREEN" else {}),
                     "diff": changes,
                     "impact": mine,
                 },

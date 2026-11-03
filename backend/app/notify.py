@@ -272,6 +272,16 @@ class Story:
     product: str = ""
     topics: list[str] = field(default_factory=list)
     source_kind: str = ""
+    # "GREEN": from a CSAF provider's TLP:GREEN document (allowed per provider) – every format labels it
+    tlp: str = ""
+
+
+TLP_PREFIX = "[TLP:GREEN] "
+
+
+def tlp_line(lang: str) -> str:
+    """The label of a TLP:GREEN item, as each channel shows it."""
+    return CARD_LABELS.get(lang, CARD_LABELS["de"])["tlp_green"]
 
 
 def _link(story_id: str) -> str:
@@ -329,6 +339,7 @@ def render_mail(rule: str, stories: list[Story], total: int, lang: str, *, test:
             "sev_label": lb["sev"][s.severity],
             "sev_color": SEV_COLORS[s.severity][0],
             "sev_bg": SEV_COLORS[s.severity][1],
+            "tlp": tlp_line(lang) if s.tlp == "GREEN" else "",
         }
         for s in stories
     ]
@@ -351,6 +362,8 @@ def render_mail(rule: str, stories: list[Story], total: int, lang: str, *, test:
     lines = [heading, "=" * min(len(heading), 60), ""]
     for c in cards:
         lines += [f"[{c['sev_label']}] {c['source']} · {c['date']}", c["title"]]
+        if c["tlp"]:
+            lines.append(c["tlp"])
         if c["summary"]:
             lines.append(c["summary"])
         if c["url"]:
@@ -375,6 +388,8 @@ CARD_LABELS = {
         "product": "Produkt",
         "source": "Quelle",
         "category": "Kategorie",
+        "tlp": "TLP",
+        "tlp_green": "TLP:GREEN – nur intern weitergeben",
         "topics": {
             "zeroday": "Zero-Day",
             "exploited": "Aktiv ausgenutzt",
@@ -402,6 +417,8 @@ CARD_LABELS = {
         "product": "Product",
         "source": "Source",
         "category": "Category",
+        "tlp": "TLP",
+        "tlp_green": "TLP:GREEN – share internally only",
         "topics": {
             "zeroday": "Zero-day",
             "exploited": "Actively exploited",
@@ -474,7 +491,8 @@ def category(s: "Story", lang: str) -> str:
 def card_fields(s: "Story", lang: str) -> list[tuple[str, str]]:
     """(label, value) of a card: Produkt (when known), Quelle, Kategorie – plain text, each channel escapes it."""
     cl = CARD_LABELS[lang]
-    out = [(cl["product"], s.product)] if s.product else []
+    out = [(cl["tlp"], cl["tlp_green"])] if s.tlp == "GREEN" else []
+    out += [(cl["product"], s.product)] if s.product else []
     return [*out, (cl["source"], s.source), (cl["category"], category(s, lang))]
 
 
@@ -728,6 +746,8 @@ def render_webhook(channel: str, rules: list[str], stories: list[Story], total: 
                 # 0.1.46, additive: the story's topics (news.TOPICS) and the product when reliably known ("" otherwise)
                 "topics": list(s.topics or []),
                 "product": s.product,
+                # additive: "GREEN" for a CSAF provider's TLP:GREEN document (share internally only), else ""
+                "tlp": s.tlp or "",
             }
             for s in stories
         ],
@@ -1629,10 +1649,13 @@ def vendor_story(ev: VendorEvent, lang: str) -> Story:
         title = f"{where}: {d.get('ident') or ''} – {head}".strip(" –")
         if d.get("now_exploited"):
             title = f"{lb['now_exploited']}: {title}"
+        tlp = "GREEN" if d.get("tlp") == "GREEN" else ""
+        if tlp:
+            title = TLP_PREFIX + title  # also in a subject, a compact list and a desktop notification
         product_line = f"{product} {version}".strip() + (f" → {d['fixed']}" if d.get("fixed") and version else "")
         return Story(
             str(ev.id), title[:300], summary[:600], str(d.get("url") or link), ev.severity, lb["source"], ev.created_at, list(d.get("cves") or []), "vendor.vuln", link,
-            product=product_line, topics=["exploited"] if d.get("exploited") else [], source_kind="vendor_news",
+            product=product_line, topics=["exploited"] if d.get("exploited") else [], source_kind="vendor_news", tlp=tlp,
         )
     if ev.kind == "change":
         return change_story(ev, lang, where=product, link=link)
@@ -1716,7 +1739,10 @@ def change_story(ev: VendorEvent, lang: str, *, where: str, link: str) -> Story:
     if d.get("title"):
         summary += f"\n{d['title']}"
     src_name = VENDOR_LABELS.get(lang, VENDOR_LABELS["de"])["source"]
-    return Story(str(ev.id), title[:300], summary[:600], str(d.get("url") or link), ev.severity, src_name, ev.created_at, list(d.get("cves") or []), "vendor.change", link, product=where, source_kind="vendor_news")
+    tlp = "GREEN" if d.get("tlp") == "GREEN" else ""
+    if tlp:
+        title = TLP_PREFIX + title
+    return Story(str(ev.id), title[:300], summary[:600], str(d.get("url") or link), ev.severity, src_name, ev.created_at, list(d.get("cves") or []), "vendor.change", link, product=where, source_kind="vendor_news", tlp=tlp)
 
 
 @dataclass

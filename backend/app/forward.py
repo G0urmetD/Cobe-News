@@ -154,6 +154,7 @@ class Forward:
     product: str = ""
     topics: list[str] = field(default_factory=list)
     source_kind: str = ""
+    tlp: str = ""  # "GREEN": a finding from a CSAF provider's TLP:GREEN document – labelled in every format
 
 
 def _sev(lang: str, s: str) -> str:
@@ -181,7 +182,7 @@ def _versions(f: Forward, lang: str) -> str:
 def _facts(f: Forward, lang: str) -> list[str]:
     """The mail's plain lines: the Dringlichkeit, the own versions – escaped like the feed's text."""
     lb = TEXT[lang]
-    out = []
+    out = [notify.tlp_line(lang)] if f.tlp == "GREEN" else []
     if f.score:
         out.append(lb["score"].format(value=f.score["value"], level=lb["levels"].get(f.score["level"], f.score["level"])))
     if v := _versions(f, lang):
@@ -203,7 +204,7 @@ def _card(f: Forward, lang: str) -> list[tuple[str, str]]:
     each renderer escapes it. The comment is a field of its own ("Kommentar", line by line, plain text), the short
     description (notify.brief) follows the fields."""
     lb = TEXT[lang]
-    s = notify.Story("", f.title, f.summary, f.url, f.severity, f.source, f.published_at or datetime.now(UTC), product=f.product, topics=list(f.topics), source_kind=f.source_kind)
+    s = notify.Story("", f.title, f.summary, f.url, f.severity, f.source, f.published_at or datetime.now(UTC), product=f.product, topics=list(f.topics), source_kind=f.source_kind, tlp=f.tlp)
     out = notify.card_fields(s, lang)
     if f.score:
         out.append((lb["score_label"], _score(f, lang)))
@@ -361,7 +362,8 @@ def render_mail(f: Forward, lang: str) -> tuple[str, str, str]:
         sev_color=notify.SEV_COLORS.get(f.severity, notify.SEV_COLORS["info"])[0],
         sev_bg=notify.SEV_COLORS.get(f.severity, notify.SEV_COLORS["info"])[1],
         accent=notify.ACCENTS.get(f.severity, notify.ACCENTS["info"]),
-        facts=facts,
+        facts=[x for x in facts if x != notify.tlp_line(lang)],
+        tlp=notify.tlp_line(lang) if f.tlp == "GREEN" else "",
         labels={"article": lb["article"], "open": lb["open"], "button": nl["button"]},
         app_url=get_config().base_url + "/",
         footer=footer,
@@ -409,6 +411,7 @@ def render_webhook(f: Forward, channel: str, lang: str, delivery: str) -> dict:
             # 0.1.46, additive (as news.stories): the topics (news.TOPICS) and the product when reliably known ("" otherwise)
             "topics": list(f.topics),
             "product": f.product,
+            "tlp": f.tlp or "",  # additive: "GREEN" – share internally only
         },
     }
 
@@ -529,8 +532,10 @@ async def _finding(db, product: str, finding: str, lang: str) -> tuple[str, Forw
         sender="", team="", comment="", title=f"{label}: {x['ident']} – {x.get('headline') or x.get('title') or ''}".strip(" –"), summary=(x.get("summary") or "")[:600],
         url=x.get("url") or "", link=_cobe_link("/vendor", product=product, finding=x["id"]), severity=x.get("severity") or "info", source=TEXT[lang]["vendor"],
         published_at=published, cves=list(x.get("cves") or [])[:30], score={"value": sc["value"], "level": sc["level"]} if sc else None, versions=rows, kind="finding",
-        product=label, topics=["exploited"] if x.get("exploited") else [], source_kind="vendor_news",
+        product=label, topics=["exploited"] if x.get("exploited") else [], source_kind="vendor_news", tlp="GREEN" if x.get("tlp") == "GREEN" else "",
     )
+    if f.tlp:
+        f.title = notify.TLP_PREFIX + f.title
     return f"finding:{product}:{x['id']}", f
 
 

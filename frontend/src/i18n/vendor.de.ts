@@ -530,7 +530,10 @@ const vendorDe: Record<string, string> = {
   "glossary.csafText":
     "Maschinenlesbares Format für Sicherheitshinweise (Version 2.0). Hersteller veröffentlichen damit betroffene und behobene Versionen je Produkt – Cobe News liest sie direkt beim Hersteller.",
   "glossary.tlp": "TLP (Traffic Light Protocol)",
-  "glossary.tlpText": "Kennzeichnung, wer eine Information weitergeben darf. Cobe News liest nur TLP:CLEAR bzw. TLP:WHITE (öffentlich) – nie GREEN, AMBER oder RED.",
+  "glossary.tlpText":
+    "Kennzeichnung, wer eine Information weitergeben darf. Cobe News liest TLP:CLEAR bzw. TLP:WHITE (öffentlich); TLP:GREEN nur, wo ein Admin es für einen CSAF-Anbieter zulässt – solche Befunde tragen das Zeichen „TLP:GREEN“. AMBER und RED nie.",
+  "vendor.tlpGreenHint": "TLP:GREEN: Weitergabe nur innerhalb eurer Organisation/Community, nicht öffentlich.",
+  "vendor.src.allowGreen": "TLP:GREEN zulassen",
   "glossary.ssvc": "SSVC (Stakeholder-Specific Vulnerability Categorization)",
   "glossary.ssvcText":
     "Einstufung der CISA je CVE: ob die Lücke ausgenutzt wird (keine / Exploit-Code öffentlich / aktiv), ob sich ein Angriff automatisieren lässt und wie schwer die Folgen sind.",
@@ -591,7 +594,7 @@ const vendorDe: Record<string, string> = {
   "vendor.src.offVendor": "Vendor News ist aus – keine dieser Quellen fragt an.",
   "vendor.src.csaf": "CSAF-Anbieter der Hersteller",
   "vendor.src.csafHint":
-    "Hinweise direkt von Siemens, Cisco, Schneider Electric und Open-Xchange (CSAF 2.0, nur TLP:CLEAR/WHITE, Prüfsumme geprüft), sobald ihr einem Produkt des Herstellers folgt. Gefunden über die Liste des BSI oder die Standard-Adresse des Herstellers. Was der erste Abruf an Älterem (über 7 Tage) bringt, steht auf der Seite, wird aber nicht gemeldet; ein Hersteller-Hinweis zählt nur für die eigenen Produkte des Herstellers.",
+    "Hinweise direkt von Siemens, Cisco, Schneider Electric und Open-Xchange (CSAF 2.0, TLP:CLEAR/WHITE – TLP:GREEN nur, wenn ihr es je Anbieter zulasst –, Prüfsumme geprüft), sobald ihr einem Produkt des Herstellers folgt. Gefunden über die Liste des BSI oder die Standard-Adresse des Herstellers. Was der erste Abruf an Älterem (über 7 Tage) bringt, steht auf der Seite, wird aber nicht gemeldet; ein Hersteller-Hinweis zählt nur für die eigenen Produkte des Herstellers.",
   "vendor.src.cvelist": "cvelistV5 (CVE-Liste)",
   "vendor.src.cvelistHint":
     "Dreimal am Tag (nach 5, 11 und 17 Uhr UTC) und einmal nach Tageswechsel nur die geänderten CVE-Einträge (eine ZIP-Datei von GitHub, zusammen etwa 10 MB am Tag, nie die ganze Liste) und einzelne ältere Einträge, wo die NVD noch nicht analysiert hat: die betroffenen Versionen des Herstellers (CNA) und die Einstufung der CISA (CVSS, SSVC, KEV). Behalten wird nur, was gefolgte Produkte betrifft.",

@@ -163,8 +163,9 @@ effective with the next update:
    on `wid.cert-bund.de`, read once a day), else `https://<domain>/.well-known/csaf/provider-metadata.json`.
 2. **List of documents:** a ROLIE feed or the `changes.csv` file of a directory – fetched conditionally, so an
    unchanged list costs only a short request.
-3. **Public documents only:** only feeds and documents labelled [TLP](term:tlp):WHITE or TLP:CLEAR are read. A
-   document without a label only from a distribution not labelled otherwise. TLP:GREEN, AMBER and RED are never read.
+3. **Public documents – TLP:GREEN only on request:** feeds and documents labelled [TLP](term:tlp):WHITE or
+   TLP:CLEAR are read. A document without a label only from a distribution not labelled otherwise. TLP:GREEN only
+   where an admin allows it for this provider ([below](#tlp-green)); AMBER, AMBER+STRICT and RED are never read.
 4. **Hash:** where the provider offers a hash (`.sha512` or `.sha256`), it has to match – otherwise the document is
    skipped (counted as unreadable under *Health*). If the feed lists a hash that cannot be fetched right now, the
    document is not taken this round and tried again later. If a provider has no hash files at all, Cobe News remembers
@@ -179,6 +180,31 @@ effective with the next update:
 **No OpenPGP signature check.** The providers also sign their documents (`.asc`). Cobe News does not check that
 signature: the key for it is on the same server as the document. Whoever could change a document there could swap the
 key as well – the signature would add protection beyond TLS and the hash only with a key stored independently.
+
+### Allowing TLP:GREEN per provider {#tlp-green}
+
+**TLP:GREEN** means: share only within your organisation or community, not publicly. Some providers label even
+advisories they put online for anyone that way – the known case is **Open-Xchange** (OX App Suite and Dovecot, all
+documents TLP:GREEN). By default Cobe News does not read such documents.
+
+Under *Settings → Integrations → Vendor News → More sources* every CSAF provider has the switch **Allow TLP:GREEN**
+(off by default). Switched on:
+
+- This provider's TLP:GREEN documents are read; its list is read once from the start for that. What is older than
+  7 days shows on the page as with a first fetch, but is not notified.
+- Every finding from them carries the mark **TLP:GREEN** (explained on hover) – on the product card, in the drawer, in
+  e-mails and chat messages (field “TLP: TLP:GREEN – share internally only”, `[TLP:GREEN]` in front of the title), when
+  forwarded to a team, in the weekly report, in the webhook (`"tlp": "GREEN"`) and in the API (`/api/v1`, field
+  `tlp`). Where your channels go is your decision – a channel to the outside should not get such messages.
+- AMBER, AMBER+STRICT and RED are always refused.
+
+Switched off again, Cobe News removes the stored TLP:GREEN advisories of this provider at once (and checks again every
+round) – without a "withdrawn" message; messages from them not sent yet do not go out any more. Removed rather than
+only hidden, because you decided not to keep such content: it would otherwise stay in the database, in backups and
+exports. Every change of the switch is in the audit log ("Settings changed", field `csaf_green`).
+
+Details of news stories (BSI, Siemens, Cisco) are shown only from public documents (TLP:CLEAR/WHITE) – a TLP:GREEN
+document there is not used.
 
 ### Rules for CSAF documents {#csaf-regeln}
 

@@ -185,6 +185,11 @@ form refuses it and names the known lines and an example. Lines newer or older t
 without release lines are not checked for this; some have a fixed pattern instead (Exchange and SQL Server: build
 numbers, VMware Tools: `12.4.0`).
 
+Some products have only part of the lines: **Mozilla Firefox ESR** only the ESR lines (115, 128, 140, 153 …),
+**Jenkins LTS** only the LTS lines (2.555, 2.568 …). A version in between that is on none of them – `134.0` for
+Firefox ESR, `2.500.1` for Jenkins LTS – is refused by the form, which names the lines; mostly it is the other product
+(Mozilla Firefox, Jenkins weekly). A line newer than all known ones is fine here too.
+
 ### Split products {#getrennte-produkte}
 
 Products with two version lines under one name are split, because their advisories count them apart:

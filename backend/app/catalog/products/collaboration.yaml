@@ -63,6 +63,7 @@
   kw: [Jenkins]
   example: 2.492.2
   belongs: [{pattern: '^\s*v?2\.\d+\s*$', to: jenkins-weekly}]  # 2.499: a weekly release
+  lines_only: lts  # only the LTS lines (endoflife.date: 2.568, 2.555 …) – 2.500.1 is no LTS release
 - key: jenkins-weekly
   label: Jenkins (weekly)
   vendor: Jenkins Project

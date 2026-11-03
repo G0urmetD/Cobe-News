@@ -104,6 +104,9 @@ async def facts(db: AsyncSession, cves: list[str]) -> dict[str, dict]:
                 select(VendorAdvisory.id, VendorAdvisory.source, VendorAdvisory.ident, VendorAdvisory.title, VendorAdvisory.severity, VendorAdvisory.cves, VendorAdvisoryState.facts, VendorAdvisory.url)
                 .outerjoin(VendorAdvisoryState, VendorAdvisoryState.advisory_id == VendorAdvisory.id)
                 .where(or_(VendorAdvisory.cves.op("?|")(pg_array(part)), VendorAdvisory.ident.in_(part)))
+                # a CSAF provider's TLP:GREEN document stays with the product's findings, where it is labelled –
+                # the watch's messages (fix, title, link) never draw on it
+                .where(func.coalesce(VendorAdvisory.data["tlp"].as_string(), "") != "GREEN")
                 .order_by(VendorAdvisory.id)
             )
         ).all()

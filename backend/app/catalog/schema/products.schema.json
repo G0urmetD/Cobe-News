@@ -272,6 +272,25 @@
           "description": "An example version, shown as placeholder.",
           "title": "Example"
         },
+        "excluded_names": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 8,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Product names in advisories (CSAF entries, CNA rows) that are another product although CPE or name match – Dovecot: 'OX Dovecot Pro' (Open-Xchange's commercial line, same CPE).",
+          "title": "Excluded Names"
+        },
         "filter": {
           "anyOf": [
             {
@@ -355,6 +374,23 @@
           "description": "Parts that name a line with its own rows in CVE records (Exchange: 15.2.1748 = 2019 CU15).",
           "title": "Line Depth"
         },
+        "lines_only": {
+          "anyOf": [
+            {
+              "enum": [
+                "lts",
+                "all"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Only some release lines are the product's (Firefox ESR, Jenkins LTS: 'lts' – the lines endoflife.date marks LTS; 'all': every listed line): a typed version between them on none of them is refused.",
+          "title": "Lines Only"
+        },
         "names": {
           "anyOf": [
             {
@@ -384,7 +420,8 @@
                   "office_build",
                   "nginx_plus",
                   "checkpoint",
-                  "horizon_yymm"
+                  "horizon_yymm",
+                  "leading_zeros"
                 ],
                 "type": "string"
               },

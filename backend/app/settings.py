@@ -17,7 +17,7 @@ DEFAULTS: dict[str, dict] = {
     # the stories) need, and only public addresses or CVE ids leave the machine (docs/BETRIEB.md: Weitere Quellen)
     # The exploit lists (app/exploits.py – the same public file for everyone, daily, conditional): Metasploit and the
     # nuclei templates on (small, compressed), Exploit-DB off (~10 MB a day, uncompressed)
-    "vendor": {"enabled": True, "nvd_key_enc": "", "every_h": 6, "eol_every_h": 24, "csaf": True, "cvelist": True, "epss": True, "osv": True, "exploit_metasploit": True, "exploit_exploitdb": False, "exploit_nuclei": True, "review_days": 90},
+    "vendor": {"enabled": True, "nvd_key_enc": "", "every_h": 6, "eol_every_h": 24, "csaf": True, "cvelist": True, "epss": True, "osv": True, "exploit_metasploit": True, "exploit_exploitdb": False, "exploit_nuclei": True, "review_days": 90, "csaf_green": []},
     "sessions": {"idle_min": 60, "absolute_h": 12},
     # passkeys (WebAuthn) for local accounts: on – nobody has one until they register it themselves (after re-confirming
     # who they are), and only while BASE_URL is an https host name (app/auth/webauthn.availability)

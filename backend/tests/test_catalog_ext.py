@@ -196,7 +196,7 @@ def test_horizon_yymm_is_stored_as_the_lines_write_it(cat):
 
 def test_open_xchange_csaf_provider():
     prov = next(p for p in catalog.CSAF_PROVIDERS if p["key"] == "openxchange")
-    assert prov["domain"] == "www.open-xchange.com" and prov["vendors"] == ["Open-Xchange"]
+    assert prov["domain"] == "www.open-xchange.com" and prov["vendors"] == ["Open-Xchange", "Dovecot (Open-Xchange)"]
     assert catalog.product("open-xchange")["vendor"] == "Open-Xchange"
 
 

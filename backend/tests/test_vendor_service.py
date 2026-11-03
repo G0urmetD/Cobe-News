@@ -434,7 +434,7 @@ async def test_rules_from_before_keep_sending_news(admin_client):
 
 async def test_settings_keep_the_nvd_key_secret(admin_client):
     r = await admin_client.put("/api/admin/vendor", json={"enabled": True, "every_h": 6, "eol_every_h": 24, "nvd_key": "0000aaaa-bbbb-cccc-dddd-eeeeffff0000"})
-    assert r.json() == {"enabled": True, "every_h": 6, "eol_every_h": 24, "nvd_key_set": True, **STRUCTURED_OFF, "review_days": 90, "rev": 1}  # tests: those off (conftest)
+    assert r.json() == {"enabled": True, "every_h": 6, "eol_every_h": 24, "nvd_key_set": True, **STRUCTURED_OFF, "review_days": 90, "csaf_green": [], "rev": 1}  # tests: those off (conftest)
     d = (await admin_client.get("/api/admin/vendor")).json()
     assert "0000aaaa" not in json.dumps(d) and d["settings"]["nvd_key_set"]
     r = await admin_client.put("/api/admin/vendor", json={"enabled": True})

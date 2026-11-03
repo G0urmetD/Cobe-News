@@ -43,6 +43,38 @@ Zertifikat (siehe [HTTPS](#https)).
 | `cobe-news-app` | FastAPI + Web-UI + Hintergrundjobs (Feeds, Benachrichtigungen, Zertifikat, Verzeichnisabgleich) | `127.0.0.1:8096` (http, nur Health/Notfall) |
 | `cobe-news-db` | PostgreSQL 18 – alle Daten (siehe [PostgreSQL](#postgresql)) | keiner (internes Netz, nur die App) |
 
+### Veröffentlichtes Image statt lokalem Build
+
+Standard ist der lokale Build (`docker compose up -d --build`, Image `cobe-news:latest`) – daran ändert sich nichts.
+Wer stattdessen das veröffentlichte, signierte Image einer Version betreiben will
+(`ghcr.io/g0urmetd/cobe-news:<version>`, gebaut von der Release-Pipeline, siehe [Release](#release)), schaltet die
+Datei `docker-compose.image.yml` zu – in `.env`:
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
+COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:0.1.46          # eine Version, nicht latest (oder …:0.1.46@sha256:<digest>)
+```
+
+Die Datei ersetzt beim Dienst `app` nur das Image (`image: ${COBE_NEWS_IMAGE}`, der `build`-Teil fällt weg); alles
+andere – Datenbank, Proxy, Volumes, `.env` – bleibt, wie es ist. Ohne `COBE_NEWS_IMAGE` bricht `docker compose` mit
+einem Hinweis ab, statt still etwas anderes zu starten. Vor dem Start die Signatur prüfen (cosign ≥ 2, keyless – die
+Identität ist der Release-Workflow dieses Repositorys):
+
+```bash
+cosign verify ghcr.io/g0urmetd/cobe-news:0.1.46 \
+  --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+docker compose pull app          # holt das Image (pull_policy: missing – ein vorhandenes wird nicht neu geholt)
+docker compose up -d             # ohne --build
+docker compose config app | grep image:   # zeigt, welches Image Compose nimmt
+```
+
+`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn in `COBE_NEWS_IMAGE` übernimmt
+(`…:0.1.46@sha256:<digest>`), startet genau das geprüfte Image, auch wenn der Tag später anders zeigen sollte. Ein Update:
+`COBE_NEWS_IMAGE` auf die neue Version setzen, Signatur prüfen, `docker compose pull app && docker compose up -d` (die
+Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen aus `.env` nehmen und
+`docker compose up -d --build`.
+
 ## Erster Start: Setup-Token und Notfall-Admin
 
 Beim ersten Start schreibt die App ein **einmaliges Setup-Token** ins Log (60 Minuten gültig, bei jedem Neustart bis
@@ -638,7 +670,28 @@ schema/*.schema.json      JSON Schema für Editoren (aus app/catalog_data.py erz
   # hosts: [example.com]           # erlaubte Hosts der Feeds und Dokumente (Standard: die letzten zwei Teile der domain)
 ```
 
-Eingetragen: Siemens, Cisco, Schneider Electric, Open-Xchange (0.1.45). Citrix/NetScaler hat keinen CSAF-Anbieter und
+Eingetragen: Siemens, Cisco, Schneider Electric, Open-Xchange (0.1.45; seit Katalog 2026.11.03-1 auch für Dovecot –
+Hersteller `Dovecot (Open-Xchange)`: die Dokumente `oxdc-adv-…` führen „OX Dovecot CE“ und „OX Dovecot Pro“ im Zweig
+„Open-Xchange GmbH“ mit der CPE `a:open-xchange:dovecot`; der Katalog-Eintrag ist Dovecot CE, „OX Dovecot Pro“ zählt
+nicht, `excluded_names`). Open-Xchange kennzeichnet seine CSAF-Dokumente (App Suite und Dovecot, geprüft 03.11.2026)
+mit **TLP:GREEN** (Weitergabe nur innerhalb der Organisation/Community, nicht öffentlich). Ab Werk wird nur
+TLP:WHITE/CLEAR gelesen, solche Dokumente werden abgelehnt (Quellen-Gesundheit: „blocked“); Dovecots Befunde kommen
+dann aus den CVE-Einträgen (CNA „OX“: „Open-Xchange GmbH / OX Dovecot CE“) und der NVD.
+
+**TLP:GREEN je Anbieter** – *Integrationen → Vendor News → Weitere Quellen*, Schalter „TLP:GREEN zulassen“ je
+Anbieter (Einstellung `vendor.csaf_green`, Liste der Anbieter-Schlüssel, ab Werk leer; Audit: `settings.changed`).
+Eingeschaltet liest der Anbieter auch TLP:GREEN-Feeds und -Dokumente (seine Liste wird dafür einmal von vorn gelesen,
+Älteres als 7 Tage still wie beim ersten Abruf); jeder solche Hinweis trägt `data.tlp = "GREEN"`, der Befund `tlp`,
+und jede Ausgabe kennzeichnet ihn: Karte und Schublade (Zeichen „TLP:GREEN“), Mail/Chat/ntfy/Gotify/Mattermost (Feld
+„TLP“, `[TLP:GREEN]` vor dem Titel, auch Web Push), Weiterleiten an Teams, Wochenbericht, Webhook (`tlp`, in
+`news.stories` und `news.forward`) und `/api/v1` (`tlp`). AMBER, AMBER+STRICT und RED werden nie gelesen. Öffentliche
+Wege gibt es nicht; der Kalender-Feed enthält keine Hinweise (nur Support-Enden). Die Details zu News-Meldungen nehmen
+nur öffentliche Dokumente (ein Dokument mit anderem TLP als CLEAR/WHITE wird dort nicht verwendet). Wieder
+ausgeschaltet: die gespeicherten TLP:GREEN-Hinweise des Anbieters werden sofort entfernt (und in jeder Runde erneut
+geprüft, `csaf_providers.purge_green`), ohne Revision und ohne „zurückgezogen“; noch nicht verschickte Ereignisse
+daraus werden still (baseline), verschickte bleiben in der Historie mit Kennzeichnung. Entfernt statt versteckt: wer
+TLP:GREEN abschaltet, will solche Inhalte nicht halten – versteckt stünden sie weiter in Datenbank, Sicherung und
+Export, und jeder Ausgabeweg bräuchte einen eigenen Filter. Citrix/NetScaler hat keinen CSAF-Anbieter und
 keinen Feed der Security Bulletins (geprüft 02.11.2026: BSI-Liste, `/.well-known/csaf/` von citrix.com, netscaler.com,
 cloud.com, support.citrix.com; der alte RSS-Feed liefert nur die Webseite) – Citrix-Produkte laufen über die CNA-Daten
 der CVE-Liste und NVD, die Webseiten werden nicht ausgelesen.
@@ -672,15 +725,19 @@ Version besteht, wenn endoflife.date es nicht oder falsch zeigt – weniger Teil
 und ohne `depth` ist keine Version ungenau). Regeln für eingetragene Versionen (`app/version_input.py`): `pattern`
 (regulärer Ausdruck, dem eine Version genügen muss, z. B. nur Builds) mit `pattern_hint` (Text aus texts.yaml),
 `normalize` (Anzeigeformen übersetzen: `two_digit_year`, `netscaler`, `ise_patch`, `office_build`, `nginx_plus`,
-`checkpoint`, `horizon_yymm`), `belongs` (`[{pattern, to}]` – Formen eines abgetrennten Produkts, z. B. pfSense Plus bei pfSense CE),
+`checkpoint`, `horizon_yymm`, `leading_zeros` – Exchange `15.02.1748.024` → `15.2.1748.24`), `lines_only` (`lts`: nur
+die Linien, die endoflife.date als LTS führt, sind die des Produkts – Firefox ESR, Jenkins LTS; `all`: jede gelistete
+Linie; eine Version dazwischen auf keiner davon wird abgelehnt, ältere und neuere als die bekannten nicht), `belongs` (`[{pattern, to}]` – Formen eines abgetrennten Produkts, z. B. pfSense Plus bei pfSense CE),
 `editions` (Editionen mit gleichen Versionsnummern und ihren Build-Bereichen, z. B. SharePoint 2016/2019/SE),
 `line_depth` (Teile, die eine Linie mit eigenen Zeilen in CVE-Einträgen bilden, Exchange: 3) und `cpe_editions`
-(`[cpe, sw_edition]` – nur diese Editionen einer CPE zählen, Firefox `esr`, Jenkins `lts`). Gegen die Release-Linien
+(`[cpe, sw_edition]` – nur diese Editionen einer CPE zählen, Firefox `esr`, Jenkins `lts`), `excluded_names`
+(Produktnamen in CSAF-Dokumenten und CNA-Zeilen, die trotz passender CPE ein anderes Produkt sind – Dovecot:
+`OX Dovecot Pro`). Gegen die Release-Linien
 von endoflife.date wird jede Version auf Plausibilität geprüft. Eine Build-Tabelle (`kind: names`) nennt `products`,
 `sources`, `fetched`, optional `strip`, `extract`, `claims`, `hint` und `rows: [{value, names}]` – ein Name, den die
 Tabelle zweimal vergibt, stoppt den Start. Ein Eintrag ohne `label` verschiebt nur ein
 endoflife.date-Produkt in diese Kategorie (erlaubt dann nur `cpes`, `scheme`, `hint`, `osv`, `aliases`, `replaces` und
-die Versionsregeln `pattern`, `pattern_hint`, `normalize`, `belongs`, `cpe_editions`). Ein Produkt ohne CPE in der NVD
+die Versionsregeln `pattern`, `pattern_hint`, `normalize`, `belongs`, `cpe_editions`, `lines_only`). Ein Produkt ohne CPE in der NVD
 bekommt `cpes: []` und `hint: nocpe`.
 
 **CPE prüfen** – gibt es sie im CPE-Verzeichnis der NVD? Im Katalog „Nicht im Katalog?“ suchen (dieselbe Abfrage) oder
@@ -731,6 +788,16 @@ in `backend/app/catalog/` ändert (oben) – er kommt mit dem nächsten Update.
 Die **Katalogversion** steht unten im Katalog und auf „Version & Changelog“ und zählt getrennt von der App. Ein mit
 endoflife.date neu gebauter Katalog (`data/vendor_catalog.json`) merkt sich den Fingerabdruck der Katalogdaten; ändern
 sich die Daten mit einem Update, werden sie beim Laden neu angewandt – ohne auf die nächste Aktualisierung zu warten.
+
+**Neu verknüpfen nach einer Katalogänderung** – neue Namen oder CPEs eines Produkts (z. B. CNA-Namen wie „Exchange
+Server Subscription Edition“) verknüpfen von sich aus nur neue oder geänderte Hinweise. Deshalb verknüpft die
+Vendor-News-Runde einmal je `catalog_version` die gespeicherten Hinweise neu mit den gefolgten Produkten
+(`vendor.relink_catalog`): zehn Produkte je Runde, der Stand steht in der Einstellung `catalog_relink` (Version,
+erledigte Produkte) – ein Neustart macht weiter, nichts doppelt. So gefundene Verknüpfungen sind **still**
+(`vendor_advisory_products.quiet`, Migration 0028): ein Befund, den es nur durch sie gibt, erscheint in der Ansicht,
+wird aber nicht gemeldet (wie die Grundlinie eines neu gefolgten Produkts) – eine Katalogänderung ist keine Neuigkeit,
+und die Hinweise sind alt. Wird ein Hinweis später neu gespeichert (die Quelle ändert ihn), gilt seine Verknüpfung
+wieder normal. Dasselbe gilt für neue CPEs aus der täglichen endoflife.date-Aktualisierung.
 
 **Signierte Katalog-Updates (geplant, nicht gebaut)** – heute kommen Katalog-Änderungen mit dem Image. Später soll ein
 Katalog auch ohne neues Image kommen können:
@@ -1352,9 +1419,11 @@ Prüfen der Signatur:
 
 ```bash
 cosign verify ghcr.io/g0urmetd/cobe-news:0.1.47 \
-  --certificate-identity-regexp 'https://github.com/G0urmetD/Cobe-News/.github/workflows/release.yml@refs/tags/v.*' \
+  --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
+
+Das Image statt eines lokalen Builds betreiben: [Veröffentlichtes Image statt lokalem Build](#veröffentlichtes-image-statt-lokalem-build).
 
 ## Offene Punkte
 
@@ -1366,8 +1435,11 @@ cosign verify ghcr.io/g0urmetd/cobe-news:0.1.47 \
   (Build) und ManageEngine (nur Build-Nummern) – es gibt dafür keine offizielle Tabelle, die sich übernehmen ließe.
   Citrix hat keine maschinenlesbare Bulletin-Quelle (nur CVE-Daten). Ohne CPE in der NVD (nur News und
   Herstellerdaten): Matrix42 Empirum, Aagon ACMP, Datto RMM, Swyx, d.velop, ELO, DocuWare, ESET PROTECT, G DATA, NCP VPN
-  Server, SAProuter, INSYS icom, Fujitsu iRMC, HPE iLO 7, Dell iDRAC10, Drucker/MFP. Dovecot ist nicht an den
-  CSAF-Anbieter Open-Xchange angebunden (ein endoflife.date-Produkt ohne eigenen Herstellernamen im Katalog).
+  Server, SAProuter, INSYS icom, Fujitsu iRMC, HPE iLO 7, Drucker/MFP (Dell iDRAC10 hat seit Katalog 2026.11.03-1 die
+  CPE `o:dell:idrac10_firmware`). Dovecot ist an den CSAF-Anbieter Open-Xchange angebunden, dessen Dokumente
+  TLP:GREEN tragen – gelesen nur, wenn ein Admin TLP:GREEN für Open-Xchange zulässt (siehe „CSAF-Anbieter“). Dells CVE-Einträge für iDRAC9 nennen
+  14G und 15G/16G in einer Zeile „iDRAC9“ mit je eigener Grenze – ein 14G-Build über 7.00.00.18x gilt dort als betroffen
+  bis zur 15G/16G-Grenze (eine Generation steht nicht in der Version).
 - Weitere Quellen: OpenPGP-Signaturen der CSAF-Dokumente werden nicht geprüft (nur die Prüfsumme); Microsofts CSAF/VEX
   nicht eingetragen; gespeicherte Einträge von cvelistV5 und OSV werden (wie die der NVD) nicht aufgeräumt, wenn einem
   Produkt nicht mehr gefolgt wird; fehlen der App mehr als 3 Tage, holt cvelistV5 die Tage davor nicht nach (die NVD

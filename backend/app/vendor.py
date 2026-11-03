@@ -494,11 +494,12 @@ def _relink_candidates(product: dict):  # noqa: ANN202
     return or_(VendorAdvisory.source.not_in(CVE_SOURCES), *conds)
 
 
-async def relink(db: AsyncSession, product: dict) -> int:
-    """A product followed later (or added by CPE, or given more CPEs by a catalogue refresh): the stored advisories that
-    concern it are linked now – the queries of other products may have brought them already. Only the candidates
-    (_relink_candidates) are read, in batches as raw JSON text, decoded and matched off the event loop: a database
-    with 60k NVD records never stalls the requests."""
+async def relink(db: AsyncSession, product: dict, *, quiet: bool = False) -> int:
+    """A product followed later (or added by CPE, or given more CPEs or names by a catalogue change): the stored
+    advisories that concern it are linked now – the queries of other products may have brought them already. Only the
+    candidates (_relink_candidates) are read, in batches as raw JSON text, decoded and matched off the event loop: a
+    database with 60k NVD records never stalls the requests. `quiet`: the links it adds are quiet – a finding that
+    exists only through them is shown, never notified (a catalogue change is no news, relink_catalog)."""
     one = index_of([product])
     have = set(await db.scalars(select(VendorAdvisoryProduct.advisory_id).where(VendorAdvisoryProduct.product == product["key"])))
 
@@ -526,11 +527,45 @@ async def relink(db: AsyncSession, product: dict) -> int:
         hits += await asyncio.to_thread(match, rows)
         await dbm.release(db)  # the read transaction ends between batches
     if hits:
-        await db.execute(pg_insert(VendorAdvisoryProduct).on_conflict_do_nothing(), [{"product": product["key"], "advisory_id": x} for x in hits])
+        await db.execute(pg_insert(VendorAdvisoryProduct).on_conflict_do_nothing(), [{"product": product["key"], "advisory_id": x, "quiet": quiet} for x in hits])
     await db.commit()
     added = len(hits)
     if added:
         bump([product["key"]])
+    return added
+
+
+RELINK_STATE = "catalog_relink"  # settings row: {version, done: [product keys], complete}
+RELINK_PRODUCTS = 10  # followed products relinked per round – a database with many products is done over a few rounds
+
+
+async def relink_catalog(db: AsyncSession) -> int | None:
+    """Once per catalogue version (catalog.yaml catalog_version): the followed products linked again against the stored
+    advisories – a new catalogue can give a product names (CNA names, CPEs) its stored advisories carry, which only
+    new or updated advisories would get linked by otherwise. RELINK_PRODUCTS a round; where it got to is kept (settings
+    row RELINK_STATE), so a restart goes on, nothing is done twice; a product relinked already finds nothing new
+    (relink skips links that are there). The links it adds are quiet: what appears only through them is the baseline
+    – shown, not sent – as a catalogue rollout is no news, and an advisory linked this way is an old one (the round
+    links new and updated advisories with the current catalogue anyway). None: nothing (left) to do."""
+    version = catalog.catalog_version()
+    state = await settings_store.get(db, RELINK_STATE)
+    if state.get("version") == version and state.get("complete"):
+        return None
+    if state.get("version") != version:
+        state = {"version": version, "done": [], "complete": False}
+    done = set(state.get("done") or [])
+    keys = sorted({f.product for f in await follows(db, enabled_only=False) if not f.custom})
+    todo = [k for k in keys if k not in done]
+    added = 0
+    for k in todo[:RELINK_PRODUCTS]:
+        if (p := catalog.product(k)) is not None:
+            added += await relink(db, p, quiet=True)
+        done.add(k)
+    state = {"version": version, "done": sorted(done & set(keys)), "complete": len(todo) <= RELINK_PRODUCTS}
+    await settings_store.put(db, RELINK_STATE, state)
+    await db.commit()
+    if added:
+        log.info("vendor: catalogue %s – %d stored advisories linked to followed products (quiet)", version, added)
     return added
 
 
@@ -1146,10 +1181,11 @@ async def sync_eol(db: AsyncSession, every: timedelta, force: bool) -> int | Non
             _record(db, st, meter, items=max(0, len(cat["products"]) - had) if had else 0)
             await db.commit()
             bump()
-            # a followed product with new CPEs or names: the stored advisories that concern it now are linked
+            # a followed product with new CPEs or names: the stored advisories that concern it now are linked –
+            # quietly, as after a catalogue update (relink_catalog): old advisories found anew are no news
             for key, sig in before.items():
                 if (p := catalog.product(key)) is not None and _match_sig(p) != sig:
-                    await relink(db, p)
+                    await relink(db, p, quiet=True)
         else:
             _ok(st, every)
             _record(db, st, meter)
@@ -1262,6 +1298,12 @@ async def run_round(*, force: bool = False, only: str | None = None) -> dict:
         ix = await current_index(db)
         key = nvd_key(cfg)
         await sync_eol(db, eol_every, False)
+        try:
+            if (r := await relink_catalog(db)) is not None:
+                out["relink:catalog"] = r
+        except Exception:  # noqa: BLE001 - the relink never stops the round; it goes on next round
+            await db.rollback()
+            log.exception("vendor: relinking after the catalogue change failed")
         names = list(dict.fromkeys(n for p in products if p.get("adv") == "paloalto" for n in p.get("names") or []))
         for n in names:
             if (r := await sync_paloalto(db, n, every, ix, force)) is not None:
@@ -1298,8 +1340,16 @@ async def sync_structured(db: AsyncSession, cfg: dict, products: list[dict], eve
     from app import csaf_providers, cvelist
 
     out: dict[str, int] = {}
+    green = csaf_providers.green_allowed(cfg)
+    try:
+        # TLP:GREEN of a provider no longer allowed to bring it: gone before anything else is read (also with CSAF off)
+        if n := await csaf_providers.purge_green(db, green):
+            out["csaf:tlp_green_removed"] = n
+    except Exception:  # noqa: BLE001 - tried again next round
+        await db.rollback()
+        log.exception("vendor: removing TLP:GREEN advisories failed")
     if cfg.get("csaf", True):
-        for k, n in (await csaf_providers.sync_all(db, products, every, ix, force)).items():
+        for k, n in (await csaf_providers.sync_all(db, products, every, ix, force, green)).items():
             out[k] = n
     if cfg.get("cvelist", True):
         if (r := await cvelist.sync_delta(db, products, ix, force)) is not None:
@@ -1509,8 +1559,11 @@ def findings(
                 # FIRST EPSS: the CVE of the group most likely to be exploited in the next 30 days (epss.py)
                 "epss": {"cve": top["cve"], "score": top["score"], "percentile": top["percentile"], "date": top["date"]} if top else None,
                 "ssvc": ssvc,  # CISA's SSVC decision points (cvelistV5 ADP): exploitation, automatable, technical impact
-                # an advisory a CSAF provider brought with its first fill: shown, never notified (csaf_providers)
-                "quiet": bool(data.get("initial")),
+                # an advisory a CSAF provider brought with its first fill: shown, never notified (csaf_providers) –
+                # as a finding only links of the relink after a catalogue change make (relink_catalog)
+                "quiet": bool(data.get("initial")) or all(getattr(x, "quiet", False) for x in all_advs),
+                # from a CSAF provider's TLP:GREEN document (allowed per provider): labelled wherever it is shown or sent
+                "tlp": "GREEN" if any((x.data or {}).get("tlp") == "GREEN" for x in all_advs) else None,
                 "published_at": (a.published_at or a.updated_at).isoformat() if (a.published_at or a.updated_at) else None,
                 "status": worst.status,
                 "versions": [
@@ -1792,6 +1845,7 @@ class Adv:
     published_at: datetime | None
     updated_at: datetime | None
     data: dict
+    quiet: bool = False  # its link to the product is quiet (relink_catalog)
 
 
 _ADV_COLS = (
@@ -1815,12 +1869,17 @@ def _advs(rows: list) -> list[Adv]:
     out = []
     for r in rows:
         data = json.loads(r[12]) if r[12] else {}
-        out.append(Adv(r[0], r[1], r[2] or "", r[3] or "", r[4] or "", r[5] or "", json.loads(r[6]) if r[6] else [], r[7], r[8] or "info", bool(r[9]), r[10], r[11], data if isinstance(data, dict) else {}))
+        quiet = bool(r[13]) if len(r) > 13 else False
+        out.append(Adv(r[0], r[1], r[2] or "", r[3] or "", r[4] or "", r[5] or "", json.loads(r[6]) if r[6] else [], r[7], r[8] or "info", bool(r[9]), r[10], r[11], data if isinstance(data, dict) else {}, quiet))
     return out
 
 
 async def load_advs(db: AsyncSession, product: str) -> list[Adv]:
-    rows = (await db.execute(select(*_ADV_COLS).join(VendorAdvisoryProduct, VendorAdvisoryProduct.advisory_id == VendorAdvisory.id).where(VendorAdvisoryProduct.product == product))).all()
+    rows = (
+        await db.execute(
+            select(*_ADV_COLS, VendorAdvisoryProduct.quiet).join(VendorAdvisoryProduct, VendorAdvisoryProduct.advisory_id == VendorAdvisory.id).where(VendorAdvisoryProduct.product == product)
+        )
+    ).all()
     return await asyncio.to_thread(_advs, rows)
 
 
@@ -2270,6 +2329,7 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                 "cvss": fd["cvss"],
                 "exploited": fd["exploited"],
                 "published_at": fd["published_at"],
+                **({"tlp": fd["tlp"]} if fd.get("tlp") else {}),
             }
             key = f"{scope}:{fd['id']}"[:400]
             if key not in known and not (cves & known_cves[scope]):
