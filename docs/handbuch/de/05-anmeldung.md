@@ -57,7 +57,13 @@ Entra-Benutzer erscheinen in derselben Liste, sobald sie sich einmal angemeldet 
 4. Cobe News zeigt **einmal** ein temporäres Passwort (vier Fünfergruppen mit Bindestrichen). Kopieren, auf sicherem Weg
    weitergeben und mit „Notiert“ schließen. Danach ist es nicht mehr abrufbar.
 5. Bei der ersten Anmeldung legt die Person ein eigenes Passwort fest. Bis dahin trägt das Konto die Markierung
-   *Temporäres Passwort*.
+   *Startpasswort läuft ab am …*.
+
+Ein temporäres Passwort gilt **7 Tage** ab Vergabe (einstellbar von 1 bis 30 Tagen, [Zeitlimits](#sitzungen-zeitlimits)) –
+das gilt auch für eines aus „Passwort zurücksetzen“ und aus `reset-emergency`. Danach lehnt Cobe News die Anmeldung damit
+ab („Startpasswort abgelaufen – Admin um ein neues bitten“), und die Liste zeigt *Startpasswort abgelaufen*. Ein Admin
+vergibt dann mit „Passwort zurücksetzen“ ein neues. Eine längere Einstellung gilt auch für schon vergebene Passwörter
+(gerechnet ab ihrer Vergabe). Das eigene Passwort einer Person läuft nie ab.
 
 Regeln für Passwörter: mindestens 12 Zeichen, kein häufiges Passwort, nicht der Benutzername darin und keines der
 **letzten fünf Passwörter** des Kontos (das aktuelle und die vier davor) – „eines der letzten fünf Passwörter“.
@@ -204,6 +210,11 @@ Der Notfall-Admin ist das lokale Admin-Konto aus der Ersteinrichtung. Es
 - wird durch Fehlversuche nie gesperrt – sein **richtiges** Passwort mit TOTP wird auch von einer geblockten Adresse
   angenommen. Als Bremse wartet nach 20 Fehlversuchen in einer Stunde jede Prüfung 3 Sekunden, und es läuft nur eine
   gleichzeitig.
+- meldet, wenn jemand sein Passwort rät: Überschreiten die Fehlversuche die 20 in einer Stunde, schreibt Cobe News eine
+  Warnung ins Log der App („emergency admin: … failed sign-in checks“), einen Eintrag ins
+  [Protokoll](/docs/betrieb#protokoll) („Notfall-Admin: Fehlversuchs-Budget überschritten“) und zeigt 24 Stunden lang
+  einen Hinweis unter [Einstellungen → HTTPS & Zertifikat](/settings/https) – höchstens einmal pro Stunde, ein Angreifer
+  kann damit weder Log noch Protokoll fluten.
 
 Bewahre Passwort und TOTP-Zugang des Notfall-Admins offline auf (Passwort-Tresor).
 
@@ -245,8 +256,9 @@ Der Befehl
   jemand anderes eingerichtet hat, öffnet danach noch die Tür,
 - beendet alle Sitzungen des Kontos und hebt eine Sperre auf.
 
-Danach mit dem temporären Passwort anmelden, ein neues Passwort festlegen und TOTP neu einrichten. Weitere Befehle:
-[Kommandozeile](/docs/betrieb#cli).
+Danach mit dem temporären Passwort anmelden, ein neues Passwort festlegen und TOTP neu einrichten. Es gilt wie jedes
+temporäre Passwort 7 Tage ([einstellbar](#sitzungen-zeitlimits)); danach den Befehl einfach noch einmal ausführen.
+Weitere Befehle: [Kommandozeile](/docs/betrieb#cli).
 
 ## Active Directory / LDAP {#ad-ldap}
 
@@ -830,6 +842,7 @@ SameSite=Lax). Abmelden beendet die Sitzung sofort.
 |---|---|---|
 | Abmelden nach Inaktivität | 5–480 Minuten ohne Aktion | 60 Minuten |
 | Spätestens neu anmelden nach | 1–72 Stunden, auch bei Aktivität | 12 Stunden |
+| Startpasswort gültig für | 1–30 Tage ab Vergabe eines temporären Passworts ([Anlegen](#benutzer-anlegen)) | 7 Tage |
 
 Ein kürzeres Limit gilt sofort auch für laufende Sitzungen. Speichern verlangt eine
 [erneute Bestätigung](#erneut-bestaetigen).
@@ -918,6 +931,10 @@ dazu. Betroffen sind:
 - Fehlversuche zählen je Herkunft getrennt: Eine abgelehnte AD-Anmeldung sperrt nie das gleichnamige lokale Konto.
 - Jeder Fehlversuch verzögert die nächste Prüfung ein wenig.
 - Der Notfall-Admin wird nie gesperrt ([Notfall-Admin](#notfall-admin)).
+- **Fehlgeschlagene CSRF-Prüfung**: Ein schreibender Aufruf ohne oder mit falschem CSRF-Token (eine fremde Seite, ein
+  Skript – der Browser mit Cobe News schickt es immer mit) wird abgelehnt und als Warnung ins Log der App geschrieben
+  („csrf check failed“, mit Methode, Pfad und Adresse bzw. /64-Netz, nie mit Token oder Cookie). Höchstens eine Zeile
+  pro Adresse und Minute; was dazwischen kam, zählt die nächste Zeile mit.
 
 ### Geteilte Adressen {#geteilte-adressen}
 
