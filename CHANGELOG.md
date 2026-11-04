@@ -14,7 +14,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 - **Gateway in der Anleitung**: Das Docker-Netz `edge` hat das Gateway `172.31.250.128` (erste Adresse von `EDGE_RANGE`), nicht `.1` – die Empfehlung `TRUSTED_PROXIES=172.31.250.1/32` war falsch und ließ die App alle Besucher unter einer Adresse sehen.
 
 ### Entfernt
-- **Quellen „CISA Alerts“ und „Rockwell Automation“**: Beide lehnen automatische Abrufe aus den meisten Netzen ab (HTTP 403) und lieferten nie. Sie verschwinden beim Update aus jeder Installation; Regeln und Desktop-Auswahl lassen sie los. CISAs KEV-Katalog bleibt; OT-Meldungen kommen weiter über CERT@VDE, Siemens ProductCERT und SecurityWeek ICS/OT. Wer eine der Quellen erreicht, kann ihre Adresse als eigene Quelle eintragen.
+- **Quellen „CISA Alerts“ und „Rockwell Automation“**: Beide lehnen automatische Abrufe aus den meisten Netzen ab (HTTP 403) und lieferten nie. Sie verschwinden beim Update aus jeder Installation (im Protokoll als Löschung durch das System); Regeln und Desktop-Auswahl lassen sie los, Meldungen, die nur eine dieser Quellen brachte (CISA Alerts vor 0.1.7), gehen mit. CISAs KEV-Katalog bleibt; OT-Meldungen kommen weiter über CERT@VDE, Siemens ProductCERT und SecurityWeek ICS/OT. Wer eine der Quellen erreicht, kann ihre Adresse als eigene Quelle eintragen.
 
 ### Betrieb
 - **Update lokal**: `docker compose up -d --build --remove-orphans` – entfernt den alten Container `cobe-news-db-init`; Daten, Volumes und Netz bleiben. Mit `docker-compose.image.yml` statt `COBE_NEWS_IMAGE` jetzt `COBE_NEWS_VERSION` (oder alle drei Image-Variablen).

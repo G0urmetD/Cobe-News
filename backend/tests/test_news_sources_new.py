@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 
 from app import db, news
-from app.models import NewsItem, NewsSource, NotifyRule
+from app.models import AuditEntry, NewsItem, NewsSource, NotifyRule
 
 NEW_ON = {"cert-at", "certvde", "securityweek-ics", "veeam"}
 NEW_OFF = {"cccs", "cert-fr", "watchtowr", "huntress", "oracle", "risky-bulletin", "msrc"}
@@ -65,6 +65,24 @@ async def test_retired_sources_leave_with_what_refers_to_them():
         rule = await s.scalar(select(NotifyRule).where(NotifyRule.name == "only CISA"))
         assert rule.sources == [] and rule.enabled is False
         assert await s.scalar(select(NewsItem).where(NewsItem.url == "https://www.cisa.gov/x")) is None  # carried by nobody else
+        entries = list(await s.scalars(select(AuditEntry).where(AuditEntry.action == "source.deleted")))
+        assert {e.target_label for e in entries} == {"CISA Alerts", "Rockwell Automation"} and {e.actor_kind for e in entries} == {"system"}
     async with db.session() as s:
         await news.ensure_sources(s)  # again: nothing left to do
+
+
+async def test_a_failing_retirement_never_stops_the_start(monkeypatch):
+    from app import api
+
+    async with db.session() as s:
+        s.add(NewsSource(id=uuid.uuid4(), key="cisa", name="CISA Alerts", url="https://www.cisa.gov/cybersecurity-advisories/alerts.xml", site="https://www.cisa.gov", builtin=True, enabled=True, failures=0))
+        await s.commit()
+
+    async def broken(db_, s_):  # noqa: ANN001
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(api, "forget_source", broken)
+    async with db.session() as s:
+        await news.ensure_sources(s)  # no exception
+    assert "cisa" in await _on() and "heise" in await _on()  # kept for the next start, the rest done
 

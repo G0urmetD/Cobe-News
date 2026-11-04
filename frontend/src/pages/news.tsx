@@ -239,8 +239,22 @@ export function NewsPage() {
       }
     />
   )
+  // before the first answer: no filters yet – with the news switched off they would show for a moment and vanish
+  if (!first)
+    return (
+      <div className="space-y-5">
+        {header}
+        {list.isError ? (
+          <QueryError error={list.error} onRetry={() => void list.refetch()} />
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> {t("news.loading")}
+          </p>
+        )}
+      </div>
+    )
   // news switched off: only the note – no filters, nothing they could act on
-  if (first && !first.enabled)
+  if (!first.enabled)
     return (
       <div className="space-y-5">
         {header}

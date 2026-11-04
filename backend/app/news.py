@@ -1626,12 +1626,20 @@ async def ensure_sources(db: AsyncSession) -> None:
             .where(NewsSource.key == key, NewsSource.builtin.is_(True), NewsSource.switched_at.is_(None), NewsSource.enabled.is_not(on))
             .values(enabled=on)
         )
+    from app import audit
     from app.api import forget_source  # app.api imports this module
 
-    for old in await db.scalars(select(NewsSource).where(NewsSource.key.in_(RETIRED), NewsSource.builtin.is_(True))):
-        await forget_source(db, old)
-        await db.delete(old)
-        log.info("news: built-in source %s removed (no longer part of Cobe News)", old.key)
+    for old in list(await db.scalars(select(NewsSource).where(NewsSource.key.in_(RETIRED), NewsSource.builtin.is_(True)))):
+        # each on its own savepoint: a failure leaves that source as it was (logged, tried again at the next start) –
+        # never a start that fails over a source nobody fetches
+        try:
+            async with db.begin_nested():
+                audit.record(db, audit.SYSTEM, "source.deleted", audit.target("news_source", old.id, old.name), {"url": old.url, "reason": "retired"})
+                await forget_source(db, old)
+                await db.delete(old)
+            log.info("news: built-in source %s removed (no longer part of Cobe News)", old.key)
+        except Exception:  # noqa: BLE001
+            log.exception("news: built-in source %s could not be removed – tried again at the next start", old.key)
     await db.commit()
 
 
