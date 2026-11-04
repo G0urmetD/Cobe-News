@@ -163,6 +163,17 @@ as finished with `Exited (0)` – that is correct, it only runs briefly at the s
 
 Only the app's process can read `./data` and the files in it.
 
+### With Portainer {#portainer}
+
+If you manage Docker with Portainer, you need no checkout: the file `docker-compose.portainer.yml` from the repository
+goes as a whole into Portainer's web editor (*Stacks → Add stack → Web editor*), the values of the `.env` become the
+stack's *Environment variables* – `POSTGRES_PASSWORD` and `POSTGRES_APP_PASSWORD` are required. It runs the released
+image from version 0.1.48 on and is hardened just like the normal installation. The containers are named after the
+stack (e.g. `news-app-1`), the data lives in named volumes (`news_data`, `news_db18`, `news_tls`). An update: set
+`COBE_NEWS_IMAGE` to the new version and *Update the stack*. Backup, restore test and restore run there with
+`docker exec` or a throwaway container instead of `docker compose` – all steps, variables and limits: docs/BETRIEB.md,
+section "Portainer (Stack-Editor)".
+
 ## Update {#update}
 
 Cobe News is updated with Git and Docker Compose. The app brings the database to the new version's state by itself at
