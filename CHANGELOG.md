@@ -19,6 +19,11 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 ### Betrieb
 - **Update lokal**: `docker compose up -d --build --remove-orphans` – entfernt den alten Container `cobe-news-db-init`; Daten, Volumes und Netz bleiben. Mit `docker-compose.image.yml` statt `COBE_NEWS_IMAGE` jetzt `COBE_NEWS_VERSION` (oder alle drei Image-Variablen).
 - **Update Portainer**: neue Datei einfügen, `COBE_NEWS_IMAGE` aus den Variablen löschen, *Update the stack*; die alten Container `assets`/`db-init` und die Volumes `<stack>_deploy-postgres`/`<stack>_deploy-nginx` können weg.
+- **Eigener Reverse Proxy, alter Rat**: Wer bis 0.1.48 `TRUSTED_PROXIES=172.31.250.1/32` gesetzt hat, entfernt diese Zeile (oder setzt sie leer) – das Gateway des Netzes `edge` ist `172.31.250.128`, und ein gesetztes `TRUSTED_PROXIES` ersetzt es; sonst steht weiter jede Anfrage unter `.128`. Die App warnt beim Start.
+- **Gateway nur, wenn sicher**: `PROXY_ENABLED=0` vertraut dem Gateway nur, wenn es in `EDGE_SUBNET` liegt und die App sicher auf einer Linux Docker Engine läuft; auf Docker Desktop, OrbStack, Colima, WSL2 – oder wenn DNS keine klare Antwort gibt – glaubt sie niemandem (Log `proxy: … trusted from nobody`; `TRUSTED_PROXIES=<Gateway>/32` erzwingt es).
+- **HSTS** mit `external` nur bei ausdrücklich gesetztem `TLS_MODE=external` (oder `HSTS=1`) – nicht, wenn es sich bloß aus `PROXY_ENABLED=0` ergibt; wer es bisher gesetzt hatte, behält es.
+- **Portainer**: Die Images ab 0.1.49 brauchen die Stack-Datei ab 0.1.49 – nur `COBE_NEWS_IMAGE` hochzusetzen und die alte Datei zu behalten, scheitert (Meldung „/srv/deploy/postgres missing …“).
+- **Datenbank-Container**: PID 1 läuft nach dem Vorbereiten des Datenordners als `postgres` ohne Capabilities; `docker kill -s HUP` lädt die Konfiguration neu.
 - **Neue Pakete auf ghcr.io**: `cobe-news-db` und `cobe-news-proxy` – nach dem ersten Release einmal auf „Public“ stellen.
 - **Tests ohne Ablaufdatum**: Testdaten mit festem Datum laufen jetzt relativ zum Testtag – mehrere Tests wären ab Ende November ausgefallen und hätten die Release-Pipeline gestoppt.
 
