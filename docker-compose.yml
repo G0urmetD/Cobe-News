@@ -37,6 +37,7 @@ services:
       # empty: with PROXY_ENABLED=0 the Docker gateway (this host – the app's port is published on 127.0.0.1 only);
       # set: exactly these instead; "none": nobody (docs/BETRIEB.md: HTTPS, 3)
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      EDGE_SUBNET: ${EDGE_SUBNET:-172.31.250.0/24}    # the network edge (below): the gateway is trusted only inside it
       SHARED_ADDRESSES: ${SHARED_ADDRESSES:-}         # addresses many people share: never blocked (docs/BETRIEB.md)
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
       SECRET_KEY: ${SECRET_KEY:-}                     # empty: a key file in ./data (secret.key, 0600)

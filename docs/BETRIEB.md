@@ -50,8 +50,17 @@ kurzen Dienst mehr, der beim Start „Exited (0)“ zurücklässt (bis 0.1.48: `
 (Sicherung vorher, Handbuch *Betrieb → Update*). Beim Update von **0.1.48 oder älter** entfernt `--remove-orphans` den
 alten Container `cobe-news-db-init` (ohne den Schalter bleibt er als „Exited“ stehen und Compose warnt „Found orphan
 containers“ – harmlos, `docker rm cobe-news-db-init` geht auch). Volumes (`cobe-news_db18`, `cobe-news_tls`), `./data`
-und das Netz `cobe-news_edge` bleiben, wie sie sind; nichts muss von Hand umgezogen werden. Zurück auf 0.1.48 (alte
-`docker-compose.yml`, `docker compose up -d --no-build`) legt `db-init` wieder an – dieselben Volumes.
+und das Netz `cobe-news_edge` bleiben, wie sie sind; nichts muss von Hand umgezogen werden. Mit eigenem Reverse Proxy:
+steht in der `.env` noch `TRUSTED_PROXIES=172.31.250.1/32` (der falsche Rat bis 0.1.48), diese Zeile **entfernen** (oder
+leer setzen) – sonst sieht die App weiter jede Anfrage vom Gateway `172.31.250.128`; das Log warnt beim Start
+(`proxy: TRUSTED_PROXIES=… lies in the network edge … but not on its gateway`). Details: [HTTPS](#https), 3.
+
+**Zurück auf 0.1.48**: `docker compose up -d --build` hat `cobe-news:latest` mit der neuen App überschrieben – das alte
+Image muss vorher behalten worden sein (`docker tag cobe-news:latest cobe-news:before-update` vor dem Update, Handbuch
+*Betrieb → Update*). Dann: `git checkout <Stand von 0.1.48>`, `docker tag cobe-news:before-update cobe-news:latest`,
+`docker compose up -d --no-build --remove-orphans` – das legt `db-init` wieder an (Datenbank und Proxy wieder direkt aus
+den Basis-Images), dieselben Volumes. Brachte das Update eine Migration mit, vorher die Sicherung mit der alten Version
+zurückspielen. Ohne behaltenes Image: `git checkout <Stand von 0.1.48>` und `docker compose up -d --build` baut sie neu.
 
 ### Veröffentlichtes Image statt lokalem Build
 
@@ -171,8 +180,12 @@ Sicherung zurückspielen).
 `COBE_NEWS_IMAGE` **löschen** (sonst bliebe die App auf 0.1.48 – die Version kommt jetzt aus `COBE_NEWS_VERSION` bzw. der
 Datei), *Update the stack* – mit **Prune services**, wo Portainer den Schalter anbietet (entfernt die beiden beendeten
 Container `assets` und `db-init`); sonst bleiben sie als „exited“ stehen und lassen sich unter *Containers* löschen.
-Mit eigenem Reverse Proxy dürfen die bisherigen `TLS_MODE=external` und `TRUSTED_PROXIES=…` heraus – `PROXY_ENABLED=0`
-genügt ([HTTPS](#https), 3.). Die Volumes `news_data`, `news_db18`, `news_tls` und das Netz bleiben; die Volumes
+Mit eigenem Reverse Proxy: `TRUSTED_PROXIES=172.31.250.1/32` (der falsche Rat bis 0.1.48) **entfernen** oder leer setzen –
+sonst bleibt jede Anfrage beim Gateway `….128` (das Log der App warnt); ein gesetztes `TRUSTED_PROXIES=<Gateway>/32` darf
+heraus, `PROXY_ENABLED=0` genügt ([HTTPS](#https), 3.); `TLS_MODE=external` behalten, wer HSTS will. **Die Images ab
+0.1.49 brauchen die Stack-Datei ab 0.1.49**: nur `COBE_NEWS_IMAGE` auf 0.1.49 zu stellen und die alte Datei zu behalten,
+scheitert – deren Dienst `assets` sucht `/srv/deploy` im App-Image und meldet irreführend „COBE_NEWS_IMAGE must be Cobe
+News 0.1.48 or newer“. Die Volumes `news_data`, `news_db18`, `news_tls` und das Netz bleiben; die Volumes
 `news_deploy-postgres` und `news_deploy-nginx` braucht nichts mehr (nur kopierte Dateien, keine Daten) – unter
 *Volumes* löschen.
 
@@ -434,7 +447,10 @@ Zertifikat läuft: in `.env` (bzw. den Environment variables des Stacks) `PROXY_
 den eigenen Proxy auf `http://127.0.0.1:8096` (`APP_PORT`) zeigen lassen – fertig. `PROXY_ENABLED=0` bewirkt:
 
 - der mitgelieferte nginx startet nicht (`scale: 0`),
-- `TLS_MODE` gilt als `external` (TLS endet am eigenen Proxy; ein ausdrücklich gesetztes `TLS_MODE` geht vor),
+- `TLS_MODE` gilt als `external` (TLS endet am eigenen Proxy; ein ausdrücklich gesetztes `TLS_MODE` geht vor). HSTS
+  sendet die App dabei **nicht** – bis 0.1.48 lief eine solche Installation als `selfsigned` ohne HSTS, und ein Jahr
+  HSTS ließe sich nicht zurücknehmen. HSTS gibt es mit ausdrücklichem `TLS_MODE=external` (oder `HSTS=1`, das HSTS in
+  jedem Modus einschaltet),
 - die App glaubt `X-Forwarded-For` und `X-Forwarded-Proto` von ihrem **Docker-Gateway** – das ist der Host selbst. Die
   App-Zeile im Log beim Start sagt es: `proxy: PROXY_ENABLED=0 – X-Forwarded-For trusted from 172.31.250.128 (the Docker
   gateway: a reverse proxy on this host)`; im Zugriffslog stehen danach die echten Client-Adressen.
@@ -456,10 +472,19 @@ eigenen Adresse (sein `X-Forwarded-For` zählt nicht), einer in einem anderen Ne
 Geprüft mit Docker Engine 29 unter Linux. Wer auf dem Host Code ausführen kann, kann seine Adresse
 damit selbst wählen – dieselbe Grenze wie bisher mit `TRUSTED_PROXIES=<Gateway>`. Daraus folgt:
 
-- **Docker Desktop, OrbStack, Colima/Lima, Podman Machine:** dort erreicht *jeder* Container die `127.0.0.1`-Ports des
-  Rechners über `host.docker.internal` (o. Ä.) – und kommt ebenfalls vom Gateway. Die App erkennt das (einer dieser Namen
-  löst auf) und glaubt dann **niemandem**; das Log sagt `… host.docker.internal resolves … trusted from nobody`. Wer es
-  trotzdem will (eigener Rechner, keine fremden Container): `TRUSTED_PROXIES=<Gateway>/32` ausdrücklich setzen.
+- **Docker Desktop, OrbStack, Colima/Lima, Podman Machine, WSL2:** dort erreicht *jeder* Container die `127.0.0.1`-Ports
+  des Rechners über `host.docker.internal` oder die Host-Adresse der VM (`192.168.65.254`) – und kommt ebenfalls vom
+  Gateway. Die App glaubt dem Gateway deshalb nur, wenn sie **sicher** ist, auf einer Linux Docker Engine zu laufen: der
+  Kernel ist keiner dieser VMs (`linuxkit`, `orbstack`, `microsoft-standard-WSL2` in `uname -r`), und keiner der Namen
+  `host.docker.internal`, `gateway.docker.internal`, `host.orb.internal`, `host.lima.internal`,
+  `host.containers.internal` existiert – der Resolver sagt ausdrücklich „gibt es nicht“. Löst einer auf, glaubt sie
+  **niemandem**; antwortet der Resolver nicht klar (kein DNS, Zeitüberschreitung – höchstens 3 Sekunden beim Start),
+  ebenso nicht, und sie fragt im Hintergrund jede Minute neu. Das Log sagt es (`… a desktop Docker …` bzw. `… cannot
+  tell …, trusted from nobody`). Wer es trotzdem will (eigener Rechner, keine fremden Container):
+  `TRUSTED_PROXIES=<Gateway>/32` ausdrücklich setzen.
+- **Nur ein Gateway im Netz `edge`:** die App vergleicht es mit `EDGE_SUBNET` (beide Compose-Dateien geben es ihr mit).
+  Liegt das Default-Gateway nicht darin – etwa mit `network_mode: host`, wo es der Router des LANs wäre –, glaubt sie
+  niemandem.
 - **Den App-Port nie auf eine andere Adresse als `127.0.0.1` legen**, solange das Gateway vertraut wird (die
   Compose-Dateien tun das nicht; wer sie ändert, setzt `TRUSTED_PROXIES=none`).
 - **Nie mit dem mitgelieferten nginx** (`PROXY_ENABLED=1`): dann gilt nur dessen feste Adresse (`PROXY_IP`), nie das
@@ -469,9 +494,12 @@ damit selbst wählen – dieselbe Grenze wie bisher mit `TRUSTED_PROXIES=<Gatewa
 Ein **Proxy-Container** im Netz `edge` (von außen `cobe-news_edge`, Ziel `http://cobe-news-app:8000`) bekommt dort eine
 feste Adresse unterhalb von `.128`, also außerhalb von `EDGE_RANGE` (z. B. `172.31.250.20`), und genau diese steht in
 `TRUSTED_PROXIES` – eine dynamische Adresse könnte nach einem Neustart ein anderer Container bekommen. HSTS sendet die
-App auch in diesem Modus – auf Anfragen, die über HTTPS kamen, also von einer vertrauten Adresse mit
-`X-Forwarded-Proto: https`; der eigene Proxy darf den Header zusätzlich selbst setzen. Bis 0.1.48 gesetzte
-`TLS_MODE=external` und `TRUSTED_PROXIES=172.31.250.128/32` stören nicht (gleiche Wirkung), können aber weg. Beispiel:
+App mit ausdrücklichem `TLS_MODE=external` (siehe oben) – auf Anfragen, die über HTTPS kamen, also von einer vertrauten Adresse mit
+`X-Forwarded-Proto: https`; der eigene Proxy darf den Header zusätzlich selbst setzen. Bis 0.1.48 gesetzte Werte:
+`TRUSTED_PROXIES=172.31.250.1/32` (der falsche Rat von damals) **entfernen** oder leer setzen – ein gesetztes
+`TRUSTED_PROXIES` ersetzt das Gateway, die App sähe weiter jede Anfrage von `172.31.250.128`; sie warnt beim Start
+(`proxy: TRUSTED_PROXIES=172.31.250.1/32 lies in the network edge … but not on its gateway`). `TRUSTED_PROXIES=172.31.250.128/32`
+stört nicht (unter Linux dieselbe Wirkung), kann weg; `TLS_MODE=external` behalten, wer HSTS will. Beispiel:
 
 ```nginx
 server {
@@ -1655,26 +1683,27 @@ Gearbeitet wird nie direkt auf `main` (geschützt), sondern in eigenen Branches 
 Pipeline. Ein Release startet nur mit einem Tag:
 
 ```bash
-git tag v0.1.47 && git push origin v0.1.47
+git tag v0.1.49 && git push origin v0.1.49   # die Version aus backend/app/__init__.py
 ```
 
 Die einzige Pipeline, [`.github/workflows/release.yml`](../.github/workflows/release.yml), prüft dann, dass der Tag zu
 allen Versionsangaben passt (`backend/app/__init__.py`, `backend/pyproject.toml`, `backend/uv.lock`,
-`frontend/package.json`, `frontend/package-lock.json`) und `CHANGELOG.md` einen Abschnitt `## 0.1.47 – …` hat, lässt die
+`frontend/package.json`, `frontend/package-lock.json`) und `CHANGELOG.md` einen Abschnitt `## <Version> – …` hat, lässt die
 Backend-Tests (mit PostgreSQL 18), die Frontend-Prüfungen, Tests und den Build laufen und prüft die Abhängigkeiten auf
 bekannte Schwachstellen. Erst wenn alles grün ist, baut sie die drei Images für amd64 und arm64 – die App (`Dockerfile`),
-die Datenbank (`deploy/postgres`) und den Proxy (`deploy/nginx`) –, legt sie als `ghcr.io/g0urmetd/cobe-news:0.1.47`,
-`ghcr.io/g0urmetd/cobe-news-db:0.1.47` und `ghcr.io/g0urmetd/cobe-news-proxy:0.1.47` (je auch `:latest`) ab, mit
+die Datenbank (`deploy/postgres`) und den Proxy (`deploy/nginx`) –, legt sie als `ghcr.io/g0urmetd/cobe-news:<Version>`,
+`ghcr.io/g0urmetd/cobe-news-db:<Version>` und `ghcr.io/g0urmetd/cobe-news-proxy:<Version>` (je auch `:latest`) ab, mit
 Provenance und SBOM, signiert alle drei (cosign, ohne gespeicherten Schlüssel) und schreibt den GitHub-Release mit dem
 Text aus dem Changelog und den drei Digests. Neue Pakete auf ghcr.io sind zuerst privat: nach dem ersten Release mit
 `cobe-news-db` und `cobe-news-proxy` beide unter *Packages → Package settings* auf *Public* stellen (wie `cobe-news`),
 sonst scheitert das Holen ohne Anmeldung (Portainer: „unauthorized“).
 
-Prüfen der Signaturen:
+Prüfen der Signaturen (die Images `-db` und `-proxy` gibt es ab 0.1.49):
 
 ```bash
+v=0.1.49
 for i in cobe-news cobe-news-db cobe-news-proxy; do
-  cosign verify ghcr.io/g0urmetd/$i:0.1.47 \
+  cosign verify ghcr.io/g0urmetd/$i:$v \
     --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done

@@ -134,7 +134,11 @@ def test_the_database_is_healthy_only_after_the_role_setup(local):
     assert "ready=/var/run/postgresql/.cobe-news-ready" in script and 'rm -f "$ready"' in script
     # the marker only after a successful db-init; a failed one stops PostgreSQL and exits 1
     assert re.search(r'db-init\.sh"; then\n\s+: >"\$ready"', script) and "finish 1" in script
-    assert "trap stop INT TERM" in script and 'kill -INT "$pg"' in script
+    assert "trap stop INT TERM" in script and 'kill -INT "$pg"' in script and "trap 'kill -HUP \"$pg\"" in script
+    # root only to prepare the data folder, then PID 1 is postgres without capabilities (no gosu for anything after)
+    code = [x.strip() for x in script.splitlines() if x.strip() and not x.strip().startswith("#")]
+    assert [x for x in code if "gosu" in x] == ['exec gosu postgres "$0" "$@"']
+    assert "docker_create_db_directories" in script and "source docker-entrypoint.sh" in script
     # the app's role and the restore role: the db container has their passwords, the app never the superuser's
     env = db["environment"]
     assert env["POSTGRES_APP_PASSWORD"].startswith("${POSTGRES_APP_PASSWORD:?") and env["POSTGRES_RESTORE_PASSWORD"] == "${POSTGRES_RESTORE_PASSWORD:-}"
@@ -155,6 +159,8 @@ def test_one_switch_for_an_own_reverse_proxy(local, portainer):
     for f in (local, portainer):
         env = f["services"]["app"]["environment"]
         assert env["TLS_MODE"] == "${TLS_MODE:-}" and env["TRUSTED_PROXIES"] == "${TRUSTED_PROXIES:-}"
+        # the gateway is trusted only inside the network edge: the app gets its subnet, the same expression as the network
+        assert env["EDGE_SUBNET"] == f["networks"]["edge"]["ipam"]["config"][0]["subnet"] == "${EDGE_SUBNET:-172.31.250.0/24}"
         assert f["services"]["app"]["ports"] == ["127.0.0.1:${APP_PORT:-8096}:8000"]
         assert f["services"]["proxy"]["scale"] == "${PROXY_ENABLED:-1}"
         # an explicit gateway only when asked for: empty keeps an existing network as it is (a changed IPAM config makes
@@ -168,7 +174,11 @@ def test_one_switch_for_an_own_reverse_proxy(local, portainer):
     assert "PROXY_ENABLED" not in bundled.split("Recommended", 1)[0]
     for block in (own, bundled):
         assert "POSTGRES_PASSWORD=" in block and "POSTGRES_APP_PASSWORD=" in block and "BASE_URL=https://" in block
-    assert "TRUSTED_PROXIES" not in own and "TLS_MODE" not in own  # not needed any more
+    variables = [x for x in own.splitlines() if re.match(r"# {6}[A-Z_]+=", x)]
+    assert len(variables) == 4 and not any("TRUSTED_PROXIES" in x or "TLS_MODE" in x for x in variables)  # not needed any more
+    # the port of the app beyond 127.0.0.1 only with TRUSTED_PROXIES=none; the old advice (.1) to be removed
+    flat = " ".join(x.lstrip("# ") for x in own.splitlines())
+    assert "TRUSTED_PROXIES=none" in flat and "TRUSTED_PROXIES=172.31.250.1/32: remove" in flat
 
 
 def test_dockerfiles_pin_their_base_images_and_carry_the_files(local):
@@ -246,7 +256,8 @@ def test_no_one_shot_containers_left_in_scripts_and_wrong_gateway_advice_gone():
         assert "db-init" not in path.read_text(encoding="utf-8"), path
     texts = {p: p.read_text(encoding="utf-8") for p in [ROOT / "docs" / "BETRIEB.md", ROOT / "README.md", ROOT / ".env.example", *sorted((ROOT / "docs" / "handbuch").glob("*/*.md"))]}
     for path, text in texts.items():
-        # only as the wrong one ("nicht `172.31.250.1`", "not `172.31.250.1`")
-        wrong = re.findall(r"(?<!nicht `)(?<!not `)172\.31\.250\.1(?![0-9])", text)
-        assert not wrong and "172.31.250.1/32" not in text, path
+        # only where it is called wrong or to be removed (the advice of 0.1.48: TRUSTED_PROXIES=172.31.250.1/32)
+        for para in re.split(r"\n\s*\n", text):
+            if re.search(r"172\.31\.250\.1(?![0-9])", para):
+                assert any(w in para for w in ("entfernen", "remove", "nicht `172.31.250.1`", "not `172.31.250.1`")), (path, para[:300])
         assert "docker compose logs db-init" not in text and "up -d db-init" not in text, path
