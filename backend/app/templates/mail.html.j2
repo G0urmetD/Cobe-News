@@ -3,46 +3,91 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>{{ subject }}</title>
+{#- The light colours are inline (Gmail and Outlook for Windows read nothing else); the dark ones override them by
+    class where the client knows prefers-color-scheme (Apple Mail, iOS, Outlook for Mac, Thunderbird) or marks its
+    dark mode (Outlook.com: [data-ogsc] / [data-ogsb]). The CSS is the app's own (notify.DARK), never feed text. -#}
+<style>
+:root{color-scheme:light dark;supported-color-schemes:light dark;}
+{{ dark_css|safe }}
+</style>
 </head>
-{#- The mail style. Mail clients (Outlook!) ignore <style> blocks: tables, inline styles, web-safe fonts only. -#}
-<body style="margin:0;padding:0;background:#f3f4f7;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2330;">
+{#- The mail style. Mail clients (Outlook!) ignore much of CSS: tables, inline styles, web-safe fonts only. -#}
+{%- set mono = "font-family:SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;" -%}
+{%- macro sev(s) -%}
+<span class="cn-sev-{{ s.sev }}" style="display:inline-block;padding:2px 8px;border-radius:999px;background:{{ s.sev_bg }};color:{{ s.sev_color }};font-size:11px;font-weight:700;line-height:16px;white-space:nowrap;">{{ s.sev_label }}</span>
+{%- endmacro -%}
+{%- macro ours(s) -%}
+<span class="cn-ourspill" style="display:inline-block;padding:2px 8px;border-radius:999px;background:#3d55d4;color:#ffffff;font-size:11px;font-weight:700;line-height:16px;">&#9733; {{ s.ours }}</span>
+{%- endmacro -%}
+<body class="cn-page" style="margin:0;padding:0;background:#f3f4f7;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2330;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ preheader }}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f7;">
+<table role="presentation" class="cn-page" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f7;">
 <tr><td align="center" style="padding:28px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
 
 <tr><td style="padding:0 4px 14px;">
   <table role="presentation" cellpadding="0" cellspacing="0"><tr>
     <td style="width:30px;height:30px;background:#3d55d4;border-radius:8px;color:#ffffff;font-weight:700;font-size:15px;text-align:center;vertical-align:middle;">C</td>
-    <td style="padding-left:10px;font-size:15px;font-weight:600;color:#1f2330;">Cobe News <span style="color:#7a8094;font-weight:400;">· {{ rule }}</span></td>
+    <td class="cn-text" style="padding-left:10px;font-size:15px;font-weight:600;color:#1f2330;">Cobe News <span class="cn-muted" style="color:#5b6175;font-weight:400;">· {{ rule }}</span></td>
   </tr></table>
 </td></tr>
 
-<tr><td style="background:#ffffff;border:1px solid #e3e5ec;border-radius:12px;overflow:hidden;">
+<tr><td class="cn-card" style="background:#ffffff;border:1px solid #e3e5ec;border-radius:12px;overflow:hidden;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr><td style="height:4px;background:{{ accent }};font-size:0;line-height:0;">&nbsp;</td></tr>
-    <tr><td style="padding:26px 28px 6px;">
-      <p style="margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:{{ accent }};font-weight:600;">{{ eyebrow }}</p>
-      <h1 style="margin:0;font-size:21px;line-height:1.3;font-weight:650;color:#1f2330;">{{ heading }}</h1>
+    <tr><td style="padding:24px 28px 4px;">
+      <h1 class="cn-text" style="margin:0;font-size:21px;line-height:1.3;font-weight:650;color:#1f2330;">{{ heading }}</h1>
+      <p class="cn-muted" style="margin:6px 0 0;font-size:13px;line-height:1.45;color:#5b6175;">{{ eyebrow }}</p>
     </td></tr>
 
-    {% for s in stories %}
-    <tr><td style="padding:{% if loop.first %}14{% else %}6{% endif %}px 28px 8px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e5ec;border-radius:10px;">
-        <tr><td style="padding:14px 16px 4px;">
-          <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:{{ s.sev_bg }};color:{{ s.sev_color }};font-size:11px;font-weight:600;">{{ s.sev_label }}</span>
-          &nbsp;<span style="font-size:12px;color:#5b6175;">{{ s.source }} · {{ s.date }}</span>
+    {% if compact %}
+    {#- many stories: one line each – severity, product, the title as the link into Cobe News -#}
+    <tr><td style="padding:14px 28px 4px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      {% for s in stories %}
+        <tr><td class="cn-line" style="padding:9px 0;border-top:1px solid #e3e5ec;font-size:14px;line-height:1.45;">
+          {{ sev(s) }}&nbsp;
+          {%- if s.name %} <span class="cn-muted" style="color:#5b6175;font-weight:600;">{{ s.name }}</span> <span class="cn-muted" style="color:#5b6175;">·</span>{% endif %}
+          <a class="cn-text" href="{{ s.link }}" style="color:#1f2330;text-decoration:none;font-weight:600;">{{ s.title }}</a>
+          {%- if s.ours %} &nbsp;{{ ours(s) }}{% endif %}
+          {%- if s.tlp %} &nbsp;<span class="cn-tlp" style="display:inline-block;padding:2px 6px;border-radius:4px;background:#e6f4ea;color:#1e6b34;font-size:11px;font-weight:700;">TLP:GREEN</span>{% endif %}
         </td></tr>
-        <tr><td style="padding:4px 16px 2px;font-size:16px;font-weight:600;line-height:1.35;">{% if s.url %}<a href="{{ s.url }}" style="color:#1f2330;text-decoration:none;">{{ s.title }}</a>{% else %}{{ s.title }}{% endif %}</td></tr>
-        {% if s.tlp %}<tr><td style="padding:4px 16px 0;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e6f4ea;color:#1e6b34;font-size:11px;font-weight:700;">{{ s.tlp }}</span></td></tr>{% endif %}
-        {% if s.summary %}<tr><td style="padding:6px 16px 4px;font-size:14px;line-height:1.55;color:#4a5066;">{{ s.summary }}</td></tr>{% endif %}
-        <tr><td style="padding:6px 16px 14px;font-size:13px;">{% if s.url %}<a href="{{ s.url }}" style="color:#3d55d4;">{{ labels.article }}</a> &nbsp;·&nbsp; {% endif %}<a href="{{ s.link }}" style="color:#3d55d4;">{{ labels.open }}</a></td></tr>
+      {% endfor %}
+      </table>
+    </td></tr>
+    {% else %}
+    {% for s in stories %}
+    <tr><td style="padding:{% if loop.first %}16{% else %}6{% endif %}px 28px 8px;">
+      {%- if s.ours %}
+      <table role="presentation" class="cn-ours" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6ff;border:1px solid #c9d1fb;border-left:4px solid #3d55d4;border-radius:10px;">
+      {%- else %}
+      <table role="presentation" class="cn-story" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e5ec;border-radius:10px;">
+      {%- endif %}
+        <tr><td style="padding:14px 16px 4px;line-height:20px;">
+          {{ sev(s) }}&nbsp; <span class="cn-muted" style="font-size:12px;color:#5b6175;">{{ s.source }} · <span style="white-space:nowrap;">{{ s.date }}</span></span>
+        </td></tr>
+        {% if s.ours %}<tr><td style="padding:4px 16px 0;">{{ ours(s) }}</td></tr>{% endif %}
+        <tr><td class="cn-text" style="padding:6px 16px 2px;font-size:16px;font-weight:600;line-height:1.35;color:#1f2330;">{% if s.url %}<a class="cn-text" href="{{ s.url }}" style="color:#1f2330;text-decoration:none;">{{ s.title }}</a>{% else %}{{ s.title }}{% endif %}</td></tr>
+        {% if s.facts.product or s.facts.cves or s.facts.topics %}
+        <tr><td class="cn-muted" style="padding:5px 16px 0;font-size:12px;line-height:22px;color:#5b6175;">
+          {%- if s.facts.product %}<span class="cn-text" style="color:#1f2330;font-weight:600;">{{ s.facts.product }}</span>{% endif %}
+          {%- if s.facts.cves %}{% if s.facts.product %} &nbsp;·&nbsp; {% endif %}{% for c in s.facts.cves %}<span class="cn-muted" style="{{ mono }}font-size:12px;color:#5b6175;white-space:nowrap;">{{ c }}</span>{% if not loop.last %}, {% endif %}{% endfor %}{% if s.facts.cves_more %} {{ s.facts.cves_more }}{% endif %}{% endif %}
+          {%- if s.facts.topics %}{% if s.facts.product or s.facts.cves %} &nbsp;·&nbsp;{% endif %}
+            {%- for t in s.facts.topics %} <span class="{{ 'cn-hot' if t.hot else 'cn-chip' }}" style="display:inline-block;padding:0 7px;border-radius:4px;background:{{ '#fde8e6' if t.hot else '#eef0f6' }};color:{{ '#a0221b' if t.hot else '#3a4055' }};font-size:11px;font-weight:600;line-height:18px;white-space:nowrap;">{{ t.label }}</span>{% endfor %}
+          {%- endif %}
+        </td></tr>
+        {% endif %}
+        {% if s.tlp %}<tr><td style="padding:6px 16px 0;"><span class="cn-tlp" style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e6f4ea;color:#1e6b34;font-size:11px;font-weight:700;">{{ s.tlp }}</span></td></tr>{% endif %}
+        {% if s.summary %}<tr><td class="cn-body" style="padding:8px 16px 4px;font-size:14px;line-height:1.55;color:#4a5066;">{{ s.summary }}</td></tr>{% endif %}
+        <tr><td style="padding:6px 16px 14px;font-size:13px;">{% if s.url %}<a class="cn-link" href="{{ s.url }}" style="color:#3d55d4;">{{ labels.article }}</a> &nbsp;·&nbsp; {% endif %}<a class="cn-link" href="{{ s.link }}" style="color:#3d55d4;">{{ labels.open }}</a></td></tr>
       </table>
     </td></tr>
     {% endfor %}
-    {% if more %}<tr><td style="padding:4px 28px 4px;font-size:14px;color:#4a5066;">{{ more }}</td></tr>{% endif %}
+    {% endif %}
+    {% if more %}<tr><td class="cn-body" style="padding:6px 28px 4px;font-size:14px;color:#4a5066;">{{ more }}</td></tr>{% endif %}
 
     <tr><td style="padding:16px 28px 28px;">
       <table role="presentation" cellpadding="0" cellspacing="0"><tr>
@@ -52,7 +97,8 @@
   </table>
 </td></tr>
 
-<tr><td style="padding:16px 8px 0;font-size:12px;line-height:1.5;color:#7a8094;text-align:center;">
+<tr><td class="cn-foot" style="padding:16px 8px 0;font-size:12px;line-height:1.5;color:#5f6679;text-align:center;">
+  {% if why %}<p style="margin:0 0 6px;">{{ why.text }} &nbsp;·&nbsp; <a class="cn-link" href="{{ why.url }}" style="color:#3d55d4;">{{ why.label }}</a></p>{% endif %}
   {% for f in footer %}<p style="margin:0 0 4px;">{{ f }}</p>{% endfor %}
 </td></tr>
 

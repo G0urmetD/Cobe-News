@@ -126,12 +126,21 @@ const refreshNotify = (qc: QueryClient) => {
   void qc.invalidateQueries({ queryKey: ["admin", "channels"] })
 }
 
-/** The rules: the list, or one rule in the editor (list ↔ editor in the same tab). */
+/** The rules: the list, or one rule in the editor (list ↔ editor in the same tab). `?tab=rules&rule=<id>` (the
+ *  notification mail's "Regel bearbeiten") opens that rule in the editor. */
 function RulesPane({ onChannels }: { onChannels: () => void }) {
   const qc = useQueryClient()
   const rules = useRules().data
+  const [params, setParams] = useSearchParams()
   // the rule being edited by id (its stored state from the list); `key`: a fresh form after "load the current state"
-  const [editing, setEditing] = useState<{ id: string | "new"; key: number } | null>(null)
+  const [editing, setEditing] = useState<{ id: string | "new"; key: number } | null>(() => {
+    const asked = params.get("rule")
+    return asked ? { id: asked, key: 0 } : null
+  })
+  const done = () => {
+    setEditing(null)
+    if (params.has("rule")) setParams({ tab: "rules" }, { replace: true })
+  }
   const rule = editing && editing.id !== "new" ? (rules?.find((r) => r.id === editing.id) ?? null) : null
   // removed by another admin meanwhile: back to the list
   if (editing && editing.id !== "new" && rules && !rule) setEditing(null)
@@ -141,7 +150,7 @@ function RulesPane({ onChannels }: { onChannels: () => void }) {
       <RuleEditor
         key={editing.key}
         rule={rule}
-        onDone={() => setEditing(null)}
+        onDone={done}
         onChannels={onChannels}
         onStale={() => refreshNotify(qc)}
         onReload={() =>
