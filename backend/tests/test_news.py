@@ -237,11 +237,12 @@ async def test_fetch_now_asks_each_source_once():
 
 async def test_prune_removes_old_stories_and_their_reads(reader_client):
     client = reader_client
-    await set_news(enabled=True, keep_days=7)
+    await set_news(enabled=True, keep_days=365)  # the feed's dates are fixed (28 Oct 2026): kept whatever day the test runs
     await _sources(("feed-a", "https://news.example.org/a.xml"))
     await news.refresh_due(transport=_site({"/a.xml": RSS}, []))
     first = (await client.get("/api/news")).json()["items"][0]
     await client.post(f"/api/news/{first['id']}/read")
+    await set_news(enabled=True, keep_days=7)
     async with db.session() as s:
         await s.execute(update(NewsItem).values(published_at=datetime.now(UTC) - timedelta(days=30)))
         await s.commit()
