@@ -467,10 +467,11 @@ def _ordered(events: list[VendorEvent]) -> list[VendorEvent]:
 
 
 def render_mail(events: list[VendorEvent], lang: str, tz: str | None = None) -> tuple[str, str, str]:
-    """The person's mail – times in their own zone (`tz`: their quiet hours' zone, else Europe/Berlin)."""
+    """The person's mail – times in their own zone (`tz`: their quiet hours' zone, else Europe/Berlin). The LIST shown
+    are cut in the order the mail shows them (notify.priority: exploited or critical first, then by severity, newest)."""
     lang = _lang(lang)
-    shown = _ordered(events)[:LIST]
-    return notify.render_mail(LABELS[lang]["label"], [story(e, lang) for e in shown], len(events), lang, footer=LABELS[lang]["footer"], tz=tz)
+    shown = sorted((story(e, lang) for e in events), key=notify.priority, reverse=True)[:LIST]
+    return notify.render_mail(LABELS[lang]["label"], shown, len(events), lang, footer=LABELS[lang]["footer"], tz=tz)
 
 
 def render_teams(events: list[VendorEvent], lang: str, *, test: bool = False) -> dict:

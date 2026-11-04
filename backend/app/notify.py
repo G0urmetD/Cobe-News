@@ -335,9 +335,12 @@ def headline(title: str) -> str:
 
 
 def priority(s: Story) -> tuple:
-    """The order of the stories of one message (and which make the cut when there are more): those concerning our
-    products first, then the actively exploited ones, then by severity, then the newest first. Sort with reverse=True."""
-    return (bool(s.ours), "exploited" in (s.topics or []), RANK.get(s.severity, 0), s.published_at)
+    """The order of the stories of one message (and which make the cut when there are more): the urgent ones first –
+    actively exploited or critical –, then those concerning our products, then by severity, then the newest first. So a
+    low or medium finding of a followed product never pushes an exploited or critical story out of a summary. Sort with
+    reverse=True."""
+    urgent = "exploited" in (s.topics or []) or s.severity == "critical"
+    return (urgent, bool(s.ours), RANK.get(s.severity, 0), s.published_at)
 
 
 def tlp_line(lang: str) -> str:
@@ -376,7 +379,14 @@ SUBJECT_NAME_MAX = 40  # characters of one story's name in it
 COMPACT_FROM = 6  # stories in one mail from which it is a compact list (a line per story, no summaries) instead of cards
 CVES_SHOWN = 3  # CVEs named on a mail's story (then "+N")
 HOT_TOPICS = ("zeroday", "exploited", "ransomware")  # topic chips in the warning colour
-_RANGE = re.compile(r"\s+(?:→|<=?|>=?|≤|≥|=|\d).*$")
+# a product's version range ("Example Gateway < 2.4.1", "PAN-OS 11.1.2 → 11.1.6-h3", "GitLab 17.0 - 19.5") – not the
+# numbers that are part of its name ("Exchange Server 2019 CU14", "Windows 11")
+_RANGE = re.compile(r"(?:\s+v?\d[\w.-]*)?\s+(?:→|->).*$|\s+(?:<=?|>=?|≤|≥|=)\s*v?\d.*$|\s+v?\d[\w.]*\s*[-–]\s*v?\d.*$")
+
+
+def product_name(product: str) -> str:
+    """A product without its version range (the subject's and the compact line's name)."""
+    return _RANGE.sub("", one_line(product)).strip()
 
 
 def _local(d: datetime, lang: str, tz: str | None = None) -> str:
@@ -408,7 +418,7 @@ def mail_name(s: Story) -> str:
     head, colon, _ = title.partition(": ")
     if colon and 2 <= len(head) <= SUBJECT_NAME_MAX:
         return head
-    if s.product and (p := _RANGE.sub("", one_line(s.product))):
+    if s.product and (p := product_name(s.product)):
         return _cut(p, SUBJECT_NAME_MAX)
     return _cut(title, SUBJECT_NAME_MAX)
 
@@ -484,7 +494,7 @@ def _body_title(s: Story) -> str:
 def _compact_name(s: Story) -> str:
     """The product in front of a compact line – only when neither the title (what it names before the colon) nor the
     "Betrifft eure Produkte" mark says it anyway."""
-    name = _RANGE.sub("", s.product) if s.product and not s.ours else ""
+    name = product_name(s.product) if s.product and not s.ours else ""
     title = s.headline.removeprefix(TLP_PREFIX).lower()
     head = title.partition(": ")[0] if ": " in title else title
     low = name.lower()
@@ -616,21 +626,24 @@ def render_mail(
         footer=footer,
         dark_css=_DARK_CSS,
     )
-    lines = [heading, eyebrow, "=" * min(max(len(heading), len(eyebrow)), 60), ""]
+    # the text part: every field of one line stays one line (a title, product or rule name with a line break would
+    # make a line of its own – "Bcc: …" looking like a header); only the summary keeps its lines (plain_block)
+    ol = one_line
+    lines = [ol(heading), ol(eyebrow), "=" * min(max(len(ol(heading)), len(ol(eyebrow))), 60), ""]
     for c in cards:
-        mark = f" · {c['ours']}" if c["ours"] else ""
+        mark = f" · {ol(c['ours'])}" if c["ours"] else ""
         if compact:
             green = TLP_PREFIX if c["tlp"] else ""  # the compact line's one TLP marker (no line of its own)
-            lines += [f"• [{c['sev_label']}] {green}{c['name'] + ' · ' if c['name'] else ''}{c['title']}{mark}", f"  {c['link']}"]
+            lines += [f"• [{c['sev_label']}] {green}{ol(c['name']) + ' · ' if c['name'] else ''}{ol(c['title'])}{mark}", f"  {c['link']}"]
             continue
-        lines += [f"[{c['sev_label']}]{mark}", c["title"]]
+        lines += [f"[{c['sev_label']}]{mark}", ol(c["title"])]
         if c["facts_text"]:
-            lines.append(c["facts_text"])
-        lines.append(f"{c['source']} · {c['date']}")
+            lines.append(ol(c["facts_text"]))
+        lines.append(ol(f"{c['source']} · {c['date']}"))
         if c["tlp"]:
             lines.append(c["tlp"])
         if c["summary"]:
-            lines.append(c["summary"])
+            lines.append(plain_block(c["summary"]))
         if c["url"]:
             lines.append(f"{lb['article']}: {c['url']}")
         lines += [f"{lb['open']}: {c['link']}", ""]
@@ -640,8 +653,8 @@ def render_mail(
         lines += [more, ""]
     lines += [f"{lb['button']}: {get_config().base_url}/", "", "-- "]
     if why:
-        lines.append(f"{why['text']} · {why['label']}: {why['url']}")
-    lines += footer
+        lines.append(ol(f"{why['text']} · {why['label']}: {why['url']}"))
+    lines += [ol(f) for f in footer]
     return subject, "\n".join(lines) + "\n", body
 
 
@@ -1514,19 +1527,53 @@ def _story(i: NewsItem, s: NewsSource) -> Story:
     )
 
 
-async def with_products(db: AsyncSession, stories: list[Story]) -> None:
+async def rule_scopes(db: AsyncSession, rule_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[str]]:
+    """The products (catalogue keys) of the teams a rule is limited to (notify_rule_teams → team_products) – per rule
+    that is limited to teams; a rule not in the result covers every followed product. One query for all the rules."""
+    if not rule_ids:
+        return {}
+    q = (
+        select(NotifyRuleTeam.rule_id, VendorFollow.product)
+        .select_from(NotifyRuleTeam)
+        .outerjoin(TeamProduct, TeamProduct.team_id == NotifyRuleTeam.team_id)
+        .outerjoin(VendorFollow, VendorFollow.id == TeamProduct.follow_id)
+        .where(NotifyRuleTeam.rule_id.in_(rule_ids))
+    )
+    out: dict[uuid.UUID, set[str]] = {}
+    for rid, product in await db.execute(q):
+        out.setdefault(rid, set())
+        if product:
+            out[rid].add(str(product))
+    return out
+
+
+def scope_of(rule_ids, scopes: dict[uuid.UUID, set[str]]) -> set[str] | None:  # noqa: ANN001
+    """What "eure Produkte" means for a story the rules `rule_ids` brought: the union of what they cover – None (every
+    followed product) as soon as one of them is not limited to teams."""
+    keys: set[str] = set()
+    for rid in rule_ids:
+        if rid not in scopes:
+            return None
+        keys |= scopes[rid]
+    return keys
+
+
+async def with_products(db: AsyncSession, stories: list[Story], scope: dict[str, set[str] | None] | None = None) -> None:
     """The cards' "Produkt" of news stories – only what is reliably known: a followed product the story's details
     concern (with the version entered and its fix: "PAN-OS 11.1.2 → 11.1.6-h3"), else the details' first affected
     product with its range ("GitLab < 19.5.1", as the News page's card hint). Without details: no product (no guess).
     And "Betrifft eure Produkte": the labels of the followed products a story concerns (news_items.products, those
-    still followed) – one query for all the stories."""
+    still followed) – one query for all the stories. `scope`: per story id the products that count (the teams of the
+    rules that brought it – scope_of); a story not in it, or None: every followed product."""
     from app import story_details
 
+    scope = scope or {}
     keyed = [st for st in stories if st.kind == "news" and st.product_keys and not st.ours]
     if keyed:
         labels = await story_details.followed_labels(db)
         for st in keyed:
-            st.ours = [neutral(labels[k])[:120] for k in st.product_keys if k in labels]
+            allowed = scope.get(st.id)
+            st.ours = [neutral(labels[k])[:120] for k in st.product_keys if k in labels and (allowed is None or k in allowed)]
     news_ids = {}
     for st in stories:
         if st.kind == "news" and not st.product:
@@ -2060,16 +2107,22 @@ async def channel_pending(db: AsyncSession, ch: NotifyChannel, lang_of=None) -> 
         )
     ).all()
     out: dict[tuple[str, uuid.UUID], Row] = {}
+    brought: dict[uuid.UUID, list[uuid.UUID]] = {}  # per news story: every rule that brought it ("eure Produkte")
     for rule, added in links:
         since = max(rule.active_since, added)
         if "news" in rule_kinds(rule):
             for i, s in await pending(db, rule, ch.id, since):
                 out.setdefault(("news", i.id), Row(_story(i, s), rule, ("news", i.id)))
+                brought.setdefault(i.id, []).append(rule.id)
         for ev in await vendor_pending(db, rule, ch.id, since):
             out.setdefault(("vendor", ev.id), Row(vendor_story(ev, rule.lang), rule, ("vendor", ev.id)))
         for hv in await health_pending(db, rule, ch.id, since):
             out.setdefault(("health", hv.id), Row(health_story(hv, rule.lang), rule, ("health", hv.id)))
-    await with_products(db, [r.story for r in out.values()])
+    # a Vendor News finding is ours anyway (a rule limited to teams brings only its teams' products); a news story's
+    # products count as far as the rules that brought it cover them – a team's rule calls only its products "eure"
+    scopes = await rule_scopes(db, sorted({r for rs in brought.values() for r in rs}))
+    scope = {str(i): scope_of(rs, scopes) for i, rs in brought.items()} if scopes else None
+    await with_products(db, [r.story for r in out.values()], scope)
     return list(out.values())
 
 
@@ -2419,7 +2472,16 @@ async def resend(db: AsyncSession, ch: NotifyChannel, row, actor=None) -> Notify
     stories = [(found[(k, i)], k, r) for k, i, r in left if (k, i) in found]
     if not stories:
         raise Gone("gone")
-    await with_products(db, [x[0] for x in stories])
+    # the rules of the delivery: their union decides what counts as "eure Produkte" (as in the round)
+    rids = []
+    for r in row.rules or []:
+        try:
+            rids.append(uuid.UUID(str(r.get("id"))))
+        except (ValueError, AttributeError):
+            continue
+    scopes = await rule_scopes(db, rids)
+    whole = scope_of(rids, scopes) if rids else None
+    await with_products(db, [x[0] for x in stories], {x[0].id: whole for x in stories} if whole is not None else None)
     m = summary(stories, lang, list(row.rules or []))
     smtp = await settings_store.get(db, "smtp") if ch.type == "email" else None
     who = {"channel_id": ch.id, "channel_name": ch.name, "channel_type": ch.type}
