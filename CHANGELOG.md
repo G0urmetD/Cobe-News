@@ -2,12 +2,19 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
-## 0.1.49 – Stack ohne Einmal-Container, ein Schalter hinter eigenem Reverse Proxy
+## 0.1.49 – Stack ohne Einmal-Container, ein Schalter hinter eigenem Reverse Proxy, neue Alert-Mail
 
 ### Verbessert
 - **Nur noch Dienste, die laufen**: Datenbank und Proxy haben eigene kleine Images (`cobe-news-db`, `cobe-news-proxy`, signiert wie die App). Die Datenbank legt die Rolle der App bei jedem Start selbst an und meldet sich erst danach „healthy“ – die Einmal-Container `db-init` (lokal und Portainer) und `assets` (Portainer) gibt es nicht mehr, Portainer zeigt keine beendeten Container mehr.
 - **Hinter eigenem Reverse Proxy reicht `PROXY_ENABLED=0`**: TLS gilt dann als extern, und die App übernimmt die Client-Adresse von ihrem Docker-Gateway (über das unter Linux nur der Host selbst kommt – der App-Port ist an 127.0.0.1 gebunden). Auf Docker Desktop, wo auch andere Container über das Gateway kommen, vertraut sie niemandem von selbst. `TRUSTED_PROXIES` wirkt weiter als Vorgabe, `none` vertraut niemandem.
 - **Portainer-Datei**: am Anfang zwei fertige Blöcke zum Abschreiben – mit und ohne eigenen Reverse Proxy.
+- **Benachrichtigungs-Mail überarbeitet**: Je Meldung eine Zeile mit Produkt (wenn sicher bekannt), den ersten drei CVEs und den Themen („Aktiv ausgenutzt“, „Zero-Day“, „Exploit veröffentlicht“ …); Meldungen, die ein gefolgtes Produkt betreffen, tragen „Betrifft eure Produkte: …“ und stehen zuerst – danach aktiv ausgenutzte, dann nach Schwere, die neueste zuerst. Nach derselben Reihenfolge wählt eine Sammelnachricht (auch in den Chat-Kanälen) ihre zehn aus.
+- **Betreff und Kopf der Mail**: Der Betreff nennt, worum es geht („[Cobe News] 5 neue Meldungen: Emerson Ovation, SolarWinds Dameware +3“); statt der doppelten Überschrift steht darunter eine Zeile „Höchste Schwere: Hoch · 1 betrifft eure Produkte · 1 aktiv ausgenutzt“.
+- **BSI-Kennzeichen aus dem Titel**: „[NEU]“, „[UPDATE]“, „[UNGEPATCHT]“ und „[kritisch]“ … „[niedrig]“ vorne im Titel fallen in Mail, Chat-Karten und Push weg – Schwere und Thema stehen ohnehin dabei; der Webhook bekommt den Titel unverändert.
+- **Ortszeit statt UTC in der Mail**: „04.11.2026 11:19 MEZ“ – Kanäle in Europe/Berlin, persönliche Nachrichten in der Zeitzone der Person.
+- **Dunkelmodus**: Die Mail hat ein eigenes dunkles Farbschema (Apple Mail, iOS, Outlook für Mac und Outlook.com, Thunderbird); die Schwere-Plaketten sind in beiden Modi gut lesbar.
+- **Kompakte Liste ab 6 Meldungen**: eine Zeile je Meldung (Schwere, Produkt, Titel als Link in Cobe News) statt langer Karten.
+- **Warum die Mail kommt**: Der Fuß nennt die Regel mit „Regel bearbeiten“ – der Link öffnet die Regel direkt im Editor (Einstellungen › Kanäle & Regeln).
 - **News ausgeschaltet**: Die Seite zeigt nur noch den Hinweis „News sind ausgeschaltet“ – ohne Filter darunter, die nichts bewirken könnten.
 
 ### Fixes
