@@ -224,22 +224,26 @@ export function NewsPage() {
     }
   }
 
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title={t("nav.news")}
-        description={t("news.description")}
-        actions={
-          isAdmin && (
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/settings/integrations#news">
-                <Settings2 /> {t("news.sources")}
-              </Link>
-            </Button>
-          )
-        }
-      />
-      {first && !first.enabled && (
+  const header = (
+    <PageHeader
+      title={t("nav.news")}
+      description={t("news.description")}
+      actions={
+        isAdmin && (
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/settings/integrations#news">
+              <Settings2 /> {t("news.sources")}
+            </Link>
+          </Button>
+        )
+      }
+    />
+  )
+  // news switched off: only the note – no filters, nothing they could act on
+  if (first && !first.enabled)
+    return (
+      <div className="space-y-5">
+        {header}
         <EmptyState
           icon={Newspaper}
           title={t("news.offTitle")}
@@ -252,7 +256,12 @@ export function NewsPage() {
             )
           }
         />
-      )}
+      </div>
+    )
+
+  return (
+    <div className="space-y-5">
+      {header}
       <div className="flex flex-wrap items-center gap-2">
         <SearchBox applied={q} onSearch={setQ} onPending={setTyping} />
         <MultiSelect

@@ -575,14 +575,16 @@ hier deshalb auch nicht von selbst, siehe [HTTPS](#https), 3.).
 
 In der News-Schublade stehen die Quellen in Gruppen mit Sprache (DE/EN/FR); eine Gruppe ist aufgeklappt, sobald eine
 ihrer Quellen an ist. Neue eingebaute Quellen erscheinen nach einem Update mit ihrem Standard – was ein Admin an- oder
-ausgeschaltet hat, bleibt so. Ändert sich der Standard einer eingebauten Quelle (CISA Alerts ab 0.1.7: aus), folgt ihm
-nur eine Quelle, die nie ein Admin geschaltet hat; seit 0.1.7 merkt sich Cobe News jedes Schalten.
+ausgeschaltet hat, bleibt so. Ändert sich der Standard einer eingebauten Quelle, folgt ihm nur eine Quelle, die nie ein
+Admin geschaltet hat; seit 0.1.7 merkt sich Cobe News jedes Schalten. Eine Quelle, die Cobe News nicht mehr mitbringt,
+verschwindet beim nächsten Start wie eine gelöschte eigene: Regeln und Desktop-Auswahl lassen sie los, Meldungen, die
+auch eine andere Quelle bringt, bleiben.
 
 | Gruppe | Eingeschaltet (Standard) | Wählbar |
 |---|---|---|
-| Behörden & CERTs | BSI Cyber-Sicherheitswarnungen, CERT-EU Security Advisories, CERT.at Warnungen | CISA Alerts, BSI CERT-Bund (WID), BSI Presse, NCSC UK, Canadian Centre for Cyber Security, CERT-FR Alertes (FR) |
+| Behörden & CERTs | BSI Cyber-Sicherheitswarnungen, CERT-EU Security Advisories, CERT.at Warnungen | BSI CERT-Bund (WID), BSI Presse, NCSC UK, Canadian Centre for Cyber Security, CERT-FR Alertes (FR) |
 | Schwachstellen-Kataloge | CISA KEV (JSON) | ENISA EUVD – ausgenutzte Schwachstellen (JSON), Microsoft Patchday (MSRC, JSON) |
-| Hersteller-Hinweise (PSIRT) | CERT@VDE (OT-Hersteller), Veeam Security | Fortinet PSIRT, Palo Alto Networks PSIRT, Cisco PSIRT, Ivanti, Siemens ProductCERT, Rockwell Automation, Oracle Security Alerts |
+| Hersteller-Hinweise (PSIRT) | CERT@VDE (OT-Hersteller), Veeam Security | Fortinet PSIRT, Palo Alto Networks PSIRT, Cisco PSIRT, Ivanti, Siemens ProductCERT, Oracle Security Alerts |
 | Research | Microsoft Threat Intelligence, Cisco Talos | Unit 42, Google Threat Intelligence (Mandiant), Kaspersky Securelist, ESET WeLiveSecurity, Check Point Research, Zero Day Initiative, SANS ISC, watchTowr Labs, Huntress |
 | Presse | heise online, heise Security, The Hacker News, golem.de Security, BleepingComputer, SecurityWeek ICS/OT | SecurityWeek, Krebs on Security, Dark Reading, The Record, Borns IT-Blog, Security-Insider, t3n Security, Risky Bulletin |
 
@@ -593,9 +595,11 @@ nur eine Quelle, die nie ein Admin geschaltet hat; seit 0.1.7 merkt sich Cobe Ne
 - **Microsoft Patchday (MSRC)** liest den CVRF-Index (`api.msrc.microsoft.com/cvrf/v3.0/updates`): je Release eine
   Meldung („Microsoft: October 2026 Security Updates“, Link zu den Release Notes im Update Guide), Schwere **hoch** –
   der ruhige Weg, Microsoft zu folgen (der Update-Guide-Feed hat je CVE einen Eintrag, Hunderte im Monat).
-- **CISA Alerts** ist ab 0.1.7 aus: `www.cisa.gov` lehnt automatische Abrufe aus vielen Netzen ab (403, Bot-Schutz).
-  Cobe News umgeht das nicht (kein anderer User-Agent, keine Browser-Header) und zeigt bei 403 „Die Quelle lehnt
-  automatische Abrufe ab“. Wer die Quelle einschaltet und sie erreicht, behält sie.
+- **CISA Alerts und Rockwell Automation** gibt es seit 0.1.49 nicht mehr: `www.cisa.gov` und `www.rockwellautomation.com`
+  lehnen automatische Abrufe aus den meisten Netzen ab (403, Bot-Schutz) – sie lieferten nie. Cobe News umgeht so etwas
+  nicht (kein anderer User-Agent, keine Browser-Header) und zeigt bei 403 „Die Quelle lehnt automatische Abrufe ab“. Wer
+  eine davon erreicht, trägt ihre Adresse als eigene Quelle ein. CISAs KEV-Katalog bleibt; OT-Meldungen kommen über
+  CERT@VDE, Siemens ProductCERT und SecurityWeek ICS/OT.
 - **Eine Meldung je CVE:** zwischen KEV, EUVD und den BSI-Warnungen ist dieselbe CVE innerhalb von 30 Tagen dieselbe
   Meldung („auch bei …“, die höhere Schwere mit Begründung), wenn eine Seite genau diese eine CVE betrifft. Ein
   Presseartikel über dieselbe CVE bleibt eine eigene Meldung.
@@ -617,7 +621,7 @@ nur eine Quelle, die nie ein Admin geschaltet hat; seit 0.1.7 merkt sich Cobe Ne
   (nur eine *Ausnutzung* in freier Wildbahn zählt). CVSS-Werte auch in deutscher Form („CVSS-Score von 9.8“,
   „CVSS-Basiswert 9,8“); eine Versionsangabe („CVSS:3.1/AV:N…“, „CVSS 3.1“) gilt nie als Wert.
 - **Ausgehende Hosts** (nur eingeschaltete Quellen, je Host höchstens eine Anfrage pro Minute): Standard `www.heise.de`,
-  `feeds.feedburner.com`, `rss.golem.de`, `www.bleepingcomputer.com`, `www.cisa.gov` (KEV; Alerts wählbar),
+  `feeds.feedburner.com`, `rss.golem.de`, `www.bleepingcomputer.com`, `www.cisa.gov` (KEV),
   `www.bsi.bund.de`, `cert.europa.eu`, `www.microsoft.com`, `blog.talosintelligence.com`, `www.cert.at`, `certvde.com`,
   `www.securityweek.com`, `www.veeam.com`; wählbar `wid.cert-bund.de`, `www.ncsc.gov.uk`,
   `euvdservices.enisa.europa.eu`, `filestore.fortinet.com`, `security.paloaltonetworks.com`, `sec.cloudapps.cisco.com`,
@@ -625,7 +629,7 @@ nur eine Quelle, die nie ein Admin geschaltet hat; seit 0.1.7 merkt sich Cobe Ne
   `securelist.com`, `research.checkpoint.com`, `www.zerodayinitiative.com`, `isc.sans.edu`, `www.securityweek.com`,
   `krebsonsecurity.com`, `www.darkreading.com`, `therecord.media`, `www.borncity.com`, `www.security-insider.de`,
   `t3n.de`, `www.cyber.gc.ca`, `cert.cyber.gouv.fr`, `labs.watchtowr.com`, `www.huntress.com`,
-  `www.rockwellautomation.com`, `www.oracle.com`, `news.risky.biz`, `api.msrc.microsoft.com`; dazu die Startseiten für
+  `www.oracle.com`, `news.risky.biz`, `api.msrc.microsoft.com`; dazu die Startseiten für
   die Logos (z. B. `risky.biz`, `msrc.microsoft.com`).
 
 Abruf: höchstens eine Anfrage pro Website und Minute, `ETag`/`If-Modified-Since`, nach 429/503 Pause wie

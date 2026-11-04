@@ -78,8 +78,6 @@ BUILTIN: list[Builtin] = [
     Builtin("thehackernews", "The Hacker News", "https://feeds.feedburner.com/TheHackersNews", "https://thehackernews.com", True, "en", "press"),
     Builtin("golem-security", "golem.de Security", "https://rss.golem.de/rss.php?tp=sec&feed=ATOM1.0", "https://www.golem.de", True, "de", "press"),
     Builtin("bleepingcomputer", "BleepingComputer", "https://www.bleepingcomputer.com/feed/", "https://www.bleepingcomputer.com", True, "en", "press"),
-    # off since 0.1.7: www.cisa.gov refuses automatic fetches from many networks (403, bot protection) – see DEFAULT_CHANGED
-    Builtin("cisa", "CISA Alerts", "https://www.cisa.gov/cybersecurity-advisories/alerts.xml", "https://www.cisa.gov", False, "en", "authority"),
     Builtin(
         "bsi-csw",
         "BSI Cyber-Sicherheitswarnungen",
@@ -219,15 +217,6 @@ BUILTIN: list[Builtin] = [
     Builtin("watchtowr", "watchTowr Labs", "https://labs.watchtowr.com/rss/", "https://labs.watchtowr.com", False, "en", "research"),
     Builtin("huntress", "Huntress", "https://www.huntress.com/blog/rss.xml", "https://www.huntress.com", False, "en", "research"),
     Builtin(
-        "rockwell",
-        "Rockwell Automation",
-        "https://www.rockwellautomation.com/bin/rss/security-advisories.xml",
-        "https://www.rockwellautomation.com",
-        False,
-        "en",
-        "vendor",
-    ),
-    Builtin(
         "oracle",
         "Oracle Security Alerts",
         "https://www.oracle.com/ocom/groups/public/@otn/documents/webcontent/rss-otn-sec.xml",
@@ -243,8 +232,13 @@ BUILTIN: list[Builtin] = [
 BUILTIN_BY_KEY = {b.key: b for b in BUILTIN}
 # built-in sources whose default changed in an update: where no admin ever switched them (switched_at None – nothing was
 # recorded before 0.1.7, so that is every installation that never touched them since), they follow the new default.
-# CISA Alerts (0.1.7: on → off): www.cisa.gov answers 403 to automatic fetches from many networks.
-DEFAULT_CHANGED = ("cisa",)
+DEFAULT_CHANGED: tuple[str, ...] = ()
+# built-in sources taken out of Cobe News: removed from every installation at the next start (as an admin deletes a
+# source of their own – rules and desktop choices let go of it, stories other sources carry stay). Both answer automatic
+# fetches with 403 (bot protection) from most networks, so they never delivered (0.1.49): CISA Alerts (off since 0.1.7;
+# CISA's KEV catalogue stays) and Rockwell Automation (OT news come through CERT@VDE, Siemens and SecurityWeek ICS/OT).
+# An admin who reaches them can add the address as a source of their own.
+RETIRED = frozenset({"cisa", "rockwell"})
 # sources about single vulnerabilities: a story with the same CVE from another of them is the same story ("also in")
 CVE_SOURCES = frozenset({"cisa-kev", "enisa-euvd", "bsi-csw"})
 CVE_WINDOW = timedelta(days=30)
@@ -1090,7 +1084,7 @@ TOPICS_DONE = "news_topics_done"
 KEV_KEY = "cisa-kev"
 CATALOG_KEYS = frozenset({"cisa-kev", "enisa-euvd"})
 # OT vendors and the ICS desk of a newsroom: everything they publish is about OT/ICS
-OT_SOURCES = frozenset({"siemens-productcert", "certvde", "securityweek-ics", "rockwell"})
+OT_SOURCES = frozenset({"siemens-productcert", "certvde", "securityweek-ics"})
 # a story naming more CVEs than this is a digest ("Patchday: 80 Lücken") – a KEV CVE among them makes it "exploited"
 # only when its title or teaser names that CVE
 KEV_DIGEST = 3
@@ -1615,7 +1609,8 @@ async def save_config(db: AsyncSession, value: dict) -> dict:
 async def ensure_sources(db: AsyncSession) -> None:
     """The built-in sources exist (switched on or off as left in the settings); name and address follow the code.
     A key new to an existing installation comes with its default (on or off) – an existing source keeps its switch.
-    Only a source whose default changed (DEFAULT_CHANGED) and that no admin ever switched follows the new default."""
+    Only a source whose default changed (DEFAULT_CHANGED) and that no admin ever switched follows the new default; a
+    retired one (RETIRED) is removed with what refers to it."""
     for b in BUILTIN:
         stmt = pg_insert(NewsSource).values(id=uuid.uuid4(), key=b.key, name=b.name, url=b.url, site=b.site, builtin=True, enabled=b.on, failures=0)
         # a new address (a release moved the feed): the old one's ETag / Last-Modified, pause and error are not the
@@ -1631,6 +1626,12 @@ async def ensure_sources(db: AsyncSession) -> None:
             .where(NewsSource.key == key, NewsSource.builtin.is_(True), NewsSource.switched_at.is_(None), NewsSource.enabled.is_not(on))
             .values(enabled=on)
         )
+    from app.api import forget_source  # app.api imports this module
+
+    for old in await db.scalars(select(NewsSource).where(NewsSource.key.in_(RETIRED), NewsSource.builtin.is_(True))):
+        await forget_source(db, old)
+        await db.delete(old)
+        log.info("news: built-in source %s removed (no longer part of Cobe News)", old.key)
     await db.commit()
 
 

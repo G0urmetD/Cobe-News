@@ -2,6 +2,14 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.49 – Stack ohne Einmal-Container
+
+### Verbessert
+- **News ausgeschaltet**: Die Seite zeigt nur noch den Hinweis „News sind ausgeschaltet“ – ohne Filter darunter, die nichts bewirken könnten.
+
+### Entfernt
+- **Quellen „CISA Alerts“ und „Rockwell Automation“**: Beide lehnen automatische Abrufe aus den meisten Netzen ab (HTTP 403) und lieferten nie. Sie verschwinden beim Update aus jeder Installation; Regeln und Desktop-Auswahl lassen sie los. CISAs KEV-Katalog bleibt; OT-Meldungen kommen weiter über CERT@VDE, Siemens ProductCERT und SecurityWeek ICS/OT. Wer eine der Quellen erreicht, kann ihre Adresse als eigene Quelle eintragen.
+
 ## 0.1.48 – Portainer-Stack
 
 ### Neu
