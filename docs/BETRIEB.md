@@ -62,20 +62,20 @@ der Release-Pipeline, siehe [Release](#release)), schaltet die Datei `docker-com
 
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
-COBE_NEWS_VERSION=0.1.48                                   # eine Version, nicht latest – gilt für alle drei Images
+COBE_NEWS_VERSION=0.1.49                                   # eine Version, nicht latest – gilt für alle drei Images
 ```
 
 Die Datei ersetzt bei `app`, `db` und `proxy` nur das Image (der `build`-Teil fällt weg); alles andere – Volumes, Netze,
 `.env` – bleibt, wie es ist. Ohne `COBE_NEWS_VERSION` bricht `docker compose` mit einem Hinweis ab, statt still etwas
 anderes zu starten. Einzelne Images lassen sich per Digest festnageln: `COBE_NEWS_IMAGE`, `COBE_NEWS_DB_IMAGE`,
-`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.48@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
+`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.49@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
 **Bis 0.1.48** nahm die Datei nur `COBE_NEWS_IMAGE` (die App) – wer sie so nutzt, setzt jetzt `COBE_NEWS_VERSION` und
 nimmt `COBE_NEWS_IMAGE` heraus (sonst bliebe die App auf der alten Version). Vor dem Start die Signaturen prüfen
 (cosign ≥ 2, keyless – die Identität ist der Release-Workflow dieses Repositorys):
 
 ```bash
 for i in cobe-news cobe-news-db cobe-news-proxy; do
-  cosign verify ghcr.io/g0urmetd/$i:0.1.48 \
+  cosign verify ghcr.io/g0urmetd/$i:0.1.49 \
     --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -84,7 +84,7 @@ docker compose up -d --remove-orphans   # ohne --build
 docker compose config --images          # zeigt, welche Images Compose nimmt
 ```
 
-`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.48@sha256:<digest>` in der
+`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.49@sha256:<digest>` in der
 jeweiligen Image-Variable), startet genau das geprüfte Image, auch wenn der Tag später anders zeigen sollte. Ein Update:
 `COBE_NEWS_VERSION` auf die neue Version setzen, Signaturen prüfen, `docker compose pull && docker compose up -d
 --remove-orphans` (die Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen
@@ -217,8 +217,8 @@ Eine Datei ins Volume `data` (z. B. für `CA_FILE=/data/ca.pem`): `docker cp ca.
 http-Umleitung: beim Dienst `proxy` unter `ports` die Zeile `- "${BIND:-127.0.0.1}:${HTTP_PORT:-8094}:80"` ergänzen.
 `scripts/setup-env.sh` und `scripts/restore-test.sh` brauchen den Checkout (Ersatz oben). Änderungen an den Variablen
 immer mit *Update the stack* übernehmen – ein bloßer Neustart der Container behält die alten Werte. Die Images
-`cobe-news-db` und `cobe-news-proxy` gibt es ab der ersten Version mit dieser Datei; ältere Versionen lassen sich mit ihr
-nicht starten (dafür die Datei jener Version nehmen).
+`cobe-news-db` und `cobe-news-proxy` gibt es ab 0.1.49; ältere Versionen lassen sich mit dieser Datei nicht starten
+(dafür die Datei jener Version nehmen).
 
 ## Erster Start: Setup-Token und Notfall-Admin
 
