@@ -6,11 +6,12 @@ import hashlib
 import io
 import json
 import zipfile
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import httpx
 import pytest
+from conftest import dated_back
 from sqlalchemy import select
 
 from app import csaf_providers, cvelist, db, epss, news, osv, source_health, story_details, vendor
@@ -30,6 +31,12 @@ ASA_DOC = CISCO + "2026/cisco-sa-asaftd-tunnel-dos-s6mgkb75.json"
 
 def fx(name: str) -> bytes:
     return (FIX / name).read_bytes()
+
+
+def asa_recent() -> bytes:
+    """The Cisco ASA document (taken 28 Oct 2026) as if published yesterday: an advisory older than EVENT_FRESH (30
+    days) is never notified, its fixed dates would expire."""
+    return dated_back(fx("csaf_cisco_asa.json"), date(2026, 10, 28))
 
 
 def record(cid: str, vendor_: str, product: str, versions: list[dict], *, state: str = "PUBLISHED", updated: str = "2026-10-30T06:00:00.000Z") -> dict:
@@ -277,7 +284,7 @@ async def test_first_fill_is_never_notified_later_documents_are(net, structured_
         s.add(VendorFetch(key="nvd:a:cisco:adaptive_security_appliance_software", failures=0, items=0, last_ok_at=now))
         await s.commit()
     t1 = (now - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")  # older than FRESH_FILL: quiet (a younger one: M7 test)
-    _cisco_routes(net, csv_=f"2026/cisco-sa-asaftd-tunnel-dos-s6mgkb75.json,{t1}\n")
+    _cisco_routes(net, csv_=f"2026/cisco-sa-asaftd-tunnel-dos-s6mgkb75.json,{t1}\n", doc=asa_recent())
     await _csaf_round()
 
     async def vuln_events() -> list[VendorEvent]:
@@ -287,7 +294,7 @@ async def test_first_fill_is_never_notified_later_documents_are(net, structured_
 
     first = await vuln_events()
     assert len(first) == 1 and first[0].baseline  # the first fill: quiet
-    doc = json.loads(fx("csaf_cisco_asa.json"))
+    doc = json.loads(asa_recent())
     doc["document"]["tracking"]["id"] = "cisco-sa-asaftd-second-x"
     doc["vulnerabilities"][0]["cve"] = "CVE-2026-76419"
     body = json.dumps(doc).encode()

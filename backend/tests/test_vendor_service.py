@@ -407,17 +407,23 @@ async def test_severity_filter_and_unversioned_products(admin_client, sites, hoo
 
 
 async def test_version_and_eol_events(admin_client, sites, hooks, monkeypatch):
-    real = vendor.release_info
-    # the first round on a fixed day well before the EOL window of 11.2 (2027-05-02) – with the real day the EOL would
-    # already be near at the first round and land in the baseline, and the test would depend on the calendar
-    monkeypatch.setattr(vendor, "release_info", lambda p, v, today=None: real(p, v, date(2026, 10, 1)))
+    real, real_stage = vendor.release_info, vendor.eol_stage
+
+    def on(day: date) -> None:
+        """The EOL clock (the line's state and the version's pre-warning stage) on a fixed day – with the real day the
+        EOL of 11.2 (2027-05-02) would come near, then pass, and the test would depend on the calendar."""
+        monkeypatch.setattr(vendor, "release_info", lambda p, v, today=None: real(p, v, day))
+        monkeypatch.setattr(vendor, "eol_stage", lambda eol_from, today: real_stage(eol_from, day))
+
+    # the first round on a fixed day well before the EOL window of 11.2 – its end lands in no baseline
+    on(date(2026, 10, 1))
     await _follow(admin_client, "panos", "11.2.4-h23")
     await _webhook_rule(admin_client, ["vendor_version"])
     await _round()
     async with db.session() as s:
         kinds = {e.kind for e in await s.scalars(select(VendorEvent).where(VendorEvent.baseline.is_(True)))}
     assert "version" in kinds  # 11.2.16 is out: shown, not sent (baseline)
-    monkeypatch.setattr(vendor, "release_info", lambda p, v, today=None: real(p, v, date(2027, 3, 1)))
+    on(date(2027, 3, 1))
     async with db.session() as s:
         assert await vendor.evaluate_events(s, full=True) == 1  # EOL of 11.2 on 2027-05-02 is near now (the hourly full evaluation)
     await _dispatch()
