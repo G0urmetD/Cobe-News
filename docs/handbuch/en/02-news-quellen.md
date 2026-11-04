@@ -155,7 +155,7 @@ the reason ("CISA KEV lists CVE-…", "in the title: ‘actively exploited’") 
 | **Incident/data leak** | "data breach", "Datenleck", "Datenpanne", "Kundendaten", "cyberattack on …", stolen or exposed data |
 | **Supply chain** | "supply chain", "Lieferkette", malicious npm/PyPI packages or extensions, typosquatting, "dependency confusion" |
 | **Phishing/social engineering** | "phishing", "vishing", "smishing", "ClickFix", "AitM", "social engineering", fake sign-in pages – not "campaign" or "threat actor" alone |
-| **OT/ICS** | the OT sources Siemens ProductCERT, CERT@VDE, Rockwell Automation and SecurityWeek ICS/OT; terms such as SIMATIC, CODESYS, PLC/SPS, SCADA, ICS, OT security |
+| **OT/ICS** | the OT sources Siemens ProductCERT, CERT@VDE and SecurityWeek ICS/OT; terms such as SIMATIC, CODESYS, PLC/SPS, SCADA, ICS, OT security |
 
 An **authority warning** is no topic but a kind of source: in the source filter "All: Authorities & CERTs" picks all
 authorities at once.
@@ -225,9 +225,9 @@ off ([Integrations → News](/docs/integrationen#news)). The language is shown a
 
 | Group | On by default | Optional |
 |---|---|---|
-| Authorities & CERTs | BSI Cyber-Sicherheitswarnungen, CERT-EU Security Advisories, CERT.at Warnungen | CISA Alerts, BSI CERT-Bund (WID), BSI Presse, NCSC UK, Canadian Centre for Cyber Security, CERT-FR Alertes (FR) |
+| Authorities & CERTs | BSI Cyber-Sicherheitswarnungen, CERT-EU Security Advisories, CERT.at Warnungen | BSI CERT-Bund (WID), BSI Presse, NCSC UK, Canadian Centre for Cyber Security, CERT-FR Alertes (FR) |
 | Vulnerability catalogs | CISA KEV | ENISA EUVD, Microsoft Patchday (MSRC) |
-| Vendor advisories | CERT@VDE (OT-Hersteller), Veeam Security | Fortinet PSIRT, Palo Alto Networks PSIRT, Cisco PSIRT, Ivanti Security Advisories, Siemens ProductCERT, Rockwell Automation, Oracle Security Alerts |
+| Vendor advisories | CERT@VDE (OT-Hersteller), Veeam Security | Fortinet PSIRT, Palo Alto Networks PSIRT, Cisco PSIRT, Ivanti Security Advisories, Siemens ProductCERT, Oracle Security Alerts |
 | Research | Microsoft Threat Intelligence, Cisco Talos | Unit 42, Google Threat Intelligence (Mandiant), Kaspersky Securelist, ESET WeLiveSecurity, Check Point Research, Zero Day Initiative (ZDI), SANS Internet Storm Center, watchTowr Labs, Huntress |
 | Press | heise online, heise Security, The Hacker News, golem.de Security, BleepingComputer, SecurityWeek ICS/OT | SecurityWeek, Krebs on Security, Dark Reading, The Record, Borns IT- und Windows-Blog, Security-Insider, t3n Security, Risky Bulletin |
 
@@ -244,8 +244,9 @@ off ([Integrations → News](/docs/integrationen#news)). The language is shown a
 - **Microsoft Patchday (MSRC)** brings one story per Patchday release ("Microsoft: October 2026 Security Updates")
   linking to the release notes – instead of hundreds of single stories per CVE.
 - **Vendor advisories** are precise but cover only that vendor's products. Cobe News takes the severity from the vendor.
-- **CISA Alerts** is off by default: `www.cisa.gov` refuses automatic fetches from many networks (HTTP 403). Cobe News
-  does not work around that and then shows "The source refuses automatic fetches".
+- **CISA Alerts and Rockwell Automation** are no built-in sources since 0.1.49: both refuse automatic fetches from
+  most networks (HTTP 403). Cobe News does not work around that and shows "The source refuses automatic fetches" for
+  such a source. CISA's KEV catalogue stays.
 - **BSI CERT-Bund (WID)** brings many advisories a day – hence off by default.
 
 ### New sources and the backlog {#rueckstand}
