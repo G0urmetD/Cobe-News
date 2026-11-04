@@ -1,6 +1,8 @@
 import os
+import re
 import secrets
 import tempfile
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.engine import make_url
 
@@ -199,6 +201,18 @@ async def client():
 async def set_news(**value):
     async with db.session() as s:
         await news.save_config(s, {**news.DEFAULTS, **value})
+
+
+def dated_back(data: bytes, made: date, days_ago: int = 1) -> bytes:
+    """A fixture as if fetched now: every timestamp in it (YYYY-MM-DDT…) moves by the same number of days, so that
+    `made` (the day the fixture was taken) becomes `days_ago` days before today (UTC) – order and spacing stay. For
+    dates a window counts from the real now (EVENT_FRESH, the news retention): fixed ones would expire."""
+    shift = datetime.now(UTC).date() - timedelta(days=days_ago) - made
+
+    def move(m: re.Match) -> bytes:
+        return (date.fromisoformat(m.group(0).decode()) + shift).isoformat().encode()
+
+    return re.sub(rb"\b\d{4}-\d{2}-\d{2}(?=T)", move, data)
 
 
 async def add_user(username: str, role: str = "reader", *, totp_secret: str | None = None, emergency: bool = False, **extra) -> User:

@@ -4,11 +4,12 @@ to the followed products of Vendor News (and its notifications)."""
 
 import json
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import httpx
 import pytest
+from conftest import dated_back
 from sqlalchemy import select
 
 from app import db, news, story_details, vendor
@@ -146,7 +147,8 @@ class Sites:
         self.calls.append(req)
         u = str(req.url)
         if u.endswith("wid-sec-w-2026-4115.json"):
-            return httpx.Response(200, content=(FIX / "csaf_wid.json").read_bytes())
+            # as if published days ago (taken 28 Oct 2026): older than EVENT_FRESH (30 days) it would never notify
+            return httpx.Response(200, content=dated_back((FIX / "csaf_wid.json").read_bytes(), date(2026, 10, 28)))
         if u.endswith("ssa-566512.json"):
             return httpx.Response(200, content=(FIX / "csaf_siemens.json").read_bytes())
         if "contentjson/CiscoSecurityAdvisory" in u:

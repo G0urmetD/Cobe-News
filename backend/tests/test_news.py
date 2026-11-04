@@ -1,7 +1,8 @@
 """Security news: feeds read (RSS, Atom, RDF), each story once, severity by
 rules, polite fetching, read per person, the settings and sources. No real feed is fetched: all HTTP is mocked."""
 
-from datetime import UTC, datetime, timedelta
+import email.utils
+from datetime import UTC, datetime, timedelta, timezone
 from unittest.mock import ANY
 
 import httpx
@@ -12,20 +13,41 @@ from sqlalchemy import delete, select, update
 from app import db, netaddr, news
 from app.models import NewsItem, NewsRead, NewsSource
 
-NOW = datetime(2026, 10, 28, 9, 0, tzinfo=UTC)
+# The fixtures' clock: 09:00 UTC three days before the test run, the stories a few hours older (their order and spacing
+# as they were made, 28 Oct 2026). Relative to the run, not fixed: older than the retention (keep_days, 7 at the least)
+# a story is not stored at all – fixed dates would expire. Older than a day when fetched they arrive as backlog (no
+# notification); fresh() moves a feed to the last hours where a test needs stories that notify.
+NOW = (datetime.now(UTC) - timedelta(days=3)).replace(hour=9, minute=0, second=0, microsecond=0)
+
+
+def _ago(hours: int) -> datetime:
+    return NOW - timedelta(hours=hours)
+
+
+def _rfc822(hours: int) -> bytes:
+    """RSS: e.g. "Tue, 28 Oct 2026 07:00:00 GMT"."""
+    return email.utils.format_datetime(_ago(hours), usegmt=True).encode()
+
+
+def _iso(hours: int, offset_h: int = 0) -> bytes:
+    """Atom / Dublin Core: e.g. "2026-10-28T08:00:00+01:00", or "2026-10-28T06:00:00Z" in UTC."""
+    t = _ago(hours)
+    if offset_h:
+        return t.astimezone(timezone(timedelta(hours=offset_h))).isoformat().encode()
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ").encode()
+
 
 ATOM = b"""<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom"><title>heise Security</title>
 <entry><title>Angreifer nehmen L\xc3\xbccken in Magento ins Visier</title>
 <link href="https://www.heise.de/news/Magento-Lecks-11502623.html?wt_mc=rss.red.security.beitrag.atom"/>
-<id>https://heise.de/-11502623</id><published>2026-10-28T08:00:00+01:00</published>
+<id>https://heise.de/-11502623</id><published>""" + _iso(2, offset_h=1) + b"""</published>
 <summary>In freier Wildbahn wurden Angriffe auf kritische Sicherheitsl\xc3\xbccken beobachtet (CVE-2026-1234).</summary>
 <content type="html">&lt;p&gt;Text &lt;img src="https://heise.cloudimg.io/x.jpg"&gt; &lt;a href="https://example.org/a" onclick="x()"&gt;Link&lt;/a&gt;&lt;/p&gt;</content>
 </entry></feed>"""
 
 def fresh(feed: bytes) -> bytes:
     """The feed's dates moved to the last hours – stories older than a day when they arrive are backlog (no notification)."""
-    import email.utils
     import re
 
     n = iter(range(1, 100))
@@ -36,16 +58,16 @@ RSS = b"""<?xml version="1.0"?>
 <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Example</title>
 <image><url>https://example.org/logo.png</url></image>
 <item><title>New ransomware gang hits hospitals</title><link>https://news.example.org/ransomware/?utm_source=rss</link>
-<pubDate>Tue, 28 Oct 2026 07:00:00 GMT</pubDate><description>&lt;b&gt;Data&lt;/b&gt; stolen.</description></item>
+<pubDate>""" + _rfc822(2) + b"""</pubDate><description>&lt;b&gt;Data&lt;/b&gt; stolen.</description></item>
 <item><title>Patch for CVE-2026-9999 (CVSS 9.8)</title><link>https://news.example.org/patch</link>
-<pubDate>Tue, 28 Oct 2026 06:00:00 GMT</pubDate><description>Update now.</description></item>
-<item><title>A quiet day</title><link>https://news.example.org/quiet</link><pubDate>Tue, 28 Oct 2026 05:00:00 GMT</pubDate></item>
+<pubDate>""" + _rfc822(3) + b"""</pubDate><description>Update now.</description></item>
+<item><title>A quiet day</title><link>https://news.example.org/quiet</link><pubDate>""" + _rfc822(4) + b"""</pubDate></item>
 </channel></rss>"""
 
 RDF = b"""<?xml version="1.0"?>
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/">
 <channel><title>RDF</title></channel>
-<item><title>[NEU] [hoch] Linux Kernel: Schwachstelle</title><link>https://wid.example.org/1</link><dc:date>2026-10-28T06:00:00Z</dc:date></item>
+<item><title>[NEU] [hoch] Linux Kernel: Schwachstelle</title><link>https://wid.example.org/1</link><dc:date>""" + _iso(3) + b"""</dc:date></item>
 </rdf:RDF>"""
 
 
@@ -54,9 +76,9 @@ RDF = b"""<?xml version="1.0"?>
 
 def test_feeds_are_read():
     e, meta = news.parse_feed(ATOM)
-    assert e[0]["title"].startswith("Angreifer") and e[0]["link"].startswith("https://www.heise.de/news/") and e[0]["date"].hour == 7
+    assert e[0]["title"].startswith("Angreifer") and e[0]["link"].startswith("https://www.heise.de/news/") and e[0]["date"] == _ago(2) and e[0]["date"].hour == 7
     e, meta = news.parse_feed(RSS)
-    assert len(e) == 3 and meta["icon"] == "https://example.org/logo.png" and e[0]["date"] == datetime(2026, 10, 28, 7, tzinfo=UTC)
+    assert len(e) == 3 and meta["icon"] == "https://example.org/logo.png" and e[0]["date"] == _ago(2)
     e, _ = news.parse_feed(RDF)
     assert e[0]["link"] == "https://wid.example.org/1"
     # no DTD, no entities – nothing that could expand or reach out
@@ -237,12 +259,11 @@ async def test_fetch_now_asks_each_source_once():
 
 async def test_prune_removes_old_stories_and_their_reads(reader_client):
     client = reader_client
-    await set_news(enabled=True, keep_days=365)  # the feed's dates are fixed (28 Oct 2026): kept whatever day the test runs
+    await set_news(enabled=True, keep_days=7)  # the feed's stories are a few days old (NOW): inside the 7 days
     await _sources(("feed-a", "https://news.example.org/a.xml"))
     await news.refresh_due(transport=_site({"/a.xml": RSS}, []))
     first = (await client.get("/api/news")).json()["items"][0]
     await client.post(f"/api/news/{first['id']}/read")
-    await set_news(enabled=True, keep_days=7)
     async with db.session() as s:
         await s.execute(update(NewsItem).values(published_at=datetime.now(UTC) - timedelta(days=30)))
         await s.commit()
