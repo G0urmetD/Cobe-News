@@ -8,9 +8,12 @@
 # them the stack does not deploy. Everything else has the defaults of docker-compose.yml; on a server usually
 # BIND=0.0.0.0 with BASE_URL set to the address people type. Data in named volumes (data, db18, tls) – kept on
 # "Update the stack" and on a stop; deleting the stack together with its volumes deletes the database.
-# No container_name: the containers are named after the stack (stack "news" → news-app-1, volume news_db18), so a stack
-# and a local compose install (cobe-news-app …) never clash – on a host with a local install the stack must not be
-# called "cobe-news" (that is the local install's project name: the same volumes).
+# No container_name: the containers are named after the stack (stack "news" → news-app-1, volume news_db18), so the
+# names and volumes of a stack and a local compose install (cobe-news-app …) never clash – on a host with a local
+# install the stack must not be called "cobe-news" (that is the local install's project name: the same volumes), and
+# PORT, APP_PORT, EDGE_SUBNET, EDGE_RANGE and PROXY_IP need other values (the defaults are the local install's: the same
+# ports, "Pool overlaps"). Docker standalone only, not Swarm: docker stack deploy ignores the depends_on conditions,
+# network_mode, security_opt, mem_limit, scale and ipv4_address, and restarts the finished "assets" over and over.
 
 x-logging: &logging
   driver: json-file
@@ -20,19 +23,22 @@ x-logging: &logging
 
 services:
   # once at every start, before db-init and proxy: the deploy files of this image (/srv/deploy) into the volumes
-  # deploy-postgres and deploy-nginx – old files out, the new ones in, read-only for everyone else. Root without any
-  # capability (it only writes into its own volumes), no network.
+  # deploy-postgres and deploy-nginx – old files out, the new ones in, read-only for everyone else. As the image's user
+  # cobenews (the owner Docker gives the fresh volumes, Dockerfile: /assets), no capability, no network.
   assets:
     image: ${COBE_NEWS_IMAGE:-ghcr.io/g0urmetd/cobe-news:0.1.48}
     logging: *logging
     restart: "no"
-    user: "0:0"
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
         for d in postgres nginx; do
           if [ ! -d "/srv/deploy/$$d" ]; then
             echo "assets: /srv/deploy/$$d missing – COBE_NEWS_IMAGE must be Cobe News 0.1.48 or newer" >&2
+            exit 1
+          fi
+          if [ ! -w "/assets/$$d" ]; then
+            echo "assets: cannot write the volume deploy-$$d (owner uid $$(stat -c %u "/assets/$$d"), this is uid $$(id -u)) – delete that volume of the stack, then deploy again (it is made anew from the image)" >&2
             exit 1
           fi
           find "/assets/$$d" -mindepth 1 -delete
@@ -43,6 +49,10 @@ services:
     volumes:
       - deploy-postgres:/assets/postgres
       - deploy-nginx:/assets/nginx
+    # the image declares /data and /tls as volumes: tmpfs here, so this one-shot leaves no anonymous volumes behind
+    tmpfs:
+      - /data
+      - /tls
     network_mode: none
     mem_limit: 64m
     pids_limit: 32
@@ -180,6 +190,9 @@ services:
     mem_limit: 64m
     pids_limit: 32
     read_only: true
+    # the postgres image declares /var/lib/postgresql a volume: tmpfs here (psql writes nothing), no anonymous volume
+    tmpfs:
+      - /var/lib/postgresql
     security_opt:
       - no-new-privileges:true
     cap_drop:

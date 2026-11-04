@@ -143,6 +143,9 @@ services:
     mem_limit: 64m
     pids_limit: 32
     read_only: true
+    # the postgres image declares /var/lib/postgresql a volume: tmpfs here (psql writes nothing), no anonymous volume
+    tmpfs:
+      - /var/lib/postgresql
     security_opt:
       - no-new-privileges:true
     cap_drop:

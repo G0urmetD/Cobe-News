@@ -172,7 +172,9 @@ image from version 0.1.48 on and is hardened just like the normal installation. 
 stack (e.g. `news-app-1`), the data lives in named volumes (`news_data`, `news_db18`, `news_tls`). An update: set
 `COBE_NEWS_IMAGE` to the new version and *Update the stack*. Backup, restore test and restore run there with
 `docker exec` or a throwaway container instead of `docker compose` – all steps, variables and limits: docs/BETRIEB.md,
-section "Portainer (Stack-Editor)".
+section "Portainer (Stack-Editor)". Docker Standalone environments only, not Swarm: `docker stack deploy` ignores the
+start order and parts of the hardening and restarts the short copy service over and over. Next to a local
+installation on the same host, `PORT`, `APP_PORT`, `EDGE_SUBNET`, `EDGE_RANGE` and `PROXY_IP` need other values.
 
 ## Update {#update}
 
