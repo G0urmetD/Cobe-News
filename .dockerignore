@@ -8,3 +8,5 @@ data
 .env
 # screenshots for the README – never part of the image (only docs/handbuch is copied)
 docs/images
+# own certificates and keys (TLS_MODE=own) – never part of the image
+deploy/certs

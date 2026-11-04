@@ -75,6 +75,86 @@ docker compose config app | grep image:   # zeigt, welches Image Compose nimmt
 Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen aus `.env` nehmen und
 `docker compose up -d --build`.
 
+### Portainer (Stack-Editor)
+
+Ohne Checkout und ohne Dateien auf dem Host: [`docker-compose.portainer.yml`](../docker-compose.portainer.yml) ist eine
+eigenständige Compose-Datei (kein Zusatz zu `docker-compose.yml`) für Portainers Web-Editor. Sie startet das
+veröffentlichte Image (**ab 0.1.48** – es bringt die Dateien aus `deploy/` unter `/srv/deploy` mit), dieselben gepinnten
+Images für PostgreSQL und nginx und dieselbe Härtung wie `docker-compose.yml`. Der kurze Dienst **`assets`** kopiert bei
+jedem Start die Dateien für `db-init` und den Proxy aus dem App-Image in die Volumes `deploy-postgres` und `deploy-nginx`
+(alte Dateien raus, neue rein, für alle nur lesbar; root ohne jede Capability, ohne Netz) – ein Image-Update bringt so
+die passenden mit. Ein älteres Image lehnt `assets` mit einem Hinweis ab, der Stack startet dann nicht. Der lokale Build
+(`docker-compose.yml`) bleibt, wie er ist.
+
+1. *Stacks → Add stack → Web editor*: den Inhalt von `docker-compose.portainer.yml` einfügen. Stack-Name z. B. `news` –
+   **nicht** `cobe-news`, wenn auf demselben Host eine lokale Installation läuft (das ist deren Projektname: der Stack
+   nähme ihre Volumes und Netze). Die Container heißen nach dem Stack (`news-app-1`, `news-db-1`, `news-proxy-1` …, kein
+   `container_name`), die Volumes `news_data`, `news_db18`, `news_tls` – Stack und lokale Installation kommen sich nie in
+   die Quere.
+2. Unter *Environment variables* eintragen (Portainer füllt damit die `${…}` der Datei; eine `.env` gibt es nicht):
+
+   | Variable | Bedeutung |
+   |---|---|
+   | `POSTGRES_PASSWORD` | **Pflicht** – Superuser der Datenbank (nur `db-init`). Einmal erzeugen und **behalten**: das Volume wird damit angelegt |
+   | `POSTGRES_APP_PASSWORD` | **Pflicht** – die Rolle der App `cobe_news_app`, mindestens 16 Zeichen |
+   | `POSTGRES_RESTORE_PASSWORD` | empfohlen – Rolle des [Rücksicherungs-Tests](#rücksicherungs-test); leer: kein Test |
+   | `COBE_NEWS_IMAGE` | Image und Version, Standard `ghcr.io/g0urmetd/cobe-news:0.1.48` (oder `…@sha256:<digest>`) |
+   | `BASE_URL`, `NEWS_HOSTNAME`, `TLS_NAMES` | Adresse und Namen wie in der `.env` ([HTTPS](#https), Host-Namen) |
+   | `BIND`, `PORT` | Standard `127.0.0.1` und `8095` – auf einem Server meist `BIND=0.0.0.0`, dann `BASE_URL` auf den Namen, den die Browser benutzen (sonst warnt der Proxy im Log und antwortet mit 421) |
+   | `SECRET_KEY` | leer: Schlüsseldatei `secret.key` im Volume `data`; besser setzen und getrennt aufbewahren ([Daten](#daten)) |
+   | `BACKUP_PASSPHRASE` | Sicherungen verschlüsselt – besser nur dem cron-Job mitgeben (unten) |
+   | `EDGE_SUBNET`, `EDGE_RANGE`, `PROXY_IP` | nur ändern, wenn auf dem Host schon ein Cobe News mit `172.31.250.0/24` läuft |
+
+   Passwörter nur aus Buchstaben und Ziffern (nichts zu quoten), z. B. `openssl rand -hex 24`. Ohne die beiden
+   Pflicht-Passwörter bricht das Deployment mit einer Meldung ab. Alle anderen Variablen aus `.env.example` wirken
+   genauso. Portainer zeigt die Werte jedem, der den Stack bearbeiten darf.
+3. *Deploy the stack*. Danach zeigen `assets` und `db-init` „Exited (0)“ (richtig so), die App „healthy“. Das
+   Setup-Token steht im Log von `news-app-1` (Portainer: Container → Logs, oder
+   `docker logs news-app-1 2>&1 | grep -A1 "Setup token"`); weiter wie beim [ersten Start](#erster-start-setup-token-und-notfall-admin).
+   Welche Namen nginx bedient: Log von `news-proxy-1`, Zeile `answering to …`. Der Text der 421-Seite nennt `.env` –
+   hier sind das die Environment variables des Stacks.
+
+**Update:** Signatur der neuen Version prüfen ([cosign](#veröffentlichtes-image-statt-lokalem-build)), `COBE_NEWS_IMAGE`
+auf sie setzen, *Update the stack* (mit *Re-pull image*). `assets` kopiert die Dateien der neuen Version, der Proxy wird
+dabei neu angelegt (der Image-Name steht auch in seiner Umgebung) und liest sie; die Migrationen laufen beim Start der
+App. Zurück: die alte Version eintragen und wieder *Update the stack* (brachte das Update eine Migration mit, vorher die
+Sicherung zurückspielen).
+
+**Eigenes Zertifikat** (`TLS_MODE=own`): `TLS_SOURCE` auf einen **absoluten** Ordner auf dem Host setzen, z. B.
+`/opt/cobe-news/certs` mit `cobe.crt` und `cobe.key` ([HTTPS](#https)) – relative Pfade gibt es im Web-Editor nicht, ein
+anderes benanntes Volume als `tls` ebenso wenig (die Datei kennt nur ihre eigenen).
+
+**Sicherung:** „Jetzt sichern“ in der Oberfläche wie immer; die Dateien liegen im Volume `news_data` unter `backups/`.
+Die Befehle oben (`docker compose exec … app`) brauchen den Checkout – mit Portainer dasselbe direkt am Container, z. B.
+per cron auf dem Host:
+
+```
+30 2 * * * root docker exec -e BACKUP_PASSPHRASE="$(cat /root/.cobe-news-backup-pass)" news-app-1 python -m app.cli backup >>/var/log/cobe-news-backup.log 2>&1 && docker cp news-app-1:/data/backups/. /srv/cobe-news-backups/
+```
+
+Rücksicherungs-Test vom Host (statt `scripts/restore-test.sh`):
+`docker exec -i news-app-1 python -m app.cli restore-test --passphrase-file - < /root/.cobe-news-backup-pass`.
+Wiederherstellen: die App anhalten und die Wiederherstellung in einem Wegwerf-Container mit demselben Image, dem
+Datenbank-Netz und dem Volume `data` laufen lassen – das Passwort der App aus der Shell, nicht von der Befehlszeile (mit
+`SECRET_KEY` im Stack ebenso `-e SECRET_KEY`):
+
+```bash
+docker stop news-app-1
+read -rs POSTGRES_PASSWORD; export POSTGRES_PASSWORD      # der Wert von POSTGRES_APP_PASSWORD
+docker run --rm -it --network news_db -v news_data:/data --read-only --tmpfs /tmp --cap-drop ALL \
+  --security-opt no-new-privileges:true -e POSTGRES_HOST=db -e POSTGRES_USER=cobe_news_app -e POSTGRES_PASSWORD \
+  ghcr.io/g0urmetd/cobe-news:0.1.48 python -m app.cli restore /data/backups/cobe-news-<Zeit>.tar   # .tar.enc: -e BACKUP_PASSPHRASE
+docker start news-app-1
+```
+
+Eine Datei ins Volume `data` (z. B. für `CA_FILE=/data/ca.pem`): `docker cp ca.pem news-app-1:/data/ca.pem`.
+
+**Grenzen:** Images bis 0.1.47 gehen nicht (ihnen fehlen die Dateien unter `/srv/deploy`). Die Zusatzdateien
+(`docker-compose.http.yml`, `docker-compose.image.yml`) gibt es hier nicht – die http-Umleitung: beim Dienst `proxy`
+unter `ports` die Zeile `- "${BIND:-127.0.0.1}:${HTTP_PORT:-8094}:80"` ergänzen. `scripts/setup-env.sh` und
+`scripts/restore-test.sh` brauchen den Checkout (Ersatz oben). Änderungen an den Variablen immer mit *Update the stack*
+übernehmen – ein bloßer Neustart der Container behält die alten Werte.
+
 ## Erster Start: Setup-Token und Notfall-Admin
 
 Beim ersten Start schreibt die App ein **einmaliges Setup-Token** ins Log (60 Minuten gültig, bei jedem Neustart bis
