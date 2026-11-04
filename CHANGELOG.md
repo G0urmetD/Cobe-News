@@ -2,13 +2,25 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
-## 0.1.49 – Stack ohne Einmal-Container
+## 0.1.49 – Stack ohne Einmal-Container, ein Schalter hinter eigenem Reverse Proxy
 
 ### Verbessert
+- **Nur noch Dienste, die laufen**: Datenbank und Proxy haben eigene kleine Images (`cobe-news-db`, `cobe-news-proxy`, signiert wie die App). Die Datenbank legt die Rolle der App bei jedem Start selbst an und meldet sich erst danach „healthy“ – die Einmal-Container `db-init` (lokal und Portainer) und `assets` (Portainer) gibt es nicht mehr, Portainer zeigt keine beendeten Container mehr.
+- **Hinter eigenem Reverse Proxy reicht `PROXY_ENABLED=0`**: TLS gilt dann als extern, und die App übernimmt die Client-Adresse von ihrem Docker-Gateway (über das unter Linux nur der Host selbst kommt – der App-Port ist an 127.0.0.1 gebunden). Auf Docker Desktop, wo auch andere Container über das Gateway kommen, vertraut sie niemandem von selbst. `TRUSTED_PROXIES` wirkt weiter als Vorgabe, `none` vertraut niemandem.
+- **Portainer-Datei**: am Anfang zwei fertige Blöcke zum Abschreiben – mit und ohne eigenen Reverse Proxy.
 - **News ausgeschaltet**: Die Seite zeigt nur noch den Hinweis „News sind ausgeschaltet“ – ohne Filter darunter, die nichts bewirken könnten.
+
+### Fixes
+- **Gateway in der Anleitung**: Das Docker-Netz `edge` hat das Gateway `172.31.250.128` (erste Adresse von `EDGE_RANGE`), nicht `.1` – die Empfehlung `TRUSTED_PROXIES=172.31.250.1/32` war falsch und ließ die App alle Besucher unter einer Adresse sehen.
 
 ### Entfernt
 - **Quellen „CISA Alerts“ und „Rockwell Automation“**: Beide lehnen automatische Abrufe aus den meisten Netzen ab (HTTP 403) und lieferten nie. Sie verschwinden beim Update aus jeder Installation; Regeln und Desktop-Auswahl lassen sie los. CISAs KEV-Katalog bleibt; OT-Meldungen kommen weiter über CERT@VDE, Siemens ProductCERT und SecurityWeek ICS/OT. Wer eine der Quellen erreicht, kann ihre Adresse als eigene Quelle eintragen.
+
+### Betrieb
+- **Update lokal**: `docker compose up -d --build --remove-orphans` – entfernt den alten Container `cobe-news-db-init`; Daten, Volumes und Netz bleiben. Mit `docker-compose.image.yml` statt `COBE_NEWS_IMAGE` jetzt `COBE_NEWS_VERSION` (oder alle drei Image-Variablen).
+- **Update Portainer**: neue Datei einfügen, `COBE_NEWS_IMAGE` aus den Variablen löschen, *Update the stack*; die alten Container `assets`/`db-init` und die Volumes `<stack>_deploy-postgres`/`<stack>_deploy-nginx` können weg.
+- **Neue Pakete auf ghcr.io**: `cobe-news-db` und `cobe-news-proxy` – nach dem ersten Release einmal auf „Public“ stellen.
+- **Tests ohne Ablaufdatum**: Testdaten mit festem Datum laufen jetzt relativ zum Testtag – mehrere Tests wären ab Ende November ausgefallen und hätten die Release-Pipeline gestoppt.
 
 ## 0.1.48 – Portainer-Stack
 
