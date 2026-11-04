@@ -134,16 +134,19 @@ function RulesPane({ onChannels }: { onChannels: () => void }) {
   const [params, setParams] = useSearchParams()
   // the rule being edited by id (its stored state from the list); `key`: a fresh form after "load the current state"
   const [editing, setEditing] = useState<{ id: string | "new"; key: number } | null>(() => {
+    // a link opens a stored rule only – never a blank editor ("rule=new")
     const asked = params.get("rule")
-    return asked ? { id: asked, key: 0 } : null
+    return asked && asked !== "new" ? { id: asked, key: 0 } : null
   })
-  const done = () => {
-    setEditing(null)
-    if (params.has("rule")) setParams({ tab: "rules" }, { replace: true })
-  }
+  const done = () => setEditing(null)
+  // back at the list (closed, or the link named an unknown rule): the link's id leaves the address – in an effect, the
+  // router's state is not set while rendering
+  useEffect(() => {
+    if (!editing && params.has("rule")) setParams({ tab: "rules" }, { replace: true })
+  }, [editing, params, setParams])
   const rule = editing && editing.id !== "new" ? (rules?.find((r) => r.id === editing.id) ?? null) : null
-  // removed by another admin meanwhile: back to the list
-  if (editing && editing.id !== "new" && rules && !rule) setEditing(null)
+  // removed by another admin meanwhile, or a link to an unknown rule: back to the list (and the link's id out of the address)
+  if (editing && editing.id !== "new" && rules && !rule) done()
   if (editing) {
     if (editing.id !== "new" && !rule) return <Loading />
     return (

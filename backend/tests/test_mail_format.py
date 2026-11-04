@@ -74,29 +74,59 @@ def test_tags_out_in_mail_cards_and_push_but_not_in_the_webhook():
 # ---------------------------------------------------------------- the order
 
 
-def test_order_our_products_then_exploited_then_severity_then_newest():
+def test_order_urgent_then_our_products_then_severity_then_newest():
     crit = story(1, severity="critical")
     old_high = story(2, severity="high", published_at=WINTER - timedelta(days=2))
     new_high = story(3, severity="high")
     hot = story(4, severity="low", topics=["exploited"])
     ours = story(5, severity="info", ours=["PAN-OS"])
-    got = sorted([crit, old_high, new_high, hot, ours], key=notify.priority, reverse=True)
-    assert [s.id[-1] for s in got] == ["5", "4", "1", "3", "2"]
-    # the mail lists them so, whatever order it is given
-    text = notify.render_mail("R", [crit, old_high, new_high, hot, ours], 5, "de")[1]
-    assert [text.index(f"Produkt {n}: Lücke") for n in (5, 4, 1, 3, 2)] == sorted(text.index(f"Produkt {n}: Lücke") for n in (5, 4, 1, 3, 2))
+    ours_high = story(6, severity="high", ours=["PAN-OS"])
+    got = sorted([crit, old_high, new_high, hot, ours, ours_high], key=notify.priority, reverse=True)
+    assert [s.id[-1] for s in got] == ["1", "4", "6", "5", "3", "2"]
+    # the mail lists them so, whatever order it is given (cards up to 5)
+    five = [crit, old_high, new_high, hot, ours]
+    text = notify.render_mail("R", five, 5, "de")[1]
+    at = [text.index(f"Produkt {n}: Lücke") for n in (1, 4, 5, 3, 2)]
+    assert at == sorted(at)
 
 
-def test_what_makes_the_cut_follows_the_same_order():
+def _vendor_low(n: int) -> VendorEvent:
+    return VendorEvent(id=uuid.uuid4(), key=f"vuln:panos:x:{n}", kind="vuln", product="panos", severity="medium" if n % 2 else "low", created_at=WINTER - timedelta(minutes=n),
+                       data={"product": "PAN-OS", "version": "11.1.2", "status": "affected", "ident": f"PAN-SA-{n}", "headline": f"Befund {n}"})  # fmt: skip
+
+
+def test_low_findings_of_our_products_never_push_out_an_exploited_or_critical_story():
+    """Review M2: ten low / medium Vendor News findings (ours) and a critical, actively exploited news story in a round
+    of twelve – the story makes the cut (the mail and every chat channel), and comes first."""
     rule = NotifyRule(id=uuid.uuid4(), name="Alles", lang="de")
-    many = [notify.Row(story(n, severity="critical"), rule, ("news", uuid.uuid4())) for n in range(1, 15)]
-    low_ours = notify.Row(story(20, severity="low", ours=["Example Gateway"]), rule, ("news", uuid.uuid4()))
-    low_hot = notify.Row(story(21, severity="low", topics=["exploited"]), rule, ("news", uuid.uuid4()))
-    [m] = notify.plan([*many, low_ours, low_hot])
-    assert m.total == 16 and len(m.stories) == notify.LIST
-    assert m.stories[0] is low_ours.story and m.stories[1] is low_hot.story
-    resent = notify.summary([(r.story, "news", rule.id) for r in [*many, low_ours, low_hot]], "de", [{"id": str(rule.id), "name": "Alles"}])
-    assert resent.stories[:2] == [low_ours.story, low_hot.story]
+    findings = [notify.Row(notify.vendor_story(_vendor_low(n), "de"), rule, ("vendor", uuid.uuid4())) for n in range(1, 12)]
+    assert all(r.story.ours for r in findings)
+    crit = notify.Row(story(30, severity="critical", topics=["exploited"], published_at=WINTER - timedelta(days=1)), rule, ("news", uuid.uuid4()))
+    hot = notify.Row(story(31, severity="medium", topics=["exploited"], published_at=WINTER - timedelta(days=1)), rule, ("news", uuid.uuid4()))
+    [m] = notify.plan([*findings, crit, hot])
+    assert m.total == 13 and len(m.stories) == notify.LIST
+    assert m.stories[:2] == [crit.story, hot.story]
+    resent = notify.summary([(r.story, r.mark[0], rule.id) for r in [*findings, crit, hot]], "de", [{"id": str(rule.id), "name": "Alles"}])
+    assert resent.stories[:2] == [crit.story, hot.story]
+    # the mail shows them in the order they were cut
+    text = notify.render_mail("Alles", m.stories, m.total, "de")[1]
+    assert text.index("Produkt 30: Lücke") < text.index("Produkt 31: Lücke") < text.index("Befund 1")
+    # among the rest: our products before the others of the same urgency
+    other = notify.Row(story(32, severity="high"), rule, ("news", uuid.uuid4()))
+    [m] = notify.plan([*findings, crit, other])
+    assert m.stories[0] is crit.story and other.story not in m.stories  # a high news story is not urgent: ours first
+
+
+def test_personal_mail_cuts_in_the_order_it_shows():
+    """Review L3: the person's mail cuts its LIST by the same order it shows them (notify.priority)."""
+    evs = [_vendor_low(n) for n in range(1, 15)]
+    hot = VendorEvent(id=uuid.uuid4(), key="vuln:panos:x:hot", kind="vuln", product="panos", severity="medium", created_at=WINTER - timedelta(days=3),
+                      data={"product": "PAN-OS", "version": "11.1.2", "status": "affected", "ident": "PAN-SA-HOT", "headline": "Ausgenutzt", "exploited": True})  # fmt: skip
+    high = [VendorEvent(id=uuid.uuid4(), key=f"vuln:panos:h:{n}", kind="vuln", product="panos", severity="high", created_at=WINTER - timedelta(days=4),
+                        data={"product": "PAN-OS", "version": "11.1.2", "status": "affected", "ident": f"PAN-SA-H{n}", "headline": f"Hoch {n}"}) for n in range(personal.LIST)]  # fmt: skip
+    text = personal.render_mail([*evs, hot, *high], "de")[1]
+    # the exploited medium one is listed (before: cut by severity alone, ten high ones first) – and comes first
+    assert "Ausgenutzt" in text and text.index("Ausgenutzt") < text.index("Hoch 0")
 
 
 # ---------------------------------------------------------------- subject, heading, summary line
@@ -111,9 +141,9 @@ def test_subject_names_the_stories():
         story(5, title="Noch ein Gerät: Lücke", severity="low"),
     ]
     subject = notify.render_mail("Regel", stories, 7, "de")[0]
-    assert subject.startswith("[Cobe News] 7 neue Meldungen: Example Gateway, SolarWinds Dameware, Emerson Ovation, Hackers abuse a flaw in a very popular…")
+    assert subject.startswith("[Cobe News] 7 neue Meldungen: SolarWinds Dameware, Example Gateway, Emerson Ovation, Hackers abuse a flaw in a very popular…")
     assert re.search(r" \+\d$", subject) and len(subject) <= notify.SUBJECT_MAX
-    assert notify.render_mail("Rule", stories, 5, "en")[0].startswith("[Cobe News] 5 new stories: Example Gateway, ")
+    assert notify.render_mail("Rule", stories, 5, "en")[0].startswith("[Cobe News] 5 new stories: SolarWinds Dameware, Example Gateway, ")
     # the same name twice is named once (and counted)
     twice = notify.render_mail("R", [story(1, title="Gerät: x"), story(2, title="Gerät: y")], 2, "de")[0]
     assert twice == "[Cobe News] 2 neue Meldungen: Gerät"
@@ -288,7 +318,8 @@ async def test_our_products_come_from_the_story_and_the_followed_ones():
     from app import vendor_catalog
 
     assert ours.ours == [vendor_catalog.product("panos")["label"]] and next(x for x in stories if x.id == str(j.id)).ours == []
-    assert sorted(stories, key=notify.priority, reverse=True)[0] is ours  # before the critical one
+    ranked = sorted(stories, key=notify.priority, reverse=True)
+    assert ranked[0].id == str(j.id) and ranked[1] is ours  # the critical one first, then ours
 
 
 def test_a_vendor_finding_is_ours_a_version_is_not():
@@ -314,3 +345,101 @@ def test_tlp_green_is_said_once_in_the_mail_body(lang):
     # the chat cards as before: the title keeps the prefix, the card its TLP field – no third mention
     slack = str(notify.render_slack("R", [green], 1, lang)["blocks"])  # (the notification's fallback text aside)
     assert slack.count("[TLP:GREEN]") == 1 and slack.count(line) == 1
+
+
+# ---------------------------------------------------------------- review findings: text part, team scope, names
+
+
+def test_the_text_part_keeps_single_line_fields_on_one_line():
+    """Review L1: a line break in a title, product, our product's label or a rule name never makes a line of its own in
+    the text part ("Bcc: …" looking like a header)."""
+    bad = "x\r\nBcc: evil@example.org\nTo: y"
+    stories = [story(1, title=f"Gerät: {bad}", product=f"P {bad}", ours=[f"O {bad}"], source=f"Q {bad}", summary="Erste Zeile.\nZweite Zeile.")]
+    for many in (stories, stories * notify.COMPACT_FROM):
+        text = notify.render_mail(f"Regel {bad}", many, len(many), "de", rules=[f"Regel {bad}"])[1]
+        assert not re.search(r"^(Bcc|To):", text, re.M), text
+        assert "\r" not in text
+    _, text, _ = notify.render_mail("R", stories, 1, "de")
+    assert "Erste Zeile.\nZweite Zeile." in text  # the summary keeps its lines
+    personal_footer = notify.render_mail("R", stories, 1, "de", footer=[f"Fuß {bad}"])[1]
+    assert not re.search(r"^Bcc:", personal_footer, re.M)
+
+
+def test_scope_of_the_rules_that_brought_a_story():
+    a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    scopes = {a: {"panos"}, b: {"fortios"}}  # c: not limited to teams
+    assert notify.scope_of([a], scopes) == {"panos"}
+    assert notify.scope_of([a, b], scopes) == {"panos", "fortios"}  # the union of what they cover
+    assert notify.scope_of([a, c], scopes) is None  # one of them covers every followed product
+    assert notify.scope_of([], scopes) == set()
+
+
+async def _team_rule(admin_client, team_products: list[str], others: list[str]) -> tuple:
+    """A webhook channel, a rule limited to a team that owns `team_products`; `others` followed outside the team."""
+    from app.models import NotifyRuleTeam, Team, TeamProduct
+
+    async with db.session() as s:
+        t = Team(name=f"Netz {uuid.uuid4().hex[:6]}")
+        s.add(t)
+        follows = {k: VendorFollow(product=k, enabled=True) for k in [*team_products, *others]}
+        s.add_all(follows.values())
+        await s.flush()
+        s.add_all([TeamProduct(team_id=t.id, follow_id=follows[k].id) for k in team_products])
+        await s.commit()
+    r = await admin_client.post("/api/admin/notify/channels", json={"name": "n8n", "type": "webhook", "url": "https://n8n.corp.example/webhook/cobe-news"})
+    assert r.status_code == 200, r.text
+    ch = r.json()
+    r = await admin_client.post("/api/admin/notify/rules", json={"name": "Netzwerk", "channels": [ch["id"]], "severities": []})
+    assert r.status_code == 200, r.text
+    rule = r.json()
+    async with db.session() as s:
+        s.add(NotifyRuleTeam(rule_id=uuid.UUID(rule["id"]), team_id=t.id))
+        await s.commit()
+    return ch, rule
+
+
+async def test_a_team_rule_calls_only_its_teams_products_ours(admin_client):
+    """Review L2: a rule limited to a team marks (and lists first) only that team's products; a rule without teams in
+    the same channel widens it again (the union of the rules that brought the story)."""
+    from app import vendor_catalog
+    from app.models import NotifyChannel
+    from tests.test_notify import _source, _stories
+
+    ch, _rule = await _team_rule(admin_client, ["panos"], ["fortios"])
+    src = await _source()
+    [mine, theirs] = await _stories(src, "low", "low")
+    async with db.session() as s:
+        for i, keys in ((mine, ["panos"]), (theirs, ["fortios"])):
+            await s.execute(NewsItem.__table__.update().where(NewsItem.id == i.id).values(products=keys))
+        await s.commit()
+        rows = await notify.channel_pending(s, await s.get(NotifyChannel, uuid.UUID(ch["id"])))
+    got = {r.story.id: r.story.ours for r in rows}
+    assert got[str(mine.id)] == [vendor_catalog.product("panos")["label"]] and got[str(theirs.id)] == []
+    # a second rule on the channel, not limited to teams: it brings the story too – every followed product counts
+    r = await admin_client.post("/api/admin/notify/rules", json={"name": "Alles", "channels": [ch["id"]], "severities": []})
+    assert r.status_code == 200, r.text
+    [later] = await _stories(src, "low")
+    async with db.session() as s:
+        await s.execute(NewsItem.__table__.update().where(NewsItem.id == later.id).values(products=["fortios"]))
+        await s.commit()
+        rows = await notify.channel_pending(s, await s.get(NotifyChannel, uuid.UUID(ch["id"])))
+    got = {r.story.id: r.story.ours for r in rows}
+    assert got[str(later.id)] == [vendor_catalog.product("fortios")["label"]]
+
+
+@pytest.mark.parametrize(
+    ("product", "want"),
+    [
+        ("PAN-OS 11.1.2 → 11.1.6-h3", "PAN-OS"),
+        ("Example Gateway 2.3.0 → 2.4.1", "Example Gateway"),
+        ("GitLab < 19.5.1", "GitLab"),
+        ("GitLab 17.0 - 19.5", "GitLab"),
+        ("Cisco IOS XE 17.9.4 -> 17.9.5", "Cisco IOS XE"),
+        ("Exchange Server 2019 CU14", "Exchange Server 2019 CU14"),
+        ("Windows 11", "Windows 11"),
+        ("Windows Server 2022 < 10.0.20348.2700", "Windows Server 2022"),
+    ],
+)
+def test_product_name_drops_only_the_range(product, want):
+    """Review L7: numbers that are part of a product's name stay in the subject's name."""
+    assert notify.product_name(product) == want

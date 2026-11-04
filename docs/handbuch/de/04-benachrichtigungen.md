@@ -543,12 +543,15 @@ nach – keine Bilder, keine Zählpixel.
   „[TLP:GREEN]“ vorn.
 - **Kopf.** Die Überschrift („5 neue Security-Meldungen“, bei einer Meldung ihr Titel) und darunter eine Zeile mit dem
   Wichtigsten: „Höchste Schwere: Hoch · 1 betrifft eure Produkte · 1 aktiv ausgenutzt“ – Teile mit null fallen weg.
-- **Reihenfolge.** Zuerst, was **eure Produkte** betrifft, dann **aktiv ausgenutzte** Meldungen, dann nach **Schwere**,
-  zuletzt die **neueste** zuerst. Nach derselben Reihenfolge wählt eine [Sammelnachricht](#einmal-pro-kanal) ihre zehn
-  aus.
+- **Reihenfolge.** Zuerst das Dringende – **aktiv ausgenutzt** oder **kritisch** –, dann, was **eure Produkte**
+  betrifft, dann nach **Schwere**, zuletzt die **neueste** zuerst. Nach derselben Reihenfolge wählt eine
+  [Sammelnachricht](#einmal-pro-kanal) ihre zehn aus – ein niedriger Befund eines eigenen Produkts verdrängt nie eine
+  ausgenutzte oder kritische Meldung.
 - **Je Meldung** (bis 5 Meldungen): Schwere, Quelle und Zeit; „Betrifft eure Produkte: …“ – hervorgehoben – wenn die
   [Details aus der Quelle](/docs/news-quellen#details-aus-der-quelle) ein in Vendor News gefolgtes Produkt betreffen
-  (wie der Filter „Betrifft unsere Produkte“ auf der News-Seite) oder ein Vendor-News-Befund es tut; der Titel (ohne die
+  (wie der Filter „Betrifft unsere Produkte“ auf der News-Seite) oder ein Vendor-News-Befund es tut. Ist die Regel
+  auf Teams beschränkt, zählen nur die Produkte dieser Teams (brachten mehrere Regeln die Meldung, alles, was eine von
+  ihnen abdeckt); der Titel (ohne die
   BSI-Kennzeichen, siehe oben); eine Zeile mit **Produkt** (wenn sicher bekannt), den ersten drei **CVEs** („+N“ für
   weitere) und den **Themen** („Aktiv ausgenutzt“, „Zero-Day“, „Exploit veröffentlicht“ …); die Zusammenfassung;
   „Artikel öffnen“ und „In Cobe News öffnen“.
@@ -1326,8 +1329,8 @@ nachgeschickt.
   eine Meldung, die inzwischen höher eingestuft ist.
 - Jede Meldung geht **höchstens einmal pro Kanal** raus – auch wenn mehrere Regeln sie an denselben Kanal schicken.
 - **Bis zu 3** Meldungen einer Runde kommen einzeln (die älteste zuerst). **Mehr** kommen als **eine
-  Sammelnachricht**: die 10 wichtigsten, der Rest gezählt – zuerst, was eure Produkte betrifft, dann aktiv
-  ausgenutzte, dann nach Schwere und die neueste zuerst. Regeln mit verschiedener Sprache bekommen getrennte
+  Sammelnachricht**: die 10 wichtigsten, der Rest gezählt – zuerst aktiv ausgenutzte und kritische, dann, was eure
+  Produkte betrifft, dann nach Schwere und die neueste zuerst. Regeln mit verschiedener Sprache bekommen getrennte
   Nachrichten.
 - Die Kanäle werden nebeneinander beliefert. Scheitert ein Kanal, bleiben seine Meldungen offen und kommen beim nächsten
   Versuch – nach 2, 4, 8 … Minuten, höchstens 6 Stunden (siehe [Testen, Fehler und Pause](#kanal-testen)).

@@ -522,11 +522,13 @@ no tracking pixels.
   stories: Emerson Ovation, SolarWinds Dameware +3"). With a TLP:GREEN story among them, "[TLP:GREEN]" comes first.
 - **Header.** The heading ("5 new security stories", for one story its title) and below it a line with what matters
   most: "Highest severity: High · 1 concerns your products · 1 actively exploited" – parts that are zero are left out.
-- **Order.** First what concerns **your products**, then **actively exploited** stories, then by **severity**, then the
-  **newest** first. A [summary](#einmal-pro-kanal) picks its ten in the same order.
+- **Order.** First what is urgent – **actively exploited** or **critical** –, then what concerns **your products**,
+  then by **severity**, then the **newest** first. A [summary](#einmal-pro-kanal) picks its ten in the same order – a
+  low finding of an own product never pushes out an exploited or critical story.
 - **Per story** (up to 5 stories): severity, source and time; "Concerns your products: …" – highlighted – when the
   [details from the source](/docs/news-quellen#details-aus-der-quelle) concern a product followed in Vendor News (as the
-  filter "Concerns our products" on the News page) or a Vendor News finding does; the title (without the BSI tags, see
+  filter "Concerns our products" on the News page) or a Vendor News finding does. When the rule is limited to teams,
+  only those teams' products count (when several rules brought the story, everything one of them covers); the title (without the BSI tags, see
   above); a line with the **product** (when reliably known), the first three **CVEs** ("+N" for more) and the
   **topics** ("Actively exploited", "Zero-day", "Exploit published" …); the summary; "Open article" and "Open in Cobe
   News".
@@ -1293,8 +1295,8 @@ A rule only sends what arrives **after** it was saved or switched on. Older stor
   was rated higher in the meantime follows as well.
 - Each story goes out **at most once per channel** – even when several rules send it to the same channel.
 - **Up to 3** stories of a round come one by one (oldest first). **More** come as **one summary**: the 10 most
-  important, the rest counted – first what concerns your products, then actively exploited ones, then by severity and
-  the newest first. Rules with different languages get separate messages.
+  important, the rest counted – first actively exploited and critical ones, then what concerns your products, then by
+  severity and the newest first. Rules with different languages get separate messages.
 - The channels are served side by side. If a channel fails, its stories stay open and come with the next try – after
   2, 4, 8 … minutes, at most 6 hours (see [Testing, errors and pause](#kanal-testen)).
 - Each message is marked as sent right after it went out. If the process dies exactly in between, it comes again; a
