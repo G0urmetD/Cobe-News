@@ -1,6 +1,6 @@
 # Release: runs only when a release tag is pushed (e.g. `git tag v0.1.47 && git push origin v0.1.47`) – never on
-# commits or pull requests. First all checks; only when they are green the image is built, pushed to ghcr.io, signed
-# and the GitHub release is written from the matching CHANGELOG.md section.
+# commits or pull requests. First all checks; only when they are green the three images (app, database, proxy) are
+# built, pushed to ghcr.io and signed, and the GitHub release is written from the matching CHANGELOG.md section.
 name: release
 
 on:
@@ -17,6 +17,10 @@ concurrency:
 env:
   # lower case: registries and cosign accept only lower-case repository names (the account is G0urmetD)
   IMAGE: ghcr.io/g0urmetd/cobe-news
+  # the database (PostgreSQL 18 + the app's role at every start, deploy/postgres) and the proxy (nginx + its
+  # configuration, deploy/nginx) – docker-compose.portainer.yml and docker-compose.image.yml run them with the app
+  DB_IMAGE: ghcr.io/g0urmetd/cobe-news-db
+  PROXY_IMAGE: ghcr.io/g0urmetd/cobe-news-proxy
 
 jobs:
   checks:
@@ -109,7 +113,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   image:
-    name: Image (amd64 + arm64), signed
+    name: Images (amd64 + arm64), signed
     needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -119,6 +123,8 @@ jobs:
       id-token: write # keyless signing (cosign / Sigstore)
     outputs:
       digest: ${{ steps.build.outputs.digest }}
+      db-digest: ${{ steps.build-db.outputs.digest }}
+      proxy-digest: ${{ steps.build-proxy.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -133,6 +139,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # the app
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
@@ -156,12 +163,66 @@ jobs:
           provenance: mode=max
           sbom: true
 
+      # the database: PostgreSQL 18 (pinned in deploy/postgres/Dockerfile) with the role set-up of the app
+      - id: meta-db
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.DB_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=Cobe News database
+            org.opencontainers.image.description=PostgreSQL 18 for Cobe News – sets up the app's own role at every start
+            org.opencontainers.image.licenses=MIT
+
+      - id: build-db
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: deploy/postgres
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-db.outputs.tags }}
+          labels: ${{ steps.meta-db.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+
+      # the proxy: nginx (pinned in deploy/nginx/Dockerfile) with the configuration of Cobe News
+      - id: meta-proxy
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.PROXY_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=Cobe News proxy
+            org.opencontainers.image.description=nginx for Cobe News – TLS, known host names only, certificate watch
+            org.opencontainers.image.licenses=MIT
+
+      - id: build-proxy
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: deploy/nginx
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-proxy.outputs.tags }}
+          labels: ${{ steps.meta-proxy.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      - name: Sign the image (keyless)
+      - name: Sign the images (keyless)
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+          DB_DIGEST: ${{ steps.build-db.outputs.digest }}
+          PROXY_DIGEST: ${{ steps.build-proxy.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+          cosign sign --yes "${DB_IMAGE}@${DB_DIGEST}"
+          cosign sign --yes "${PROXY_IMAGE}@${PROXY_DIGEST}"
 
   release:
     name: GitHub release
@@ -179,6 +240,8 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
           DIGEST: ${{ needs.image.outputs.digest }}
+          DB_DIGEST: ${{ needs.image.outputs.db-digest }}
+          PROXY_DIGEST: ${{ needs.image.outputs.proxy-digest }}
         run: |
           set -euo pipefail
           v="${TAG#v}"
@@ -189,13 +252,21 @@ jobs:
           ' CHANGELOG.md > notes.md
           {
             echo
-            echo "## Image"
+            echo "## Images"
             echo
             echo '```'
             echo "docker pull ${IMAGE}:${v}"
+            echo "docker pull ${DB_IMAGE}:${v}"
+            echo "docker pull ${PROXY_IMAGE}:${v}"
             echo '```'
             echo
-            echo "Digest: \`${DIGEST}\` – signed with cosign (keyless, GitHub OIDC)."
+            echo "| Image | Digest |"
+            echo "|---|---|"
+            echo "| \`${IMAGE}:${v}\` | \`${DIGEST}\` |"
+            echo "| \`${DB_IMAGE}:${v}\` | \`${DB_DIGEST}\` |"
+            echo "| \`${PROXY_IMAGE}:${v}\` | \`${PROXY_DIGEST}\` |"
+            echo
+            echo "All three signed with cosign (keyless, GitHub OIDC). Portainer: docker-compose.portainer.yml of this tag (COBE_NEWS_VERSION=${v})."
           } >> notes.md
 
       - name: Create the release

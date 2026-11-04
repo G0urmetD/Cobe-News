@@ -300,6 +300,8 @@ def create_app() -> FastAPI:
         except Exception:  # noqa: BLE001 - a bad host name in .env must not keep the app from starting
             log.exception("tls: certificate not created")
         loop.last_tls = time.monotonic()
+        # in a thread: it may ask DNS once (netaddr.desktop_docker) – cached before the first request
+        log.info("proxy: %s", await asyncio.to_thread(cfg.proxy_trust))
         task = asyncio.create_task(loop.run()) if cfg.run_loop else None
         # Vendor News in a task of its own: its rate-limited requests (NVD) never hold up the news round
         vtask = asyncio.create_task(vloop.run()) if cfg.run_loop else None

@@ -172,6 +172,26 @@ def container_gateway() -> str | None:
     return None
 
 
+# names a desktop Docker (Docker Desktop, OrbStack, Colima/Lima, Rancher Desktop, Podman machine) gives every container
+# for the host – absolute (trailing dot): no search domain of the host may turn them into a company name
+DESKTOP_HOST_NAMES = ("host.docker.internal.", "gateway.docker.internal.", "host.orb.internal.", "host.lima.internal.", "host.containers.internal.")
+
+
+@lru_cache
+def desktop_docker() -> str | None:
+    """A Docker in a VM on a desktop – the name of the host that resolves here, or None. There every container reaches the
+    host's own 127.0.0.1 ports through such a name, and arrives at the app from this container's gateway – exactly like
+    a reverse proxy on the host. So the gateway is trusted on its own only where none of them resolves: a Linux Docker
+    Engine (there they exist only with extra_hosts, which the compose files do not set). Blocking (DNS), once."""
+    for name in DESKTOP_HOST_NAMES:
+        try:
+            socket.getaddrinfo(name, None)
+        except (OSError, UnicodeError):
+            continue
+        return name.rstrip(".")
+    return None
+
+
 def shared_address(ip: str) -> bool:
     """An address that stands for many people: the Docker gateway, a trusted proxy itself (a request without a usable
     X-Forwarded-For) or one of SHARED_ADDRESSES (an office NAT). Never blocked automatically – that would lock everyone

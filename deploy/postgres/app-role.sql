@@ -1,6 +1,6 @@
 -- Cobe News: the role the app connects with – owner of the database and its tables, but no superuser: it cannot run
 -- programs on the database server (COPY … TO PROGRAM), read its files, create untrusted extensions or other roles.
--- Idempotent; run by db-init.sh as the superuser. docs/BETRIEB.md: PostgreSQL, Rollen.
+-- Idempotent; run by db-init.sh as the superuser at every start of the database image (cobe-news-db.sh). docs/BETRIEB.md: PostgreSQL, Rollen.
 \getenv app_password POSTGRES_APP_PASSWORD
 SELECT NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cobe_news_app') AS missing \gset
 \if :missing

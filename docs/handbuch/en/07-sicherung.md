@@ -264,8 +264,8 @@ What it costs:
 
 ### Setting up {#ruecksicherungs-test-einrichten}
 
-A **new** installation has everything already: `scripts/setup-env.sh` generates the password, `db-init` creates role
-and database. Set up an **existing** installation once like this:
+A **new** installation has everything already: `scripts/setup-env.sh` generates the password, the database container
+creates role and database. Set up an **existing** installation once like this:
 
 **1. Update the code** – as with every [update](/docs/betrieb#update-schritte) (`git pull`).
 
@@ -276,12 +276,12 @@ cd /opt/cobe-news
 scripts/setup-env.sh
 ```
 
-**3. Restart** – `db-init` creates or checks the role and the throwaway database at every start. The log then says
-`cobe_news_restore ready`:
+**3. Restart** – the database container creates or checks the role and the throwaway database at every start. The log
+then says `cobe_news_restore ready`:
 
 ```bash
 docker compose up -d --build
-docker compose logs db-init
+docker compose logs db | grep db-init
 ```
 
 **4. Try it** – *Settings → Backup & export → Restore test*, "Test now". If there is no backup yet, choose "Back up
@@ -292,11 +292,11 @@ now" first.
 > in the cron job, see [cron](#cron)), the app's test fails with the code `passphrase`. Then let the host start the
 > test: [By host cron](#ruecksicherungs-test-host).
 
-`POSTGRES_RESTORE_PASSWORD` must be at least 16 characters long. If it is shorter, `db-init` stops and the app does not
-start – `setup-env.sh` generates 40 characters.
+`POSTGRES_RESTORE_PASSWORD` must be at least 16 characters long. If it is shorter, the database's set-up stops and the app
+does not start – `setup-env.sh` generates 40 characters.
 
 **Not wanted?** Leave `POSTGRES_RESTORE_PASSWORD=` empty in the `.env` (keep the line, otherwise `setup-env.sh` adds it
-again) and run `docker compose up -d`. Then `db-init` creates nothing, and the tab says "not set up". A role and
+again) and run `docker compose up -d`. Then the database creates nothing, and the tab says "not set up". A role and
 database created earlier stay. To remove them:
 
 ```bash
@@ -358,12 +358,12 @@ If a test fails, the page names a code:
 | Code | Meaning | What to do |
 |---|---|---|
 | `not_configured` | no throwaway database set up | [Setting up](#ruecksicherungs-test-einrichten) |
-| `unsafe` | the target is the app's database or role, or the test's role has too many rights (superuser, may create databases or roles, may connect to the app's database, is a member of the app's role, does not own the throwaway database) | `docker compose up -d` (db-init sets the rights again), read `docker compose logs db-init`; never grant rights by hand |
+| `unsafe` | the target is the app's database or role, or the test's role has too many rights (superuser, may create databases or roles, may connect to the app's database, is a member of the app's role, does not own the throwaway database) | `docker compose up -d` (the database sets the rights again at every start), read `docker compose logs db`; never grant rights by hand |
 | `busy` | another test is running (not recorded as an outcome) | wait |
 | `no_backup` | there is no backup | "Back up now" |
 | `passphrase` | the newest backup is encrypted, the app does not know the passphrase | [By host cron](#ruecksicherungs-test-host) |
 | `verify` | the file failed a check: wrong passphrase, signature of another key or none, missing or foreign files, checksum, table of contents, schema of a newer version | read the message – a restore of this backup would fail too |
-| `connect` | the throwaway database cannot be reached (wrong password, role or database missing) | `docker compose up -d`, `docker compose logs db-init` |
+| `connect` | the throwaway database cannot be reached (wrong password, role or database missing) | `docker compose up -d`, `docker compose logs db` |
 | `restore` | `pg_restore` or `psql` reported an error | read the message and `docker compose logs app` |
 | `rows` | the rows per table differ from the manifest | back up again and test again |
 | `schema` | the schema differs from that of a freshly migrated database | read the message; the backup contains something Cobe News does not create itself |
@@ -396,7 +396,7 @@ sudo chown -R 10001 data
 **3. Start the database** – build the image and create only the (empty) database with the app's role:
 
 ```bash
-docker compose build && docker compose up -d db-init
+docker compose build && docker compose up -d --wait db
 ```
 
 **4. Restore** – with `--use-backup-key`, so that the key is taken from the backup:

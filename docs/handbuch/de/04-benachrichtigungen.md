@@ -1070,7 +1070,7 @@ diese eine. Ungültige Einträge werden still übergangen – prüfe daher nach 
 
 - private Adressen (`10.…`, `172.16–31.…`, `192.168.…`, IPv6-ULA und andere nicht öffentliche Bereiche),
 - die eigenen Docker-Netze von Cobe News, z. B. ein Empfänger im Netz `edge`: `WEBHOOK_PRIVATE_NETS=172.31.250.50`,
-- der Docker-Host: das Gateway des Containers (ab Werk `172.31.250.1`), bei Docker Desktop `192.168.65.0/24`.
+- der Docker-Host: das Gateway des Containers (ab Werk `172.31.250.128`), bei Docker Desktop `192.168.65.0/24`.
 
 **Immer gesperrt**, auch wenn die Adresse in der Liste steht:
 
@@ -1173,7 +1173,7 @@ in `WEBHOOK_PRIVATE_NETS` nicht oder die App wurde nicht neu gestartet.
 ist immer gesperrt. Stattdessen:
 
 - **Linux:** Das Skript lauscht auf `0.0.0.0` (wie oben). Als Ziel nimmst du die LAN-Adresse des Rechners oder das
-  Gateway des Containers (ab Werk `172.31.250.1`) und trägst genau diese Adresse in `WEBHOOK_PRIVATE_NETS` ein.
+  Gateway des Containers (ab Werk `172.31.250.128`) und trägst genau diese Adresse in `WEBHOOK_PRIVATE_NETS` ein.
 - **Docker Desktop:** Dienste, die auf dem Rechner nur an `127.0.0.1` lauschen, erreicht der Container über die
   Adresse hinter `host.docker.internal`, meist `192.168.65.254`. Diese Adresse in der URL verwenden und in
   `WEBHOOK_PRIVATE_NETS` eintragen – den Namen `host.docker.internal` selbst lehnt Cobe News immer ab.

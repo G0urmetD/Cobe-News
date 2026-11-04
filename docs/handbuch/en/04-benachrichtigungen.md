@@ -1039,7 +1039,7 @@ one. Invalid entries are skipped silently – so check with "Test" after the res
 
 - private addresses (`10.…`, `172.16–31.…`, `192.168.…`, IPv6 ULA and other non-public ranges),
 - Cobe News' own Docker networks, e.g. a receiver in the network `edge`: `WEBHOOK_PRIVATE_NETS=172.31.250.50`,
-- the Docker host: the container's gateway (`172.31.250.1` out of the box), with Docker Desktop `192.168.65.0/24`.
+- the Docker host: the container's gateway (`172.31.250.128` out of the box), with Docker Desktop `192.168.65.0/24`.
 
 **Always blocked**, even when the address is in the list:
 
@@ -1142,7 +1142,7 @@ Nothing arrives? Does the machine's firewall allow port 8080? If the channel sho
 loopback is always blocked. Instead:
 
 - **Linux:** the script listens on `0.0.0.0` (as above). As the target, use the machine's LAN address or the
-  container's gateway (`172.31.250.1` out of the box) and enter exactly that address in `WEBHOOK_PRIVATE_NETS`.
+  container's gateway (`172.31.250.128` out of the box) and enter exactly that address in `WEBHOOK_PRIVATE_NETS`.
 - **Docker Desktop:** services that listen only on the machine's `127.0.0.1` are reached by the container through the
   address behind `host.docker.internal`, usually `192.168.65.254`. Use that address in the URL and enter it in
   `WEBHOOK_PRIVATE_NETS` – Cobe News always refuses the name `host.docker.internal` itself.

@@ -10,6 +10,9 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.engine import URL, make_url
 
+# TRUSTED_PROXIES=none: trust no proxy of your own – also not the Docker gateway with PROXY_ENABLED=0
+NO_PROXIES = "none"
+
 # Teams (Workflows / Power Automate, classic Incoming Webhook) and Slack – the hosts their webhook URLs live on
 DEFAULT_WEBHOOK_HOSTS = ("hooks.slack.com", "*.webhook.office.com", "*.logic.azure.com", "*.powerplatform.com")
 
@@ -49,10 +52,10 @@ class Config:
     tls_names: tuple[str, ...] = ()
     base_url: str = "https://localhost:8095"
     hsts: bool = False  # also with the self-signed certificate (once it is trusted everywhere)
-    # who may set X-Forwarded-For: the bundled nginx (fixed address) and/or own proxies
+    # who may set X-Forwarded-For: the bundled nginx (fixed address) and/or own proxies – see trusted_networks
     proxy_enabled: bool = True
     proxy_ip: str = "172.31.250.10"
-    trusted_proxies: tuple[str, ...] = ()
+    trusted_proxies: tuple[str, ...] = ()  # TRUSTED_PROXIES; ("none",): nobody (not even the Docker gateway)
     # addresses that stand for many people (never blocked, see netaddr.shared_address) besides the Docker gateway
     shared_addresses: tuple[str, ...] = ()
     # SMTP server addresses allowed although internal (loopback, link-local, this container's Docker networks), e.g. a
@@ -125,17 +128,62 @@ class Config:
 
     @property
     def trusted_networks(self) -> tuple:
-        nets = list(self.trusted_proxies)
+        """Whose X-Forwarded-For / X-Forwarded-Proto the app believes: the bundled nginx at its fixed address
+        (PROXY_ENABLED=1) and TRUSTED_PROXIES. Without the bundled nginx and without TRUSTED_PROXIES (PROXY_ENABLED=0
+        alone): this container's default gateway – the Docker host, where a reverse proxy of your own reaches the app's
+        port. Safe on a Linux Docker Engine because both compose files publish that port on the host's 127.0.0.1 only:
+        what comes from the gateway comes from the host itself (Docker's forwarding of the 127.0.0.1 port, or a process
+        of the host straight to the container) – another container comes from its own address, another machine never
+        from the gateway. Not on a desktop Docker (netaddr.desktop_docker): there every container reaches the host's
+        127.0.0.1 port by host.docker.internal and comes from the gateway, too – nobody is trusted then. TRUSTED_PROXIES
+        replaces the gateway; "none" trusts no proxy of your own (docs/BETRIEB.md: HTTPS, 3)."""
+        nets = [p for p in self.trusted_proxies if p != NO_PROXIES]
         if self.proxy_enabled and self.proxy_ip:
             nets.append(f"{self.proxy_ip}/32")
+        elif not self.trusted_proxies:
+            gateway = self.host_proxy_gateway()
+            if gateway:
+                nets.append(f"{gateway}/32")
         return self.networks(nets)
+
+    @staticmethod
+    def host_proxy_gateway() -> str | None:
+        """The gateway trusted for PROXY_ENABLED=0 without TRUSTED_PROXIES – None without one or on a desktop Docker."""
+        from app import netaddr  # noqa: PLC0415 - netaddr imports this module
+
+        gateway = netaddr.container_gateway()
+        return gateway if gateway and not netaddr.desktop_docker() else None
+
+    def proxy_trust(self) -> str:
+        """For the log at the start: whose X-Forwarded-For counts, and why. Blocking (DNS, once): call in a thread."""
+        from app import netaddr  # noqa: PLC0415 - netaddr imports this module
+
+        nets = ", ".join(str(n.network_address) if n.num_addresses == 1 else str(n) for n in self.trusted_networks) or "nobody"
+        own = bool(self.trusted_proxies) and self.trusted_proxies != (NO_PROXIES,)
+        if self.proxy_enabled:
+            return f"X-Forwarded-For trusted from {nets} (the bundled nginx{' and TRUSTED_PROXIES' if own else ''})"
+        if self.trusted_proxies:
+            return f"PROXY_ENABLED=0 – X-Forwarded-For trusted from {nets} (TRUSTED_PROXIES)"
+        gateway, desktop = netaddr.container_gateway(), netaddr.desktop_docker()
+        if gateway and desktop:
+            return (
+                f"PROXY_ENABLED=0 – {desktop} resolves (a desktop Docker: every container reaches the app's port through the gateway"
+                f" {gateway}), so X-Forwarded-For is trusted from nobody; TRUSTED_PROXIES={gateway}/32 trusts the gateway anyway"
+            )
+        if gateway:
+            return f"PROXY_ENABLED=0 – X-Forwarded-For trusted from {nets} (the Docker gateway: a reverse proxy on this host)"
+        return "PROXY_ENABLED=0 – no Docker gateway found, X-Forwarded-For trusted from nobody: set TRUSTED_PROXIES to your proxy's address"
 
 
 @lru_cache
 def get_config() -> Config:
     data = Path(os.environ.get("DATA_DIR", "./data")).resolve()
     static = Path(os.environ.get("STATIC_DIR", Path(__file__).resolve().parent.parent / "static"))
-    mode = (os.environ.get("TLS_MODE") or "selfsigned").strip().lower()
+    proxy_enabled = _flag("PROXY_ENABLED", True)
+    # TLS_MODE empty (or unknown): selfsigned with the bundled nginx, external without it (your own proxy ends TLS)
+    mode = (os.environ.get("TLS_MODE") or "").strip().lower()
+    if mode not in ("selfsigned", "own", "external"):
+        mode = "selfsigned" if proxy_enabled else "external"
     return Config(
         data_dir=data,
         static_dir=static,
@@ -144,13 +192,13 @@ def get_config() -> Config:
         allow_private=_flag("ALLOW_PRIVATE_FEEDS"),
         cookie_secure=_flag("COOKIE_SECURE", True),
         run_loop=_flag("NEWS_LOOP", True),
-        tls_mode=mode if mode in ("selfsigned", "own", "external") else "selfsigned",
+        tls_mode=mode,
         tls_path=Path(os.environ.get("TLS_PATH") or (data / "tls")),
         hostname=(os.environ.get("NEWS_HOSTNAME") or "").strip().lower(),
         tls_names=_list("TLS_NAMES"),
         base_url=(os.environ.get("BASE_URL") or "https://localhost:8095").strip().rstrip("/"),
         hsts=_flag("HSTS"),
-        proxy_enabled=_flag("PROXY_ENABLED", True),
+        proxy_enabled=proxy_enabled,
         proxy_ip=(os.environ.get("PROXY_IP") or "172.31.250.10").strip(),
         trusted_proxies=_list("TRUSTED_PROXIES"),
         shared_addresses=_list("SHARED_ADDRESSES"),
