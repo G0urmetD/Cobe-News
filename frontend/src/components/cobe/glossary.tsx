@@ -32,13 +32,13 @@ export const TERMS = [
 export type TermKey = (typeof TERMS)[number]
 
 /** A term with its explanation on hover or focus – dotted underline, like an abbreviation. */
-export function Term({ k, children, focusable = true, className }: { k: TermKey; children: React.ReactNode; focusable?: boolean; className?: string }) {
+export function Term({ k, children, className }: { k: TermKey; children: React.ReactNode; className?: string }) {
   const { t } = useTranslation()
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-          tabIndex={focusable ? 0 : undefined}
+          tabIndex={0}
           className={cn(
             "cursor-help underline decoration-muted-foreground/60 decoration-dotted underline-offset-4 outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring/50",
             className,

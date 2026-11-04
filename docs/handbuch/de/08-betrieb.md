@@ -163,6 +163,20 @@ steht als beendet mit `Exited (0)` da – das ist richtig, er läuft nur kurz be
 
 `./data` und alle Dateien darin kann nur der Prozess der App lesen.
 
+### Mit Portainer {#portainer}
+
+Wer Docker mit Portainer verwaltet, braucht keinen Checkout: Die Datei `docker-compose.portainer.yml` aus dem
+Repository kommt als Ganzes in Portainers Web-Editor (*Stacks → Add stack → Web editor*), die Werte der `.env` als
+*Environment variables* des Stacks – Pflicht sind `POSTGRES_PASSWORD` und `POSTGRES_APP_PASSWORD`. Sie nimmt das
+veröffentlichte Image ab Version 0.1.48 und ist genauso gehärtet wie die normale Installation. Die Container heißen
+nach dem Stack (z. B. `news-app-1`), die Daten liegen in benannten Volumes (`news_data`, `news_db18`, `news_tls`). Ein
+Update: `COBE_NEWS_IMAGE` auf die neue Version setzen und *Update the stack*. Sicherung, Rücksicherungs-Test und
+Wiederherstellung laufen dort mit `docker exec` bzw. einem Wegwerf-Container statt mit `docker compose` – alle
+Schritte, Variablen und Grenzen: docs/BETRIEB.md, Abschnitt „Portainer (Stack-Editor)“. Nur für Umgebungen vom Typ
+Docker Standalone, nicht Swarm: `docker stack deploy` übergeht die Startreihenfolge und Teile der Härtung und startet
+den kurzen Kopier-Dienst immer wieder. Neben einer lokalen Installation auf demselben Host brauchen `PORT`, `APP_PORT`,
+`EDGE_SUBNET`, `EDGE_RANGE` und `PROXY_IP` andere Werte.
+
 ## Update {#update}
 
 Cobe News wird mit Git und Docker Compose aktualisiert. Die Datenbank bringt die App beim Start selbst auf den Stand

@@ -2,6 +2,18 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.48 – Portainer-Stack
+
+### Neu
+- **Portainer-Stack**: `docker-compose.portainer.yml` lässt sich in Portainers Stack-Editor einfügen – Werte als Umgebungsvariablen setzen, deployen; kein Checkout, keine Dateien auf dem Host. Die Dateien für Datenbank-Init und Proxy kommen dafür mit dem Image und werden bei jedem Start in den Stack kopiert. Anleitung in docs/BETRIEB.md („Portainer (Stack-Editor)“).
+
+### Verbessert
+- **TLP:GREEN auf der Übersichtskarte**: Die Plakette steht neben der Zeile statt darin – ein Antippen erklärt sie auch am Handy, statt den Befund zu öffnen.
+
+### Betrieb
+- Das Image enthält jetzt `deploy/postgres` und `deploy/nginx` unter `/srv/deploy` (für den Portainer-Stack); die lokale Installation mit `docker-compose.yml` bleibt unverändert.
+- `db-init` hinterlässt kein anonymes Volume mehr (das Postgres-Image erklärt eines; jetzt tmpfs). Ein bestehendes, leeres hängt Compose beim Update weiter an – einmal `docker compose up -d --force-recreate --renew-anon-volumes --no-deps db-init` löst es, danach `docker volume prune` (nur `db-init`, nie `db`: die Datenbank liegt im benannten Volume `db18`).
+
 ## 0.1.47 – Exploit-Hinweise, Themen in Regeln, Update-Hinweis und Härtung
 
 ### Neu

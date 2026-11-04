@@ -52,6 +52,10 @@ Instead of building locally you can run the released, signed image `ghcr.io/g0ur
 `.env`, then `docker compose pull app && docker compose up -d` – how to verify the signature with cosign:
 [`docs/BETRIEB.md`](docs/BETRIEB.md#veröffentlichtes-image-statt-lokalem-build). Without these two lines nothing changes.
 
+With Portainer (no checkout): paste [`docker-compose.portainer.yml`](docker-compose.portainer.yml) into the stack web
+editor and set `POSTGRES_PASSWORD` and `POSTGRES_APP_PASSWORD` as environment variables – see
+[`docs/BETRIEB.md`](docs/BETRIEB.md#portainer-stack-editor).
+
 ## Documentation
 
 - **Handbook in the app** – user menu → *Documentation* (`/docs`), German and English: setup, sign-in, channels and

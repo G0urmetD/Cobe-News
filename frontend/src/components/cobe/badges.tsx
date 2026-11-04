@@ -35,9 +35,9 @@ export function Pill({
 }
 
 /** A finding from a CSAF provider's TLP:GREEN document (an admin allowed it): share within the organisation /
- *  community only – the badge says it, the glossary's tooltip explains it (hover, focus, touch). One component for the
- *  finding and the overview's line; `inButton`: inside a button (the overview's line) – not a focus stop of its own. */
-export function TlpPill({ compact = false, inButton = false }: { compact?: boolean; inButton?: boolean }) {
+ *  community only – the badge says it, the glossary's tooltip explains it (hover, focus – a tap focuses it on touch).
+ *  One component for the finding and the overview's line (`compact`, beside the line's button, never inside it). */
+export function TlpPill({ compact = false }: { compact?: boolean }) {
   const pill = compact ? (
     <span className="rounded border border-success/40 px-1 font-mono text-[10px] font-semibold text-success-fg">TLP:GREEN</span>
   ) : (
@@ -46,7 +46,7 @@ export function TlpPill({ compact = false, inButton = false }: { compact?: boole
     </Pill>
   )
   return (
-    <Term k="tlp" focusable={!inButton} className="shrink-0 no-underline">
+    <Term k="tlp" className="shrink-0 no-underline">
       {pill}
     </Term>
   )

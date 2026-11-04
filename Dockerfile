@@ -32,6 +32,17 @@ COPY CHANGELOG.md ./CHANGELOG.md
 COPY docs/handbuch/de ./handbuch/de
 COPY docs/handbuch/en ./handbuch/en
 COPY --from=ui /ui/dist ./static
+# the deploy files for docker-compose.portainer.yml (a stack without a checkout): its one-shot service "assets" copies
+# them into the volumes of db-init and proxy. Only these two folders (never deploy/certs – an own key stays out of the
+# image); owned by root, read-only for everyone else. The app itself never reads them.
+# /assets/postgres and /assets/nginx: the mount points of those volumes, owned by cobenews – Docker hands that owner to
+# a fresh named volume at its first mount, so "assets" copies as cobenews (no root); everyone else only reads.
+COPY deploy/postgres /srv/deploy/postgres
+COPY deploy/nginx /srv/deploy/nginx
+RUN chmod -R u=rwX,go=rX /srv/deploy \
+ && mkdir -p /assets/postgres /assets/nginx \
+ && chown cobenews /assets/postgres /assets/nginx \
+ && chmod 755 /assets /assets/postgres /assets/nginx
 USER cobenews
 EXPOSE 8000
 VOLUME ["/data", "/tls"]
