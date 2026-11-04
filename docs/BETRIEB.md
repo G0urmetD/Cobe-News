@@ -477,11 +477,17 @@ damit selbst wählen – dieselbe Grenze wie bisher mit `TRUSTED_PROXIES=<Gatewa
   Gateway. Die App glaubt dem Gateway deshalb nur, wenn sie **sicher** ist, auf einer Linux Docker Engine zu laufen: der
   Kernel ist keiner dieser VMs (`linuxkit`, `orbstack`, `microsoft-standard-WSL2` in `uname -r`), und keiner der Namen
   `host.docker.internal`, `gateway.docker.internal`, `host.orb.internal`, `host.lima.internal`,
-  `host.containers.internal` existiert – der Resolver sagt ausdrücklich „gibt es nicht“. Löst einer auf, glaubt sie
+  `host.containers.internal` existiert – weder in `/etc/hosts` des Containers (dort trägt Podman Machine seinen Namen
+  ein) noch im DNS, wo der Resolver ausdrücklich „gibt es nicht“ sagen muss. Steht einer da oder löst auf, glaubt sie
   **niemandem**; antwortet der Resolver nicht klar (kein DNS, Zeitüberschreitung – höchstens 3 Sekunden beim Start),
   ebenso nicht, und sie fragt im Hintergrund jede Minute neu. Das Log sagt es (`… a desktop Docker …` bzw. `… cannot
   tell …, trusted from nobody`). Wer es trotzdem will (eigener Rechner, keine fremden Container):
-  `TRUSTED_PROXIES=<Gateway>/32` ausdrücklich setzen.
+  `TRUSTED_PROXIES=<Gateway>/32` ausdrücklich setzen. Dasselbe gilt auf einer Linux Docker Engine, die dem App-Container
+  `extra_hosts: host.docker.internal:host-gateway` mitgibt (die Compose-Dateien tun das nicht), und auf einem Server
+  **ohne erreichbares DNS** (abgeschottet, der Upstream antwortet dauerhaft SERVFAIL): dort bleibt es bei „trusted from
+  nobody“ – `TRUSTED_PROXIES=<Gateway>/32` setzen. Das Gateway nennt die Startzeile der App (`… through the gateway
+  172.31.250.128 …`) oder `docker network inspect -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' <Projekt>_edge`
+  (`cobe-news_edge`, beim Stack `news_edge`).
 - **Nur ein Gateway im Netz `edge`:** die App vergleicht es mit `EDGE_SUBNET` (beide Compose-Dateien geben es ihr mit).
   Liegt das Default-Gateway nicht darin – etwa mit `network_mode: host`, wo es der Router des LANs wäre –, glaubt sie
   niemandem.

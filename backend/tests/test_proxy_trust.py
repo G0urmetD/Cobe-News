@@ -42,10 +42,15 @@ def use(monkeypatch):
 
 
 @pytest.fixture
-def fresh_kind(monkeypatch):
-    """The real check_host_kind / host_kind with a kernel and a resolver of the test's choice."""
+def fresh_kind(monkeypatch, tmp_path):
+    """The real check_host_kind / host_kind with a kernel, an /etc/hosts (a Linux engine's, by default) and a resolver of
+    the test's choice."""
+    hosts = tmp_path / "hosts"
+    hosts.write_text("127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n172.31.250.129\t3f2a9c1d0b7e\n")
     netaddr.reset_host_kind()
     monkeypatch.setattr(netaddr, "_kernel_release", lambda: "6.8.0-48-generic")
+    monkeypatch.setattr(netaddr, "HOSTS_FILE", str(hosts))
+    monkeypatch.hosts = hosts
     yield monkeypatch
     netaddr.reset_host_kind()
 
@@ -193,6 +198,38 @@ def test_the_kernel_of_a_desktop_vm_needs_no_dns(fresh_kind):
         kind = netaddr.check_host_kind()
         assert kind.kind == "desktop" and release in kind.why
     assert asked == []
+
+
+@pytest.mark.parametrize(
+    ("line", "name"),
+    [
+        ("169.254.1.2\thost.containers.internal host.containers", "host.containers.internal"),  # Podman machine
+        ("172.17.0.1 HOST.DOCKER.INTERNAL.  # extra_hosts: host-gateway", "host.docker.internal"),  # fails closed on an engine too
+        ("192.168.5.2\tsomething host.lima.internal", "host.lima.internal"),
+    ],
+)
+def test_a_host_name_in_etc_hosts_is_a_desktop_without_dns(fresh_kind, line, name):
+    """glibc's files backend never matches the absolute name ("host.containers.internal." → EAI_NONAME) – the file is read
+    itself, before any DNS."""
+    fresh_kind.hosts.write_text(fresh_kind.hosts.read_text() + line + "\n")
+    asked = _resolver(fresh_kind, _raise(_gaierror(socket.EAI_NONAME)))
+    assert netaddr.check_host_kind() == netaddr.HostKind("desktop", f"{name} in {fresh_kind.hosts}")
+    assert asked == []
+
+
+def test_names_only_in_a_comment_or_as_part_of_others_do_not_count(fresh_kind):
+    fresh_kind.hosts.write_text("# 172.17.0.1 host.docker.internal\n10.0.0.5 my-host.docker.internal.corp\n")
+    _resolver(fresh_kind, _raise(_gaierror(socket.EAI_NONAME)))
+    assert netaddr.check_host_kind().kind == "engine"
+
+
+def test_an_unreadable_etc_hosts_is_unknown(fresh_kind):
+    fresh_kind.setattr(netaddr, "HOSTS_FILE", str(fresh_kind.hosts) + ".missing")
+    asked = _resolver(fresh_kind, _raise(_gaierror(socket.EAI_NONAME)))
+    kind = netaddr.check_host_kind()
+    assert kind.kind == "unknown" and "cannot read" in kind.why and asked == []
+    fresh_kind.setattr(netaddr, "HOSTS_FILE", str(fresh_kind.hosts))  # not kept
+    assert netaddr.check_host_kind().kind == "engine"
 
 
 def test_a_host_name_that_resolves_is_a_desktop(fresh_kind):

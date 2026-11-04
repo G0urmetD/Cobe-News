@@ -205,6 +205,21 @@ def _kernel_release() -> str:
     return os.uname().release
 
 
+HOSTS_FILE = "/etc/hosts"
+
+
+def _hosts_file_names() -> set[str]:
+    """Every name in /etc/hosts, lower case. A desktop Docker may put its host name there only (Podman machine:
+    host.containers.internal) – the absolute names asked below never match there (glibc's files backend does not strip
+    the trailing dot), so this file is read itself. OSError: the caller decides (unknown)."""
+    names: set[str] = set()
+    with open(HOSTS_FILE, encoding="utf-8", errors="replace") as f:  # noqa: PTH123 - a tiny file, read once
+        for line in f:
+            fields = line.split("#", 1)[0].split()
+            names.update(n.lower().rstrip(".") for n in fields[1:])
+    return names
+
+
 def _lookup(name: str) -> str:
     """ "found", "absent" (the resolver says the name does not exist) or "error: …" (anything else)."""
     try:
@@ -217,7 +232,8 @@ def _lookup(name: str) -> str:
 
 
 def check_host_kind(budget: float = DNS_BUDGET_S) -> HostKind:
-    """Blocking, at most `budget` seconds: a desktop Docker by its kernel, else by the names of the host (all asked at once).
+    """Blocking, at most `budget` seconds: a desktop Docker by its kernel, by a name of the host in /etc/hosts, else by
+    asking DNS for those names (all at once).
     There every container reaches the host's own 127.0.0.1 ports – through such a name or the VM's host address
     (192.168.65.254 under Docker Desktop) – and arrives at the app from this container's gateway, exactly like a reverse
     proxy on the host. So "engine" only when every name is reported as not existing; a resolver that fails or is too slow
@@ -229,6 +245,15 @@ def check_host_kind(budget: float = DNS_BUDGET_S) -> HostKind:
     marker = next((m for m in DESKTOP_KERNELS if m in release.lower()), None)
     if marker:
         _host_kind = HostKind("desktop", f"kernel {release}")
+        return _host_kind
+    try:
+        listed = _hosts_file_names()
+    except OSError as exc:
+        return HostKind("unknown", f"cannot read {HOSTS_FILE}: {exc}")
+    in_hosts = [n.rstrip(".") for n in DESKTOP_HOST_NAMES if n.rstrip(".") in listed]
+    if in_hosts:
+        # fails closed also on a Linux engine with extra_hosts: host.docker.internal:host-gateway – TRUSTED_PROXIES then
+        _host_kind = HostKind("desktop", f"{in_hosts[0]} in {HOSTS_FILE}")
         return _host_kind
     results: dict[str, str] = {}
 
