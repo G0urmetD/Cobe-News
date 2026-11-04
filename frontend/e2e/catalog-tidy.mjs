@@ -208,12 +208,10 @@ async function pillFlow(browser, combo, t, touch) {
       lc,
     })
   } else {
-    // the pill sits inside the line's button (no focus stop of its own, TlpPill inButton): a tap opens the finding,
-    // whose pill explains it by a tap – no tooltip on the line itself (Radix tooltips do not open on touch)
-    if (has) await line.tap()
-    const opened = await until(async () => (await sheet(p).locator('li[data-finding="paloalto:PAN-SA-2026-0077"]').count()) > 0, 5000)
-    const tip = opened ? await tipOn(p, sheet(p).locator('li[data-finding="paloalto:PAN-SA-2026-0077"] [tabindex]').filter({ hasText: "TLP:GREEN" }).first(), "tap") : ""
-    check(`${tag}: on the overview card's line (touch) – contrast ${lc}:1; a tap opens the finding, whose pill explains it`, has && lc >= 4.5 && opened && tip.includes("TLP"), {
+    // the pill sits beside the line's button (0.1.48: a focus stop of its own) – a tap explains it, the finding stays shut
+    const tip = has ? await tipOn(p, line, "tap") : ""
+    const opened = (await sheet(p).locator('li[data-finding="paloalto:PAN-SA-2026-0077"]').count()) > 0
+    check(`${tag}: on the overview card's line (touch) – a tap explains it, contrast ${lc}:1`, has && lc >= 4.5 && tip.includes("TLP") && !opened, {
       has,
       lc,
       opened,
@@ -226,7 +224,7 @@ async function pillFlow(browser, combo, t, touch) {
 
 /** The CSAF providers under Weitere Quellen (be56216): two columns – name and state left (they wrap there), the
  *  TLP:GREEN switch in one column on the right; no horizontal scroll. */
-async function providerLayout(page, combo, t) {
+async function providerLayout(page, combo) {
   const tag = `${combo.lang} ${combo.width}px ${combo.theme} CSAF providers`
   await page.goto(`${BASE}/settings/integrations?vendor=sources`)
   await settle(page)
@@ -274,13 +272,13 @@ try {
       await signIn(r.ctx, creds.user, creds.password, true)
       await versionsFlow(r, combo, t)
       await greenFlow(r, combo, t)
-      await providerLayout(r.page, combo, t)
+      await providerLayout(r.page, combo)
       check(`${combo.lang} admin: no page or console errors`, r.errors.length === 0, r.errors.slice(0, 3))
       await r.ctx.close()
     } else {
       const r = await open(browser, combo)
       await signIn(r.ctx, creds.user, creds.password, true)
-      await providerLayout(r.page, combo, t)
+      await providerLayout(r.page, combo)
       check(`${combo.lang} ${combo.width}px ${combo.theme} admin: no page or console errors`, r.errors.length === 0, r.errors.slice(0, 3))
       await r.ctx.close()
     }

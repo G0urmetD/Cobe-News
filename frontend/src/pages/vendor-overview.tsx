@@ -795,16 +795,18 @@ function FindingLine({ f, productKey, onOpen, prefix }: { f: OverviewItem["lates
         {f.unread && <span className="sr-only">{t("reader.unread")}: </span>}
         <span className={cn("font-mono text-foreground/80", f.unread && "font-semibold text-foreground")}>{f.ident}</span> {f.headline || f.title}
       </span>
-      {f.tlp === "GREEN" && <TlpPill compact inButton />}
       {f.exploited && <AlertTriangle className="size-3 shrink-0 text-sev-critical" aria-label={t("vendor.exploited")} />}
     </button>
   )
-  if (!cve) return line
-  // a finding named by its CVE: the star beside the line (not inside its button)
+  const tlp = f.tlp === "GREEN"
+  if (!cve && !tlp) return line
+  // beside the line, not inside its button: the star of a finding named by its CVE, and the TLP:GREEN pill – a focus
+  // stop of its own, so a tap explains it (inside the button a tap only opened the finding)
   return (
     <span className="flex items-center gap-0.5">
       <span className="min-w-0 flex-1">{line}</span>
-      <WatchStar cve={cve} origin={{ kind: "finding", product: productKey, advisory: f.id }} />
+      {tlp && <TlpPill compact />}
+      {cve && <WatchStar cve={cve} origin={{ kind: "finding", product: productKey, advisory: f.id }} />}
     </span>
   )
 }

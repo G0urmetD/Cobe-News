@@ -71,13 +71,13 @@ describe("exploit and TLP pills", () => {
     expect(html).toContain('title="Exploit-DB-Eintrag öffnen"')
     expect(html).not.toContain("zu  öffnen")
   })
-  it("TLP:GREEN explains itself through the glossary (focusable) – inside a button not a focus stop of its own", () => {
+  it("TLP:GREEN explains itself through the glossary (focusable – a tap opens it on touch), compact as well", () => {
     const own = render(createElement(TlpPill))
     expect(own).toContain("TLP:GREEN")
     expect(own).toContain('tabindex="0"')
     expect(own).toContain("var(--success-fg)") // the darker text tone (AA on the tint)
-    const inButton = render(createElement(TlpPill, { compact: true, inButton: true }))
-    expect(inButton).toContain("TLP:GREEN")
-    expect(inButton).not.toContain("tabindex")
+    const compact = render(createElement(TlpPill, { compact: true }))
+    expect(compact).toContain("TLP:GREEN")
+    expect(compact).toContain('tabindex="0"') // the overview's line: beside its button, a focus stop of its own
   })
 })
