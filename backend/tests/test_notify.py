@@ -719,7 +719,9 @@ async def test_a_line_break_never_breaks_the_mails(admin_client, monkeypatch):
     for path, body in (("/api/admin/notify/rules", {"name": "Kritisch\nalles", "channels": []}), ("/api/admin/notify/channels", {"name": "SOC\r\nBcc: x", "type": "email", "recipients": ["soc@corp.example"]})):
         r = await admin_client.post(path, json=body)
         assert r.status_code == 422, (path, r.text)
-    subject, text, html = notify.render_mail("Kritisch\nalles", [notify.EXAMPLE] * 4, 4, "de")
+    subject, text, html = notify.render_mail("Kritisch\nalles", [notify.EXAMPLE], 1, "de", test=True)  # the rule's name in the subject
+    broken = notify.Story("00000000-0000-4000-8000-000000000002", "Example\r\nGateway: Lücke", "", "", "high", "Q", datetime.now(UTC))
+    many = notify.render_mail("Kritisch\nalles", [notify.EXAMPLE, broken, notify.EXAMPLE, notify.EXAMPLE], 4, "de")[0]  # a story's name
     sent = []
 
     async def fake_send(msg, **kw):  # noqa: ANN001, ANN003
@@ -732,6 +734,8 @@ async def test_a_line_break_never_breaks_the_mails(admin_client, monkeypatch):
     monkeypatch.setattr(notify.netaddr, "mail_socket", fake_socket)
     await notify.send_mail({"host": "mail.corp.example", "from_addr": "news@corp.example", "port": 25}, ["a@corp.example"], subject, text, html)
     assert sent and "\n" not in sent[0] and "Kritisch alles" in sent[0]
+    await notify.send_mail({"host": "mail.corp.example", "from_addr": "news@corp.example", "port": 25}, ["a@corp.example"], many, text, html)
+    assert "\n" not in sent[1] and "\r" not in sent[1] and "Example Gateway" in sent[1]
     assert notify.one_line("a\r\n\tb c\x00d") == "a b c d"
 
 

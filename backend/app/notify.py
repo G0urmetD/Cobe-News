@@ -54,6 +54,7 @@ from app import advisory_changes, audit, bounded, delivery_log
 from app import db as dbm
 from app import netaddr
 from app import news as news_svc
+from app import quiet
 from app import settings as settings_store
 from app import vendor_titles as titles
 from app.config import get_config, tls_verify
@@ -143,11 +144,23 @@ LABELS = {
         "button": "Cobe News öffnen",
         "test": "Testnachricht",
         "test_title": "Testnachricht von Cobe News – der Kanal „{rule}“ ist richtig eingerichtet.",
-        "footer": "Diese Nachricht hat Cobe News automatisch versendet ({rule}).",
+        "footer": "Diese Nachricht hat Cobe News automatisch versendet.",
         "footer2": "Welche Meldungen kommen, stellt ein Admin unter Einstellungen › Kanäle & Regeln ein.",
         "source": "Quelle",
         "severity": "Schwere",
         "published": "Veröffentlicht",
+        # the mail (render_mail): subject, summary line, the story's marks, why it comes
+        "subject_many": "{n} neue Meldungen",
+        "top_sev": "Höchste Schwere: {sev}",
+        "n_ours": ("1 betrifft eure Produkte", "{n} betreffen eure Produkte"),
+        "n_exploited": "{n} aktiv ausgenutzt",
+        "ours": "Betrifft eure Produkte",
+        "exploited": "Aktiv ausgenutzt",
+        "why_rule": ("Regel „{names}“", "Regeln {names}"),
+        "edit_rule": ("Regel bearbeiten", "Regeln bearbeiten"),
+        "why_test": "Testnachricht für „{rule}“",
+        "edit_test": "Kanäle & Regeln",
+        "quote": "„{}“",
     },
     "en": {
         "sev": {"critical": "Critical", "high": "High", "medium": "Medium", "low": "Low", "info": "Info"},
@@ -159,17 +172,28 @@ LABELS = {
         "button": "Open Cobe News",
         "test": "Test message",
         "test_title": "Test message from Cobe News – the channel “{rule}” is set up correctly.",
-        "footer": "Sent automatically by Cobe News ({rule}).",
+        "footer": "Sent automatically by Cobe News.",
         "footer2": "An admin chooses which stories come under Settings › Channels & rules.",
         "source": "Source",
         "severity": "Severity",
         "published": "Published",
+        "subject_many": "{n} new stories",
+        "top_sev": "Highest severity: {sev}",
+        "n_ours": ("1 concerns your products", "{n} concern your products"),
+        "n_exploited": "{n} actively exploited",
+        "ours": "Concerns your products",
+        "exploited": "Actively exploited",
+        "why_rule": ("Rule “{names}”", "Rules {names}"),
+        "edit_rule": ("Edit rule", "Edit rules"),
+        "why_test": "Test message for “{rule}”",
+        "edit_test": "Channels & rules",
+        "quote": "“{}”",
     },
 }
 # (text, background) for mails – mail clients know no oklch
 SEV_COLORS = {
     "critical": ("#b3261e", "#fde8e6"),
-    "high": ("#b4510f", "#fdeee2"),
+    "high": ("#a8490c", "#fdeee2"),
     "medium": ("#8a6100", "#fdf3d7"),
     "low": ("#2a5d9f", "#e6eefa"),
     "info": ("#4a5066", "#eef0f6"),
@@ -275,13 +299,45 @@ class Story:
     source_kind: str = ""
     # "GREEN": from a CSAF provider's TLP:GREEN document (allowed per provider) – every format labels it
     tlp: str = ""
+    # "Betrifft eure Produkte": the followed products (their labels) the story concerns – a news story's
+    # news_items.products (`product_keys`, the catalogue keys; resolved by with_products), a Vendor News vulnerability's
+    # product. The mail marks such a story and lists it first (priority)
+    ours: list[str] = field(default_factory=list)
+    product_keys: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # feed text: no direction or control characters in any channel (app/plaintext.py)
         self.title, self.summary, self.source, self.product = (neutral(x) for x in (self.title, self.summary, self.source, self.product))
+        self.ours = [neutral(x) for x in self.ours or []]
+
+    @property
+    def headline(self) -> str:
+        """The title as the messages show it: without the publisher's status and severity tags in front (headline)."""
+        return headline(self.title)
 
 
 TLP_PREFIX = "[TLP:GREEN] "
+# The tags the BSI's WID / CERT-Bund feed puts in front of a title: "[NEU] [hoch] Emerson Ovation: …", "[UPDATE]
+# [kritisch] …", "[UNGEPATCHT] [hoch] …" – the state of the advisory and its rating, which every message shows anyway
+# (the severity, the topic "Ohne Patch"). Only these words, only in front, only whole bracketed tags.
+_STATUS_TAGS = re.compile(r"^(?:\s*\[(?:neu|update|ungepatcht|kritisch|hoch|mittel|niedrig)\])+\s*", re.I)
+
+
+def headline(title: str) -> str:
+    """A title without the publisher's status and severity tags in front ("[NEU] [hoch] Emerson Ovation: Mehrere
+    Schwachstellen" → "Emerson Ovation: Mehrere Schwachstellen") – a TLP:GREEN prefix stays in front; a title that is
+    nothing but tags stays as it is. Used by the mail, the chat cards and the push messages (not the webhook's JSON:
+    the receiver gets the title as the source wrote it)."""
+    t = title or ""
+    pre = TLP_PREFIX if t.startswith(TLP_PREFIX) else ""
+    rest = _STATUS_TAGS.sub("", t[len(pre) :], count=1)
+    return pre + rest if rest.strip() else t
+
+
+def priority(s: Story) -> tuple:
+    """The order of the stories of one message (and which make the cut when there are more): those concerning our
+    products first, then the actively exploited ones, then by severity, then the newest first. Sort with reverse=True."""
+    return (bool(s.ours), "exploited" in (s.topics or []), RANK.get(s.severity, 0), s.published_at)
 
 
 def tlp_line(lang: str) -> str:
@@ -315,58 +371,262 @@ def one_line(text: str) -> str:
     return " ".join(_CONTROL.sub(" ", neutral(text)).split())
 
 
+SUBJECT_MAX = 150  # characters of a summary's subject (the names of its stories, then "+N")
+SUBJECT_NAME_MAX = 40  # characters of one story's name in it
+COMPACT_FROM = 6  # stories in one mail from which it is a compact list (a line per story, no summaries) instead of cards
+CVES_SHOWN = 3  # CVEs named on a mail's story (then "+N")
+HOT_TOPICS = ("zeroday", "exploited", "ransomware")  # topic chips in the warning colour
+_RANGE = re.compile(r"\s+(?:→|<=?|>=?|≤|≥|=|\d).*$")
+
+
+def _local(d: datetime, lang: str, tz: str | None = None) -> str:
+    """A mail's time: in the recipient's zone (a person's own, else the installation's Europe/Berlin – quiet.DEFAULT_TZ)
+    with the zone's abbreviation, so it is never ambiguous: "04.11.2026 11:19 MEZ", "2026-11-04 11:19 CET"."""
+    x = d.astimezone(quiet.zone(tz))
+    abbr = x.tzname() or ""
+    if lang == "de":
+        abbr = {"CET": "MEZ", "CEST": "MESZ"}.get(abbr, abbr)
+    return x.strftime("%d.%m.%Y %H:%M" if lang == "de" else "%Y-%m-%d %H:%M") + (f" {abbr}" if abbr else "")
+
+
+def _cut(text: str, limit: int) -> str:
+    """At most `limit` characters, cut at a blank (never inside a word) with "…"."""
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    head = text[: limit - 1]
+    return (head.rsplit(" ", 1)[0] if " " in head else head).rstrip(",;:–—-") + "…"
+
+
+def mail_name(s: Story) -> str:
+    """What a summary's subject calls a story: the followed product it concerns, else what its title names before the
+    colon ("Emerson Ovation: Mehrere Schwachstellen" → "Emerson Ovation"), else its product without the versions, else
+    the title shortened."""
+    if s.ours:
+        return _cut(one_line(s.ours[0]), SUBJECT_NAME_MAX)
+    title = one_line(s.headline.removeprefix(TLP_PREFIX))
+    head, colon, _ = title.partition(": ")
+    if colon and 2 <= len(head) <= SUBJECT_NAME_MAX:
+        return head
+    if s.product and (p := _RANGE.sub("", one_line(s.product))):
+        return _cut(p, SUBJECT_NAME_MAX)
+    return _cut(title, SUBJECT_NAME_MAX)
+
+
 def _subject(rule: str, stories: list[Story], total: int, lang: str, test: bool) -> str:
+    """One story: its severity and title. More: how many and what they are about – the names in the mail's order, as
+    many as fit SUBJECT_MAX, then "+N" ("[Cobe News] 5 neue Meldungen: Emerson Ovation, SolarWinds Dameware +3")."""
     lb = LABELS[lang]
     if test:
         return f"[Cobe News] {lb['test']} · {rule}"
     if total == 1:
         s = stories[0]
-        return f"[Cobe News] {lb['sev'][s.severity]}: {s.title}"[:250]
-    return f"[Cobe News] {lb['many'].format(n=total)} · {rule}"
+        return f"[Cobe News] {lb['sev'][s.severity]}: {s.headline}"[:250]
+    green = "[TLP:GREEN] " if any(s.tlp == "GREEN" for s in stories) else ""
+    head = f"[Cobe News] {green}{lb['subject_many'].format(n=total)}"
+    names: list[str] = []
+    covered = 0
+    for s in stories:
+        name = mail_name(s)
+        if name in names:
+            covered += 1
+            continue
+        rest = total - covered - 1
+        if len(f"{head}: {', '.join([*names, name])}") + (len(f" +{rest}") if rest else 0) > SUBJECT_MAX:
+            break
+        names.append(name)
+        covered += 1
+    if not names:
+        return head
+    rest = total - covered
+    return f"{head}: {', '.join(names)}" + (f" +{rest}" if rest else "")
 
 
-def render_mail(rule: str, stories: list[Story], total: int, lang: str, *, test: bool = False, footer: list[str] | None = None) -> tuple[str, str, str]:
-    """(subject, text, html) in the mail style (HTML escaped by Jinja's autoescape). `footer`: other closing lines
-    than a channel's (the personal notifications say why the person gets it and where to change it)."""
-    lb = LABELS[lang]
+def _summary_line(lb: dict, stories: list[Story], total: int) -> str:
+    """The line above the heading: the highest severity, how many concern our products, how many are actively exploited
+    (each only when there are any). One story: its severity and marks."""
     top = max(stories, key=lambda s: RANK.get(s.severity, 0))
-    heading = lb["test_title"].format(rule=rule) if test else (stories[0].title if total == 1 else lb["many"].format(n=total))
-    eyebrow = lb["test"] if test else lb["sev"][top.severity] if total == 1 else lb["many"].format(n=total)
+    ours = sum(1 for s in stories if s.ours)
+    hot = sum(1 for s in stories if "exploited" in (s.topics or []))
+    if total == 1:
+        return " · ".join([f"{lb['severity']}: {lb['sev'][top.severity]}", *([lb["ours"]] if ours else []), *([lb["exploited"]] if hot else [])])
+    parts = [lb["top_sev"].format(sev=lb["sev"][top.severity])]
+    if ours:
+        parts.append(lb["n_ours"][0] if ours == 1 else lb["n_ours"][1].format(n=ours))
+    if hot:
+        parts.append(lb["n_exploited"].format(n=hot))
+    return " · ".join(parts)
+
+
+def rule_link(rule_ids: list[str] | None = None) -> str:
+    """Where a rule is edited: Einstellungen › Kanäle & Regeln › Regeln – one rule opens in the editor."""
+    base = f"{get_config().base_url}/settings/rules?tab=rules"
+    ids = [str(x) for x in rule_ids or [] if x]
+    return f"{base}&{urlencode({'rule': ids[0]})}" if len(ids) == 1 else base
+
+
+def _why(lb: dict, rule: str, rules: list[str] | None, rule_ids: list[str] | None, test: bool) -> dict:
+    """The footer's first line: why the mail comes (the rule or rules) and where that is changed."""
+    if test:
+        return {"text": lb["why_test"].format(rule=rule), "label": lb["edit_test"], "url": f"{get_config().base_url}/settings/rules"}
+    names = [n for n in rules or [] if n] or [rule]
+    one = len(names) == 1
+    shown = names[0] if one else ", ".join(lb["quote"].format(n) for n in names[:5]) + (" …" if len(names) > 5 else "")
+    return {"text": lb["why_rule"][0 if one else 1].format(names=shown), "label": lb["edit_rule"][0 if one else 1], "url": rule_link(rule_ids)}
+
+
+def _body_title(s: Story) -> str:
+    """A title in the mail's body: a TLP:GREEN story has its pill (and its line in the text part) – the "[TLP:GREEN]"
+    in front of the title would say it twice. The subject and the chat cards keep it."""
+    return s.headline.removeprefix(TLP_PREFIX) if s.tlp == "GREEN" else s.headline
+
+
+def _compact_name(s: Story) -> str:
+    """The product in front of a compact line – only when neither the title (what it names before the colon) nor the
+    "Betrifft eure Produkte" mark says it anyway."""
+    name = _RANGE.sub("", s.product) if s.product and not s.ours else ""
+    title = s.headline.removeprefix(TLP_PREFIX).lower()
+    head = title.partition(": ")[0] if ": " in title else title
+    low = name.lower()
+    return "" if not name or title.startswith(low) or low.startswith(head) else name
+
+
+def _facts(s: Story, lang: str) -> dict:
+    """A story's facts line: the product (when known), its CVEs (CVES_SHOWN, then "+N"), its topics (news.TOPICS order)."""
+    topics = CARD_LABELS[lang]["topics"]
+    cves = list(dict.fromkeys(s.cves or []))
+    return {
+        "product": s.product,
+        "cves": cves[:CVES_SHOWN],
+        "cves_more": f"+{len(cves) - CVES_SHOWN}" if len(cves) > CVES_SHOWN else "",
+        "topics": [{"label": topics[t], "hot": t in HOT_TOPICS} for t in news_svc.TOPICS if t in (s.topics or [])],
+    }
+
+
+def _facts_text(f: dict) -> str:
+    cves = " ".join(x for x in (", ".join(f["cves"]), f["cves_more"]) if x)
+    return " · ".join(x for x in (f["product"], cves, ", ".join(t["label"] for t in f["topics"])) if x)
+
+
+def _dark_css() -> str:
+    """The dark colours (Apple Mail, iOS Mail, Outlook for Mac, Thunderbird: prefers-color-scheme; Outlook.com: its
+    [data-ogsc] / [data-ogsb] marks). The light colours stay inline – what Gmail and Outlook for Windows read."""
+    rules = []
+    for cls, (color, bg, border) in DARK.items():
+        decl = [f"color:{color} !important"] if color else []
+        decl += [f"background-color:{bg} !important"] if bg else []
+        decl += [f"border-color:{border} !important"] if border else []
+        rules.append((cls, decl, color, bg))
+    dark = "".join(f".{c}{{{';'.join(d)}}}" for c, d, _, _ in rules if d)
+    ogsc = "".join(f"[data-ogsc] .{c}{{color:{col} !important}}" for c, _, col, _ in rules if col)
+    ogsb = "".join(f"[data-ogsb] .{c}{{background-color:{bg} !important}}" for c, _, _, bg in rules if bg)
+    return f"@media (prefers-color-scheme: dark){{{dark}}}{ogsc}{ogsb}"
+
+
+# (text, background, border) of the mail in dark mode, by class – text on its background at least 4.5:1
+DARK = {
+    "cn-page": ("#e8eaf0", "#0f1115", ""),
+    "cn-card": ("", "#1a1d24", "#2f3340"),
+    "cn-story": ("", "#1a1d24", "#2f3340"),
+    "cn-ours": ("", "#1d2238", "#7d8fff"),
+    "cn-text": ("#e8eaf0", "", ""),
+    "cn-muted": ("#a6acbd", "", ""),
+    "cn-body": ("#c3c8d6", "", ""),
+    "cn-foot": ("#9097a8", "", ""),
+    "cn-link": ("#a9b8ff", "", ""),
+    "cn-line": ("", "", "#2f3340"),
+    "cn-chip": ("#d0d4e0", "#2a2e3a", ""),
+    "cn-hot": ("#ffb4ab", "#4a1d1a", ""),
+    "cn-tlp": ("#9be3b4", "#173a24", ""),
+    "cn-ourspill": ("#ffffff", "#4257d6", ""),
+    **{f"cn-sev-{k}": v for k, v in {
+        "critical": ("#ffb4ab", "#4f1b17", ""),
+        "high": ("#ffc29b", "#4d2810", ""),
+        "medium": ("#f3d27a", "#3f3200", ""),
+        "low": ("#aac8ff", "#1b2f52", ""),
+        "info": ("#c9cdd9", "#2b2f3b", ""),
+    }.items()},
+}  # fmt: skip
+_DARK_CSS = _dark_css()
+
+
+def render_mail(
+    rule: str,
+    stories: list[Story],
+    total: int,
+    lang: str,
+    *,
+    test: bool = False,
+    footer: list[str] | None = None,
+    rules: list[str] | None = None,
+    rule_ids: list[str] | None = None,
+    tz: str | None = None,
+) -> tuple[str, str, str]:
+    """(subject, text, html) in the mail style (HTML escaped by Jinja's autoescape). The stories in their order
+    (priority: our products, actively exploited, severity, newest); up to COMPACT_FROM - 1 as cards (facts line,
+    summary, links), more as a compact list (a line each). Times in `tz` (the person's zone; else Europe/Berlin).
+    `footer`: other closing lines than a rule's (the personal notifications say why the person gets it and where to
+    change it) – without it the footer names the rule(s) (`rules`) with a link to edit them (`rule_ids`)."""
+    lb = LABELS[lang]
+    stories = sorted(stories, key=priority, reverse=True)
+    top = max(stories, key=lambda s: RANK.get(s.severity, 0))
+    heading = lb["test_title"].format(rule=rule) if test else (_body_title(stories[0]) if total == 1 else lb["many"].format(n=total))
+    eyebrow = lb["test"] if test else _summary_line(lb, stories, total)
     more = lb["more"].format(n=total - len(stories)) if total > len(stories) else ""
-    cards = [
-        {
-            "title": s.title,
-            "summary": s.summary,
-            "url": _safe_url(s.url),
-            "link": _open(s),
-            "source": s.source,
-            "date": _date(s.published_at, lang),
-            "sev_label": lb["sev"][s.severity],
-            "sev_color": SEV_COLORS[s.severity][0],
-            "sev_bg": SEV_COLORS[s.severity][1],
-            "tlp": tlp_line(lang) if s.tlp == "GREEN" else "",
-        }
-        for s in stories
-    ]
-    footer = footer or [lb["footer"].format(rule=rule), lb["footer2"]]
+    compact = len(stories) >= COMPACT_FROM
+    cards = []
+    for s in stories:
+        facts = _facts(s, lang)
+        cards.append(
+            {
+                "title": _body_title(s),
+                "summary": s.summary,
+                "url": _safe_url(s.url),
+                "link": _open(s),
+                "source": s.source,
+                "date": _local(s.published_at, lang, tz),
+                "sev": s.severity if s.severity in SEV_COLORS else "info",
+                "sev_label": lb["sev"][s.severity],
+                "sev_color": SEV_COLORS[s.severity][0],
+                "sev_bg": SEV_COLORS[s.severity][1],
+                "tlp": tlp_line(lang) if s.tlp == "GREEN" else "",
+                "ours": f"{lb['ours']}: {', '.join(s.ours[:3])}" + (f" +{len(s.ours) - 3}" if len(s.ours) > 3 else "") if s.ours else "",
+                "facts": facts,
+                "facts_text": _facts_text(facts),
+                "name": _compact_name(s),
+            }
+        )
+    why = None if footer else _why(lb, rule, rules, rule_ids, test)
+    footer = footer or [f"{lb['footer']} {lb['footer2']}"]
     subject = _subject(rule, stories, total, lang, test)
     body = _env.get_template("mail.html.j2").render(
         lang=lang,
         subject=subject,
-        preheader=stories[0].title,
+        preheader=heading if total == 1 or test else f"{eyebrow} – {', '.join(mail_name(s) for s in stories[:3])}",
         rule=rule,
         accent=ACCENTS[top.severity],
         eyebrow=eyebrow,
         heading=heading,
         stories=cards,
+        compact=compact,
         more=more,
         app_url=get_config().base_url + "/",
         labels=lb,
+        why=why,
         footer=footer,
+        dark_css=_DARK_CSS,
     )
-    lines = [heading, "=" * min(len(heading), 60), ""]
+    lines = [heading, eyebrow, "=" * min(max(len(heading), len(eyebrow)), 60), ""]
     for c in cards:
-        lines += [f"[{c['sev_label']}] {c['source']} · {c['date']}", c["title"]]
+        mark = f" · {c['ours']}" if c["ours"] else ""
+        if compact:
+            green = TLP_PREFIX if c["tlp"] else ""  # the compact line's one TLP marker (no line of its own)
+            lines += [f"• [{c['sev_label']}] {green}{c['name'] + ' · ' if c['name'] else ''}{c['title']}{mark}", f"  {c['link']}"]
+            continue
+        lines += [f"[{c['sev_label']}]{mark}", c["title"]]
+        if c["facts_text"]:
+            lines.append(c["facts_text"])
+        lines.append(f"{c['source']} · {c['date']}")
         if c["tlp"]:
             lines.append(c["tlp"])
         if c["summary"]:
@@ -374,9 +634,14 @@ def render_mail(rule: str, stories: list[Story], total: int, lang: str, *, test:
         if c["url"]:
             lines.append(f"{lb['article']}: {c['url']}")
         lines += [f"{lb['open']}: {c['link']}", ""]
+    if compact:
+        lines.append("")
     if more:
         lines += [more, ""]
-    lines += ["-- ", *footer]
+    lines += [f"{lb['button']}: {get_config().base_url}/", "", "-- "]
+    if why:
+        lines.append(f"{why['text']} · {why['label']}: {why['url']}")
+    lines += footer
     return subject, "\n".join(lines) + "\n", body
 
 
@@ -545,7 +810,7 @@ def render_slack(rule: str, stories: list[Story], total: int, lang: str, *, test
         lines = []
         for s in stories:
             url = _safe_url(_open(s))  # a summary's line opens the story in Cobe News
-            title = _slack_esc(s.title)[:200]
+            title = _slack_esc(s.headline)[:200]
             lines.append(f"• *<{url}|{title}>* · {_slack_esc(compact_extra(s, lang))}" if url else f"• *{title}* · {_slack_esc(compact_extra(s, lang))}")
         chunk = ""
         for line in lines:  # sections of at most SLACK_SECTION_MAX characters
@@ -558,7 +823,7 @@ def render_slack(rule: str, stories: list[Story], total: int, lang: str, *, test
     else:
         for s in stories:
             url = _safe_url(s.url)
-            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*<{url}|{_slack_esc(s.title)}>*" if url else f"*{_slack_esc(s.title)}*"}})
+            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*<{url}|{_slack_esc(s.headline)}>*" if url else f"*{_slack_esc(s.headline)}*"}})
             # labelled fields (at most 10 per section, 2000 characters each)
             blocks.append({"type": "section", "fields": [{"type": "mrkdwn", "text": f"*{label}*\n{_slack_esc(value)[:300]}"} for label, value in card_fields(s, lang)]})
             if b := brief(s.summary):
@@ -569,7 +834,7 @@ def render_slack(rule: str, stories: list[Story], total: int, lang: str, *, test
     blocks.append({"type": "actions", "elements": [{"type": "button", "text": {"type": "plain_text", "text": lb["button"]}, "url": get_config().base_url + "/"}]})
     # at most 50 blocks: the button stays the last one
     blocks = [*blocks[:49], blocks[-1]] if len(blocks) > 50 else blocks
-    return {"text": f"[Cobe News] {head}: " + "; ".join(_slack_esc(s.title) for s in stories)[:300], "blocks": blocks}
+    return {"text": f"[Cobe News] {head}: " + "; ".join(_slack_esc(s.headline) for s in stories)[:300], "blocks": blocks}
 
 
 def _teams_esc(v: str) -> str:
@@ -588,7 +853,7 @@ def render_teams(rule: str, stories: list[Story], total: int, lang: str, *, test
         body.append({"type": "TextBlock", "text": _teams_esc(lb["test_title"].format(rule=rule)), "wrap": True})
     for s in stories:
         url = _safe_url(s.url)
-        title = f"[{_teams_esc(s.title)}]({url})" if url else _teams_esc(s.title)
+        title = f"[{_teams_esc(s.headline)}]({url})" if url else _teams_esc(s.headline)
         if _compact(total):
             # one line per story: title · Produkt · Kategorie, coloured by its severity
             line = f"{title} · {_teams_esc(compact_extra(s, lang))}"
@@ -650,7 +915,7 @@ def render_discord(rule: str, stories: list[Story], total: int, lang: str, *, te
         lines: list[str] = []
         for s in stories:
             url = _safe_url(_open(s))  # a summary's line opens the story in Cobe News
-            line = f"• [{_discord_esc(s.title)[:200]}]({url}) · {_discord_esc(compact_extra(s, lang))}"
+            line = f"• [{_discord_esc(s.headline)[:200]}]({url}) · {_discord_esc(compact_extra(s, lang))}"
             if len("\n".join([*lines, line])) > DISCORD_LIST:
                 break
             lines.append(line)
@@ -660,7 +925,7 @@ def render_discord(rule: str, stories: list[Story], total: int, lang: str, *, te
         for s in stories[:DISCORD_EMBEDS]:
             b = brief(s.summary)
             e: dict = {
-                "title": _discord_esc(s.title)[:250],
+                "title": _discord_esc(s.headline)[:250],
                 "description": (f"{_discord_esc(b)}\n" if b else "") + f"[{_discord_esc(lb['open'])}]({_safe_url(_open(s))})",
                 "color": DISCORD_COLORS.get(s.severity, DISCORD_COLORS["info"]),
                 "fields": [{"name": label[:256], "value": (_discord_esc(value) or "–")[:DISCORD_FIELD], "inline": True} for label, value in card_fields(s, lang)],
@@ -702,9 +967,9 @@ def render_telegram(rule: str, stories: list[Story], total: int, lang: str, *, t
     shown = 0
     for s in stories:
         if _compact(total):
-            block = [f"• {_tg_link(_open(s), s.title[:200])} · {_tg(compact_extra(s, lang))}"]
+            block = [f"• {_tg_link(_open(s), s.headline[:200])} · {_tg(compact_extra(s, lang))}"]
         else:
-            head = _tg_link(s.url, s.title[:300])
+            head = _tg_link(s.url, s.headline[:300])
             block = ["", head if head.startswith("<b>") else f"<b>{head}</b>", *(f"<b>{_tg(label)}:</b> {_tg(value[:300])}" for label, value in card_fields(s, lang))]
             if b := brief(s.summary):
                 block.append(_tg(b))
@@ -786,7 +1051,7 @@ def render_push(rule: str, stories: list[Story], total: int, lang: str, *, test:
     card as the chats (Produkt, Quelle, Kategorie, short description), a compact list for many stories."""
     lb = LABELS[lang]
     if total == 1 and not test:
-        title = f"{lb['sev'][stories[0].severity]}: {stories[0].title}"
+        title = f"{lb['sev'][stories[0].severity]}: {stories[0].headline}"
     else:
         title = f"{_head(lb, total, test)} · {rule}"
     out: list[str] = []
@@ -795,9 +1060,9 @@ def render_push(rule: str, stories: list[Story], total: int, lang: str, *, test:
     shown = 0
     for s in stories:
         if _compact(total):
-            block = [f"• {one_line(s.title)[:200]} · {one_line(compact_extra(s, lang))}"]
+            block = [f"• {one_line(s.headline)[:200]} · {one_line(compact_extra(s, lang))}"]
         else:
-            block = [one_line(s.title), *(f"{label}: {one_line(value)[:300]}" for label, value in card_fields(s, lang))]
+            block = [one_line(s.headline), *(f"{label}: {one_line(value)[:300]}" for label, value in card_fields(s, lang))]
             if b := brief(s.summary):
                 block += ["", b]
             if url := _safe_url(s.url):
@@ -868,18 +1133,18 @@ def render_mattermost(rule: str, stories: list[Story], total: int, lang: str, *,
         lines = []
         for s in stories:
             url = _safe_url(_open(s))  # a summary's line opens the story in Cobe News
-            lines.append(f"• [{mm_esc(s.title)[:200]}]({url}) · {mm_esc(compact_extra(s, lang))}")
+            lines.append(f"• [{mm_esc(s.headline)[:200]}]({url}) · {mm_esc(compact_extra(s, lang))}")
         attachments.append({"fallback": mm_plain(_head(lb, total, test))[:300], "color": MM_COLORS.get(_top(stories), MM_COLORS["info"]), "text": "\n".join(lines)[:3800]})
         shown = len(stories)
     else:
         for s in stories[:10]:
             url = _safe_url(s.url)
-            body = f"**[{mm_esc(s.title)[:400]}]({url})**" if url else f"**{mm_esc(s.title)[:400]}**"
+            body = f"**[{mm_esc(s.headline)[:400]}]({url})**" if url else f"**{mm_esc(s.headline)[:400]}**"
             if b := brief(s.summary):
                 body += "\n" + mm_esc(b)
             body += f"\n{mm_esc(_date(s.published_at, lang))} · [{mm_esc(lb['open'])}]({_safe_url(_open(s))})"
             fields = [{"title": mm_plain(label), "value": mm_esc(value)[:300], "short": True} for label, value in card_fields(s, lang)]
-            attachments.append({"fallback": mm_plain(f"{lb['sev'][s.severity]}: {s.title}")[:300], "color": MM_COLORS.get(s.severity, MM_COLORS["info"]), "text": body, "fields": fields})
+            attachments.append({"fallback": mm_plain(f"{lb['sev'][s.severity]}: {s.headline}")[:300], "color": MM_COLORS.get(s.severity, MM_COLORS["info"]), "text": body, "fields": fields})
         shown = len(stories[:10])
     if total > shown:
         text += "\n" + mm_esc(lb["more"].format(n=total - shown))
@@ -1181,13 +1446,24 @@ def delivery_id(channel_id: uuid.UUID, key: str) -> str:
 
 
 async def deliver(
-    t: Target, stories: list[Story], total: int, lang: str, label: str, *, rules: list[str] | None = None, smtp: dict | None = None, test: bool = False, key: str = ""
+    t: Target,
+    stories: list[Story],
+    total: int,
+    lang: str,
+    label: str,
+    *,
+    rules: list[str] | None = None,
+    smtp: dict | None = None,
+    test: bool = False,
+    key: str = "",
+    rule_ids: list[str] | None = None,
 ) -> None:
     """One message to one channel – or NotifyError. `key`: what the message carries (its stories / events) – the
-    webhook's delivery id is derived from it (none, e.g. a test: a new id each time)."""
+    webhook's delivery id is derived from it (none, e.g. a test: a new id each time). `rule_ids`: the rules that brought
+    it (the mail's footer links to them)."""
     lang = lang if lang in LABELS else "de"
     if t.type == "email":
-        subject, text, body = render_mail(label, stories, total, lang, test=test)
+        subject, text, body = render_mail(label, stories, total, lang, test=test, rules=rules, rule_ids=rule_ids)
         await send_mail(smtp or {}, t.recipients, subject, text, body)
         return
     if t.type == "telegram":
@@ -1232,15 +1508,25 @@ async def deliver(
 def _story(i: NewsItem, s: NewsSource) -> Story:
     b = news_svc.BUILTIN_BY_KEY.get(s.key) if s.builtin else None
     topics = [t for t in news_svc.TOPICS if t in (i.topics or [])]
-    return Story(str(i.id), i.title, i.summary, i.url, i.severity, s.name, i.published_at, list(i.cves or []), topics=topics, source_kind=b.category if b else "custom")
+    return Story(
+        str(i.id), i.title, i.summary, i.url, i.severity, s.name, i.published_at, list(i.cves or []), topics=topics, source_kind=b.category if b else "custom",
+        product_keys=[str(k) for k in i.products or []],
+    )
 
 
 async def with_products(db: AsyncSession, stories: list[Story]) -> None:
     """The cards' "Produkt" of news stories – only what is reliably known: a followed product the story's details
     concern (with the version entered and its fix: "PAN-OS 11.1.2 → 11.1.6-h3"), else the details' first affected
-    product with its range ("GitLab < 19.5.1", as the News page's card hint). Without details: no product (no guess)."""
+    product with its range ("GitLab < 19.5.1", as the News page's card hint). Without details: no product (no guess).
+    And "Betrifft eure Produkte": the labels of the followed products a story concerns (news_items.products, those
+    still followed) – one query for all the stories."""
     from app import story_details
 
+    keyed = [st for st in stories if st.kind == "news" and st.product_keys and not st.ours]
+    if keyed:
+        labels = await story_details.followed_labels(db)
+        for st in keyed:
+            st.ours = [neutral(labels[k])[:120] for k in st.product_keys if k in labels]
     news_ids = {}
     for st in stories:
         if st.kind == "news" and not st.product:
@@ -1664,6 +1950,7 @@ def vendor_story(ev: VendorEvent, lang: str) -> Story:
         return Story(
             str(ev.id), title[:300], summary[:600], str(d.get("url") or link), ev.severity, lb["source"], ev.created_at, list(d.get("cves") or []), "vendor.vuln", link,
             product=product_line, topics=["exploited"] if d.get("exploited") else [], source_kind="vendor_news", tlp=tlp,
+            ours=[product],  # a Vendor News finding is one of a followed product
         )
     if ev.kind == "change":
         return change_story(ev, lang, where=product, link=link)
@@ -1814,7 +2101,8 @@ class Message:
 
 
 def plan(rows: list[Row]) -> list[Message]:
-    """Per language: up to BATCH stories one message each (oldest first), more in one summary."""
+    """Per language: up to BATCH stories one message each (oldest first), more in one summary (the LIST first by
+    priority: our products, actively exploited, severity, newest)."""
     out: list[Message] = []
     for lang in sorted({r.rule.lang for r in rows}):
         group = [x for x in rows if x.rule.lang == lang]
@@ -1824,7 +2112,7 @@ def plan(rows: list[Row]) -> list[Message]:
             for x in sorted(group, key=lambda x: x.story.published_at):
                 out.append(Message([x.story], 1, lang, x.rule.name, [x.rule.name], [(x.mark[0], x.mark[1], x.rule.id)], [{"id": str(x.rule.id), "name": x.rule.name}]))
         else:
-            top = sorted(group, key=lambda x: (RANK.get(x.story.severity, 0), x.story.published_at), reverse=True)[:LIST]
+            top = sorted(group, key=lambda x: priority(x.story), reverse=True)[:LIST]
             by = sorted({str(x.rule.id): x.rule.name for x in group}.items(), key=lambda kv: (kv[1], kv[0]))
             out.append(Message([x.story for x in top], len(group), lang, label, names, [(x.mark[0], x.mark[1], x.rule.id) for x in group], [{"id": i, "name": n} for i, n in by]))
     return out
@@ -1832,13 +2120,13 @@ def plan(rows: list[Row]) -> list[Message]:
 
 def summary(stories: list[tuple[Story, str, uuid.UUID]], lang: str, rules: list[dict]) -> Message:
     """One message of these stories (story, mark kind, rule id) – as plan() makes it: one story as itself, more as a
-    summary (the LIST most severe listed). A resend sends a delivery again this way."""
+    summary (the LIST first by priority listed). A resend sends a delivery again this way."""
     names = sorted({r["name"] for r in rules if r.get("name")})
     label = ", ".join(names[:3]) + (" …" if len(names) > 3 else "") if names else "Cobe News"
     items = [(kind, uuid.UUID(st.id), rid) for st, kind, rid in stories]
     if len(stories) == 1:
         return Message([stories[0][0]], 1, lang, label, names, items, rules)
-    top = sorted((x[0] for x in stories), key=lambda st: (RANK.get(st.severity, 0), st.published_at), reverse=True)[:LIST]
+    top = sorted((x[0] for x in stories), key=priority, reverse=True)[:LIST]
     return Message(top, len(stories), lang, label, names, items, rules)
 
 
@@ -1944,7 +2232,7 @@ async def _run(db: AsyncSession, gate: asyncio.Lock, job: _Job, smtp: dict) -> i
         if job.target is not None:
             try:
                 async with asyncio.timeout_at(deadline):
-                    await deliver(job.target, m.stories, m.total, m.lang, m.label, rules=m.rules, smtp=smtp, key=m.key)
+                    await deliver(job.target, m.stories, m.total, m.lang, m.label, rules=m.rules, smtp=smtp, key=m.key, rule_ids=[r["id"] for r in m.by])
             except NotifyError as exc:
                 err = exc
             except TimeoutError:
@@ -2142,7 +2430,7 @@ async def resend(db: AsyncSession, ch: NotifyChannel, row, actor=None) -> Notify
         t = resolve(ch)
         await dbm.release(db)  # nothing open while the channel is asked
         async with asyncio.timeout(CHANNEL_DEADLINE):
-            await deliver(t, m.stories, m.total, m.lang, m.label, rules=m.rules, smtp=smtp, key=m.key)
+            await deliver(t, m.stories, m.total, m.lang, m.label, rules=m.rules, smtp=smtp, key=m.key, rule_ids=[str(r.get("id") or "") for r in m.by])
     except NotifyError as exc:
         err = exc
     except TimeoutError:
