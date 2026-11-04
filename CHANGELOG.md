@@ -12,6 +12,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
 ### Betrieb
 - Das Image enthält jetzt `deploy/postgres` und `deploy/nginx` unter `/srv/deploy` (für den Portainer-Stack); die lokale Installation mit `docker-compose.yml` bleibt unverändert.
+- `db-init` hinterlässt kein anonymes Volume mehr (das Postgres-Image erklärt eines; jetzt tmpfs) – nach einem Update kann ein altes, leeres mit `docker volume prune` weg.
 
 ## 0.1.47 – Exploit-Hinweise, Themen in Regeln, Update-Hinweis und Härtung
 
