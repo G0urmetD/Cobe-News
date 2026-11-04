@@ -296,3 +296,21 @@ def test_a_vendor_finding_is_ours_a_version_is_not():
     version = VendorEvent(id=uuid.uuid4(), key="v", kind="version", product="panos", severity="low", created_at=datetime.now(UTC), data={"product": "PAN-OS", "version": "11.1.2", "latest": "11.1.6"})
     assert notify.vendor_story(vuln, "de").ours and not notify.vendor_story(version, "de").ours
     assert personal.story(vuln, "de").ours == []
+
+
+@pytest.mark.parametrize("lang", ["de", "en"])
+def test_tlp_green_is_said_once_in_the_mail_body(lang):
+    green = story(6, title="[TLP:GREEN] Example Firewall 7.2: Lücke", tlp="GREEN")
+    line = notify.tlp_line(lang)
+    for stories in ([green], [green, story(1)], [green, *(story(n) for n in range(1, notify.COMPACT_FROM))]):
+        subject, text, html = notify.render_mail("R", stories, len(stories), lang)
+        assert "[TLP:GREEN]" in subject  # the subject keeps it
+        body = html.split("</head>", 1)[1]
+        assert "[TLP:GREEN]" not in body and "Example Firewall 7.2: Lücke" in body and 'class="cn-tlp"' in body
+        if len(stories) >= notify.COMPACT_FROM:  # the compact text line: the prefix is its one marker
+            assert text.count("TLP:GREEN") == 1 and f"• [{notify.LABELS[lang]['sev']['medium']}] [TLP:GREEN] Example Firewall 7.2: Lücke" in text
+        else:  # a card: the labelled line, the title without the prefix
+            assert text.count("TLP:GREEN") == 1 and line in text and "\nExample Firewall 7.2: Lücke\n" in text
+    # the chat cards as before: the title keeps the prefix, the card its TLP field – no third mention
+    slack = str(notify.render_slack("R", [green], 1, lang)["blocks"])  # (the notification's fallback text aside)
+    assert slack.count("[TLP:GREEN]") == 1 and slack.count(line) == 1

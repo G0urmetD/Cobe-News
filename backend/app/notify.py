@@ -475,6 +475,12 @@ def _why(lb: dict, rule: str, rules: list[str] | None, rule_ids: list[str] | Non
     return {"text": lb["why_rule"][0 if one else 1].format(names=shown), "label": lb["edit_rule"][0 if one else 1], "url": rule_link(rule_ids)}
 
 
+def _body_title(s: Story) -> str:
+    """A title in the mail's body: a TLP:GREEN story has its pill (and its line in the text part) – the "[TLP:GREEN]"
+    in front of the title would say it twice. The subject and the chat cards keep it."""
+    return s.headline.removeprefix(TLP_PREFIX) if s.tlp == "GREEN" else s.headline
+
+
 def _compact_name(s: Story) -> str:
     """The product in front of a compact line – only when neither the title (what it names before the colon) nor the
     "Betrifft eure Produkte" mark says it anyway."""
@@ -564,7 +570,7 @@ def render_mail(
     lb = LABELS[lang]
     stories = sorted(stories, key=priority, reverse=True)
     top = max(stories, key=lambda s: RANK.get(s.severity, 0))
-    heading = lb["test_title"].format(rule=rule) if test else (stories[0].headline if total == 1 else lb["many"].format(n=total))
+    heading = lb["test_title"].format(rule=rule) if test else (_body_title(stories[0]) if total == 1 else lb["many"].format(n=total))
     eyebrow = lb["test"] if test else _summary_line(lb, stories, total)
     more = lb["more"].format(n=total - len(stories)) if total > len(stories) else ""
     compact = len(stories) >= COMPACT_FROM
@@ -573,7 +579,7 @@ def render_mail(
         facts = _facts(s, lang)
         cards.append(
             {
-                "title": s.headline,
+                "title": _body_title(s),
                 "summary": s.summary,
                 "url": _safe_url(s.url),
                 "link": _open(s),
@@ -614,7 +620,8 @@ def render_mail(
     for c in cards:
         mark = f" · {c['ours']}" if c["ours"] else ""
         if compact:
-            lines += [f"• [{c['sev_label']}] {c['name'] + ' · ' if c['name'] else ''}{c['title']}{mark}", f"  {c['link']}"]
+            green = TLP_PREFIX if c["tlp"] else ""  # the compact line's one TLP marker (no line of its own)
+            lines += [f"• [{c['sev_label']}] {green}{c['name'] + ' · ' if c['name'] else ''}{c['title']}{mark}", f"  {c['link']}"]
             continue
         lines += [f"[{c['sev_label']}]{mark}", c["title"]]
         if c["facts_text"]:
