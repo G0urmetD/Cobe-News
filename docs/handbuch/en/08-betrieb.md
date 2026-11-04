@@ -33,7 +33,7 @@ Everything about the installation itself (address, certificate, network, databas
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `TLS_MODE` | `selfsigned` (the app creates and renews the certificate), `own` (your certificate), `external` (TLS ends at your own proxy) | `selfsigned`; with `PROXY_ENABLED=0`: `external` |
+| `TLS_MODE` | `selfsigned` (the app creates and renews the certificate), `own` (your certificate), `external` (TLS ends at your own proxy). HSTS with `external` only when it is set here explicitly ([HSTS](#hsts)) | `selfsigned`; with `PROXY_ENABLED=0`: `external` (without HSTS) |
 | `TLS_SOURCE` | with `own`: folder with `cobe.crt` and `cobe.key`, e.g. `./deploy/certs` | the Docker volume `tls` |
 | `HSTS` | `1` sends [HSTS](term:hsts) with the self-signed certificate too. With `own` and `external` HSTS is always sent – to host names only, never to `localhost` or IP addresses ([HSTS](#hsts)) | `0` |
 
@@ -327,8 +327,11 @@ chmod 600 deploy/certs/cobe.key
 certificate errors.
 
 - With `TLS_MODE=own` and `TLS_MODE=external` Cobe News always sends HSTS – with `external` on every request that
-  came over HTTPS: your proxy must be in `TRUSTED_PROXIES` and send `X-Forwarded-Proto https` (see
-  [example](#proxy-nginx-beispiel)). Your proxy may also set the header itself.
+  came over HTTPS: the app must believe your proxy (the gateway, [below](#trusted-proxies)) and it must send
+  `X-Forwarded-Proto https` (see [example](#proxy-nginx-beispiel)). Your proxy may also set the header itself.
+- `external` only when `TLS_MODE=external` is in the `.env`: if it merely follows from `PROXY_ENABLED=0`, Cobe News
+  sends no HSTS – such installations ran as `selfsigned` without HSTS up to 0.1.48. If you want it, put
+  `TLS_MODE=external` in (or `HSTS=1`).
 - Not with the self-signed certificate – otherwise nobody could "continue anyway". And after every renewal (about every
   150 days, a new certificate) computers that trusted the old one could not get in at all. Set `HSTS=1` only once it is
   trusted on all computers and handed out again after every renewal.
@@ -398,8 +401,9 @@ runs on. At the start the app's log says whom it believes:
 `proxy: PROXY_ENABLED=0 – X-Forwarded-For trusted from 172.31.250.128 (the Docker gateway: a reverse proxy on this host)`.
 You manage the certificate at your proxy. *Settings → HTTPS & certificate* then shows "External reverse proxy".
 
-If you set `TLS_MODE=external` and `TRUSTED_PROXIES=…` as well up to version 0.1.48, you can delete both lines – they do
-no harm, though.
+If you followed the old advice up to version 0.1.48: **remove** `TRUSTED_PROXIES=172.31.250.1/32` (or set it empty) – a
+set `TRUSTED_PROXIES` replaces the gateway, otherwise everyone keeps showing up as `172.31.250.128`; the app's log warns
+at the start. Keep `TLS_MODE=external` if you want HSTS ([HSTS](#hsts)).
 
 ### nginx example {#proxy-nginx-beispiel}
 
@@ -437,10 +441,11 @@ If your proxy runs on the host: **none** – `TRUSTED_PROXIES` stays empty. The 
 - **Why that is safe:** the app's port is published on the host's `127.0.0.1` only. So only what runs on the host
   itself comes from the gateway – your proxy (or someone signed in on the host). Another container comes from its own
   address, another machine never through the gateway.
-- **Docker Desktop, OrbStack, Colima:** there every container reaches the machine's ports through
-  `host.docker.internal` – and would come from the gateway as well. The app notices and then believes nobody (log:
-  `… host.docker.internal resolves … trusted from nobody`). To try it on your own machine: set
-  `TRUSTED_PROXIES=<gateway>/32` explicitly.
+- **Docker Desktop, OrbStack, Colima, WSL2:** there every container reaches the machine's ports through
+  `host.docker.internal` – and would come from the gateway as well. The app believes the gateway only when it is sure to
+  run on a Linux server (kernel and names like `host.docker.internal` checked); otherwise – also when DNS gives no clear
+  answer – it believes nobody (log: `… trusted from nobody`). Likewise when the gateway is not in the network `edge`
+  (`EDGE_SUBNET`). To try it on your own machine: set `TRUSTED_PROXIES=<gateway>/32` explicitly.
 
 You only need `TRUSTED_PROXIES` when your proxy runs **as a container itself** in the network `edge`: give it a fixed
 address there below `.128` – that is, outside `EDGE_RANGE`, e.g. `172.31.250.20` – and enter exactly that:
