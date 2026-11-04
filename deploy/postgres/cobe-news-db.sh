@@ -11,12 +11,17 @@
 # sourced: docker_setup_env, docker_create_db_directories) and then runs itself again as the user postgres (gosu) – PID 1
 # is postgres from then on, without any capability; PostgreSQL, the role set-up and the signals all run as that user.
 # Signals: `docker stop` (SIGINT, the image's STOPSIGNAL) or SIGTERM → PostgreSQL's fast shutdown (SIGINT): open
-# transactions rolled back, a checkpoint, exit 0; SIGHUP → reload of the configuration (as with the official image).
+# transactions rolled back, a checkpoint, exit 0; SIGHUP → reload of the configuration (as with the official image;
+# one that comes during the first start is passed on once the server is up).
 # A failed role set-up stops PostgreSQL and exits 1 – the restart policy tries again; the container never runs healthy
 # without the role (docs/BETRIEB.md: PostgreSQL, Rollen). PostgreSQL ending on its own (kill -9 …) ends the container.
 # bash, not sh: it reaps the finished PostgreSQL at once (its /proc entry goes) and `wait` still knows its exit status.
 set -eu
 
+# options only (command: ["-c", "…"]): for postgres – as the official entrypoint does
+if [ "${1:-}" != "${1#-}" ]; then
+    set -- postgres "$@"
+fi
 if [ "$(id -u)" = 0 ] && [ "${1:-}" = postgres ]; then
     # the data folder (and its owner) as the official entrypoint makes it – in a subshell: its `set -Eeo pipefail` and
     # its variables stay there; only then the switch to postgres (the capabilities are gone with it)
@@ -44,7 +49,10 @@ stop() {
     signal
 }
 trap stop INT TERM
-trap 'kill -HUP "$pg" 2>/dev/null || true' HUP
+# SIGHUP (reload) only to the running server: during the first initdb the official entrypoint would die of it – kept
+# until the server is up, then passed on
+hup=""
+trap 'hup=1' HUP
 
 # PostgreSQL's exit status once it has ended (a trapped signal interrupts `wait`: wait again) – or $1 instead
 finish() {
@@ -70,6 +78,10 @@ if [ -n "$stopping" ]; then
         sleep 1
     done
     finish
+fi
+trap 'kill -HUP "$pg" 2>/dev/null || true' HUP
+if [ -n "$hup" ]; then
+    kill -HUP "$pg" 2>/dev/null || true
 fi
 
 # over the socket, as the superuser POSTGRES_USER (with its password, should pg_hba ask for it)
