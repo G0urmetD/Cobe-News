@@ -1,0 +1,6 @@
+# the build context of the proxy image: these files and nothing else
+*
+!Dockerfile
+!cobe-news.conf.template
+!16-server-names.envsh
+!40-cert-watch.sh

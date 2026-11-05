@@ -259,7 +259,8 @@ async def test_builtin_sources_on_existing_installations():
         on = dict((await s.execute(select(NewsSource.key, NewsSource.enabled))).all())
     assert on["bsi-csw"] is False and on["fortinet-psirt"] is True and on["heise"] is False
     assert on["cisa-kev"] is True and on["talos"] is True and on["enisa-euvd"] is False
-    assert len(news.BUILTIN) == 46 and len({b.key for b in news.BUILTIN}) == 46 and all(b.url.startswith("https://") for b in news.BUILTIN)
+    # 44 since 0.1.49 (cisa, rockwell retired)
+    assert len(news.BUILTIN) == 44 and len({b.key for b in news.BUILTIN}) == 44 and all(b.url.startswith("https://") for b in news.BUILTIN)
     assert {b.category for b in news.BUILTIN} == {"authority", "vendor", "research", "press", "catalog"} and {b.lang for b in news.BUILTIN} == {"de", "en", "fr"}
     assert {b.key for b in news.BUILTIN if b.on} >= {"bsi-csw", "cert-eu", "microsoft-ti", "talos", "cisa-kev"}
 

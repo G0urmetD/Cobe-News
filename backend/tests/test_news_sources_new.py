@@ -1,16 +1,19 @@
-"""Built-in sources of 0.1.7: twelve new ones with their defaults on existing installations, and
-CISA Alerts off by default – switched off where no admin ever switched it, an admin's choice stays."""
+"""Built-in sources of 0.1.7: new ones with their defaults on existing installations; sources taken out (0.1.49: CISA
+Alerts, Rockwell Automation – 403 to automatic fetches) leave every installation with what refers to them."""
 
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import uuid
+from datetime import UTC, datetime
+
 from sqlalchemy import select, update
 
 from app import db, news
-from app.models import NewsSource
+from app.models import AuditEntry, NewsItem, NewsSource, NotifyRule
 
 NEW_ON = {"cert-at", "certvde", "securityweek-ics", "veeam"}
-NEW_OFF = {"cccs", "cert-fr", "watchtowr", "huntress", "rockwell", "oracle", "risky-bulletin", "msrc"}
+NEW_OFF = {"cccs", "cert-fr", "watchtowr", "huntress", "oracle", "risky-bulletin", "msrc"}
 
 
 async def _on() -> dict[str, bool]:
@@ -23,7 +26,7 @@ def test_new_builtin_sources():
     assert {k for k in NEW_ON | NEW_OFF if by[k].on} == NEW_ON
     assert by["cert-fr"].lang == "fr" and by["cert-at"].lang == "de" and by["msrc"].category == "catalog"
     assert by["msrc"].url == "https://api.msrc.microsoft.com/cvrf/v3.0/updates"
-    assert by["cisa"].on is False and by["cisa-kev"].on is True  # the KEV catalog (same host) stays on
+    assert by["cisa-kev"].on is True and not news.RETIRED & set(by)  # the KEV catalog (same host as CISA Alerts) stays
     # every feed host is in the list of outbound hosts in docs/BETRIEB.md
     readme = (Path(__file__).parents[2] / "docs" / "BETRIEB.md").read_text()
     missing = sorted(h for h in {urlsplit(b.url).hostname for b in news.BUILTIN} if f"`{h}`" not in readme)
@@ -43,24 +46,43 @@ async def test_new_sources_arrive_with_their_default():
     assert on["zdi"] is True and on["heise"] is False
 
 
-async def test_cisa_alerts_off_unless_an_admin_chose_it(admin_client):
-    # a new installation: off
-    assert (await _on())["cisa"] is False
-    # an older installation that never touched it (on, nothing recorded): switched off at the next start
+async def test_retired_sources_leave_with_what_refers_to_them():
+    """CISA Alerts and Rockwell Automation (0.1.49) were built in: at the next start they are gone – a rule that named
+    only one of them stops sending news, a story another source carries stays; a source of an admin's own stays."""
     async with db.session() as s:
-        await s.execute(update(NewsSource).where(NewsSource.key == "cisa").values(enabled=True, switched_at=None))
+        cisa = NewsSource(id=uuid.uuid4(), key="cisa", name="CISA Alerts", url="https://www.cisa.gov/cybersecurity-advisories/alerts.xml", site="https://www.cisa.gov", builtin=True, enabled=True, failures=0)
+        rock = NewsSource(id=uuid.uuid4(), key="rockwell", name="Rockwell Automation", url="https://www.rockwellautomation.com/bin/rss/security-advisories.xml", site="https://www.rockwellautomation.com", builtin=True, enabled=False, failures=0)
+        own = NewsSource(id=uuid.uuid4(), key="own-cisa", name="CISA (own)", url="https://www.cisa.gov/own.xml", site="https://www.cisa.gov", builtin=False, enabled=True, failures=0)
+        s.add_all([cisa, rock, own])
+        await s.flush()
+        s.add(NotifyRule(name="only CISA", kinds=["news"], sources=[str(cisa.id)], enabled=True))
+        s.add(NewsItem(source_id=cisa.id, url="https://www.cisa.gov/x", url_key="cisa-x", title="t", title_key="t", published_at=datetime.now(UTC), seq=await news.next_seq(s)))
         await s.commit()
         await news.ensure_sources(s)
-    assert (await _on())["cisa"] is False
-    # an admin switches it on: it stays on, start after start
-    sid = next(x["id"] for x in (await admin_client.get("/api/admin/news")).json()["sources"] if x["key"] == "cisa")
-    assert (await admin_client.patch(f"/api/admin/news/sources/{sid}", json={"enabled": True})).json()["enabled"] is True
-    for _ in range(2):
-        async with db.session() as s:
-            await news.ensure_sources(s)
-    assert (await _on())["cisa"] is True
-    # renaming nothing, switching another source: only that one is recorded
+    keys = set((await _on()))
+    assert not {"cisa", "rockwell"} & keys and "own-cisa" in keys
     async with db.session() as s:
-        rows = dict((await s.execute(select(NewsSource.key, NewsSource.switched_at))).all())
-    assert rows["cisa"] is not None and rows["heise"] is None
+        rule = await s.scalar(select(NotifyRule).where(NotifyRule.name == "only CISA"))
+        assert rule.sources == [] and rule.enabled is False
+        assert await s.scalar(select(NewsItem).where(NewsItem.url == "https://www.cisa.gov/x")) is None  # carried by nobody else
+        entries = list(await s.scalars(select(AuditEntry).where(AuditEntry.action == "source.deleted")))
+        assert {e.target_label for e in entries} == {"CISA Alerts", "Rockwell Automation"} and {e.actor_kind for e in entries} == {"system"}
+    async with db.session() as s:
+        await news.ensure_sources(s)  # again: nothing left to do
+
+
+async def test_a_failing_retirement_never_stops_the_start(monkeypatch):
+    from app import api
+
+    async with db.session() as s:
+        s.add(NewsSource(id=uuid.uuid4(), key="cisa", name="CISA Alerts", url="https://www.cisa.gov/cybersecurity-advisories/alerts.xml", site="https://www.cisa.gov", builtin=True, enabled=True, failures=0))
+        await s.commit()
+
+    async def broken(db_, s_):  # noqa: ANN001
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(api, "forget_source", broken)
+    async with db.session() as s:
+        await news.ensure_sources(s)  # no exception
+    assert "cisa" in await _on() and "heise" in await _on()  # kept for the next start, the rest done
 

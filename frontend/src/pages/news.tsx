@@ -156,6 +156,11 @@ export function NewsPage() {
   const mark = useMarkRead()
   const items = useMemo(() => mergePages(list.data?.pages), [list.data])
   const first = list.data?.pages[0]
+  // whether the news are on, as last answered: a new query (another state, uncached) has no page for a moment –
+  // the page keeps its filters then, only the very first load waits without them
+  const [lastEnabled, setLastEnabled] = useState<boolean | undefined>(undefined)
+  if (first && first.enabled !== lastEnabled) setLastEnabled(first.enabled) // adjusted while rendering, no effect
+  const enabled = first?.enabled ?? lastEnabled
   const counts = first?.counts ?? { new: 0, read: 0 }
   const topicCounts = first?.counts?.topics
   const topicOptions = useMemo(
@@ -224,22 +229,40 @@ export function NewsPage() {
     }
   }
 
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title={t("nav.news")}
-        description={t("news.description")}
-        actions={
-          isAdmin && (
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/settings/integrations#news">
-                <Settings2 /> {t("news.sources")}
-              </Link>
-            </Button>
-          )
-        }
-      />
-      {first && !first.enabled && (
+  const header = (
+    <PageHeader
+      title={t("nav.news")}
+      description={t("news.description")}
+      actions={
+        isAdmin && (
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/settings/integrations#news">
+              <Settings2 /> {t("news.sources")}
+            </Link>
+          </Button>
+        )
+      }
+    />
+  )
+  // before the very first answer: no filters yet – with the news switched off they would show for a moment and vanish
+  if (enabled === undefined)
+    return (
+      <div className="space-y-5">
+        {header}
+        {list.isError ? (
+          <QueryError error={list.error} onRetry={() => void list.refetch()} />
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> {t("news.loading")}
+          </p>
+        )}
+      </div>
+    )
+  // news switched off: only the note – no filters, nothing they could act on
+  if (!enabled)
+    return (
+      <div className="space-y-5">
+        {header}
         <EmptyState
           icon={Newspaper}
           title={t("news.offTitle")}
@@ -252,7 +275,12 @@ export function NewsPage() {
             )
           }
         />
-      )}
+      </div>
+    )
+
+  return (
+    <div className="space-y-5">
+      {header}
       <div className="flex flex-wrap items-center gap-2">
         <SearchBox applied={q} onSearch={setQ} onPending={setTyping} />
         <MultiSelect
@@ -362,7 +390,7 @@ export function NewsPage() {
           <Loader2 className="size-4 animate-spin" /> {t("news.loading")}
         </p>
       ) : items.length === 0 ? (
-        first?.enabled && (
+        enabled && (
           <EmptyState icon={Newspaper} title={t(state === "new" ? "news.emptyNew" : "reader.emptyAll")} text={t(state === "new" ? "news.emptyNewText" : "reader.emptyAllText")} />
         )
       ) : (

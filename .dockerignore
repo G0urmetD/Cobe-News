@@ -8,5 +8,6 @@ data
 .env
 # screenshots for the README – never part of the image (only docs/handbuch is copied)
 docs/images
-# own certificates and keys (TLS_MODE=own) – never part of the image
-deploy/certs
+# deploy/: the database and proxy images have their own build contexts (deploy/postgres, deploy/nginx); own
+# certificates and keys (deploy/certs, TLS_MODE=own) never part of any image
+deploy

@@ -484,7 +484,7 @@ the same content as compact text. The colour follows the severity.
 
 | Field | Content |
 |---|---|
-| Title | the story's title, linking to the original article |
+| Title | the story's title, linking to the original article – without the tags the BSI (WID/CERT-Bund) puts in front ("[NEU]", "[UPDATE]", "[UNGEPATCHT]", "[kritisch]" … "[niedrig]"): severity and topic are shown anyway. Other brackets and everything inside the title stay; the [webhook](#webhook) gets the title unchanged |
 | **Product** | only when reliably known: for Vendor News the product with your version and the fix ("PAN-OS 11.1.2 → 11.1.6-h3"); for stories a followed product the [details from the source](/docs/news-quellen#details-aus-der-quelle) concern (likewise with version and fix), else the details' first affected product ("GitLab < 19.5.1"). When nothing is reliably known, the field is left out – nothing is guessed. A followed product is named as the catalogue names it today – also after a rename, a split or a [merge](/docs/vendor-news#zusammengelegte-produkte). |
 | **Source** | the source's name |
 | **Category** | the story's [topics](/docs/news-quellen#themen) (at most three) and the severity, e.g. "Zero-day · Actively exploited · Critical"; without a topic the severity and the kind of source ("High · Authority") |
@@ -507,8 +507,41 @@ Google released an emergency update for Chrome. CVE-2026-1234 is already exploit
 When **more than 3** stories come at once (a [summary](#einmal-pro-kanal)), it becomes a **compact list**: one line per
 story – "title · product · category", the title opens the story in Cobe News – and "… and N more in Cobe News". So
 every message stays within the services' limits (Discord: one embed, Slack: at most 50 blocks, Telegram: below 4096
-characters). The labels are in the rule's language. Email stays as it is (a card with severity, source and date). The
-"Test" button sends the newest story (with its product, when known) or an example in exactly this format.
+characters). The labels are in the rule's language. What the email looks like is described under
+[What the email looks like](#mail-format). The "Test" button sends the newest story (with its product, when known) or an
+example in exactly this format.
+
+### What the email looks like {#mail-format}
+
+An email comes as HTML with an equivalent text part (for programs that show text only). It loads nothing – no images,
+no tracking pixels.
+
+- **Subject.** One story: severity and title ("[Cobe News] High: Emerson Ovation: Multiple vulnerabilities"). Several:
+  how many and what they are about, in the mail's order – per story the own product it concerns, else what the title
+  names before the colon, else the shortened title; at most about 150 characters, the rest as "+N" ("[Cobe News] 5 new
+  stories: Emerson Ovation, SolarWinds Dameware +3"). With a TLP:GREEN story among them, "[TLP:GREEN]" comes first.
+- **Header.** The heading ("5 new security stories", for one story its title) and below it a line with what matters
+  most: "Highest severity: High · 1 concerns your products · 1 actively exploited" – parts that are zero are left out.
+- **Order.** First what is urgent – **actively exploited** or **critical** –, then what concerns **your products**,
+  then by **severity**, then the **newest** first. A [summary](#einmal-pro-kanal) picks its ten in the same order – a
+  low finding of an own product never pushes out an exploited or critical story.
+- **Per story** (up to 5 stories): severity, source and time; "Concerns your products: …" – highlighted – when the
+  [details from the source](/docs/news-quellen#details-aus-der-quelle) concern a product followed in Vendor News (as the
+  filter "Concerns our products" on the News page) or a Vendor News finding does. When the rule is limited to teams,
+  only those teams' products count (when several rules brought the story, everything one of them covers); the title (without the BSI tags, see
+  above); a line with the **product** (when reliably known), the first three **CVEs** ("+N" for more) and the
+  **topics** ("Actively exploited", "Zero-day", "Exploit published" …); the summary; "Open article" and "Open in Cobe
+  News".
+- **From 6 stories** a compact list: one line per story – severity, product, the title as a link into Cobe News –
+  without summaries.
+- **Time.** Local time with the zone's abbreviation, so it is unambiguous: "2026-11-04 11:19 CET" (summer: CEST; in
+  German "MEZ"/"MESZ"). Channels use Europe/Berlin; [personal messages](#meine-produkte) the person's time zone (from
+  their [quiet hours](#ruhezeiten), else Europe/Berlin as well).
+- **Light and dark.** The mail has a light and a dark colour scheme; programs with a dark mode (Apple Mail, iOS, Outlook
+  for Mac and Outlook.com, Thunderbird) show the dark one, the severity stays readable in both.
+- **Footer.** Why the mail comes: "Rule “Critical” · Edit rule" – the link opens the rule under *Settings → Channels &
+  rules* (with several rules the list; admins only). Personal messages say instead for which products and CVEs they come
+  and where to switch them off.
 
 ### Creating a channel {#kanal-anlegen}
 
@@ -1039,7 +1072,7 @@ one. Invalid entries are skipped silently – so check with "Test" after the res
 
 - private addresses (`10.…`, `172.16–31.…`, `192.168.…`, IPv6 ULA and other non-public ranges),
 - Cobe News' own Docker networks, e.g. a receiver in the network `edge`: `WEBHOOK_PRIVATE_NETS=172.31.250.50`,
-- the Docker host: the container's gateway (`172.31.250.1` out of the box), with Docker Desktop `192.168.65.0/24`.
+- the Docker host: the container's gateway (`172.31.250.128` out of the box), with Docker Desktop `192.168.65.0/24`.
 
 **Always blocked**, even when the address is in the list:
 
@@ -1142,7 +1175,7 @@ Nothing arrives? Does the machine's firewall allow port 8080? If the channel sho
 loopback is always blocked. Instead:
 
 - **Linux:** the script listens on `0.0.0.0` (as above). As the target, use the machine's LAN address or the
-  container's gateway (`172.31.250.1` out of the box) and enter exactly that address in `WEBHOOK_PRIVATE_NETS`.
+  container's gateway (`172.31.250.128` out of the box) and enter exactly that address in `WEBHOOK_PRIVATE_NETS`.
 - **Docker Desktop:** services that listen only on the machine's `127.0.0.1` are reached by the container through the
   address behind `host.docker.internal`, usually `192.168.65.254`. Use that address in the URL and enter it in
   `WEBHOOK_PRIVATE_NETS` – Cobe News always refuses the name `host.docker.internal` itself.
@@ -1262,7 +1295,8 @@ A rule only sends what arrives **after** it was saved or switched on. Older stor
   was rated higher in the meantime follows as well.
 - Each story goes out **at most once per channel** – even when several rules send it to the same channel.
 - **Up to 3** stories of a round come one by one (oldest first). **More** come as **one summary**: the 10 most
-  important, the rest counted. Rules with different languages get separate messages.
+  important, the rest counted – first actively exploited and critical ones, then what concerns your products, then by
+  severity and the newest first. Rules with different languages get separate messages.
 - The channels are served side by side. If a channel fails, its stories stay open and come with the next try – after
   2, 4, 8 … minutes, at most 6 hours (see [Testing, errors and pause](#kanal-testen)).
 - Each message is marked as sent right after it went out. If the process dies exactly in between, it comes again; a

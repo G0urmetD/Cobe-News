@@ -1,19 +1,47 @@
-# Cobe News for Portainer (Stacks → Add stack → Web editor): paste this file, fill in the values under "Environment
-# variables", deploy – no checkout, no files on the host. docs/BETRIEB.md: Portainer (Stack-Editor).
-# Self-contained (not an override): the released image ghcr.io/g0urmetd/cobe-news (0.1.48 or newer – it carries the
-# files of deploy/ in /srv/deploy), PostgreSQL 18 and nginx, with the same hardening as docker-compose.yml. The one-shot
-# service "assets" copies the database and nginx files out of the app image into two volumes at every start, so an
-# image update brings the matching files along.
-# Required: POSTGRES_PASSWORD and POSTGRES_APP_PASSWORD (letters and digits, e.g. `openssl rand -hex 24`) – without
-# them the stack does not deploy. Everything else has the defaults of docker-compose.yml; on a server usually
-# BIND=0.0.0.0 with BASE_URL set to the address people type. Data in named volumes (data, db18, tls) – kept on
-# "Update the stack" and on a stop; deleting the stack together with its volumes deletes the database.
-# No container_name: the containers are named after the stack (stack "news" → news-app-1, volume news_db18), so the
-# names and volumes of a stack and a local compose install (cobe-news-app …) never clash – on a host with a local
-# install the stack must not be called "cobe-news" (that is the local install's project name: the same volumes), and
-# PORT, APP_PORT, EDGE_SUBNET, EDGE_RANGE and PROXY_IP need other values (the defaults are the local install's: the same
-# ports, "Pool overlaps"). Docker standalone only, not Swarm: docker stack deploy ignores the depends_on conditions,
-# network_mode, security_opt, mem_limit, scale and ipv4_address, and restarts the finished "assets" over and over.
+# Cobe News for Portainer (Stacks → Add stack → Web editor): paste this file, enter ONE of the two blocks below under
+# "Environment variables" (switch to "Advanced mode" and paste the lines), fill in the passwords (letters and digits,
+# e.g. `openssl rand -hex 24`) and the address, deploy. No checkout, no files on the host; three containers, all of
+# them stay running: app, db, proxy. Details, updates and limits: docs/BETRIEB.md, "Portainer (Stack-Editor)".
+#
+# A) Behind your own reverse proxy on this host (nginx, Traefik … with your certificate) – Cobe News' nginx stays off:
+#
+#      POSTGRES_PASSWORD=<random – keep it, the database is created with it>
+#      POSTGRES_APP_PASSWORD=<random, at least 16 characters>
+#      BASE_URL=https://news.corp.example
+#      PROXY_ENABLED=0
+#
+#    The app listens on http://127.0.0.1:8096 (APP_PORT, this host only) and trusts X-Forwarded-For/-Proto only from
+#    this host (the Docker gateway of its network; on Docker Desktop & co. from nobody – the log line "proxy:" says
+#    whom) – the only switch is PROXY_ENABLED=0. In your nginx:
+#      server { listen 443 ssl; server_name news.corp.example; ssl_certificate …; ssl_certificate_key …;
+#        location / { proxy_pass http://127.0.0.1:8096; proxy_http_version 1.1; proxy_set_header Connection "";
+#          proxy_set_header Host $http_host; proxy_set_header X-Forwarded-For $remote_addr;
+#          proxy_set_header X-Forwarded-Proto https; } }
+#    (X-Forwarded-For $remote_addr, never $proxy_add_x_forwarded_for – docs/BETRIEB.md: HTTPS, 3). Never publish
+#    APP_PORT beyond 127.0.0.1 while the gateway is trusted – if you do (ports of the app changed), set
+#    TRUSTED_PROXIES=none. Up to 0.1.48 the docs said TRUSTED_PROXIES=172.31.250.1/32: remove that line.
+#
+# B) Without – Cobe News' own HTTPS (nginx with a certificate the app makes and renews itself), port 8095:
+#
+#      POSTGRES_PASSWORD=<random – keep it, the database is created with it>
+#      POSTGRES_APP_PASSWORD=<random, at least 16 characters>
+#      BASE_URL=https://news.corp.example:8095
+#      BIND=0.0.0.0
+#
+#    (BIND=0.0.0.0 opens port 8095 to the network – leave it out to reach it from this host only until the first admin
+#    has set up TOTP; nginx answers only to the names in BASE_URL, NEWS_HOSTNAME, TLS_NAMES and localhost.)
+#
+# Recommended in both: POSTGRES_RESTORE_PASSWORD=<random, at least 16> (the restore test). Every other variable of
+# .env.example works the same; COBE_NEWS_VERSION picks the release (default: the one this file comes from).
+# Images: ghcr.io/g0urmetd/cobe-news, -db and -proxy of that version, signed (cosign, docs/BETRIEB.md) – the database
+# image sets up the app's own role (no superuser) at every start and only then counts as healthy, the proxy image
+# carries nginx's configuration. Same hardening as docker-compose.yml. Data in named volumes (data, db18, tls) – kept
+# on "Update the stack"; deleting the stack together with its volumes deletes the database.
+# No container_name: the containers are named after the stack (stack "news" → news-app-1, volume news_db18). Next to a
+# local install on the same host: not the stack name "cobe-news" (its volumes), and other values for PORT, APP_PORT,
+# EDGE_SUBNET, EDGE_RANGE and PROXY_IP (the defaults are the local install's). Docker standalone only, not Swarm.
+# From the 0.1.48 file (services assets and db-init): delete COBE_NEWS_IMAGE from the variables, "Update the stack"
+# with "Prune services" on (or delete the two exited containers) – docs/BETRIEB.md.
 
 x-logging: &logging
   driver: json-file
@@ -22,48 +50,8 @@ x-logging: &logging
     max-file: "3"
 
 services:
-  # once at every start, before db-init and proxy: the deploy files of this image (/srv/deploy) into the volumes
-  # deploy-postgres and deploy-nginx – old files out, the new ones in, read-only for everyone else. As the image's user
-  # cobenews (the owner Docker gives the fresh volumes, Dockerfile: /assets), no capability, no network.
-  assets:
-    image: ${COBE_NEWS_IMAGE:-ghcr.io/g0urmetd/cobe-news:0.1.48}
-    logging: *logging
-    restart: "no"
-    entrypoint: ["/bin/sh", "-ec"]
-    command:
-      - |
-        for d in postgres nginx; do
-          if [ ! -d "/srv/deploy/$$d" ]; then
-            echo "assets: /srv/deploy/$$d missing – COBE_NEWS_IMAGE must be Cobe News 0.1.48 or newer" >&2
-            exit 1
-          fi
-          if [ ! -w "/assets/$$d" ]; then
-            echo "assets: cannot write the volume deploy-$$d (owner uid $$(stat -c %u "/assets/$$d"), this is uid $$(id -u)) – delete that volume of the stack, then deploy again (it is made anew from the image)" >&2
-            exit 1
-          fi
-          find "/assets/$$d" -mindepth 1 -delete
-          cp -R "/srv/deploy/$$d/." "/assets/$$d/"
-          chmod -R u=rwX,go=rX "/assets/$$d"
-        done
-        echo "assets: $$(find /assets -type f | wc -l) deploy files copied"
-    volumes:
-      - deploy-postgres:/assets/postgres
-      - deploy-nginx:/assets/nginx
-    # the image declares /data and /tls as volumes: tmpfs here, so this one-shot leaves no anonymous volumes behind
-    tmpfs:
-      - /data
-      - /tls
-    network_mode: none
-    mem_limit: 64m
-    pids_limit: 32
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
   app:
-    image: ${COBE_NEWS_IMAGE:-ghcr.io/g0urmetd/cobe-news:0.1.48}
+    image: ${COBE_NEWS_IMAGE:-ghcr.io/g0urmetd/cobe-news:${COBE_NEWS_VERSION:-0.1.49}}
     logging: *logging
     restart: unless-stopped
     mem_limit: ${APP_MEM:-512m}
@@ -72,12 +60,15 @@ services:
       BASE_URL: ${BASE_URL:-https://localhost:8095}   # the address in the browser – links in notifications, Entra redirect
       NEWS_HOSTNAME: ${NEWS_HOSTNAME:-}               # FQDN for the self-signed certificate (besides localhost/127.0.0.1)
       TLS_NAMES: ${TLS_NAMES:-}                       # more names/IPs for it, comma separated
-      TLS_MODE: ${TLS_MODE:-selfsigned}               # selfsigned | own | external
+      TLS_MODE: ${TLS_MODE:-}                         # selfsigned | own | external; empty: selfsigned, with PROXY_ENABLED=0 external
       TLS_PATH: /tls
       HSTS: ${HSTS:-0}
-      PROXY_ENABLED: ${PROXY_ENABLED:-1}
-      PROXY_IP: ${PROXY_IP:-172.31.250.10}            # X-Forwarded-For is trusted only from here (and TRUSTED_PROXIES)
+      PROXY_ENABLED: ${PROXY_ENABLED:-1}              # 0: your own reverse proxy on this host instead of the bundled nginx
+      PROXY_IP: ${PROXY_IP:-172.31.250.10}            # the bundled nginx: X-Forwarded-For is trusted from here (and TRUSTED_PROXIES)
+      # empty: with PROXY_ENABLED=0 the Docker gateway (this host – the app's port is published on 127.0.0.1 only);
+      # set: exactly these instead; "none": nobody (docs/BETRIEB.md: HTTPS, 3)
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      EDGE_SUBNET: ${EDGE_SUBNET:-172.31.250.0/24}    # the network edge (below): the gateway is trusted only inside it
       SHARED_ADDRESSES: ${SHARED_ADDRESSES:-}         # addresses many people share: never blocked (docs/BETRIEB.md)
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
       SECRET_KEY: ${SECRET_KEY:-}                     # empty: a key file in the volume data (secret.key, 0600)
@@ -90,12 +81,12 @@ services:
       WEB_PUSH: ${WEB_PUSH:-1}                        # desktop notifications with the tab closed (docs/BETRIEB.md: Web Push)
       PUSH_CONTACT: ${PUSH_CONTACT:-}                 # mailto:/https: contact for the push services; empty: BASE_URL
       POSTGRES_HOST: db
-      # the app's own role – owner of the database, no superuser (db-init creates it; docs/BETRIEB.md: PostgreSQL, Rollen)
+      # the app's own role – owner of the database, no superuser (the db image sets it up; docs/BETRIEB.md: PostgreSQL, Rollen)
       POSTGRES_USER: cobe_news_app
-      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD under Environment variables (letters and digits, at least 16 – docs/BETRIEB.md, Portainer)}
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?set it under the stack's Environment variables (letters and digits – docs/BETRIEB.md, Portainer)}
       BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}       # set: backups encrypted, with the key (docs/BETRIEB.md: Sicherung)
-      # the restore test's throwaway database (its own role, no right on the app's database – db-init makes both when
-      # the password is set; empty: no restore test). docs/BETRIEB.md: Rücksicherungs-Test
+      # the restore test's throwaway database (its own role, no right on the app's database – the db image makes both
+      # when the password is set; empty: no restore test). docs/BETRIEB.md: Rücksicherungs-Test
       POSTGRES_RESTORE_PASSWORD: ${POSTGRES_RESTORE_PASSWORD:-}
       SQLITE_IMPORT: ${SQLITE_IMPORT:-1}              # 0: never move data/news.db (up to 0.1.15) into an empty database (docs/BETRIEB.md)
       MAX_BODY_BYTES: ${MAX_BODY_BYTES:-}             # largest request body the app takes (empty: 1 MiB, behind nginx's 1 MB)
@@ -110,9 +101,7 @@ services:
       - db
     depends_on:
       db:
-        condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
+        condition: service_healthy   # healthy = PostgreSQL up AND the app's role set up for this start
     read_only: true
     tmpfs:
       - /tmp
@@ -121,9 +110,13 @@ services:
     cap_drop:
       - ALL
 
-  # PostgreSQL 18 – reachable only from the app (network "db" is internal, no port published)
+  # PostgreSQL 18 – reachable only from the app (network "db" is internal, no port published). Up to 0.1.15 the data
+  # was in data/news.db (SQLite): the first start of 0.1.16 moves it here once and leaves the file as it is (docs/BETRIEB.md).
+  # At every start, before it counts as healthy (and so before the app starts), it sets up the app's own role
+  # cobe_news_app (no superuser) and its ownership of the database (the image's cobe-news-db.sh, db-init.sh). Only
+  # this container knows the superuser's password.
   db:
-    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    image: ${COBE_NEWS_DB_IMAGE:-ghcr.io/g0urmetd/cobe-news-db:${COBE_NEWS_VERSION:-0.1.49}}
     logging: *logging
     restart: unless-stopped
     mem_limit: ${DB_MEM:-512m}
@@ -131,16 +124,20 @@ services:
     environment:
       POSTGRES_USER: cobe_news
       POSTGRES_DB: cobe_news
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD under Environment variables (letters and digits; keep it – the database volume is created with it)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it under the stack's Environment variables (letters and digits – docs/BETRIEB.md, Portainer)}
       # byte order (as SQLite compared), no dependence on the C library's collation (no reindex after an image update)
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=builtin --locale=C.UTF-8"
+      # the app's role – its password set again at every start (the image's app-role.sql)
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?set it under the stack's Environment variables (letters and digits – docs/BETRIEB.md, Portainer)}
+      POSTGRES_RESTORE_PASSWORD: ${POSTGRES_RESTORE_PASSWORD:-}   # optional: the restore test's role (restore-role.sql)
     volumes:
       # PostgreSQL 18 keeps its data under /var/lib/postgresql/18/docker: the volume is mounted one level up
       - db18:/var/lib/postgresql
     networks:
       - db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cobe_news -d cobe_news"]
+      # the marker: written after the role set-up of this start, on the tmpfs /var/run/postgresql
+      test: ["CMD-SHELL", "test -f /var/run/postgresql/.cobe-news-ready && pg_isready -q -U cobe_news -d cobe_news"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -152,7 +149,8 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
-    # the entrypoint (root) fixes the data folder's owner and switches to the user postgres – nothing else
+    # the entrypoint (root) fixes the data folder's owner and switches to the user postgres (also to pass `docker stop`
+    # on to it) – nothing else
     cap_drop:
       - ALL
     cap_add:
@@ -162,59 +160,14 @@ services:
       - SETGID
       - SETUID
 
-  # once at every start, before the app: the app's role cobe_news_app (no superuser) and its ownership of the database
-  # – the only container that knows the superuser's password (deploy/postgres from the volume of "assets")
-  db-init:
-    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
-    logging: *logging
-    restart: "no"
-    entrypoint: ["/bin/sh", "/init/db-init.sh"]
-    user: "70:70"   # postgres in the alpine image – psql needs no root
-    environment:
-      PGHOST: db
-      PGUSER: cobe_news
-      PGDATABASE: cobe_news
-      PGAPPNAME: cobe-news-db-init
-      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD under Environment variables (letters and digits; keep it – the database volume is created with it)}
-      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD under Environment variables (letters and digits, at least 16 – docs/BETRIEB.md, Portainer)}
-      POSTGRES_RESTORE_PASSWORD: ${POSTGRES_RESTORE_PASSWORD:-}   # optional: the restore test's role (restore-role.sql)
-    volumes:
-      - deploy-postgres:/init:ro
-    networks:
-      - db
-    depends_on:
-      db:
-        condition: service_healthy
-      assets:
-        condition: service_completed_successfully
-    mem_limit: 64m
-    pids_limit: 32
-    read_only: true
-    # the postgres image declares /var/lib/postgresql a volume: tmpfs here (psql writes nothing), no anonymous volume
-    tmpfs:
-      - /var/lib/postgresql
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
+  # nginx with Cobe News' configuration in the image (the template, the names, the certificate watch)
   proxy:
-    image: nginx:1.30-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
+    image: ${COBE_NEWS_PROXY_IMAGE:-ghcr.io/g0urmetd/cobe-news-proxy:${COBE_NEWS_VERSION:-0.1.49}}
     logging: *logging
     restart: unless-stopped
     scale: ${PROXY_ENABLED:-1}
     mem_limit: 128m
     pids_limit: 64
-    # the files of deploy/nginx come from the volume, not from /docker-entrypoint.d (nginx's own scripts there stay and
-    # run as always): first the names (16-server-names.envsh, sourced – it exports NEWS_SERVER_NAMES for the template)
-    # and the certificate watch (40-cert-watch.sh, it goes to the background), then the image's own entrypoint, which
-    # fills the template from NGINX_ENVSUBST_TEMPLATE_DIR into conf.d and starts nginx
-    entrypoint:
-      - /bin/sh
-      - -ec
-      - . /etc/nginx/cobe-news/16-server-names.envsh; /bin/sh /etc/nginx/cobe-news/40-cert-watch.sh; exec /docker-entrypoint.sh "$$@"
-      - cobe-news-proxy
-    command: ["nginx", "-g", "daemon off;"]
     environment:
       NEWS_HTTPS_PORT: ${PORT:-8095}
       # the names nginx answers to (16-server-names.envsh): BASE_URL's host, NEWS_HOSTNAME, TLS_NAMES, localhost – any
@@ -225,14 +178,10 @@ services:
       # only for a warning at the start: published to the network while BASE_URL still names localhost
       NEWS_BIND: ${BIND:-127.0.0.1}
       NGINX_ENVSUBST_FILTER: "^NEWS_"
-      NGINX_ENVSUBST_TEMPLATE_DIR: /etc/nginx/cobe-news
-      # the app image the files come from: a new one recreates the proxy too, so it reads the new files (unused otherwise)
-      COBE_NEWS_ASSETS_FROM: ${COBE_NEWS_IMAGE:-ghcr.io/g0urmetd/cobe-news:0.1.48}
     ports:
       # with a sign-in in front, BIND=0.0.0.0 may open it to the network (docs/BETRIEB.md)
       - "${BIND:-127.0.0.1}:${PORT:-8095}:443"
     volumes:
-      - deploy-nginx:/etc/nginx/cobe-news:ro
       - ${TLS_SOURCE:-tls}:/etc/nginx/tls:ro
     networks:
       edge:
@@ -240,8 +189,6 @@ services:
     depends_on:
       app:
         condition: service_healthy
-      assets:
-        condition: service_completed_successfully
     read_only: true
     tmpfs:
       - /etc/nginx/conf.d
@@ -269,6 +216,10 @@ networks:
         - subnet: ${EDGE_SUBNET:-172.31.250.0/24}
           # dynamic addresses only from the upper half – the proxy's fixed one (.10) is never given to anyone else
           ip_range: ${EDGE_RANGE:-172.31.250.128/25}
+          # the address of this host in the network (a reverse proxy on the host comes from it). Empty: Docker takes the
+          # first address of EDGE_RANGE – 172.31.250.128 by default. Only for a network created anew (docs/BETRIEB.md:
+          # HTTPS, 3); empty keeps an existing network as it is
+          gateway: ${EDGE_GATEWAY:-}
   # app ↔ database only: internal (no route out, nothing published)
   db:
     internal: true
@@ -277,5 +228,3 @@ volumes:
   data:
   tls:
   db18:
-  deploy-postgres:
-  deploy-nginx:

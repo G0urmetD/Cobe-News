@@ -17,7 +17,7 @@ from app import csaf_providers, cvelist, db, osv, vendor
 from app import vendor_catalog as catalog
 from app.models import VendorAdvisory, VendorFetch
 from app.news import NewsError
-from tests.test_structured import ASA_DOC, CISCO, _adv, _cisco_routes, _csaf_round, _delta, _follow, _gh_routes, delta_zip, fx, net, record, structured_on  # noqa: F401
+from tests.test_structured import ASA_DOC, CISCO, _adv, _cisco_routes, _csaf_round, _delta, _follow, _gh_routes, asa_recent, delta_zip, fx, net, record, structured_on  # noqa: F401
 
 SCHNEIDER = next(p for p in csaf_providers.providers() if p["key"] == "schneider")
 
@@ -342,7 +342,7 @@ async def test_M7_a_fresh_document_of_the_first_fill_is_notified(net, structured
             v.baseline_at = now - timedelta(days=100)
         s.add(VendorFetch(key="nvd:a:cisco:adaptive_security_appliance_software", failures=0, items=0, last_ok_at=now))
         await s.commit()
-    _cisco_routes(net, csv_=f"2026/cisco-sa-asaftd-tunnel-dos-s6mgkb75.json,{_ts(now - timedelta(days=1))}\n")
+    _cisco_routes(net, csv_=f"2026/cisco-sa-asaftd-tunnel-dos-s6mgkb75.json,{_ts(now - timedelta(days=1))}\n", doc=asa_recent())
     await _csaf_round()
     async with db.session() as s:
         a = await s.get(VendorAdvisory, "csaf:cisco-sa-asaftd-tunnel-dos-s6mgkb75")

@@ -504,7 +504,7 @@ Gotify bekommen denselben Inhalt als knappen Text. Die Farbe richtet sich nach d
 
 | Feld | Inhalt |
 |---|---|
-| Titel | der Titel der Meldung, als Link zum Originalartikel |
+| Titel | der Titel der Meldung, als Link zum Originalartikel – ohne die Kennzeichen, die das BSI (WID/CERT-Bund) voranstellt („[NEU]“, „[UPDATE]“, „[UNGEPATCHT]“, „[kritisch]“ … „[niedrig]“): Schwere und Thema stehen ohnehin dabei. Andere Klammern und alles im Titel bleiben; der [Webhook](#webhook) bekommt den Titel unverändert |
 | **Produkt** | nur wenn sicher bekannt: bei Vendor News das Produkt mit eurer Version und dem Fix („PAN-OS 11.1.2 → 11.1.6-h3“); bei Meldungen ein gefolgtes Produkt, das die [Details aus der Quelle](/docs/news-quellen#details-aus-der-quelle) betreffen (ebenso mit Version und Fix), sonst das erste betroffene Produkt der Details („GitLab < 19.5.1“). Ist nichts sicher bekannt, fehlt das Feld – geraten wird nicht. Ein gefolgtes Produkt heißt, wie der Katalog es heute nennt – auch nach einer Umbenennung, Aufteilung oder [Zusammenlegung](/docs/vendor-news#zusammengelegte-produkte). |
 | **Quelle** | der Name der Quelle |
 | **Kategorie** | die [Themen](/docs/news-quellen#themen) der Meldung (höchstens drei) und die Schwere, z. B. „Zero-Day · Aktiv ausgenutzt · Kritisch“; ohne Thema die Schwere und die Art der Quelle („Hoch · Behörde“) |
@@ -527,9 +527,44 @@ Google hat ein Notfall-Update für Chrome veröffentlicht. Die Lücke CVE-2026-1
 Kommen **mehr als 3** Meldungen auf einmal (eine [Sammelnachricht](#einmal-pro-kanal)), wird daraus eine **kompakte
 Liste**: eine Zeile je Meldung – „Titel · Produkt · Kategorie“, der Titel öffnet die Meldung in Cobe News – und
 „… und N weitere in Cobe News“. So bleibt jede Nachricht unter den Grenzen der Dienste (Discord: ein Embed, Slack:
-höchstens 50 Blöcke, Telegram: unter 4096 Zeichen). Die Sprache der Beschriftungen ist die der Regel. Die E-Mail bleibt,
-wie sie ist (Karte mit Schwere, Quelle und Datum). Der Knopf „Testen“ schickt die neueste Meldung (mit ihrem Produkt,
-wenn bekannt) oder ein Beispiel in genau diesem Aussehen.
+höchstens 50 Blöcke, Telegram: unter 4096 Zeichen). Die Sprache der Beschriftungen ist die der Regel. Wie die
+E-Mail aussieht, steht unter [So sieht die E-Mail aus](#mail-format). Der Knopf „Testen“ schickt die neueste Meldung
+(mit ihrem Produkt, wenn bekannt) oder ein Beispiel in genau diesem Aussehen.
+
+### So sieht die E-Mail aus {#mail-format}
+
+Eine E-Mail kommt als HTML mit einem gleichwertigen Textteil (für Programme, die nur Text zeigen). Sie lädt nichts
+nach – keine Bilder, keine Zählpixel.
+
+- **Betreff.** Eine Meldung: Schwere und Titel („[Cobe News] Hoch: Emerson Ovation: Mehrere Schwachstellen“). Mehrere:
+  wie viele und worum es geht, in der Reihenfolge der Mail – je Meldung das betroffene eigene Produkt, sonst was der
+  Titel vor dem Doppelpunkt nennt, sonst der gekürzte Titel; höchstens rund 150 Zeichen, der Rest als „+N“
+  („[Cobe News] 5 neue Meldungen: Emerson Ovation, SolarWinds Dameware +3“). Ist eine TLP:GREEN-Meldung dabei, steht
+  „[TLP:GREEN]“ vorn.
+- **Kopf.** Die Überschrift („5 neue Security-Meldungen“, bei einer Meldung ihr Titel) und darunter eine Zeile mit dem
+  Wichtigsten: „Höchste Schwere: Hoch · 1 betrifft eure Produkte · 1 aktiv ausgenutzt“ – Teile mit null fallen weg.
+- **Reihenfolge.** Zuerst das Dringende – **aktiv ausgenutzt** oder **kritisch** –, dann, was **eure Produkte**
+  betrifft, dann nach **Schwere**, zuletzt die **neueste** zuerst. Nach derselben Reihenfolge wählt eine
+  [Sammelnachricht](#einmal-pro-kanal) ihre zehn aus – ein niedriger Befund eines eigenen Produkts verdrängt nie eine
+  ausgenutzte oder kritische Meldung.
+- **Je Meldung** (bis 5 Meldungen): Schwere, Quelle und Zeit; „Betrifft eure Produkte: …“ – hervorgehoben – wenn die
+  [Details aus der Quelle](/docs/news-quellen#details-aus-der-quelle) ein in Vendor News gefolgtes Produkt betreffen
+  (wie der Filter „Betrifft unsere Produkte“ auf der News-Seite) oder ein Vendor-News-Befund es tut. Ist die Regel
+  auf Teams beschränkt, zählen nur die Produkte dieser Teams (brachten mehrere Regeln die Meldung, alles, was eine von
+  ihnen abdeckt); der Titel (ohne die
+  BSI-Kennzeichen, siehe oben); eine Zeile mit **Produkt** (wenn sicher bekannt), den ersten drei **CVEs** („+N“ für
+  weitere) und den **Themen** („Aktiv ausgenutzt“, „Zero-Day“, „Exploit veröffentlicht“ …); die Zusammenfassung;
+  „Artikel öffnen“ und „In Cobe News öffnen“.
+- **Ab 6 Meldungen** eine kompakte Liste: eine Zeile je Meldung – Schwere, Produkt, der Titel als Link in Cobe News –
+  ohne Zusammenfassungen.
+- **Zeit.** In Ortszeit mit Zonenkürzel, damit sie eindeutig ist: „04.11.2026 11:19 MEZ“ (Sommer: MESZ; englisch
+  „CET“/„CEST“). Kanäle nehmen Europe/Berlin; die [persönlichen Nachrichten](#meine-produkte) die Zeitzone der Person
+  (aus ihren [Ruhezeiten](#ruhezeiten), sonst ebenfalls Europe/Berlin).
+- **Hell und dunkel.** Die Mail hat ein helles und ein dunkles Farbschema; Programme mit Dunkelmodus (Apple Mail, iOS,
+  Outlook für Mac und Outlook.com, Thunderbird) zeigen das dunkle, die Schwere bleibt in beiden gut lesbar.
+- **Fuß.** Warum die Mail kommt: „Regel „Kritisch“ · Regel bearbeiten“ – der Link öffnet die Regel unter
+  *Einstellungen → Kanäle & Regeln* (bei mehreren Regeln die Liste; nur für Admins). Persönliche Nachrichten sagen statt
+  dessen, für welche Produkte und CVEs sie kommen und wo man sie abschaltet.
 
 ### Kanal anlegen {#kanal-anlegen}
 
@@ -1070,7 +1105,7 @@ diese eine. Ungültige Einträge werden still übergangen – prüfe daher nach 
 
 - private Adressen (`10.…`, `172.16–31.…`, `192.168.…`, IPv6-ULA und andere nicht öffentliche Bereiche),
 - die eigenen Docker-Netze von Cobe News, z. B. ein Empfänger im Netz `edge`: `WEBHOOK_PRIVATE_NETS=172.31.250.50`,
-- der Docker-Host: das Gateway des Containers (ab Werk `172.31.250.1`), bei Docker Desktop `192.168.65.0/24`.
+- der Docker-Host: das Gateway des Containers (ab Werk `172.31.250.128`), bei Docker Desktop `192.168.65.0/24`.
 
 **Immer gesperrt**, auch wenn die Adresse in der Liste steht:
 
@@ -1173,7 +1208,7 @@ in `WEBHOOK_PRIVATE_NETS` nicht oder die App wurde nicht neu gestartet.
 ist immer gesperrt. Stattdessen:
 
 - **Linux:** Das Skript lauscht auf `0.0.0.0` (wie oben). Als Ziel nimmst du die LAN-Adresse des Rechners oder das
-  Gateway des Containers (ab Werk `172.31.250.1`) und trägst genau diese Adresse in `WEBHOOK_PRIVATE_NETS` ein.
+  Gateway des Containers (ab Werk `172.31.250.128`) und trägst genau diese Adresse in `WEBHOOK_PRIVATE_NETS` ein.
 - **Docker Desktop:** Dienste, die auf dem Rechner nur an `127.0.0.1` lauschen, erreicht der Container über die
   Adresse hinter `host.docker.internal`, meist `192.168.65.254`. Diese Adresse in der URL verwenden und in
   `WEBHOOK_PRIVATE_NETS` eintragen – den Namen `host.docker.internal` selbst lehnt Cobe News immer ab.
@@ -1294,7 +1329,8 @@ nachgeschickt.
   eine Meldung, die inzwischen höher eingestuft ist.
 - Jede Meldung geht **höchstens einmal pro Kanal** raus – auch wenn mehrere Regeln sie an denselben Kanal schicken.
 - **Bis zu 3** Meldungen einer Runde kommen einzeln (die älteste zuerst). **Mehr** kommen als **eine
-  Sammelnachricht**: die 10 wichtigsten, der Rest gezählt. Regeln mit verschiedener Sprache bekommen getrennte
+  Sammelnachricht**: die 10 wichtigsten, der Rest gezählt – zuerst aktiv ausgenutzte und kritische, dann, was eure
+  Produkte betrifft, dann nach Schwere und die neueste zuerst. Regeln mit verschiedener Sprache bekommen getrennte
   Nachrichten.
 - Die Kanäle werden nebeneinander beliefert. Scheitert ein Kanal, bleiben seine Meldungen offen und kommen beim nächsten
   Versuch – nach 2, 4, 8 … Minuten, höchstens 6 Stunden (siehe [Testen, Fehler und Pause](#kanal-testen)).

@@ -125,12 +125,12 @@ def test_a_warning_when_published_to_the_network_with_base_url_on_localhost():
 
 
 def _image() -> str:
-    compose = (ROOT / "docker-compose.yml").read_text()
-    return re.search(r"image: (nginx:[^\s]+)", compose).group(1)
+    dockerfile = (NGINX / "Dockerfile").read_text()  # the proxy image's pinned base (docker-compose.yml builds it)
+    return re.search(r"^FROM (nginx:[^\s]+)", dockerfile, re.M).group(1)
 
 
 def test_rendered_configuration_passes_nginx_t(tmp_path):
-    """The pinned image from docker-compose.yml, only when it is on this machine already (no pull, no network)."""
+    """The pinned base image of deploy/nginx/Dockerfile, only when it is on this machine already (no pull, no network)."""
     from app import tls
 
     docker = shutil.which("docker")

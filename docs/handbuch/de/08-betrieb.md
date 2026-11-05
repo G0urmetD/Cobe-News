@@ -27,13 +27,13 @@ Alles, was die Installation selbst betrifft (Adresse, Zertifikat, Netz, Datenban
 | `APP_PORT` | http-Port der App, fest an `127.0.0.1` gebunden: für den Health-Check, Prometheus auf demselben Host ([Metriken](/docs/api#prometheus-konfiguration)) und einen eigenen Reverse Proxy auf demselben Host | `8096` |
 | `COMPOSE_FILE` | `docker-compose.yml:docker-compose.http.yml` schaltet die Umleitung von http auf https ein ([HTTPS](#http-umleitung)) | nicht gesetzt |
 | `HTTP_PORT` | http-Port, der nur auf https umleitet (nur mit `COMPOSE_FILE` wie oben) | `8094` |
-| `COBE_NEWS_IMAGE` | das veröffentlichte, signierte Image statt des lokalen Builds, z. B. `ghcr.io/g0urmetd/cobe-news:0.1.46` – nur mit `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; Signatur vorher mit cosign prüfen (docs/BETRIEB.md) | nicht gesetzt (lokaler Build) |
+| `COBE_NEWS_VERSION` | die veröffentlichten, signierten Images statt des lokalen Builds (App, Datenbank, Proxy), z. B. `0.1.49` – nur mit `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; Signaturen vorher mit cosign prüfen (docs/BETRIEB.md). Bis 0.1.48 hieß das `COBE_NEWS_IMAGE` (nur die App) | nicht gesetzt (lokaler Build) |
 
 ### Zertifikat {#env-zertifikat}
 
 | Variable | Bedeutung | Standard |
 |---|---|---|
-| `TLS_MODE` | `selfsigned` (die App erstellt und erneuert das Zertifikat), `own` (euer Zertifikat), `external` (TLS endet an eurem eigenen Proxy) | `selfsigned` |
+| `TLS_MODE` | `selfsigned` (die App erstellt und erneuert das Zertifikat), `own` (euer Zertifikat), `external` (TLS endet an eurem eigenen Proxy). HSTS bei `external` nur, wenn es hier ausdrücklich steht ([HSTS](#hsts)) | `selfsigned`; mit `PROXY_ENABLED=0`: `external` (ohne HSTS) |
 | `TLS_SOURCE` | mit `own`: Ordner mit `cobe.crt` und `cobe.key`, z. B. `./deploy/certs` | das Docker-Volume `tls` |
 | `HSTS` | `1` sendet [HSTS](term:hsts) auch mit dem selbstsignierten Zertifikat. Bei `own` und `external` wird HSTS immer gesendet – nur an Hostnamen, nie an `localhost` oder IP-Adressen ([HSTS](#hsts)) | `0` |
 
@@ -41,8 +41,8 @@ Alles, was die Installation selbst betrifft (Adresse, Zertifikat, Netz, Datenban
 
 | Variable | Bedeutung | Standard |
 |---|---|---|
-| `PROXY_ENABLED` | `0`: der mitgelieferte nginx startet nicht – für einen eigenen [Reverse Proxy](term:reverseproxy) davor | `1` |
-| `TRUSTED_PROXIES` | Adressen oder Netze ([CIDR](term:cidr)), deren `X-Forwarded-For` die App glaubt – nur die Adresse eures eigenen Proxys, z. B. `172.31.250.1/32` für einen Proxy auf dem Host ([welche Adresse?](#trusted-proxies)) | leer |
+| `PROXY_ENABLED` | `0`: der mitgelieferte nginx startet nicht – für einen eigenen [Reverse Proxy](term:reverseproxy) auf dem Host. Der einzige Schalter: TLS gilt dann als extern, und die App glaubt `X-Forwarded-For` von ihrem Docker-Gateway, also vom Host ([Eigener Reverse Proxy](#reverse-proxy)) | `1` |
+| `TRUSTED_PROXIES` | nur nötig, wenn euer Proxy **nicht** auf dem Host läuft: Adressen oder Netze ([CIDR](term:cidr)), deren `X-Forwarded-For` die App glaubt, z. B. `172.31.250.20/32` für einen Proxy-Container im Netz `edge`. Ersetzt das Gateway; `none` glaubt niemandem ([welche Adresse?](#trusted-proxies)) | leer |
 | `SHARED_ADDRESSES` | Adressen oder Netze, die sich viele Personen teilen (z. B. das NAT eines Büros): werden nie gesperrt, Fehlversuche darüber nur gebremst | leer |
 | `COOKIE_SECURE` | Cookies nur über https. Nicht ändern – `0` ist nur für Entwicklung ohne https gedacht | `1` |
 
@@ -53,7 +53,7 @@ Alles, was die Installation selbst betrifft (Adresse, Zertifikat, Netz, Datenban
 | `SECRET_KEY` | [Hauptschlüssel](term:masterkey) für gespeicherte Geheimnisse (Webhook-URLs, SMTP-, LDAP-Passwort, Entra-Geheimnis, TOTP lokaler Konten). Mindestens 32 zufällige Zeichen, z. B. aus `openssl rand -base64 32` – ein kürzerer (oder einer aus nur wenigen verschiedenen Zeichen) startet, gibt aber beim Start eine Warnung aus und steht als Hinweis unter *Einstellungen → HTTPS & Zertifikat*. Nicht mehr ändern, wenn Geheimnisse gespeichert sind | leer: Schlüsseldatei `./data/secret.key` |
 | `WEBHOOK_HOSTS` | weitere erlaubte Hosts für Teams- und Slack-Kanäle (neben den Microsoft- und Slack-Hosts), z. B. `chat.corp.example` | leer |
 | `WEBHOOK_PRIVATE_NETS` | private Adressen oder Netze, an die Benachrichtigungskanäle senden dürfen (z. B. ein n8n im Firmennetz), z. B. `10.20.0.0/16,192.168.10.5`; auch die eigenen Docker-Netze und der Docker-Host über seine Adresse. Loopback, Link-Local (`169.254.169.254`), „any“ und Multicast bleiben immer gesperrt ([Erlaubte Ziele](/docs/benachrichtigungen#webhook-ziele)) | leer: nur öffentliche Ziele |
-| `SMTP_ALLOW_INTERNAL` | Adresse eines [SMTP](term:smtp)-Relays, das sonst als intern abgelehnt würde (z. B. auf dem Docker-Host hinter dem Gateway `172.31.250.1`; dann auch per Name wie `host.docker.internal`). Loopback, Link-Local, „any“ und Multicast bleiben immer gesperrt | leer |
+| `SMTP_ALLOW_INTERNAL` | Adresse eines [SMTP](term:smtp)-Relays, das sonst als intern abgelehnt würde (z. B. auf dem Docker-Host hinter dem Gateway `172.31.250.128`; dann auch per Name wie `host.docker.internal`). Loopback, Link-Local, „any“ und Multicast bleiben immer gesperrt | leer |
 | `HTTPS_PROXY` | Proxy für alle ausgehenden Anfragen, z. B. `http://proxy.corp.example:3128` | leer |
 | `CA_FILE` | Pfad **im Container** zu einem eigenen CA-Bündel (PEM), z. B. für einen Proxy, der TLS aufbricht. Der Ordner `./data` ist als `/data` eingehängt: Datei z. B. als `./data/ca.pem` ablegen und `CA_FILE=/data/ca.pem` setzen | leer |
 | `ALLOW_PRIVATE_FEEDS` | `1` erlaubt eigene Feeds unter privaten Adressen (Firmennetz) | `0` |
@@ -71,9 +71,9 @@ Mehr dazu: [Web Push](/docs/integrationen#web-push), Schlüssel [VAPID](term:vap
 
 | Variable | Bedeutung | Standard |
 |---|---|---|
-| `POSTGRES_PASSWORD` | Passwort des Datenbank-Superusers `cobe_news` (nur `db-init` nutzt es). **Nie ändern** ([Datenbank](#datenbank)) | von `setup-env.sh` erzeugt |
-| `POSTGRES_APP_PASSWORD` | Passwort der App-Rolle `cobe_news_app`, mindestens 16 Zeichen. Darf sich ändern – `db-init` setzt es bei jedem Start | von `setup-env.sh` erzeugt |
-| `POSTGRES_RESTORE_PASSWORD` | Passwort der Rolle `cobe_news_restore` für den [Rücksicherungs-Test](/docs/sicherung#ruecksicherungs-test), mindestens 16 Zeichen. Darf sich ändern – `db-init` setzt es bei jedem Start. Leer: kein Rücksicherungs-Test | von `setup-env.sh` erzeugt |
+| `POSTGRES_PASSWORD` | Passwort des Datenbank-Superusers `cobe_news` (nur der Datenbank-Container kennt es). **Nie ändern** ([Datenbank](#datenbank)) | von `setup-env.sh` erzeugt |
+| `POSTGRES_APP_PASSWORD` | Passwort der App-Rolle `cobe_news_app`, mindestens 16 Zeichen. Darf sich ändern – die Datenbank setzt es bei jedem Start | von `setup-env.sh` erzeugt |
+| `POSTGRES_RESTORE_PASSWORD` | Passwort der Rolle `cobe_news_restore` für den [Rücksicherungs-Test](/docs/sicherung#ruecksicherungs-test), mindestens 16 Zeichen. Darf sich ändern – die Datenbank setzt es bei jedem Start. Leer: kein Rücksicherungs-Test | von `setup-env.sh` erzeugt |
 | `DB_MEM` | Speichergrenze des Datenbank-Containers | `512m` |
 | `BACKUP_PASSPHRASE` | Sicherungen verschlüsselt und mit dem Schlüssel, mindestens 12 Zeichen. Besser nur dem [cron](term:cron)-Job mitgeben ([Verschlüsselung](/docs/sicherung#verschluesselung)) | leer: unverschlüsselt, ohne Schlüssel |
 | `SQLITE_IMPORT` | `0`: eine alte SQLite-Datei (`data/news.db`, bis Version 0.1.15) beim Start nicht in eine leere Datenbank übernehmen ([Datenbank](#datenbank)) | `1`: Übernahme an |
@@ -86,6 +86,7 @@ Mehr dazu: [Web Push](/docs/integrationen#web-push), Schlüssel [VAPID](term:vap
 | `EDGE_SUBNET` | Subnetz des Docker-Netzes `edge` zwischen nginx und App – nur ändern, wenn es mit einem eurer Netze kollidiert | `172.31.250.0/24` |
 | `EDGE_RANGE` | Bereich darin für dynamische Adressen (die feste Adresse des Proxys liegt außerhalb) | `172.31.250.128/25` |
 | `PROXY_IP` | feste Adresse des mitgelieferten nginx im Netz `edge`; nur von ihr (und aus `TRUSTED_PROXIES`) übernimmt die App die Client-Adresse. Muss in `EDGE_SUBNET` und außerhalb von `EDGE_RANGE` liegen | `172.31.250.10` |
+| `EDGE_GATEWAY` | Adresse des Hosts im Netz `edge` (von ihr kommt ein Reverse Proxy auf dem Host). Wirkt nur, wenn das Netz neu angelegt wird | leer: die erste Adresse von `EDGE_RANGE`, also `172.31.250.128` |
 | `MAX_BODY_BYTES` | größte Anfrage, die die App selbst annimmt, in Bytes (16 KiB bis 64 MiB) – hinter nginx, das schon bei 1 MB ablehnt; größere bekommen `413` (`body_too_large`). Nur nötig für einen eigenen Proxy, der mehr durchlässt; kein Endpunkt braucht mehr | `1048576` (1 MiB) |
 
 Fest in `docker-compose.yml` und nicht über die `.env` einstellbar: `TLS_PATH`, `POSTGRES_HOST` und `POSTGRES_USER` der
@@ -94,14 +95,13 @@ den Container weiter – in der `.env` wirken sie nicht.
 
 ## Start und Stopp {#start-stopp}
 
-Cobe News besteht aus vier Containern:
+Cobe News besteht aus drei Containern, die alle laufen bleiben:
 
 | Container | Aufgabe | Port |
 |---|---|---|
 | `cobe-news-proxy` | nginx: HTTPS, leitet an die App weiter | `PORT` (8095), https |
 | `cobe-news-app` | Oberfläche, API und Hintergrundaufgaben (Abrufe, Benachrichtigungen, Zertifikat, Verzeichnisabgleich) | `127.0.0.1:8096`, http, nur Health-Check |
-| `cobe-news-db` | PostgreSQL 18 mit allen Daten | keiner (internes Netz) |
-| `cobe-news-db-init` | läuft bei jedem Start kurz vor der App und richtet deren Datenbank-Rolle ein | keiner |
+| `cobe-news-db` | PostgreSQL 18 mit allen Daten; richtet bei jedem Start die Datenbank-Rolle der App ein, bevor diese startet | keiner (internes Netz) |
 
 ### Erster Start {#erster-start}
 
@@ -143,8 +143,8 @@ Erst danach die Adresse für Kollegen öffnen ([Adresse für Kollegen](#adresse)
 Alle Befehle im Installationsordner ausführen (`cd /opt/cobe-news`). Die Container starten nach einem Neustart des
 Servers von selbst wieder, solange sie nicht von Hand angehalten wurden.
 
-In `docker compose ps -a` steht die App als `healthy`, wenn sie läuft und die Datenbank erreicht. `cobe-news-db-init`
-steht als beendet mit `Exited (0)` da – das ist richtig, er läuft nur kurz beim Start.
+In `docker compose ps -a` steht die App als `healthy`, wenn sie läuft und die Datenbank erreicht. Die Datenbank meldet
+`healthy` erst, wenn sie bei diesem Start auch die Rolle der App eingerichtet hat.
 
 > [!WARNING]
 > `docker compose down -v` löscht auch die Volumes – also die ganze Datenbank und das Zertifikat. Nur verwenden, wenn
@@ -166,16 +166,28 @@ steht als beendet mit `Exited (0)` da – das ist richtig, er läuft nur kurz be
 ### Mit Portainer {#portainer}
 
 Wer Docker mit Portainer verwaltet, braucht keinen Checkout: Die Datei `docker-compose.portainer.yml` aus dem
-Repository kommt als Ganzes in Portainers Web-Editor (*Stacks → Add stack → Web editor*), die Werte der `.env` als
-*Environment variables* des Stacks – Pflicht sind `POSTGRES_PASSWORD` und `POSTGRES_APP_PASSWORD`. Sie nimmt das
-veröffentlichte Image ab Version 0.1.48 und ist genauso gehärtet wie die normale Installation. Die Container heißen
-nach dem Stack (z. B. `news-app-1`), die Daten liegen in benannten Volumes (`news_data`, `news_db18`, `news_tls`). Ein
-Update: `COBE_NEWS_IMAGE` auf die neue Version setzen und *Update the stack*. Sicherung, Rücksicherungs-Test und
-Wiederherstellung laufen dort mit `docker exec` bzw. einem Wegwerf-Container statt mit `docker compose` – alle
-Schritte, Variablen und Grenzen: docs/BETRIEB.md, Abschnitt „Portainer (Stack-Editor)“. Nur für Umgebungen vom Typ
-Docker Standalone, nicht Swarm: `docker stack deploy` übergeht die Startreihenfolge und Teile der Härtung und startet
-den kurzen Kopier-Dienst immer wieder. Neben einer lokalen Installation auf demselben Host brauchen `PORT`, `APP_PORT`,
-`EDGE_SUBNET`, `EDGE_RANGE` und `PROXY_IP` andere Werte.
+Repository kommt als Ganzes in Portainers Web-Editor (*Stacks → Add stack → Web editor*). Oben in der Datei stehen zwei
+fertige Blöcke für die *Environment variables* – einer **mit eurem eigenen Reverse Proxy** auf dem Host, einer
+**ohne** (das HTTPS von Cobe News). Jeder enthält nur die beiden Datenbank-Passwörter, `BASE_URL` und einen Schalter:
+
+```
+POSTGRES_PASSWORD=<zufällig – behalten>
+POSTGRES_APP_PASSWORD=<zufällig, mindestens 16 Zeichen>
+BASE_URL=https://news.corp.example
+PROXY_ENABLED=0
+```
+
+(ohne eigenen Proxy statt der letzten Zeile `BIND=0.0.0.0` und `BASE_URL` mit `:8095`). Der Stack startet die drei
+veröffentlichten, signierten Images der Version, aus der die Datei stammt – App, Datenbank und Proxy, genauso gehärtet
+wie die normale Installation – und alle drei Container bleiben laufen; nichts steht als „exited“ rot in der Liste. Die
+Container heißen nach dem Stack (z. B. `news-app-1`), die Daten liegen in benannten Volumes (`news_data`, `news_db18`,
+`news_tls`). Ein Update: die neue Datei einfügen (oder `COBE_NEWS_VERSION` setzen) und *Update the stack*. Wer von der
+Datei aus 0.1.48 kommt, löscht `COBE_NEWS_IMAGE` aus den Variablen und entfernt die beiden beendeten Container
+(`assets`, `db-init`, *Prune services*). Sicherung, Rücksicherungs-Test und Wiederherstellung laufen dort mit
+`docker exec` bzw. einem Wegwerf-Container statt mit `docker compose` – alle Schritte, Variablen und Grenzen:
+docs/BETRIEB.md, Abschnitt „Portainer (Stack-Editor)“. Nur für Umgebungen vom Typ Docker Standalone, nicht Swarm. Neben
+einer lokalen Installation auf demselben Host brauchen `PORT`, `APP_PORT`, `EDGE_SUBNET`, `EDGE_RANGE` und `PROXY_IP`
+andere Werte.
 
 ## Update {#update}
 
@@ -200,13 +212,18 @@ docker compose exec -T app python -m app.cli backup
 docker tag cobe-news:latest cobe-news:before-update
 git pull
 scripts/setup-env.sh
-docker compose up -d --build
+docker compose up -d --build --remove-orphans
 docker compose ps -a
 docker compose logs --tail 50 app
 ```
 
 Die erste Zeile nach dem Start nennt Version und Adresse: `Cobe News 0.1.x – data in /data, https://…`. Kommt die
-App nicht hoch, steht der Grund im Log von `app` oder `db-init` ([Logs](#logs)).
+App nicht hoch, steht der Grund im Log von `app` oder `db` ([Logs](#logs)).
+
+`--remove-orphans` räumt Container weg, die die neue Version nicht mehr hat. Beim Update von **0.1.48 oder älter** ist
+das `cobe-news-db-init`: seine Aufgabe übernimmt jetzt der Datenbank-Container selbst. Ohne den Schalter bleibt er als
+„Exited“ stehen (harmlos; `docker rm cobe-news-db-init` entfernt ihn auch). Datenbank, Zertifikat und `./data` bleiben,
+wie sie sind.
 
 ### Update-Hinweis {#update-hinweis}
 
@@ -314,8 +331,11 @@ chmod 600 deploy/certs/cobe.key
 mehr übergehen zu lassen.
 
 - Bei `TLS_MODE=own` und `TLS_MODE=external` sendet Cobe News HSTS immer – bei `external` auf jede Anfrage, die über
-  HTTPS kam: Der eigene Proxy muss in `TRUSTED_PROXIES` stehen und `X-Forwarded-Proto https` mitschicken (siehe
-  [Beispiel](#proxy-nginx-beispiel)). Euer Proxy darf den Header zusätzlich selbst setzen.
+  HTTPS kam: Die App muss eurem Proxy glauben (das Gateway, [unten](#trusted-proxies)) und er `X-Forwarded-Proto https`
+  mitschicken (siehe [Beispiel](#proxy-nginx-beispiel)). Euer Proxy darf den Header zusätzlich selbst setzen.
+- `external` nur, wenn `TLS_MODE=external` in der `.env` steht: Ergibt es sich bloß aus `PROXY_ENABLED=0`, sendet Cobe
+  News kein HSTS – solche Installationen liefen bis 0.1.48 als `selfsigned` ohne HSTS. Wer es will, trägt
+  `TLS_MODE=external` ein (oder `HSTS=1`).
 - Beim selbstsignierten Zertifikat nicht – sonst könnte niemand mehr „trotzdem fortfahren“. Und nach jeder Erneuerung
   (etwa alle 150 Tage, ein neues Zertifikat) kämen Computer, die dem alten vertraut haben, gar nicht mehr hinein. Erst
   wenn es auf allen Computern vertraut ist und nach jeder Erneuerung neu verteilt wird, `HSTS=1` setzen.
@@ -373,18 +393,23 @@ nginx bleibt dann aus.
 
 ```
 PROXY_ENABLED=0
-TLS_MODE=external
 BASE_URL=https://news.corp.example
-TRUSTED_PROXIES=172.31.250.1/32
 ```
 
-1. Die Werte oben in die `.env` eintragen.
+1. Die beiden Werte in die `.env` eintragen (mit Portainer: in die Environment variables des Stacks).
 2. `docker compose up -d`. Der Container `cobe-news-proxy` startet nicht mehr.
 3. Euren Proxy auf `http://127.0.0.1:8096` zeigen lassen (`APP_PORT`). Dieser Port ist fest an `127.0.0.1` gebunden –
    der eigene Proxy muss also auf demselben Host laufen.
-4. Prüfen, mit welcher Adresse die Anfragen ankommen, und genau diese in `TRUSTED_PROXIES` eintragen ([unten](#trusted-proxies)).
 
+Mehr ist nicht zu tun: Mit `PROXY_ENABLED=0` gilt TLS als extern (`TLS_MODE=external`, solange ihr `TLS_MODE` nicht
+selbst setzt), und die App glaubt `X-Forwarded-For` und `X-Forwarded-Proto` von ihrem Docker-Gateway – das ist der Host,
+auf dem euer Proxy läuft. Beim Start steht im Log der App, wem sie glaubt:
+`proxy: PROXY_ENABLED=0 – X-Forwarded-For trusted from 172.31.250.128 (the Docker gateway: a reverse proxy on this host)`.
 Das Zertifikat pflegt ihr an eurem Proxy. *Einstellungen → HTTPS & Zertifikat* zeigt dann „Externer Reverse Proxy“.
+
+Wer bis Version 0.1.48 dem alten Rat gefolgt ist: `TRUSTED_PROXIES=172.31.250.1/32` **entfernen** (oder leer setzen)
+– ein gesetztes `TRUSTED_PROXIES` ersetzt das Gateway, sonst stehen weiter alle unter `172.31.250.128`; das Log der App
+warnt beim Start. `TLS_MODE=external` behaltet ihr, wenn ihr HSTS wollt ([HSTS](#hsts)).
 
 ### Beispiel für nginx {#proxy-nginx-beispiel}
 
@@ -413,28 +438,31 @@ Client selbst mitschickt. Nicht `$proxy_add_x_forwarded_for` verwenden – damit
 
 ### Welche Adresse in TRUSTED_PROXIES? {#trusted-proxies}
 
-Die App glaubt `X-Forwarded-For` nur von Adressen aus `TRUSTED_PROXIES`. Ohne passenden Eintrag sehen alle Anfragen aus,
-als kämen sie vom Proxy – dann teilen sich alle Personen eine Adresse für Sperren und Bremsen.
+Läuft euer Proxy auf dem Host: **keine** – `TRUSTED_PROXIES` bleibt leer. Die App glaubt dann ihrem Docker-Gateway.
 
-1. Die Seite einmal über den eigenen Proxy öffnen.
-2. `docker compose logs --tail 20 app` ausführen. Die Zugriffszeilen beginnen mit der Adresse, von der die Anfrage kam.
-   Bei einem Proxy auf demselben Host ist das meist das Gateway des Docker-Netzes `edge`, ab Werk `172.31.250.1`.
-3. Genau diese Adresse mit `/32` eintragen und `docker compose up -d`.
+- **Welche Adresse das ist:** das Netz `edge` vergibt dynamische Adressen nur aus `EDGE_RANGE` (`172.31.250.128/25`).
+  Docker gibt dem Netz dann die erste Adresse dieses Bereichs als Gateway: `172.31.250.128` – nicht `172.31.250.1`.
+  Die App liest sie selbst aus; im Zugriffslog (`docker compose logs --tail 20 app`) seht ihr danach die echten
+  Adressen der Clients statt `172.31.250.128`.
+- **Warum das sicher ist:** der App-Port ist nur auf `127.0.0.1` des Hosts veröffentlicht. Vom Gateway kommt deshalb
+  nur, was auf dem Host selbst läuft – euer Proxy (oder jemand, der auf dem Host angemeldet ist). Ein anderer Container
+  kommt mit seiner eigenen Adresse, ein anderer Rechner gar nicht über das Gateway.
+- **Docker Desktop, OrbStack, Colima, WSL2:** dort erreicht jeder Container die Ports des Rechners über
+  `host.docker.internal` – und käme ebenfalls vom Gateway. Die App glaubt dem Gateway nur, wenn sie sicher ist, auf
+  einem Linux-Server zu laufen (Kernel und Namen wie `host.docker.internal` geprüft); sonst – auch wenn DNS nicht klar
+  antwortet – glaubt sie niemandem (Log: `… trusted from nobody`). Ebenso, wenn das Gateway nicht im Netz `edge`
+  (`EDGE_SUBNET`) liegt. Auf dem eigenen Rechner zum Ausprobieren: `TRUSTED_PROXIES=<Gateway>/32` ausdrücklich setzen.
 
-Gut zu wissen:
-
-- Die App hängt im Docker-Netz `edge` (`172.31.250.0/24`), nicht im Standard-Netz von Docker. `172.17.0.1` (das
-  Gateway des Standard-Netzes) ist deshalb **nicht** die richtige Adresse.
-- Läuft euer Proxy selbst als Container im Netz `edge`, gebt ihm dort eine feste Adresse unterhalb von `.128` – also
-  außerhalb von `EDGE_RANGE`, z. B. `172.31.250.20` – und tragt genau diese ein: `TRUSTED_PROXIES=172.31.250.20/32`.
-  Eine dynamische Adresse kann nach einem Neustart ein anderer Container bekommen. Von außen heißt das Netz
-  `cobe-news_edge`; der Proxy erreicht die App dort unter `http://cobe-news-app:8000`.
+`TRUSTED_PROXIES` braucht ihr nur, wenn euer Proxy **selbst als Container** im Netz `edge` läuft: Gebt ihm dort eine
+feste Adresse unterhalb von `.128` – also außerhalb von `EDGE_RANGE`, z. B. `172.31.250.20` – und tragt genau diese ein:
+`TRUSTED_PROXIES=172.31.250.20/32`. Sie ersetzt das Gateway. Eine dynamische Adresse kann nach einem Neustart ein anderer
+Container bekommen. Von außen heißt das Netz `cobe-news_edge`; der Proxy erreicht die App dort unter
+`http://cobe-news-app:8000`. `TRUSTED_PROXIES=none` glaubt niemandem.
 
 > [!WARNING]
-> Mit dem **mitgelieferten** nginx (`PROXY_ENABLED=1`) nie das Docker-Gateway in `TRUSTED_PROXIES` eintragen. Unter
-> Docker Desktop kommen dort alle Clients an – jeder könnte dann seine Adresse per `X-Forwarded-For` selbst wählen und
-> Sperren umgehen. Beim eigenen Proxy ist das Gateway nur deshalb in Ordnung, weil der App-Port allein auf dem Server
-> selbst (`127.0.0.1`) erreichbar ist.
+> Den App-Port (`127.0.0.1:8096` in `docker-compose.yml`) nie auf eine andere Adresse legen, solange die App dem Gateway
+> glaubt – sonst könnte jeder, der den Port erreicht, seine Adresse per `X-Forwarded-For` selbst wählen und Sperren
+> umgehen. Mit dem **mitgelieferten** nginx (`PROXY_ENABLED=1`) glaubt die App nur dessen fester Adresse, nie dem Gateway.
 
 ## Adresse für Kollegen {#adresse}
 
@@ -492,7 +520,7 @@ Microsoft ([Umleitungs-URI](/docs/anmeldung#entra-redirect-uri)).
 ### Docker Desktop (Mac, Windows) {#docker-desktop}
 
 Unter Docker Desktop (und Colima) gehen die echten Client-Adressen schon in Dockers Port-Weiterleitung verloren. Alle
-Anfragen kommen vom Docker-Gateway, z. B. `172.31.250.1`.
+Anfragen kommen vom Docker-Gateway, z. B. `172.31.250.128`.
 
 - **Was ihr seht:** im Log der App und unter *Benutzer & Rollen* („letzte Anmeldung“) steht für alle dieselbe Adresse.
 - **Was Cobe News tut:** das Gateway gilt als geteilte Adresse. Es wird nie gesperrt, Fehlversuche darüber werden nur
@@ -513,7 +541,6 @@ Jeder Container schreibt sein eigenes Log. Docker behält davon je Container bis
 cd /opt/cobe-news
 docker compose logs -f app
 docker compose logs --since 1h app
-docker compose logs db-init
 docker compose logs proxy
 docker compose logs db
 ```
@@ -521,9 +548,8 @@ docker compose logs db
 | Container | Wann hineinschauen |
 |---|---|
 | `app` | fast immer: Start (Version, Adresse), Zertifikat (`tls:`), Abrufe (`news:`), Benachrichtigungen (`notify:`, `push:`), Quellen-Gesundheit, Verzeichnisabgleich, Zugriffe (Adresse, Methode, Pfad, Status, Dauer); Warnungen zu Auffälligem: `SECRET_KEY is short` (beim Start), `csrf check failed` (höchstens eine Zeile pro Adresse und Minute), `emergency admin: … failed sign-in checks` (höchstens eine pro Stunde) |
-| `db-init` | wenn die App nicht startet – meist ein Problem mit den Datenbank-Passwörtern |
 | `proxy` | Zertifikat neu geladen („certificate changed – nginx reloaded“), die Namen, auf die nginx antwortet („answering to …“), oder nginx startet nicht |
-| `db` | Fehler der Datenbank selbst, z. B. zu wenig Speicher |
+| `db` | wenn die App nicht startet: die Zeilen `db-init: …` zeigen, ob die Rolle der App eingerichtet ist – meist ein Problem mit den Datenbank-Passwörtern; dazu Fehler der Datenbank selbst, z. B. zu wenig Speicher |
 
 `-f` folgt dem Log fortlaufend (beenden mit Strg+C), `--since 1h` zeigt nur die letzte Stunde, `--tail 100` die letzten
 100 Zeilen. Vor dem Weitergeben eines Logs Setup-Tokens und temporäre Passwörter entfernen.
@@ -589,14 +615,18 @@ nach außen, keine Verbindung ins Internet. Die Daten liegen im Volume `cobe-new
 |---|---|---|
 | `cobe_news_app` | die App, Sicherung und Wiederherstellung – Besitzer der Datenbank, aber ohne Superuser-Rechte | `POSTGRES_APP_PASSWORD` |
 | `cobe_news_restore` | nur der [Rücksicherungs-Test](/docs/sicherung#ruecksicherungs-test) – Besitzer der Wegwerf-Datenbank `cobe_news_restore_test`, kein Superuser, darf keine Datenbanken oder Rollen anlegen und sich nicht mit der Datenbank der App verbinden | `POSTGRES_RESTORE_PASSWORD` |
-| `cobe_news` | Superuser des Containers – nur der kurze Dienst `db-init` nutzt ihn | `POSTGRES_PASSWORD` |
+| `cobe_news` | Superuser des Containers – nur der Datenbank-Container selbst nutzt ihn (die App kennt sein Passwort nicht) | `POSTGRES_PASSWORD` |
 
-- `POSTGRES_PASSWORD` **nie ändern**: die Datenbank wurde damit angelegt. Ein anderes Passwort in der `.env` sperrt
-  `db-init` aus, und die App startet nicht. Dann das alte Passwort zurück in die `.env` setzen.
-- `POSTGRES_APP_PASSWORD` darf sich ändern (mindestens 16 Zeichen): `db-init` setzt es bei jedem Start neu.
-- `POSTGRES_RESTORE_PASSWORD` ebenso. Ist es gesetzt, legt `db-init` bei jedem Start auch die Rolle `cobe_news_restore`
-  und die Wegwerf-Datenbank an bzw. prüft ihre Rechte (Log: `cobe_news_restore ready`).
-- Scheitert `db-init`, startet die App nicht – der Grund steht in `docker compose logs db-init`.
+- `POSTGRES_PASSWORD` **nie ändern**: die Datenbank wurde damit angelegt; ein neuer Wert in der `.env` ändert das
+  Passwort in der Datenbank nicht. Dann das alte Passwort zurück in die `.env` setzen.
+- Bei jedem Start richtet der Datenbank-Container die Rolle der App ein (Log: `db-init: cobe_news_app ready`) und meldet
+  sich erst danach `healthy` – erst dann startet die App.
+- `POSTGRES_APP_PASSWORD` darf sich ändern (mindestens 16 Zeichen): die Datenbank setzt es bei jedem Start neu;
+  `docker compose up -d` legt dafür Datenbank und App neu an.
+- `POSTGRES_RESTORE_PASSWORD` ebenso. Ist es gesetzt, legt die Datenbank bei jedem Start auch die Rolle
+  `cobe_news_restore` und die Wegwerf-Datenbank an bzw. prüft ihre Rechte (Log: `cobe_news_restore ready`).
+- Scheitert das, hält der Datenbank-Container an und startet neu; die App startet nicht – der Grund steht in
+  `docker compose logs db` (Zeilen `db-init: …`).
 
 Das Schema kommt aus Migrationen und wird bei jedem Start der App auf den Stand ihrer Version gebracht. Die
 Speichergrenze des Containers setzt `DB_MEM` (ab Werk `512m`); bei sehr vielen Meldungen und Vendor-News-Daten hilft mehr.

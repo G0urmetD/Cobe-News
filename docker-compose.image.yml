@@ -1,11 +1,22 @@
-# Optional: run the released image instead of building locally. Enable in .env with
+# Optional: run the released images instead of building locally. Enable in .env with
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml
-#   COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:0.1.47      # a version (or …@sha256:<digest>), not latest
-# then `docker compose pull app && docker compose up -d` (no --build). Verify the signature first (cosign,
-# docs/BETRIEB.md „Veröffentlichtes Image statt lokalem Build“). Without COMPOSE_FILE nothing changes: docker-compose.yml
-# builds the image locally as before.
+#   COBE_NEWS_VERSION=0.1.49      # a released version, not latest
+# then `docker compose pull && docker compose up -d --remove-orphans` (no --build). All three images of that version:
+# ghcr.io/g0urmetd/cobe-news (app), -db (PostgreSQL 18 with the role set-up) and -proxy (nginx with the configuration).
+# Verify their signatures first (cosign, docs/BETRIEB.md „Veröffentlichtes Image statt lokalem Build“). One of them by
+# digest instead: COBE_NEWS_IMAGE, COBE_NEWS_DB_IMAGE, COBE_NEWS_PROXY_IMAGE (…@sha256:<digest>). Up to 0.1.48 this file
+# took COBE_NEWS_IMAGE only (the app) – now COBE_NEWS_VERSION is needed as well, or all three image variables.
+# Without COMPOSE_FILE nothing changes: docker-compose.yml builds the images locally.
 services:
   app:
-    image: ${COBE_NEWS_IMAGE:?set COBE_NEWS_IMAGE in .env, e.g. ghcr.io/g0urmetd/cobe-news:0.1.47 (docs/BETRIEB.md)}
+    image: ${COBE_NEWS_IMAGE:-ghcr.io/g0urmetd/cobe-news:${COBE_NEWS_VERSION:?set COBE_NEWS_VERSION in .env, e.g. 0.1.49 (docs/BETRIEB.md)}}
+    build: !reset null
+    pull_policy: missing
+  db:
+    image: ${COBE_NEWS_DB_IMAGE:-ghcr.io/g0urmetd/cobe-news-db:${COBE_NEWS_VERSION:?set COBE_NEWS_VERSION in .env, e.g. 0.1.49 (docs/BETRIEB.md)}}
+    build: !reset null
+    pull_policy: missing
+  proxy:
+    image: ${COBE_NEWS_PROXY_IMAGE:-ghcr.io/g0urmetd/cobe-news-proxy:${COBE_NEWS_VERSION:?set COBE_NEWS_VERSION in .env, e.g. 0.1.49 (docs/BETRIEB.md)}}
     build: !reset null
     pull_policy: missing

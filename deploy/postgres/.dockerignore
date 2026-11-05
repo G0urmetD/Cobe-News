@@ -1,0 +1,7 @@
+# the build context of the database image: these files and nothing else
+*
+!Dockerfile
+!cobe-news-db.sh
+!db-init.sh
+!app-role.sql
+!restore-role.sql

@@ -257,7 +257,7 @@ offline, e.g. in a password vault.
    applies only to stories that arrive after it ([Rules](/docs/benachrichtigungen#regeln)).
 3. If the channel shows an error and a next attempt, it pauses after failures. "Test" checks it at once.
 4. If the [SMTP](term:smtp) relay is on the Docker host itself, Cobe News refuses it as an internal target. Put its
-   address (the container's gateway, e.g. `172.31.250.1`, or with Docker Desktop the address behind
+   address (the container's gateway, e.g. `172.31.250.128`, or with Docker Desktop the address behind
    `host.docker.internal`) into `SMTP_ALLOW_INTERNAL`, then `docker compose up -d`. `127.0.0.1` never works – that
    would be the container itself.
 5. Check the recipients' spam folder.
@@ -278,8 +278,9 @@ folder. `docker compose restart` keeps the old values.
 ### The app does not start {#app-startet-nicht}
 
 1. `docker compose ps -a` shows which container is missing or restarting.
-2. `docker compose logs db-init` – if it fails, the app does not start. Most common reason: `POSTGRES_PASSWORD` in
-   the `.env` was changed. Put the old password back ([Database](/docs/betrieb#db-rollen)).
+2. `docker compose logs db` – the lines `db-init: …` show whether the database has set up the app's role; if that
+   fails, the app does not start. Most common reason: `POSTGRES_APP_PASSWORD` is missing or shorter than 16
+   characters ([Database](/docs/betrieb#db-rollen)).
 3. `docker compose logs --tail 100 app` – after an update it shows e.g. an error in the migration.
 
 ### Where do I find the logs? {#wo-logs}

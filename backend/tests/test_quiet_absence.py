@@ -181,18 +181,32 @@ async def test_urgent_is_the_persons_choice(mails, monkeypatch):
     assert len(mails.sent) == 1 and "PAN-SA-1" in mails.sent[0]["subject"]  # only the change that makes a version affected
 
 
+def _next_spring_forward() -> date:
+    """The next last Sunday of March (Europe/Berlin: 02:00 CET → 03:00 CEST) whose morning is still ahead – the event
+    of the test must come after the team, the ways and the switch (an hour or two before the real now)."""
+    now = datetime.now(UTC)
+    for year in (now.year, now.year + 1):
+        day = date(year, 3, 31)
+        day -= timedelta(days=(day.weekday() - 6) % 7)
+        if utc(day.year, day.month, day.day, 5, 0) > now:
+            return day
+    raise AssertionError("unreachable")
+
+
 async def test_summer_time_end_of_the_quiet_hours_in_the_round(mails, monkeypatch):
-    """28 March 2027 (spring forward): 08:00 local is 06:00 UTC – not 07:00 as the day before."""
+    """The next spring forward (28 March 2027 when written): 08:00 local is 06:00 UTC – not 07:00 as the day before."""
+    d = _next_spring_forward()
+    assert datetime(d.year, d.month, d.day, 8, tzinfo=BERLIN).utcoffset() == timedelta(hours=2) != datetime(d.year, d.month, d.day - 1, 8, tzinfo=BERLIN).utcoffset()
     await _switch()
     a = await _person("anja")
     await _team([a])
     await _ways(a, email=True)
     await _schedule(a, **NIGHT)
-    await _event("panos", at=utc(2027, 3, 28, 5, 0))
-    freeze(monkeypatch, personal, utc(2027, 3, 28, 5, 59))  # 07:59 CEST
+    await _event("panos", at=utc(d.year, d.month, d.day, 5, 0))
+    freeze(monkeypatch, personal, utc(d.year, d.month, d.day, 5, 59))  # 07:59 CEST
     await _dispatch()
     assert mails.sent == []
-    freeze(monkeypatch, personal, utc(2027, 3, 28, 6, 0))  # 08:00 CEST
+    freeze(monkeypatch, personal, utc(d.year, d.month, d.day, 6, 0))  # 08:00 CEST
     await _dispatch()
     assert len(mails.sent) == 1
 

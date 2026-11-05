@@ -10,6 +10,9 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.engine import URL, make_url
 
+# TRUSTED_PROXIES=none: trust no proxy of your own – also not the Docker gateway with PROXY_ENABLED=0
+NO_PROXIES = "none"
+
 # Teams (Workflows / Power Automate, classic Incoming Webhook) and Slack – the hosts their webhook URLs live on
 DEFAULT_WEBHOOK_HOSTS = ("hooks.slack.com", "*.webhook.office.com", "*.logic.azure.com", "*.powerplatform.com")
 
@@ -44,15 +47,19 @@ class Config:
     run_loop: bool  # background fetching in this process (off in tests)
     # HTTPS (services/tls.py)
     tls_mode: str = "selfsigned"  # selfsigned | own | external
+    # TLS_MODE written in the environment – not derived from PROXY_ENABLED=0 (only then "external" sends HSTS, tls.hsts)
+    tls_mode_explicit: bool = True
     tls_path: Path = Path("/tls")
     hostname: str = ""
     tls_names: tuple[str, ...] = ()
     base_url: str = "https://localhost:8095"
     hsts: bool = False  # also with the self-signed certificate (once it is trusted everywhere)
-    # who may set X-Forwarded-For: the bundled nginx (fixed address) and/or own proxies
+    # who may set X-Forwarded-For: the bundled nginx (fixed address) and/or own proxies – see trusted_networks
     proxy_enabled: bool = True
     proxy_ip: str = "172.31.250.10"
-    trusted_proxies: tuple[str, ...] = ()
+    trusted_proxies: tuple[str, ...] = ()  # TRUSTED_PROXIES; ("none",): nobody (not even the Docker gateway)
+    # EDGE_SUBNET (docker-compose.yml): the gateway is trusted only inside it – never a LAN router (network_mode: host)
+    edge_subnet: str = ""
     # addresses that stand for many people (never blocked, see netaddr.shared_address) besides the Docker gateway
     shared_addresses: tuple[str, ...] = ()
     # SMTP server addresses allowed although internal (loopback, link-local, this container's Docker networks), e.g. a
@@ -125,17 +132,110 @@ class Config:
 
     @property
     def trusted_networks(self) -> tuple:
-        nets = list(self.trusted_proxies)
+        """Whose X-Forwarded-For / X-Forwarded-Proto the app believes: the bundled nginx at its fixed address
+        (PROXY_ENABLED=1) and TRUSTED_PROXIES. Without the bundled nginx and without TRUSTED_PROXIES (PROXY_ENABLED=0
+        alone): this container's default gateway – the Docker host, where a reverse proxy of your own reaches the app's
+        port (host_proxy_gateway). TRUSTED_PROXIES replaces the gateway; "none" trusts no proxy of your own
+        (docs/BETRIEB.md: HTTPS, 3). Never waits: the request path."""
+        nets = [p for p in self.trusted_proxies if p != NO_PROXIES]
         if self.proxy_enabled and self.proxy_ip:
             nets.append(f"{self.proxy_ip}/32")
+        elif not self.trusted_proxies:
+            gateway = self.host_proxy_gateway()
+            if gateway:
+                nets.append(f"{gateway}/32")
         return self.networks(nets)
+
+    def _edge(self):  # noqa: ANN202
+        try:
+            return ipaddress.ip_network(self.edge_subnet, strict=False) if self.edge_subnet else None
+        except ValueError:
+            return None
+
+    def host_proxy_gateway(self, *, wait: bool = False) -> str | None:
+        """The gateway trusted for PROXY_ENABLED=0 without TRUSTED_PROXIES, or None. Only when all of it holds (fails
+        closed): a default gateway inside EDGE_SUBNET (the network edge of the compose files – not a LAN router with
+        network_mode: host), and a Linux Docker Engine for sure (netaddr.check_host_kind). There the app's port, published
+        on the host's 127.0.0.1 only, is reached from the gateway only by the host itself (Docker's forwarding of that
+        port, a process of the host straight to the container) – another container comes from its own address, another
+        machine never from the gateway. Not on a desktop Docker: there every container reaches the host's 127.0.0.1 ports
+        (host.docker.internal, 192.168.65.254) and comes from the gateway too. `wait`: ask DNS now (bounded – the start)."""
+        from app import netaddr  # noqa: PLC0415 - netaddr imports this module
+
+        gateway, edge = netaddr.container_gateway(), self._edge()
+        if not gateway or edge is None or ipaddress.ip_address(gateway) not in edge:
+            return None
+        kind = netaddr.check_host_kind() if wait else netaddr.host_kind()
+        return gateway if kind.kind == "engine" else None
+
+    def proxy_trust(self) -> str:
+        """For the log at the start: whose X-Forwarded-For counts, and why. Blocking (DNS, bounded): call in a thread."""
+        from app import netaddr  # noqa: PLC0415 - netaddr imports this module
+
+        def listed(nets: tuple) -> str:
+            return ", ".join(str(n.network_address) if n.num_addresses == 1 else str(n) for n in nets) or "nobody"
+
+        own = bool(self.trusted_proxies) and self.trusted_proxies != (NO_PROXIES,)
+        if self.proxy_enabled:
+            return f"X-Forwarded-For trusted from {listed(self.trusted_networks)} (the bundled nginx{' and TRUSTED_PROXIES' if own else ''})"
+        if self.trusted_proxies:
+            return f"PROXY_ENABLED=0 – X-Forwarded-For trusted from {listed(self.trusted_networks)} (TRUSTED_PROXIES)"
+        gateway, edge = netaddr.container_gateway(), self._edge()
+        if not gateway:
+            return "PROXY_ENABLED=0 – no Docker gateway found, X-Forwarded-For trusted from nobody: set TRUSTED_PROXIES to your proxy's address"
+        if edge is None:
+            return f"PROXY_ENABLED=0 – EDGE_SUBNET not set (or not a network), so the gateway {gateway} is not trusted – X-Forwarded-For trusted from nobody (docker-compose.yml passes it on)"
+        if ipaddress.ip_address(gateway) not in edge:
+            return f"PROXY_ENABLED=0 – the default gateway {gateway} is not in EDGE_SUBNET {edge} (network_mode: host or another network?) – X-Forwarded-For trusted from nobody"
+        kind = netaddr.check_host_kind()
+        if kind.kind == "desktop":
+            return (
+                f"PROXY_ENABLED=0 – a desktop Docker ({kind.why}): every container reaches the app's port through the gateway {gateway},"
+                f" so X-Forwarded-For is trusted from nobody; TRUSTED_PROXIES={gateway}/32 trusts the gateway anyway"
+            )
+        if kind.kind == "unknown":
+            return (
+                f"PROXY_ENABLED=0 – cannot tell whether this is a desktop Docker ({kind.why}), so X-Forwarded-For is trusted from nobody"
+                f" for now (asked again every {netaddr.RECHECK_S:g} s); TRUSTED_PROXIES={gateway}/32 trusts the gateway anyway"
+            )
+        return f"PROXY_ENABLED=0 – X-Forwarded-For trusted from {gateway} (the Docker gateway: a reverse proxy on this host)"
+
+    def proxy_warnings(self) -> list[str]:
+        """Settings that look wrong, for the log at the start: with PROXY_ENABLED=0 an entry of TRUSTED_PROXIES inside the
+        network edge that misses its gateway – up to 0.1.48 the docs said TRUSTED_PROXIES=172.31.250.1/32, but the gateway
+        is the first address of EDGE_RANGE (172.31.250.128): everyone then shows up as the gateway."""
+        from app import netaddr  # noqa: PLC0415 - netaddr imports this module
+
+        own = self.networks(p for p in self.trusted_proxies if p != NO_PROXIES)
+        gateway, edge = netaddr.container_gateway(), self._edge()
+        if self.proxy_enabled or not own or not gateway or edge is None:
+            return []
+        gw = ipaddress.ip_address(gateway)
+        if any(gw in n for n in own):
+            return []
+        inside = [n for n in own if n.version == edge.version and n.subnet_of(edge)]
+        if not inside:
+            return []
+        first = edge.network_address + 1
+        old = " – the address the docs named up to 0.1.48" if any(n.num_addresses == 1 and n.network_address == first for n in inside) else ""
+        return [
+            f"TRUSTED_PROXIES={','.join(str(n) for n in inside)} lies in the network edge ({edge}) but not on its gateway {gateway}{old}:"
+            f" a reverse proxy on this host comes from {gateway}, so every visitor shows up as {gateway}. Remove TRUSTED_PROXIES"
+            " (on a Linux Docker Engine PROXY_ENABLED=0 trusts the gateway on its own) – keep it only for a proxy container at"
+            " exactly that address"
+        ]
 
 
 @lru_cache
 def get_config() -> Config:
     data = Path(os.environ.get("DATA_DIR", "./data")).resolve()
     static = Path(os.environ.get("STATIC_DIR", Path(__file__).resolve().parent.parent / "static"))
-    mode = (os.environ.get("TLS_MODE") or "selfsigned").strip().lower()
+    proxy_enabled = _flag("PROXY_ENABLED", True)
+    # TLS_MODE empty (or unknown): selfsigned with the bundled nginx, external without it (your own proxy ends TLS)
+    mode = (os.environ.get("TLS_MODE") or "").strip().lower()
+    explicit = mode in ("selfsigned", "own", "external")
+    if not explicit:
+        mode = "selfsigned" if proxy_enabled else "external"
     return Config(
         data_dir=data,
         static_dir=static,
@@ -144,15 +244,17 @@ def get_config() -> Config:
         allow_private=_flag("ALLOW_PRIVATE_FEEDS"),
         cookie_secure=_flag("COOKIE_SECURE", True),
         run_loop=_flag("NEWS_LOOP", True),
-        tls_mode=mode if mode in ("selfsigned", "own", "external") else "selfsigned",
+        tls_mode=mode,
+        tls_mode_explicit=explicit,
         tls_path=Path(os.environ.get("TLS_PATH") or (data / "tls")),
         hostname=(os.environ.get("NEWS_HOSTNAME") or "").strip().lower(),
         tls_names=_list("TLS_NAMES"),
         base_url=(os.environ.get("BASE_URL") or "https://localhost:8095").strip().rstrip("/"),
         hsts=_flag("HSTS"),
-        proxy_enabled=_flag("PROXY_ENABLED", True),
+        proxy_enabled=proxy_enabled,
         proxy_ip=(os.environ.get("PROXY_IP") or "172.31.250.10").strip(),
         trusted_proxies=_list("TRUSTED_PROXIES"),
+        edge_subnet=(os.environ.get("EDGE_SUBNET") or "").strip(),
         shared_addresses=_list("SHARED_ADDRESSES"),
         smtp_allow_internal=_list("SMTP_ALLOW_INTERNAL"),
         webhook_private_nets=_list("WEBHOOK_PRIVATE_NETS"),

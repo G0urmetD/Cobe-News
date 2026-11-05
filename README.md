@@ -45,16 +45,20 @@ one-time setup token from the log (valid for 60 minutes) and create the first ad
 (TOTP). Then switch on the sources under *Settings → Integrations → News* and follow your products under *Vendor News*.
 
 By default the app listens on this machine only. Address, port, certificate, reverse proxy and outbound proxy are set
-in `.env` – see [`.env.example`](.env.example).
+in `.env` – see [`.env.example`](.env.example). Behind a reverse proxy of your own on the same host (nginx, Traefik …):
+`PROXY_ENABLED=0` is the only switch – point the proxy at `http://127.0.0.1:8096`
+([`docs/BETRIEB.md`](docs/BETRIEB.md#https), section 3).
 
-Instead of building locally you can run the released, signed image `ghcr.io/g0urmetd/cobe-news:<version>`: set
-`COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml` and `COBE_NEWS_IMAGE=ghcr.io/g0urmetd/cobe-news:<version>` in
-`.env`, then `docker compose pull app && docker compose up -d` – how to verify the signature with cosign:
+Three containers, all built locally: the app, the database (PostgreSQL 18 that sets up the app's own role at every
+start) and the proxy (nginx). Instead of building you can run the released, signed images
+`ghcr.io/g0urmetd/cobe-news`, `…/cobe-news-db` and `…/cobe-news-proxy`: set
+`COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml` and `COBE_NEWS_VERSION=<version>` in `.env`, then
+`docker compose pull && docker compose up -d` – how to verify the signatures with cosign:
 [`docs/BETRIEB.md`](docs/BETRIEB.md#veröffentlichtes-image-statt-lokalem-build). Without these two lines nothing changes.
 
 With Portainer (no checkout): paste [`docker-compose.portainer.yml`](docker-compose.portainer.yml) into the stack web
-editor and set `POSTGRES_PASSWORD` and `POSTGRES_APP_PASSWORD` as environment variables – see
-[`docs/BETRIEB.md`](docs/BETRIEB.md#portainer-stack-editor).
+editor and enter one of the two blocks of environment variables at its top (with or without your own reverse proxy:
+passwords, `BASE_URL` and one switch) – see [`docs/BETRIEB.md`](docs/BETRIEB.md#portainer-stack-editor).
 
 ## Documentation
 

@@ -157,7 +157,7 @@ unter „Themen“ mit dem Grund („CISA KEV listet CVE-…“, „im Titel: �
 | **Vorfall/Datenleck** | „data breach“, „Datenleck“, „Datenpanne“, „Kundendaten“, „Cyberangriff auf …“, gestohlene oder offengelegte Daten |
 | **Lieferkette** | „supply chain“, „Lieferkette“, schädliche npm-/PyPI-Pakete oder Erweiterungen, Typosquatting, „dependency confusion“ |
 | **Phishing/Social Engineering** | „Phishing“, „Vishing“, „Smishing“, „ClickFix“, „AitM“, „Social Engineering“, gefälschte Anmeldeseiten – nicht schon „Kampagne“ oder „Angreifergruppe“ |
-| **OT/ICS** | die OT-Quellen Siemens ProductCERT, CERT@VDE, Rockwell Automation und SecurityWeek ICS/OT; Begriffe wie SIMATIC, CODESYS, SPS/PLC, SCADA, ICS, OT-Sicherheit |
+| **OT/ICS** | die OT-Quellen Siemens ProductCERT, CERT@VDE und SecurityWeek ICS/OT; Begriffe wie SIMATIC, CODESYS, SPS/PLC, SCADA, ICS, OT-Sicherheit |
 
 Eine **Behörden-Warnung** ist kein Thema, sondern eine Art von Quelle: Im Quellenfilter wählt „Alle: Behörden & CERTs“
 alle Behörden auf einmal.
@@ -228,9 +228,9 @@ oder aus ([Integrationen → News](/docs/integrationen#news)). Die Sprache steht
 
 | Gruppe | Ab Werk an | Wählbar |
 |---|---|---|
-| Behörden & CERTs | BSI Cyber-Sicherheitswarnungen, CERT-EU Security Advisories, CERT.at Warnungen | CISA Alerts, BSI CERT-Bund (WID), BSI Presse, NCSC UK, Canadian Centre for Cyber Security, CERT-FR Alertes (FR) |
+| Behörden & CERTs | BSI Cyber-Sicherheitswarnungen, CERT-EU Security Advisories, CERT.at Warnungen | BSI CERT-Bund (WID), BSI Presse, NCSC UK, Canadian Centre for Cyber Security, CERT-FR Alertes (FR) |
 | Schwachstellen-Kataloge | CISA KEV | ENISA EUVD, Microsoft Patchday (MSRC) |
-| Hersteller-Hinweise | CERT@VDE (OT-Hersteller), Veeam Security | Fortinet PSIRT, Palo Alto Networks PSIRT, Cisco PSIRT, Ivanti Security Advisories, Siemens ProductCERT, Rockwell Automation, Oracle Security Alerts |
+| Hersteller-Hinweise | CERT@VDE (OT-Hersteller), Veeam Security | Fortinet PSIRT, Palo Alto Networks PSIRT, Cisco PSIRT, Ivanti Security Advisories, Siemens ProductCERT, Oracle Security Alerts |
 | Research | Microsoft Threat Intelligence, Cisco Talos | Unit 42, Google Threat Intelligence (Mandiant), Kaspersky Securelist, ESET WeLiveSecurity, Check Point Research, Zero Day Initiative (ZDI), SANS Internet Storm Center, watchTowr Labs, Huntress |
 | Presse | heise online, heise Security, The Hacker News, golem.de Security, BleepingComputer, SecurityWeek ICS/OT | SecurityWeek, Krebs on Security, Dark Reading, The Record, Borns IT- und Windows-Blog, Security-Insider, t3n Security, Risky Bulletin |
 
@@ -248,8 +248,9 @@ oder aus ([Integrationen → News](/docs/integrationen#news)). Die Sprache steht
   mit Link zu den Release Notes – statt Hunderter Einzelmeldungen je CVE.
 - **Hersteller-Hinweise** sind genau, betreffen aber nur die Produkte des Herstellers. Die Schwere übernimmt Cobe News
   vom Hersteller.
-- **CISA Alerts** ist ab Werk aus: `www.cisa.gov` lehnt automatische Abrufe aus vielen Netzen ab (HTTP 403). Cobe News
-  umgeht das nicht und zeigt dann „Die Quelle lehnt automatische Abrufe ab“.
+- **CISA Alerts und Rockwell Automation** sind seit 0.1.49 keine eingebauten Quellen mehr: beide lehnen automatische
+  Abrufe aus den meisten Netzen ab (HTTP 403). Cobe News umgeht das nicht und zeigt bei einer solchen Quelle „Die Quelle
+  lehnt automatische Abrufe ab“. CISAs KEV-Katalog bleibt.
 - **BSI CERT-Bund (WID)** bringt viele Hinweise am Tag – daher ab Werk aus.
 
 ### Neue Quellen und der Rückstand {#rueckstand}

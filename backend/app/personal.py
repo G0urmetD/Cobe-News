@@ -458,6 +458,7 @@ def event_path(ev: VendorEvent) -> str:
 def story(ev: VendorEvent, lang: str) -> notify.Story:
     s = notify.vendor_story(ev, lang)
     s.link = get_config().base_url + event_path(ev)
+    s.ours = []  # every event here is of the person's own products – the footer says so, no mark on each
     return s
 
 
@@ -465,10 +466,12 @@ def _ordered(events: list[VendorEvent]) -> list[VendorEvent]:
     return sorted(events, key=lambda e: (notify.RANK.get(e.severity, 0), e.created_at), reverse=True)
 
 
-def render_mail(events: list[VendorEvent], lang: str) -> tuple[str, str, str]:
+def render_mail(events: list[VendorEvent], lang: str, tz: str | None = None) -> tuple[str, str, str]:
+    """The person's mail – times in their own zone (`tz`: their quiet hours' zone, else Europe/Berlin). The LIST shown
+    are cut in the order the mail shows them (notify.priority: exploited or critical first, then by severity, newest)."""
     lang = _lang(lang)
-    shown = _ordered(events)[:LIST]
-    return notify.render_mail(LABELS[lang]["label"], [story(e, lang) for e in shown], len(events), lang, footer=LABELS[lang]["footer"])
+    shown = sorted((story(e, lang) for e in events), key=notify.priority, reverse=True)[:LIST]
+    return notify.render_mail(LABELS[lang]["label"], shown, len(events), lang, footer=LABELS[lang]["footer"], tz=tz)
 
 
 def render_teams(events: list[VendorEvent], lang: str, *, test: bool = False) -> dict:
@@ -538,6 +541,7 @@ class _Job:
     url: str = ""
     subs: list[PushSubscription] = field(default_factory=list)
     error: notify.NotifyError | None = None  # could not even be set up (the URL unreadable)
+    tz: str = quiet.DEFAULT_TZ  # the person's zone (the mail's times)
 
 
 _LATE = object()  # a message not started before the round's deadline: claimed, certainly not sent
@@ -746,7 +750,7 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
             subs.setdefault(s.user_id, []).append(s)
     for (uid, way), _rows in still.items():
         p, email = people[uid]
-        job = _Job(uid, way, _lang(p.lang), [], int(_state(p, way).get("failures") or 0))
+        job = _Job(uid, way, _lang(p.lang), [], int(_state(p, way).get("failures") or 0), tz=quiet.out(p.schedule)["tz"])
         if way == "email":
             if not email or not teams.MAIL.fullmatch(email):
                 no["no_address"].append((uid, way))
@@ -807,7 +811,7 @@ async def _send(job: _Job, smtp: dict, key: webpush.Vapid | None) -> tuple[notif
     try:
         async with asyncio.timeout(SEND_DEADLINE):
             if job.way == "email":
-                subject, text_, html = render_mail(job.events, job.lang)
+                subject, text_, html = render_mail(job.events, job.lang, job.tz)
                 await notify.send_mail(smtp, [job.address], subject, text_, html)
             elif job.way == "teams":
                 url = check_teams_url(job.url)

@@ -273,8 +273,8 @@ Was das kostet:
 
 ### Einrichten {#ruecksicherungs-test-einrichten}
 
-Bei einer **neuen** Installation ist alles schon da: `scripts/setup-env.sh` erzeugt das Passwort, `db-init` legt Rolle
-und Datenbank an. Eine **bestehende** Installation richtet ihr einmal so ein:
+Bei einer **neuen** Installation ist alles schon da: `scripts/setup-env.sh` erzeugt das Passwort, der Datenbank-Container legt
+Rolle und Datenbank an. Eine **bestehende** Installation richtet ihr einmal so ein:
 
 **1. Code aktualisieren** – wie bei jedem [Update](/docs/betrieb#update-schritte) (`git pull`).
 
@@ -286,12 +286,12 @@ cd /opt/cobe-news
 scripts/setup-env.sh
 ```
 
-**3. Neu starten** – `db-init` legt die Rolle und die Wegwerf-Datenbank bei jedem Start an bzw. prüft sie. Im Log steht
-danach `cobe_news_restore ready`:
+**3. Neu starten** – der Datenbank-Container legt die Rolle und die Wegwerf-Datenbank bei jedem Start an bzw. prüft sie.
+Im Log steht danach `cobe_news_restore ready`:
 
 ```bash
 docker compose up -d --build
-docker compose logs db-init
+docker compose logs db | grep db-init
 ```
 
 **4. Ausprobieren** – *Einstellungen → Sicherung & Export → Rücksicherungs-Test*, „Jetzt testen“. Gibt es noch keine
@@ -302,11 +302,11 @@ Sicherung, vorher „Jetzt sichern“.
 > `BACKUP_PASSPHRASE` nur im cron-Job, siehe [cron](#cron)), schlägt der Test der App mit dem Code `passphrase` fehl.
 > Dann den Test vom Host starten lassen: [Per Host-Cron](#ruecksicherungs-test-host).
 
-`POSTGRES_RESTORE_PASSWORD` muss mindestens 16 Zeichen lang sein. Ist es kürzer, bricht `db-init` ab und die App
-startet nicht – `setup-env.sh` erzeugt 40 Zeichen.
+`POSTGRES_RESTORE_PASSWORD` muss mindestens 16 Zeichen lang sein. Ist es kürzer, bricht die Einrichtung der Datenbank ab
+und die App startet nicht – `setup-env.sh` erzeugt 40 Zeichen.
 
 **Nicht gewünscht?** In der `.env` `POSTGRES_RESTORE_PASSWORD=` leer lassen (die Zeile behalten, sonst ergänzt
-`setup-env.sh` sie wieder) und `docker compose up -d` ausführen. Dann legt `db-init` nichts an, und der Reiter sagt
+`setup-env.sh` sie wieder) und `docker compose up -d` ausführen. Dann legt die Datenbank nichts an, und der Reiter sagt
 „nicht eingerichtet“. Eine schon angelegte Rolle und Datenbank bleiben dabei bestehen. Wer sie entfernen will:
 
 ```bash
@@ -369,12 +369,12 @@ Schlägt ein Test fehl, nennt die Seite einen Code:
 | Code | Bedeutung | Was tun |
 |---|---|---|
 | `not_configured` | keine Wegwerf-Datenbank eingerichtet | [Einrichten](#ruecksicherungs-test-einrichten) |
-| `unsafe` | das Ziel ist die Datenbank oder die Rolle der App, oder die Rolle des Tests hat zu viele Rechte (Superuser, darf Datenbanken oder Rollen anlegen, darf sich mit der Datenbank der App verbinden, ist Mitglied der Rolle der App, besitzt die Wegwerf-Datenbank nicht) | `docker compose up -d` (db-init setzt die Rechte neu), `docker compose logs db-init` lesen; nie Rechte von Hand vergeben |
+| `unsafe` | das Ziel ist die Datenbank oder die Rolle der App, oder die Rolle des Tests hat zu viele Rechte (Superuser, darf Datenbanken oder Rollen anlegen, darf sich mit der Datenbank der App verbinden, ist Mitglied der Rolle der App, besitzt die Wegwerf-Datenbank nicht) | `docker compose up -d` (die Datenbank setzt die Rechte bei jedem Start neu), `docker compose logs db` lesen; nie Rechte von Hand vergeben |
 | `busy` | ein anderer Test läuft gerade (wird nicht als Ergebnis gespeichert) | warten |
 | `no_backup` | es gibt keine Sicherung | „Jetzt sichern“ |
 | `passphrase` | die neueste Sicherung ist verschlüsselt, die App kennt die Passphrase nicht | [Per Host-Cron](#ruecksicherungs-test-host) |
 | `verify` | die Datei hat eine Prüfung nicht bestanden: falsche Passphrase, Signatur eines anderen Schlüssels oder keine, fehlende oder fremde Dateien, Prüfsumme, Inhaltsverzeichnis, Schema einer neueren Version | die Meldung lesen – so ließe sich die Sicherung auch nicht wiederherstellen |
-| `connect` | die Wegwerf-Datenbank ist nicht erreichbar (falsches Passwort, Rolle oder Datenbank fehlt) | `docker compose up -d`, `docker compose logs db-init` |
+| `connect` | die Wegwerf-Datenbank ist nicht erreichbar (falsches Passwort, Rolle oder Datenbank fehlt) | `docker compose up -d`, `docker compose logs db` |
 | `restore` | `pg_restore` oder `psql` haben einen Fehler gemeldet | die Meldung und `docker compose logs app` lesen |
 | `rows` | die Zeilen je Tabelle weichen vom Manifest ab | neu sichern und erneut testen |
 | `schema` | das Schema weicht von dem einer frisch migrierten Datenbank ab | die Meldung lesen; die Sicherung enthält etwas, das Cobe News nicht selbst anlegt |
@@ -407,7 +407,7 @@ sudo chown -R 10001 data
 **3. Datenbank starten** – Image bauen und nur die (leere) Datenbank mit der Rolle der App anlegen:
 
 ```bash
-docker compose build && docker compose up -d db-init
+docker compose build && docker compose up -d --wait db
 ```
 
 **4. Einspielen** – mit `--use-backup-key`, damit der Schlüssel aus der Sicherung übernommen wird:

@@ -269,8 +269,11 @@ def hsts() -> bool:
     """HSTS only with a certificate the browsers trust (own CA, or a proxy of one's own) – with the self-signed one a
     browser would refuse "continue anyway" for a year, and as soon as the app renews it (every ~150 days, a new
     certificate) every computer that trusted the old one would be locked out without a way past the warning. HSTS=1
-    switches it on anyway (once the certificate is handed out). Sent only to a host name (hsts_host)."""
-    return get_config().hsts or mode() in ("own", "external")
+    switches it on anyway (once the certificate is handed out). Sent only to a host name (hsts_host). "external" only when
+    TLS_MODE=external is written down – not when PROXY_ENABLED=0 alone implies it (0.1.49): such an installation ran
+    without HSTS before, and what its own proxy serves is not known here."""
+    cfg = get_config()
+    return cfg.hsts or cfg.tls_mode == "own" or (cfg.tls_mode == "external" and cfg.tls_mode_explicit)
 
 
 HSTS_HEADER = "max-age=31536000"  # no includeSubDomains (other services under the domain), no preload

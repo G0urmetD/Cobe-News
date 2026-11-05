@@ -2,6 +2,39 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.49 – Stack ohne Einmal-Container, ein Schalter hinter eigenem Reverse Proxy, neue Alert-Mail
+
+### Verbessert
+- **Nur noch Dienste, die laufen**: Datenbank und Proxy haben eigene kleine Images (`cobe-news-db`, `cobe-news-proxy`, signiert wie die App). Die Datenbank legt die Rolle der App bei jedem Start selbst an und meldet sich erst danach „healthy“ – die Einmal-Container `db-init` (lokal und Portainer) und `assets` (Portainer) gibt es nicht mehr, Portainer zeigt keine beendeten Container mehr.
+- **Hinter eigenem Reverse Proxy reicht `PROXY_ENABLED=0`**: TLS gilt dann als extern, und die App übernimmt die Client-Adresse von ihrem Docker-Gateway (über das unter Linux nur der Host selbst kommt – der App-Port ist an 127.0.0.1 gebunden). Auf Docker Desktop, wo auch andere Container über das Gateway kommen, vertraut sie niemandem von selbst. `TRUSTED_PROXIES` wirkt weiter als Vorgabe, `none` vertraut niemandem.
+- **Portainer-Datei**: am Anfang zwei fertige Blöcke zum Abschreiben – mit und ohne eigenen Reverse Proxy.
+- **Benachrichtigungs-Mail überarbeitet**: Je Meldung eine Zeile mit Produkt (wenn sicher bekannt), den ersten drei CVEs und den Themen („Aktiv ausgenutzt“, „Zero-Day“, „Exploit veröffentlicht“ …); Meldungen, die ein gefolgtes Produkt betreffen, tragen „Betrifft eure Produkte: …“ – bei einer auf Teams beschränkten Regel nur die Produkte dieser Teams. Reihenfolge: zuerst aktiv ausgenutzte und kritische Meldungen, dann, was eure Produkte betrifft, dann nach Schwere, die neueste zuerst. Nach derselben Reihenfolge wählt eine Sammelnachricht (auch in den Chat-Kanälen) ihre zehn aus – ein niedriger Befund eines eigenen Produkts verdrängt nie eine ausgenutzte oder kritische Meldung.
+- **Betreff und Kopf der Mail**: Der Betreff nennt, worum es geht („[Cobe News] 5 neue Meldungen: Emerson Ovation, SolarWinds Dameware +3“); statt der doppelten Überschrift steht darunter eine Zeile „Höchste Schwere: Hoch · 1 betrifft eure Produkte · 1 aktiv ausgenutzt“.
+- **BSI-Kennzeichen aus dem Titel**: „[NEU]“, „[UPDATE]“, „[UNGEPATCHT]“ und „[kritisch]“ … „[niedrig]“ vorne im Titel fallen in Mail, Chat-Karten und Push weg – Schwere und Thema stehen ohnehin dabei; der Webhook bekommt den Titel unverändert.
+- **Ortszeit statt UTC in der Mail**: „04.11.2026 11:19 MEZ“ – Kanäle in Europe/Berlin, persönliche Nachrichten in der Zeitzone der Person.
+- **Dunkelmodus**: Die Mail hat ein eigenes dunkles Farbschema (Apple Mail, iOS, Outlook für Mac und Outlook.com, Thunderbird); die Schwere-Plaketten sind in beiden Modi gut lesbar.
+- **Kompakte Liste ab 6 Meldungen**: eine Zeile je Meldung (Schwere, Produkt, Titel als Link in Cobe News) statt langer Karten.
+- **Warum die Mail kommt**: Der Fuß nennt die Regel mit „Regel bearbeiten“ – der Link öffnet die Regel direkt im Editor (Einstellungen › Kanäle & Regeln).
+- **News ausgeschaltet**: Die Seite zeigt nur noch den Hinweis „News sind ausgeschaltet“ – ohne Filter darunter, die nichts bewirken könnten.
+
+### Fixes
+- **Gateway in der Anleitung**: Das Docker-Netz `edge` hat das Gateway `172.31.250.128` (erste Adresse von `EDGE_RANGE`), nicht `.1` – die Empfehlung `TRUSTED_PROXIES=172.31.250.1/32` war falsch und ließ die App alle Besucher unter einer Adresse sehen.
+
+### Entfernt
+- **Quellen „CISA Alerts“ und „Rockwell Automation“**: Beide lehnen automatische Abrufe aus den meisten Netzen ab (HTTP 403) und lieferten nie. Sie verschwinden beim Update aus jeder Installation (im Protokoll als Löschung durch das System); Regeln und Desktop-Auswahl lassen sie los, Meldungen, die nur eine dieser Quellen brachte (CISA Alerts vor 0.1.7), gehen mit. CISAs KEV-Katalog bleibt; OT-Meldungen kommen weiter über CERT@VDE, Siemens ProductCERT und SecurityWeek ICS/OT. Wer eine der Quellen erreicht, kann ihre Adresse als eigene Quelle eintragen.
+
+### Betrieb
+- **Update lokal**: `docker compose up -d --build --remove-orphans` – entfernt den alten Container `cobe-news-db-init`; Daten, Volumes und Netz bleiben. Mit `docker-compose.image.yml` statt `COBE_NEWS_IMAGE` jetzt `COBE_NEWS_VERSION` (oder alle drei Image-Variablen).
+- **Update Portainer**: neue Datei einfügen, `COBE_NEWS_IMAGE` aus den Variablen löschen, *Update the stack*; die alten Container `assets`/`db-init` und die Volumes `<stack>_deploy-postgres`/`<stack>_deploy-nginx` können weg.
+- **Eigener Reverse Proxy, alter Rat**: Wer bis 0.1.48 `TRUSTED_PROXIES=172.31.250.1/32` gesetzt hat, entfernt diese Zeile (oder setzt sie leer) – das Gateway des Netzes `edge` ist `172.31.250.128`, und ein gesetztes `TRUSTED_PROXIES` ersetzt es; sonst steht weiter jede Anfrage unter `.128`. Die App warnt beim Start.
+- **Gateway nur, wenn sicher**: `PROXY_ENABLED=0` vertraut dem Gateway nur, wenn es in `EDGE_SUBNET` liegt und die App sicher auf einer Linux Docker Engine läuft; auf Docker Desktop, OrbStack, Colima, WSL2 – oder wenn DNS keine klare Antwort gibt – glaubt sie niemandem (Log `proxy: … trusted from nobody`; `TRUSTED_PROXIES=<Gateway>/32` erzwingt es).
+- **Eigener Reverse Proxy, Sonderfälle**: Steht einer der Host-Namen (`host.docker.internal`, `host.containers.internal` …) in `/etc/hosts` des Containers – Podman Machine, oder `extra_hosts: …:host-gateway` –, vertraut die App dem Gateway nicht von selbst; ebenso ohne erreichbares DNS. Dann `TRUSTED_PROXIES=<Gateway>/32` setzen (das Gateway steht in der Startzeile der App bzw. in `docker network inspect <Projekt>_edge`).
+- **HSTS** mit `external` nur bei ausdrücklich gesetztem `TLS_MODE=external` (oder `HSTS=1`) – nicht, wenn es sich bloß aus `PROXY_ENABLED=0` ergibt; wer es bisher gesetzt hatte, behält es.
+- **Portainer, einmalig beim Wechsel auf 0.1.49**: Die neue Stack-Datei einfügen – mit der Datei aus 0.1.48 und nur einem höheren `COBE_NEWS_IMAGE` startet der Stack nicht (Meldung „/srv/deploy/postgres missing …“). Ab 0.1.49 reicht für ein Update `COBE_NEWS_VERSION` auf die neue Version und *Update the stack* mit *Re-pull image*, solange das CHANGELOG nichts anderes sagt.
+- **Datenbank-Container**: PID 1 läuft nach dem Vorbereiten des Datenordners als `postgres` ohne Capabilities; `docker kill -s HUP` lädt die Konfiguration neu.
+- **Neue Pakete auf ghcr.io**: `cobe-news-db` und `cobe-news-proxy` – nach dem ersten Release einmal auf „Public“ stellen.
+- **Tests ohne Ablaufdatum**: Testdaten mit festem Datum laufen jetzt relativ zum Testtag – mehrere Tests wären ab Ende November ausgefallen und hätten die Release-Pipeline gestoppt.
+
 ## 0.1.48 – Portainer-Stack
 
 ### Neu

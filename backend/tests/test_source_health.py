@@ -3,6 +3,7 @@ categories, the states and their edge cases (switched off, never fetched, no new
 the admin API (readers get 403), one query set however many sources there are, notifications once per state change
 (not again next round, not after a restart), and the migration. All HTTP is mocked."""
 
+import email.utils
 import ssl
 from datetime import UTC, datetime, timedelta
 
@@ -16,15 +17,22 @@ from app.models import NewsItem, NewsSource, SourceFetchStat, SourceHealthDelive
 from app.news import NewsError
 from app.source_health import Facts, classify
 
+NOW = datetime.now(UTC)
+
+
+def _days_ago(days: int, hours: int) -> bytes:
+    """An RSS date relative to the run – a fixed one would fall out of the news retention (keep_days) one day."""
+    return email.utils.format_datetime(NOW - timedelta(days=days, hours=hours), usegmt=True).encode()
+
+
 RSS = b"""<?xml version="1.0"?>
 <rss version="2.0"><channel><title>Example</title>
 <item><title>New ransomware gang hits hospitals</title><link>https://news.example.org/ransomware</link>
-<pubDate>Tue, 28 Oct 2026 07:00:00 GMT</pubDate><description>Data stolen.</description></item>
-<item><title>Patch for CVE-2026-9999</title><link>https://news.example.org/patch</link><pubDate>Tue, 28 Oct 2026 06:00:00 GMT</pubDate></item>
+<pubDate>""" + _days_ago(3, 2) + b"""</pubDate><description>Data stolen.</description></item>
+<item><title>Patch for CVE-2026-9999</title><link>https://news.example.org/patch</link><pubDate>""" + _days_ago(3, 3) + b"""</pubDate></item>
 <item><title></title><link>https://news.example.org/no-title</link></item>
 </channel></rss>"""
 HOOK = "https://n8n.corp.example/webhook/health"
-NOW = datetime.now(UTC)
 
 
 async def _source(key: str = "feed-a", url: str = "https://news.example.org/a.xml", **kw) -> NewsSource:

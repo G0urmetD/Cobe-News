@@ -261,7 +261,7 @@ Zugangsdaten offline aufbewahren, z. B. in einem Passwort-Tresor.
    Regel gilt nur für Meldungen, die danach eintreffen ([Regeln](/docs/benachrichtigungen#regeln)).
 3. Zeigt der Kanal einen Fehler und einen nächsten Versuch, pausiert er nach Fehlschlägen. „Testen“ prüft ihn sofort.
 4. Liegt das [SMTP](term:smtp)-Relay auf dem Docker-Host selbst, lehnt Cobe News es als internes Ziel ab. Seine
-   Adresse (das Gateway des Containers, z. B. `172.31.250.1`, oder bei Docker Desktop die Adresse hinter
+   Adresse (das Gateway des Containers, z. B. `172.31.250.128`, oder bei Docker Desktop die Adresse hinter
    `host.docker.internal`) in `SMTP_ALLOW_INTERNAL` eintragen, dann `docker compose up -d`. `127.0.0.1` geht nie –
    das wäre der Container selbst.
 5. Den Spam-Ordner der Empfänger prüfen.
@@ -282,8 +282,9 @@ Installationsordner. `docker compose restart` behält die alten Werte.
 ### Die App startet nicht {#app-startet-nicht}
 
 1. `docker compose ps -a` zeigt, welcher Container fehlt oder neu startet.
-2. `docker compose logs db-init` – scheitert er, startet die App nicht. Häufigster Grund: `POSTGRES_PASSWORD` in der
-   `.env` wurde geändert. Das alte Passwort zurücksetzen ([Datenbank](/docs/betrieb#db-rollen)).
+2. `docker compose logs db` – die Zeilen `db-init: …` zeigen, ob die Datenbank die Rolle der App eingerichtet hat;
+   scheitert das, startet die App nicht. Häufigster Grund: `POSTGRES_APP_PASSWORD` fehlt oder ist kürzer als 16
+   Zeichen ([Datenbank](/docs/betrieb#db-rollen)).
 3. `docker compose logs --tail 100 app` – nach einem Update steht dort z. B. ein Fehler bei der Migration.
 
 ### Wo finde ich die Logs? {#wo-logs}
