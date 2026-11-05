@@ -216,16 +216,7 @@ KEEP = timedelta(days=30)
 
 async def _prune(db: AsyncSession) -> int:
     """Scores not asked for a month (a CVE of no finding or recent story any more) go – in small batches."""
-    from sqlalchemy import delete
-
-    gone = 0
-    while True:
-        ids = select(EpssScore.cve).where(EpssScore.fetched_at < datetime.now(UTC) - KEEP).limit(2000).scalar_subquery()
-        n = (await db.execute(delete(EpssScore).where(EpssScore.cve.in_(ids)))).rowcount or 0
-        await db.commit()
-        gone += n
-        if n < 2000:
-            break
+    gone = await dbm.delete_batched(db, EpssScore, EpssScore.fetched_at < datetime.now(UTC) - KEEP, batch=2000)
     if gone:
         invalidate()
     return gone

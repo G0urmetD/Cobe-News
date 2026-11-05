@@ -6,15 +6,17 @@
 // - A reader: no entry in the navigation, the API answers 403.
 // DE and EN, 1280 px and 375 px, light and dark: no page error, no console error, no horizontal scroll. The actions run
 // once per language (the wide light run).
-// Env: BASE_URL, CREDS ({user, password, totp, reader, reader_password}), PLAYWRIGHT, SHOTS, SECRET_HOST (optional: an
-// address WEBHOOK_PRIVATE_NETS allows – the test channel is only saved, never sent to). Installed Chrome; stubs.
+// 0.1.50: the dates sit in the "Zeitraum" popover, a row may carry the notable icon next to its area icon, the
+// expanded entry has its parts (Wer, Woher, Was genau, Zusammenhang).
+// Env: BASE_URL, CREDS ({user, password, totp, reader, reader_password}), PLAYWRIGHT, SHOTS, SECRET_HOST (optional: a
+// public host for the test channel – it is only saved, never sent to; default hooks.slack.com). Installed Chrome; stubs.
 import "./csp-guard.mjs" // first: every browser context of this run fails on a CSP violation
 import crypto from "node:crypto"
 import fs from "node:fs"
 import { BASE, COMBOS, H, SHOTS, check, creds, finish, json, open, pw, reauthOnce, scrollCheck, settle, signIn } from "./common.mjs"
 import { texts } from "./i18n-text.mjs"
 
-const HOST = process.env.SECRET_HOST || "10.20.0.15:18443"
+const HOST = process.env.SECRET_HOST || "hooks.slack.com"
 const rand = () => crypto.randomBytes(6).toString("hex")
 
 /** The admin's own actions of this run – through the API (they are what the log must show). */
@@ -94,7 +96,7 @@ async function run(browser, combo, state) {
   await settle(page)
   await rows.first().click()
   await page.waitForTimeout(300)
-  const details = main.locator("[id^=audit-]").first()
+  const details = main.locator("ul > li > [id^=audit-]").first() // the expanded entry (not the filter bar's hint ids)
   const dText = await details.innerText().catch(() => "")
   const locks = await details.locator("dd svg").count()
   const html = await page.content()
@@ -109,7 +111,10 @@ async function run(browser, combo, state) {
   )
   await scrollCheck(page, tag, "secret entry", shot("audit_secret"))
   // reset
-  await main.getByRole("button", { name: t("audit.filter.reset") }).click()
+  await main
+    .getByRole("search")
+    .getByRole("button", { name: t("audit.filter.reset") })
+    .click()
   await settle(page)
   check(`${tag} "${t("audit.filter.reset")}": the search empty again`, (await search.inputValue()) === "" && (await rows.count()) > 2)
 
@@ -117,21 +122,28 @@ async function run(browser, combo, state) {
   await main.getByRole("combobox", { name: t("audit.filter.group") }).click()
   await page.getByRole("option", { name: t("audit.group.tokens"), exact: true }).click()
   await settle(page)
-  const icons = await rows.locator("svg[aria-label]").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))
+  // each row's first labelled icon is its area (a notable entry carries a second one: "Auffällig")
+  const icons = await rows.evaluateAll((els) => els.map((e) => e.querySelector("svg[aria-label]")?.getAttribute("aria-label")))
   check(`${tag} area "${t("audit.group.tokens")}": only token entries`, icons.length > 0 && icons.every((x) => x === t("audit.group.tokens")), { n: icons.length })
-  // who: the admin
+  // who: the signed-in admin (the accounts come first in the list, sorted by name)
   await main.getByRole("combobox", { name: t("audit.filter.actor") }).click()
-  const actorOption = page.getByRole("option").filter({ hasText: "Anna Admin" }).first()
+  const actorOption = page.getByRole("option").filter({ hasText: creds.user }).first()
   const hasActor = (await actorOption.count()) === 1
   if (hasActor) await actorOption.click()
+  else await page.keyboard.press("Escape")
   await settle(page)
-  check(`${tag} who "Anna Admin": entries`, hasActor && (await rows.count()) > 0)
-  // dates: from tomorrow – none
+  check(`${tag} who "${creds.user}": entries`, hasActor && (await rows.count()) > 0)
+  // dates: from tomorrow – none (the days sit in the "Zeitraum" popover, outside main)
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-  await main.getByLabel(t("audit.filter.from"), { exact: true }).fill(tomorrow)
+  await main.getByRole("button", { name: new RegExp(`^${t("audit.filter.range")}`) }).click()
+  await page.getByLabel(t("audit.filter.from"), { exact: true }).fill(tomorrow)
+  await page.keyboard.press("Escape")
   await settle(page)
   check(`${tag} from tomorrow: "${t("audit.empty.filtered")}"`, (await main.innerText()).includes(t("audit.empty.filtered")))
-  await main.getByRole("button", { name: t("audit.filter.reset") }).click()
+  await main
+    .getByRole("search")
+    .getByRole("button", { name: t("audit.filter.reset") })
+    .click()
   await settle(page)
 
   // "Ältere laden"
@@ -149,11 +161,14 @@ async function run(browser, combo, state) {
   await settle(page)
   await rows.first().click()
   await page.waitForTimeout(300)
-  const change = await main.locator("[id^=audit-] dd").allInnerTexts()
+  const change = await main.locator("ul > li > [id^=audit-] [data-audit-changes] dd").allInnerTexts()
   check(`${tag} a row opened: before → after (the retention, days)`, change.length >= 2 && /\d{2,4}/.test(change[0]) && /\d{2,4}/.test(change[1]) && change[0] !== change[1], {
     change: change.slice(0, 4),
   })
-  await main.getByRole("button", { name: t("audit.filter.reset") }).click()
+  await main
+    .getByRole("search")
+    .getByRole("button", { name: t("audit.filter.reset") })
+    .click()
   await settle(page)
 
   if (wide) {

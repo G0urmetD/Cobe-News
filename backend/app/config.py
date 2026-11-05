@@ -86,6 +86,8 @@ class Config:
     # backups (app/backup.py): where they go, and the passphrase that encrypts them (with it, the key goes along)
     backup_dir: Path = Path("/data/backups")
     backup_passphrase: str = field(default="", repr=False)
+    # or the passphrase from this file (a read-only mount, a Docker secret) – read when needed, BACKUP_PASSPHRASE wins
+    backup_passphrase_file: str = ""
     # the restore test (app/restore_test.py): a throwaway database with a role of its own that has no right on the app's
     # database (db-init makes both when POSTGRES_RESTORE_PASSWORD is set) – RESTORE_TEST_DATABASE_URL instead (tests)
     restore_db_url: str = field(default="", repr=False)
@@ -271,6 +273,7 @@ def get_config() -> Config:
         sqlite_import=_flag("SQLITE_IMPORT", True),
         backup_dir=Path(os.environ.get("BACKUP_DIR") or (data / "backups")),
         backup_passphrase=os.environ.get("BACKUP_PASSPHRASE") or "",
+        backup_passphrase_file=(os.environ.get("BACKUP_PASSPHRASE_FILE") or "").strip(),
         restore_db_url=(os.environ.get("RESTORE_TEST_DATABASE_URL") or "").strip(),
         restore_db_name=(os.environ.get("POSTGRES_RESTORE_DB") or "cobe_news_restore_test").strip(),
         restore_db_user=(os.environ.get("POSTGRES_RESTORE_USER") or "cobe_news_restore").strip(),

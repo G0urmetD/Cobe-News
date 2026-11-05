@@ -32,7 +32,7 @@ the drawer.
 |---|---|---|---|
 | **Fetch news** | off | on/off | Main switch. Off: not a single request goes out, the news page shows "News are switched off". |
 | **Fetch interval per source** | 30 minutes | 15–1440 minutes | How often each source is asked. Unchanged feeds cost only a short question. |
-| **Retention** | 90 days | 7–365 days | Older stories are deleted, read and unread alike. |
+| **Retention** | 90 days | 7–365 days | Older stories are deleted, read and unread alike. A story without a date of its own stays while its feed still lists it (or another feed lists the same address). A shorter period says before saving how many stories go – for good, they are not fetched again later. |
 | **Details from the source** | on | on/off | Fetches the advisory behind each story ([Details from the source](/docs/news-quellen#details-aus-der-quelle)). |
 
 The fields can only be edited once the main switch is on.

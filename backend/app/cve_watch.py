@@ -321,10 +321,11 @@ async def withdrawn(db: AsyncSession, advisories: list[tuple[str, str, str, str,
 
 async def prune(db: AsyncSession, now: datetime | None = None) -> int:
     """States nobody watches any more (a new watch is a new baseline) and watch events older than KEEP."""
+    from app import db as dbm
+
     now = now or datetime.now(UTC)
-    n = (await db.execute(delete(CveWatchState).where(CveWatchState.cve.not_in(select(CveWatch.cve))))).rowcount or 0
-    n += (await db.execute(delete(VendorEvent).where(VendorEvent.kind == "watch", VendorEvent.created_at < now - KEEP))).rowcount or 0
-    await db.commit()
+    n = await dbm.delete_batched(db, CveWatchState, CveWatchState.cve.not_in(select(CveWatch.cve)))
+    n += await dbm.delete_batched(db, VendorEvent, VendorEvent.kind == "watch", VendorEvent.created_at < now - KEEP, batch=2000)
     return int(n)
 
 

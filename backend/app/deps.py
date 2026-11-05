@@ -60,6 +60,31 @@ def client_ip(request: Request) -> str:
     return peer
 
 
+def client_route(request: Request) -> tuple[str, str]:
+    """The client address (client_ip) and how the request arrived: "direct" (the peer itself), "bundled" (through the
+    bundled nginx), "proxy" (through a reverse proxy of your own – TRUSTED_PROXIES or the Docker host's), "bundled_proxy"
+    (an own proxy in front of the bundled nginx). For the audit log's "Woher"."""
+    ip = client_ip(request)
+    peer = _ip(request.client.host) if request.client else None
+    cfg = get_config()
+    nets = cfg.trusted_networks
+    if not peer or not nets or not any(ipaddress.ip_address(peer) in n for n in nets):
+        return ip, "direct"
+    bundled = bool(cfg.proxy_enabled and cfg.proxy_ip and peer == cfg.proxy_ip)
+    hops = [h.strip() for h in ",".join(request.headers.getlist("x-forwarded-for")).split(",") if h.strip()]
+    if not hops:
+        return ip, "direct"  # the proxy itself asked
+    own = False
+    for hop in reversed(hops):
+        a = _ip(hop)
+        if a is None or not any(ipaddress.ip_address(a) in n for n in nets):
+            break
+        own = True  # a further trusted hop: a proxy of your own on the way
+    if bundled:
+        return ip, "bundled_proxy" if own else "bundled"
+    return ip, "proxy"
+
+
 def via_https(request: Request) -> bool:
     peer = _ip(request.client.host) if request.client else None
     trusted = peer is not None and any(ipaddress.ip_address(peer) in n for n in get_config().trusted_networks)
@@ -90,6 +115,10 @@ async def _session(request: Request, db: AsyncSession) -> tuple[UserSession, Use
         return cached
     got = await sessions.load(db, request.cookies.get(sessions.cookie_name()), touch=not background(request))
     request.state.session = got
+    if got is not None:
+        from app import audit
+
+        audit.set_session(got[0])  # the audit log's "Wer": this session's reference and how it was signed in
     return got
 
 
@@ -150,3 +179,19 @@ Reader = Annotated[User, Depends(current_user)]
 Admin = Annotated[User, Depends(admin_user)]
 ActiveSession = Annotated[UserSession, Depends(current_session)]
 PeekedSession = Annotated[UserSession, Depends(peek_session)]
+
+
+def download_guard(request: Request) -> None:
+    """A download that is logged (the audit log's CSV, the data export): only from this site's own page – the CSRF token
+    must come along (the page's api.getFile sends it). A link on another site or an address typed in (a top-level
+    navigation carries the Lax session cookie) must not make an admin's browser download it and write the entry."""
+    import hmac
+
+    csrf = request.cookies.get(sessions.csrf_cookie_name()) or ""
+    sent = request.headers.get("x-csrf-token") or ""
+    if csrf and sent and hmac.compare_digest(csrf, sent):
+        return
+    raise api_error(403, "csrf_failed")
+
+
+DownloadGuard = Annotated[None, Depends(download_guard)]

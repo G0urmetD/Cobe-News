@@ -300,7 +300,7 @@ async def test_emergency_budget_exceeded_is_reported_once(client, admin_client, 
     assert len(lines) == 1 and "4 failed sign-in checks in the last hour (budget 4)" in lines[0] and "falsch" not in lines[0]
     async with db.session() as s:
         (e,) = list(await s.scalars(select(AuditEntry).where(AuditEntry.action == "login.emergency_slowed")))
-        assert e.actor_kind == "system" and e.target_label == "notfall" and e.details == {"failures_1h": 4, "budget": 4}
+        assert e.actor_kind == "system" and e.target_label == "notfall" and e.details == {"failures_1h": 4, "budget": 4, "stage": "password"}
     system = (await admin_client.get("/api/admin/tls")).json()["system"]
     assert [w["code"] for w in system] == ["emergency_failures"] and system[0]["failures"] == 4
     # an hour later (the throttle): reported again

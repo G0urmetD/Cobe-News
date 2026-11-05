@@ -23,6 +23,22 @@ export interface BackupFile {
   encrypted: boolean
 }
 
+/** Where the app's own passphrase comes from ("Jetzt sichern", the restore test) – never the passphrase itself. */
+export interface BackupPassphrase {
+  /** env: BACKUP_PASSPHRASE, file: BACKUP_PASSPHRASE_FILE, null: none (backups from the app are not encrypted) */
+  source: "env" | "file" | null
+  /** the file's path in the container */
+  file: string | null
+  /** both set: BACKUP_PASSPHRASE wins, the file is not read */
+  file_ignored: boolean
+  /** backups from the app are encrypted */
+  ok: boolean
+  /** why it cannot be used ("Jetzt sichern" fails until fixed): missing, unreadable, not_a_file, too_large, not_text, empty, short */
+  error: string | null
+  /** the server's own text for it (path and reason) */
+  detail: string | null
+}
+
 /** GET /api/admin/backup */
 export interface BackupStatus {
   /** a backup runs now ("Jetzt sichern" in the background, or the CLI / cron job) */
@@ -33,8 +49,9 @@ export interface BackupStatus {
   /** what a retention change is made on – an older state is refused (409 "stale") */
   rev: number
   dir: string
-  /** BACKUP_PASSPHRASE set: backups are encrypted and carry the master key */
+  /** the app has a usable passphrase: its backups are encrypted and carry the master key */
   with_key: boolean
+  passphrase: BackupPassphrase
   last: BackupLast | null
   backups: BackupFile[]
 }
@@ -100,3 +117,13 @@ export function restoreCommand(name: string, dir = "/data/backups"): string {
 
 /** The last outcome's error in the reader's language (the backend's own text stays available as detail). */
 export const backupErrorKey = (last: BackupLast) => `backup.err.${last.code ?? "failed"}`
+
+/** What the footer of "Jetzt sichern" says before a backup starts: encrypted, fails (the passphrase file), or plain –
+ *  plain with encrypted ones in the list (from a command with a passphrase, e.g. cron): the difference named. */
+export type NowNote = "encrypted" | "broken" | "plain" | "plainBesideEncrypted"
+
+export function nowNote(s: Pick<BackupStatus, "with_key" | "passphrase" | "backups">): NowNote {
+  if (s.with_key) return "encrypted"
+  if (s.passphrase.error) return "broken"
+  return s.backups.some((f) => f.encrypted) ? "plainBesideEncrypted" : "plain"
+}

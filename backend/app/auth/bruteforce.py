@@ -195,6 +195,13 @@ def register_failure(username: str, ip: str, *, lock_account: bool = True, emerg
     return Failure(attempts_left=left, locked_for=locked, ip_blocked=blocked, delay=delay, emergency_alert=alert)
 
 
+def failures(username: str) -> int:
+    """The account's failed attempts of the last ACCOUNT_WINDOW – read right before a sign-in succeeds (the audit log
+    marks a sign-in after several of them)."""
+    k = _key(username)
+    return len(_recent(_acct_fail, k, ACCOUNT_WINDOW)) if k else 0
+
+
 def register_success(username: str) -> None:
     _acct_fail.pop(_key(username), None)
 

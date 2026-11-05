@@ -27,7 +27,7 @@ Alles, was die Installation selbst betrifft (Adresse, Zertifikat, Netz, Datenban
 | `APP_PORT` | http-Port der App, fest an `127.0.0.1` gebunden: für den Health-Check, Prometheus auf demselben Host ([Metriken](/docs/api#prometheus-konfiguration)) und einen eigenen Reverse Proxy auf demselben Host | `8096` |
 | `COMPOSE_FILE` | `docker-compose.yml:docker-compose.http.yml` schaltet die Umleitung von http auf https ein ([HTTPS](#http-umleitung)) | nicht gesetzt |
 | `HTTP_PORT` | http-Port, der nur auf https umleitet (nur mit `COMPOSE_FILE` wie oben) | `8094` |
-| `COBE_NEWS_VERSION` | die veröffentlichten, signierten Images statt des lokalen Builds (App, Datenbank, Proxy), z. B. `0.1.49` – nur mit `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; Signaturen vorher mit cosign prüfen (docs/BETRIEB.md). Bis 0.1.48 hieß das `COBE_NEWS_IMAGE` (nur die App) | nicht gesetzt (lokaler Build) |
+| `COBE_NEWS_VERSION` | die veröffentlichten, signierten Images statt des lokalen Builds (App, Datenbank, Proxy), z. B. `0.1.50` – nur mit `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; Signaturen vorher mit cosign prüfen (docs/BETRIEB.md). Bis 0.1.48 hieß das `COBE_NEWS_IMAGE` (nur die App) | nicht gesetzt (lokaler Build) |
 
 ### Zertifikat {#env-zertifikat}
 
@@ -76,6 +76,8 @@ Mehr dazu: [Web Push](/docs/integrationen#web-push), Schlüssel [VAPID](term:vap
 | `POSTGRES_RESTORE_PASSWORD` | Passwort der Rolle `cobe_news_restore` für den [Rücksicherungs-Test](/docs/sicherung#ruecksicherungs-test), mindestens 16 Zeichen. Darf sich ändern – die Datenbank setzt es bei jedem Start. Leer: kein Rücksicherungs-Test | von `setup-env.sh` erzeugt |
 | `DB_MEM` | Speichergrenze des Datenbank-Containers | `512m` |
 | `BACKUP_PASSPHRASE` | Sicherungen verschlüsselt und mit dem Schlüssel, mindestens 12 Zeichen. Besser nur dem [cron](term:cron)-Job mitgeben ([Verschlüsselung](/docs/sicherung#verschluesselung)) | leer: unverschlüsselt, ohne Schlüssel |
+| `BACKUP_SECRET_DIR` | Ordner auf dem Host mit der Passphrase-Datei, schreibgeschützt eingehängt unter `/run/backup-secret` ([Passphrase-Datei](/docs/sicherung#passphrase-datei)) | leer: ein leeres eigenes Volume |
+| `BACKUP_PASSPHRASE_FILE` | die Passphrase aus dieser Datei im Container, z. B. `/run/backup-secret/backup-pass` – auch „Jetzt sichern“ verschlüsselt; `BACKUP_PASSPHRASE` geht vor | leer: keine Datei |
 | `SQLITE_IMPORT` | `0`: eine alte SQLite-Datei (`data/news.db`, bis Version 0.1.15) beim Start nicht in eine leere Datenbank übernehmen ([Datenbank](#datenbank)) | `1`: Übernahme an |
 
 ### Ressourcen und Netze {#env-ressourcen}
@@ -643,16 +645,93 @@ umgehen die Prüfungen der App. Für Sicherungen immer die eingebauten nehmen ([
 nicht ein eigenes `pg_dump`. Den Umstieg von älteren Versionen (SQLite bis 0.1.15, Rollen ab 0.1.22) beschreibt die
 Betriebs-Referenz des Repositorys (`docs/BETRIEB.md`) im Abschnitt „PostgreSQL“.
 
+### Wie lange Daten bleiben {#aufbewahrung-daten}
+
+Cobe News räumt selbst auf: stündlich, Vendor-News-Daten einmal am Tag, in kleinen Portionen. Jeder Schritt läuft für
+sich – scheitert einer, steht `prune … failed` im Log, die anderen laufen trotzdem, und er wird in der nächsten Stunde
+wieder versucht.
+
+| Daten | Wie lange | Einstellbar |
+|---|---|---|
+| Meldungen mit ihren Gelesen-Markierungen und Details | 90 Tage ab Veröffentlichung; ohne eigenes Datum, solange ihr Feed sie listet (oder ein anderer Feed dieselbe Adresse) | 7–365 Tage: [Integrationen → News](/docs/integrationen#news) |
+| Gelesen-Markierungen | 30 Tage (danach zählt alles als gelesen); „ungelesen“ bleibt mit der Meldung | – |
+| Protokoll | 365 Tage | 90–3650 Tage: [Protokoll](#protokoll-aufbewahrung) |
+| Zustellprotokoll | 30 Tage, höchstens 200 000 Einträge | – |
+| Persönliche Zustellungen, Wochenrückblick-Versand | 90 Tage | – |
+| CVE beobachten: was sich getan hat | 90 Tage | – |
+| Vendor-News-Ereignisse (Befunde, neue Versionen, Support-Ende) | solange das Produkt gefolgt und die Version eingetragen ist | – |
+| Revisionen eines Hinweises | die letzten 20, höchstens ein Jahr | – |
+| EPSS-Werte, Einzelabfragen je CVE | 30 Tage ohne neue Abfrage | – |
+| Abruf-Statistik der Quellen | 60 Tage (der letzte Zustand jeder Quelle bleibt) | – |
+| Widerrufene und abgelaufene API-Tokens | 30 Tage | – |
+| Sicherungen | die letzten 7, vor einer Wiederherstellung 30 Tage | 3–90: [Sicherung](/docs/sicherung#aufbewahrung) |
+| Container-Logs | 3 × 20 MB je Container | – |
+
+Die Hinweise von Vendor News selbst (NVD, Hersteller, CSAF) bleiben, auch für nicht mehr gefolgte Produkte – folgt ihr
+einem Produkt wieder, sind sie sofort da. Die vollständige Liste steht in `docs/BETRIEB.md` („Aufbewahrung“).
+
 ## Protokoll {#protokoll}
 
 Unter **Einstellungen → Protokoll** (nur Admins) steht, wer wann was an Cobe News geändert hat: wer (das Konto mit dem
 Namen von damals – oder System, Verzeichnis-Sync, Kommandozeile), was, wann, von welcher Adresse und woran. Ein Klick
-auf einen Eintrag zeigt die geänderten Felder mit Vorher und Nachher. Filtern lässt sich nach Bereich, Person, Zeitraum
-und Freitext (Name, Ziel, Adresse).
+auf einen Eintrag klappt ihn auf ([Ein Eintrag im Detail](#protokoll-eintrag)).
 
 Ein Eintrag wird in derselben Transaktion geschrieben wie die Änderung selbst: wird sie abgelehnt (etwa weil ein anderer
 Admin zwischendurch gespeichert hat), entsteht auch kein Eintrag. Einträge lassen sich weder bearbeiten noch einzeln
-löschen – auch nicht von Admins.
+löschen – auch nicht von Admins; eine Änderung hinter dem Rücken der App deckt die [Integritätskette](#protokoll-kette) auf.
+
+### Filtern {#protokoll-filter}
+
+Oben stehen **Bereich**, **Wer**, **Zeitraum** und die **Suche** (Name, Ziel, Adresse). Der Zeitraum bietet die letzten
+24 Stunden, 7, 30 oder 90 Tage – oder einen eigenen Zeitraum von Tag zu Tag. **Nur Auffälliges** zeigt die
+[Anomalien](#protokoll-auffaellig) und die sicherheitsrelevanten Aktionen: Sperren nach Fehlversuchen, Rollenwechsel,
+API-Tokens, beendete Sitzungen, eine zurückgespielte Sicherung, ein Export des Protokolls, eine kürzere Aufbewahrung.
+
+Neben jedem Wert eines aufgeklappten Eintrags stehen kleine Symbole (beim Darüberfahren oder mit der Tastatur, auf
+Touch-Geräten immer): **+** filtert nach diesem Wert (Konto, Adresse, Sitzung, Aktion, Ziel), der Pfeil öffnet das Ziel
+in der App (Regel, Quelle, Team, Kanal, Produkt …), das Doppelblatt kopiert. Gesetzte Wertfilter stehen als Chips
+unter der Filterleiste („IP: 192.0.2.10 ×“) mit der Zahl der Treffer; das × nimmt einen weg, **Filter zurücksetzen**
+alle.
+
+### Ein Eintrag im Detail {#protokoll-eintrag}
+
+- **Wer:** das Konto, seine Rolle damals, ob es das [Notfall-Konto](/docs/anmeldung#notfall-admin) war, wie die
+  Sitzung angemeldet wurde („Passwort + TOTP · lokal“) und die Sitzung – eine kurze Kennung und wie viele Einträge zu
+  ihr gehören. Die Kennung ist ein mit dem Hauptschlüssel gebildeter Hash: weder Sitzungs-Token noch Sitzungs-ID lassen
+  sich daraus ablesen.
+- **Woher:** die Adresse mit ihrer Einordnung – dieser Rechner, internes Netz (RFC 1918, ULA), das
+  [Docker-Gateway](#docker-desktop) (eine geteilte Adresse: die echte ist verdeckt), eine geteilte Adresse
+  (`SHARED_ADDRESSES`), extern –, der Weg (direkt, über den gebündelten Proxy, über einen
+  [eigenen Reverse Proxy](#reverse-proxy)), Browser und System grob („Firefox 144 · macOS“ – nie die ganze
+  Browser-Kennung), Methode und Pfad der Anfrage (ohne Query-String) und ihre **Anfrage-ID**. Dieselbe ID steht in der
+  Zeile des Zugriffs-Logs (`rid=…`, [Logs](#logs-lesen)) und in der Antwort (`X-Request-ID`) – so finden sich Eintrag und
+  Log-Zeile.
+- **Was genau:** Aktion und Ziel; bei Einstellungen der Ort in der App („Einstellungen › Anmeldung › Sitzungen“) und die
+  geänderten Felder mit ihren Namen, Vorher (rot, durchgestrichen) und Nachher (grün). **Verlauf dieses Ziels:** die
+  fünf Einträge davor zum selben Ziel.
+- **Zusammenhang:** wie viele Einträge zur selben Sitzung gehören, was von derselben Adresse in den 24 Stunden davor
+  kam (und wie viele Sperren darunter), die vorige Anmeldung des Kontos (Zeit, Adresse, Browser, Anmeldeart) und die
+  Hinweise auf [Anomalien](#protokoll-auffaellig).
+- **Fußzeile:** Nummer des Eintrags, genaue Zeit mit Zeitzone, App-Version, der Stand der
+  [Integritätskette](#protokoll-kette) für diesen Eintrag und die Ziel-ID; das Symbol **{ }** kopiert den Eintrag als
+  JSON.
+
+Einträge von vor 0.1.50 haben Browser, Sitzung, Rolle und Anfrage nicht – dort steht „nicht erfasst“ oder das Feld
+fehlt.
+
+### Auffälliges {#protokoll-auffaellig}
+
+Beim Schreiben eines Eintrags prüft die App ein paar einfache Dinge und **markiert** sie (sie handelt nie danach):
+
+- das Notfall-Konto meldet sich außerhalb von 07–19 Uhr oder am Wochenende an (Ortszeit: `TZ` des Containers, sonst
+  Europe/Berlin);
+- ein Admin meldet sich von einer Adresse an, von der keine seiner Anmeldungen der letzten 90 Tage kam;
+- mehrere Fehlversuche (ab 3) direkt vor einer Anmeldung;
+- eine Rolle wird auf Admin angehoben (auch ein neues Admin-Konto);
+- die Aufbewahrung des Protokolls wird verkürzt;
+- das Protokoll wird exportiert.
+
+Markierte Einträge tragen ein Warndreieck, die Gründe stehen unter **Zusammenhang → Hinweise**.
 
 ### Was protokolliert wird {#protokoll-inhalt}
 
@@ -662,18 +741,21 @@ löschen – auch nicht von Admins.
   Passkeys und der Zahl der damit beendeten Sitzungen) und ein Passkey, dessen Zähler zurückging (möglicher Klon,
   [Was geprüft wird](/docs/anmeldung#passkeys-pruefung)); beendete Sitzungen – auch unter
   [Meine Sitzungen](/docs/anmeldung#meine-sitzungen) und durch einen Admin, mit Umfang (eine, alle anderen, alle) und
-  Anzahl.
+  Anzahl – und eine Sitzung, die nach fünf falschen Codes beim zweiten Faktor oder bei der erneuten Bestätigung endet
+  (mit dem Schritt: Code nach dem Passwort, Einrichtung, Bestätigung, Passwortwechsel).
 - **Anmeldung:** Änderungen an AD/LDAP, Entra ID (auch [MFA-Nachweis](/docs/anmeldung#entra-mfa-nachweis) und
   Authentifizierungskontext), [Zweiter Faktor für alle](/docs/anmeldung#zweiter-faktor-alle) und den
-  Sitzungs-Zeitlimits, Gruppenzuordnungen, die Einrichtung,
-  Anmeldungen von **Admins** mit der Anmeldeart (Passwort, Passwort und TOTP, AD/LDAP, Passkey, Entra ID, Entra ID und TOTP),
-  Kontosperren und Adresssperren nach Fehlversuchen – auch nach abgelehnten Passkey-Anmeldungen –, und wenn die
-  Fehlversuche beim [Notfall-Admin](/docs/anmeldung#notfall-admin) das Stunden-Budget überschreiten.
+  Sitzungs-Zeitlimits, Gruppenzuordnungen, die Einrichtung und ein neues Einrichtungs-Token von der Kommandozeile (nie
+  das Token selbst), Anmeldungen von **Admins** mit der Anmeldeart (Passwort, Passwort und TOTP, AD/LDAP, Passkey,
+  Entra ID, Entra ID und TOTP), Kontosperren nach Fehlversuchen (mit dem Schritt, in dem sie entstanden) und
+  Adresssperren – auch nach abgelehnten Passkey-Anmeldungen –, und wenn die Fehlversuche beim
+  [Notfall-Admin](/docs/anmeldung#notfall-admin) das Stunden-Budget überschreiten.
 - **API-Tokens:** erstellt und widerrufen (Name, Rechte, Gültigkeit).
 - **Kanäle & Regeln, Teams, Quellen & Produkte:** angelegt, geändert, gelöscht; bei Teams auch Gruppen, Mitglieder,
-  Produkte, Zuteilung, Wochenrückblick und Abwesenheiten. Bei Kanälen auch ntfy, Gotify und Mattermost (Topic und
-  Tokens nur als „geändert“) und jedes [Erneut senden](/docs/benachrichtigungen#erneut-senden) aus dem
-  Zustellprotokoll (Kanal, Zustellung, ob es geklappt hat).
+  Produkte, Zuteilung, Wochenrückblick, Abwesenheiten und wer einen Team-Abgleich von Hand gestartet hat. Bei Kanälen auch
+  ntfy, Gotify und Mattermost (Topic und Tokens nur als „geändert“) und jedes
+  [Erneut senden](/docs/benachrichtigungen#erneut-senden) aus dem Zustellprotokoll (Kanal, Zustellung, ob es geklappt
+  hat).
 - **Versionen und Vorschläge:** [Versionen bestätigt](/docs/vendor-news#versionen-pruefen) – einzeln oder alle eines
   Produkts oder Teams (mit Anzahl), von Admins wie von Lesern im Team des Produkts; Antworten auf
   [Produktvorschläge](/docs/vendor-news#vorschlaege-beantworten): übernommen, abgelehnt, doppelt (mit Produkt und der
@@ -681,38 +763,124 @@ löschen – auch nicht von Admins.
 - **Einstellungen:** Nachrichten, Vendor News (auch das Intervall von „Versionen prüfen“), E-Mail-Versand, Teams,
   Passkeys ein/aus, Sicherung, Rücksicherungs-Test, Protokoll.
 - **Sicherung & Export:** Sicherung erstellt, alte Sicherungen entfernt, Sicherung zurückgespielt (Kommandozeile),
-  Rücksicherungs-Test gestartet, Export heruntergeladen, Protokoll exportiert.
+  Rücksicherungs-Test gestartet (in der App) und ausgeführt mit Ergebnis (Kommandozeile), Export heruntergeladen (in der App und mit
+  `python -m app.cli export`), eine SQLite-Datei übernommen (`migrate-sqlite`), Protokoll exportiert, und eine
+  [Lücke oder Änderung in der Kette](#protokoll-kette).
 - **Verzeichnis-Sync:** was AD oder Entra ID am Zugang ändern – Konten aus- oder wieder eingeschaltet, Rollen aus der
-  Gruppenzuordnung, ein Team-Abgleich (eine Zusammenfassung pro Lauf).
+  Gruppenzuordnung (bei einer Anmeldung mit deren Adresse), ein Team-Abgleich (eine Zusammenfassung pro Lauf).
 
 Nicht einzeln protokolliert werden fehlgeschlagene Anmeldungen – mit Passwort wie mit Passkey: die kann jeder von außen
 schicken, und ein ins Namensfeld getipptes Passwort würde sonst im Protokoll landen. Stattdessen steht die Sperre darin,
-die sie auslösen ([Fehlversuche und Sperren](/docs/anmeldung#sperren)). Anmeldungen von Lesern stehen nur als „zuletzt
-angemeldet“ am Konto. Ebenfalls nicht protokolliert: der Probelauf einer Regel (er ändert nichts), ein neuer
-Produktvorschlag eines Lesers (erst die Antwort darauf) und das Lesen des Protokolls selbst – sein Export schon.
+die sie auslösen ([Fehlversuche und Sperren](/docs/anmeldung#sperren)) – aber nur für ein **bestehendes Konto**. Ein
+Name, den es nicht gibt, wird nie protokolliert (es könnte ein Passwort sein): Die App zählt solche Sperren pro Adresse,
+schreibt pro Adresse und Stunde einen Eintrag „Sperren unbekannter Anmeldenamen“ (höchstens 20 je Stunde) und alles
+darüber hinaus – auch weitere Adresssperren – in eine Zusammenfassung je Stunde. So kann auch ein Angriff von vielen
+Adressen das Protokoll nicht fluten. Anmeldungen von Lesern stehen nur als „zuletzt angemeldet“ am Konto. Ebenfalls
+nicht protokolliert: der Probelauf einer Regel (er ändert nichts), ein neuer Produktvorschlag eines Lesers (erst die
+Antwort darauf) und das Lesen des Protokolls selbst – sein Export schon.
 
 ### Was nie darin steht {#protokoll-geheimnisse}
 
 Kein geheimer Wert – nur, dass er geändert wurde: Passwörter (lokal, Bind-Passwort, SMTP), das Client-Secret von Entra
 ID, Webhook-Adressen (dort steckt das Token im Pfad), Bot-Tokens, ntfy-Topics und -Tokens, Gotify-Tokens,
-HMAC-Secrets und Header-Werte, der NVD-API-Schlüssel,
-TOTP-Schlüssel, API-Tokens (auch nicht ihr Anfang), die Hashes früherer Passwörter
-([Passwort-Regeln](/docs/anmeldung#benutzer-anlegen)) und die Passphrase der Sicherung. Adressen erscheinen nur als
-Schema und Host (`https://hooks.example.com/…`), überlange Texte gekürzt. Eine zentrale Prüfung im Server entscheidet
-das für jedes Feld; ein Test schlägt fehl, sobald ein neues Feld nach Geheimnis aussieht und nicht geschwärzt würde.
+HMAC-Secrets und Header-Werte (auch ein `Authorization`-Header), der NVD-API-Schlüssel, TOTP-Schlüssel, API-Tokens (auch
+nicht ihr Anfang), die Hashes früherer Passwörter ([Passwort-Regeln](/docs/anmeldung#benutzer-anlegen)) und die
+Passphrase der Sicherung. Adressen erscheinen nur als Schema und Host (`https://hooks.example.com/…`) – bei jedem
+Schema (`socks5://`, `postgresql://` …) und auch mitten in einem Text; Zugangsdaten in einer Adresse
+(`benutzer:passwort@`) fallen immer weg. Werte, die wie ein Token aussehen (JWT, `xoxb-…`, `ghp_…`, lange zufällige
+Zeichenketten), stehen nur als „geheim“ darin, ein langer Produktname wie `laptop-5g-for-business-7th-edition-intel`
+dagegen normal. Steuer- und Richtungszeichen (etwa ein Rechts-nach-links-Zeichen, das „gnp.exe“ umdreht) werden
+entfernt, überlange Texte gekürzt. Eine zentrale Prüfung im Server entscheidet das für jedes Feld; ein Test schlägt
+fehl, sobald ein neues Feld nach Geheimnis aussieht und nicht geschwärzt würde.
+
+**Personenbezogene Daten:** Adresse, Browser und System (grob), die Sitzungskennung und der Anzeigename gehören zu
+einer Person. Sie unterliegen derselben [Aufbewahrung](#protokoll-aufbewahrung) wie der Eintrag und gehen mit ihm.
+
+### Nachprüfbar: die Integritätskette {#protokoll-kette}
+
+Jeder Eintrag wird kurz nach dem Schreiben **versiegelt** (spätestens nach etwa einer Minute): Er bekommt seine Position
+in einer Kette, den Hash des vorigen Eintrags und einen eigenen, mit dem Hauptschlüssel (`SECRET_KEY` bzw.
+`data/secret.key`) gebildeten Hash (HMAC-SHA-256). Auch der Zustand der Kette (Anfang, Ende, wie weit geprüft, Funde) ist
+mit diesem Schlüssel signiert.
+
+**Was die Kette beweist – und was nicht:** Sie zeigt, dass ein Eintrag **seit dem Versiegeln unverändert** ist, und
+dass seitdem keiner gelöscht oder eingeschoben wurde – gegenüber jemandem, der zwar an die Datenbank kommt, aber den
+Hauptschlüssel nicht hat. Sie beweist **nicht**, dass ein Eintrag von der App geschrieben wurde: Wer in die Datenbank
+schreiben kann, kann einen gefälschten Eintrag einfügen, bevor er versiegelt ist – er wird dann mitversiegelt (ein
+Eintrag, dessen Zeit deutlich vor der des vorigen liegt, wird als „nachträglich geschrieben?“ markiert, mehr nicht).
+Ebenso außerhalb: die neuesten, noch nicht versiegelten Einträge (bis etwa eine Minute) und alles, was jemand **mit**
+dem Hauptschlüssel tut – er kann die Kette neu berechnen. Für einen Nachweis, der auch das abdeckt, schreibt die App
+stündlich das Ende der Kette in ihr Log (siehe unten): Diese Zeile gehört in ein Log-System außerhalb des Servers.
+
+- **Prüfen:** Beim Öffnen des Protokolls prüft die App die neuen Einträge ab der Stelle, an der die letzte Prüfung
+  aufgehört hat – das bleibt auch bei Millionen Einträgen schnell. Läuft gerade die stündliche Prüfung, zeigt die Seite
+  „Prüfung läuft …“ und den letzten Stand, statt zu warten. Zusätzlich prüft das stündliche Aufräumen die **ganze**
+  Kette in Teilen (200 000 Einträge pro Stunde); eine Änderung an einem schon geprüften Eintrag fällt so innerhalb
+  weniger Stunden auf.
+- **Anzeige:** Oben steht „Kette lückenlos“ (im Hinweis: bis zu welcher Position geprüft), in der Fußzeile jedes
+  Eintrags sein Stand. Findet die Prüfung etwas, steht dort rot „Lücke oder Änderung bei Eintrag #n“ oder „Zustand der
+  Kette verändert“, und im Protokoll ein Eintrag **Protokoll-Kette: Lücke oder Änderung gefunden** (unter „Nur
+  Auffälliges“). Ein Fund **bleibt** sichtbar, bis ihn jemand auf dem Server bestätigt – auch wenn der Zustand der Kette
+  danach „aufgeräumt“ wird.
+- **Vollständig prüfen:** `docker compose exec app python -m app.cli verify-audit` prüft die ganze Kette vom ältesten
+  erhaltenen Eintrag an (Exit-Code 0: lückenlos).
+- **Anderer Hauptschlüssel:** Nach einem neuen `SECRET_KEY` (oder wenn jemand das Schlüssel-Feld im Zustand ändert)
+  steht dort rot „Mit anderem Schlüssel versiegelt – nicht prüfbar“, und neue Einträge werden nicht versiegelt – die App
+  verankert die Kette **nie von selbst** neu. Das tut erst ein Admin auf dem Server:
+  `python -m app.cli verify-audit --accept-new-key` (damit lassen sich auch geprüfte Funde bestätigen). Eine
+  Wiederherstellung mit `--ignore-key` macht das ebenfalls. Beides schreibt einen Eintrag **Protokoll-Kette neu
+  verankert** (auffällig), und die Seite zeigt „Neu verankert“ mit Datum dauerhaft an. Die Einträge davor lassen sich
+  danach nicht mehr prüfen.
+- **Aufräumen:** Gelöscht wird in der Reihenfolge der Kette, einmal am Tag (sobald der älteste Eintrag einen Tag über der
+  Aufbewahrung liegt). Vorher schreibt die App einen Eintrag **Alte Einträge aufgeräumt** in die Kette, der den neuen
+  Anfang (Position und Hash des letzten gelöschten Eintrags) festhält; ein Anfang, den kein solcher Eintrag deckt, ist ein
+  Fund. Ein Eintrag mit einer Zeit weit in der Zukunft wird markiert und hält das Aufräumen nicht auf.
+- **Zeuge im Log:** Stündlich steht im App-Log eine Zeile `audit chain head: seq=… hash=… key=… anchor=…`. Wer sie
+  in ein Log-System außerhalb des Servers schickt, kann später zeigen, dass das Ende der Kette nicht zurückgesetzt wurde.
+- **In der Datenbank:** Es gibt bewusst keinen Trigger, der Änderungen ablehnt – er stünde in jeder Sicherung, und die
+  Wiederherstellung nimmt aus Sicherheitsgründen nur Tabellen, Indizes und Sequenzen an.
+- **Nach dem Update auf 0.1.50:** Einträge von vorher werden beim ersten stündlichen Aufräumen versiegelt (50 000 in
+  etwa 4 s, 2 Mio. in etwa 2,5 min). Jedes Versiegeln schreibt die Zeile neu – die Tabelle wird dabei etwa doppelt so
+  groß. PostgreSQL gibt den Platz danach für neue Einträge wieder frei, die Datei schrumpft aber nicht. Wer ihn bei einem
+  großen Protokoll zurückhaben will, führt danach einmal aus:
+  `docker compose exec db psql -U cobe_news -c 'VACUUM FULL audit_log'`. Das schreibt die Tabelle neu und **sperrt
+  sie dabei ganz** – gemessen etwa 4 s je 450 000 Einträge (2 Mio. ≈ 15–20 s). Während der Sperre warten Aktionen, die
+  einen Protokolleintrag schreiben (Speichern in den Einstellungen, Anmeldungen von Admins), und das Protokoll lädt
+  nicht; also zu einer ruhigen Zeit. Bei einigen zehntausend Einträgen lohnt es nicht.
 
 ### Aufbewahrung {#protokoll-aufbewahrung}
 
 Ab Werk bleiben Einträge **365 Tage**, einstellbar von 90 bis 3650 Tagen unter **Protokoll → Aufbewahrung**. Ältere
-Einträge löscht die App stündlich. Eine kürzere Frist verlangt eine erneute Bestätigung – ältere Einträge gehen dann
-mit dem nächsten Aufräumen. Das Protokoll ist Teil jeder [Sicherung](/docs/sicherung#ueberblick); eine zurückgespielte
-Sicherung bringt ihr Protokoll mit (Einträge nach ihrem Zeitpunkt fehlen dann), die Wiederherstellung selbst wird
-danach als neuer Eintrag festgehalten.
+Einträge löscht die App einmal am Tag (sobald der älteste einen Tag darüber liegt), in Paketen zu je 20 000 Einträgen
+(jedes in einer eigenen kurzen Transaktion). Eine
+kürzere Frist verlangt eine erneute Bestätigung – ältere Einträge gehen dann mit dem nächsten Aufräumen – und wird als
+[auffällig](#protokoll-auffaellig) markiert. Das Protokoll ist Teil jeder [Sicherung](/docs/sicherung#ueberblick); eine
+zurückgespielte Sicherung bringt ihr Protokoll samt Kette mit (Einträge nach ihrem Zeitpunkt fehlen dann), die
+Wiederherstellung selbst wird danach als neuer Eintrag festgehalten.
 
 ### Export {#protokoll-export}
 
 **CSV exportieren** lädt die Einträge mit den gewählten Filtern herunter (UTF-8, die neuesten zuerst, höchstens
-100 000 Zeilen – für Älteres den Zeitraum eingrenzen). Zellen, die mit `=`, `+`, `-` oder `@` beginnen, bekommen ein
-Hochkomma davor, damit eine Tabellenkalkulation sie nicht als Formel ausführt. Die Einzelheiten stehen als JSON in der
-letzten Spalte. Für Zählungen ohne Namen liefert `/metrics` die Zahl der Einträge pro Bereich
-([Metriken](/docs/api#metriken)).
+100 000 Zeilen). Wird die Grenze erreicht, steht das in einer letzten Zeile (`# truncated …`) und die App meldet es – für
+Älteres den Zeitraum eingrenzen. Das **Trennzeichen** folgt der Sprache der Oberfläche: auf Deutsch das Semikolon, damit
+Excel die Datei per Doppelklick richtig in Spalten aufteilt (deutsches Excel trennt am Semikolon), auf Englisch das
+Komma.
+
+Zellen, die mit `=`, `+`, `-` oder `@` beginnen, bekommen ein Hochkomma davor, damit eine Tabellenkalkulation sie nicht
+als Formel ausführt – ebenso solche Zeichen direkt nach einem Komma oder Semikolon mitten in einer Zelle (eine
+Tabellenkalkulation mit dem anderen Trennzeichen würde dort eine neue Zelle beginnen). Die Einzelheiten stehen als JSON
+in der Spalte `details`; dort werden solche Zeichen als `\u003d` usw. geschrieben, das JSON bleibt gültig. Dahinter
+folgen Auffälligkeiten, Rolle, Sitzung, Anmeldeart, Browser, System, Anfrage, Anfrage-ID, Weg, Version und die
+Kettendaten (Position, Hash).
+
+Der Export lässt sich nur über die Schaltfläche auf der Seite auslösen (sie schickt das CSRF-Token mit) – weder ein
+Link auf einer fremden Seite noch die Adresse, direkt im Browser eingegeben, startet ihn (Antwort 403). Für Zählungen ohne Namen liefert `/metrics` die Zahl der Einträge
+pro Bereich ([Metriken](/docs/api#metriken)).
+
+### Die Suche {#protokoll-suche}
+
+Die Suche durchsucht Name, Anzeigename, Aktion, Ziel und Adresse über einen eigenen Index (Trigramme). Ab **3 Zeichen**
+antwortet sie auch bei Hunderttausenden Einträgen in Millisekunden (gemessen bei 450 000: ein Begriff ohne Treffer unter
+1 ms, ein seltener um 10 ms). Kürzere Begriffe kann der Index nicht nutzen – sie lesen alle Einträge (450 000: etwa
+60 ms, 2 Mio.: einige Zehntelsekunden); die Seite sagt das unter dem Suchfeld. Filter nach Konto, Adresse, Sitzung,
+Ziel, Aktion, Bereich und Zeitraum haben eigene Indizes und bleiben immer schnell.

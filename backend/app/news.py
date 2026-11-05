@@ -40,7 +40,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit
 
 import httpx
 import nh3
-from sqlalchemy import Text, and_, case, delete, func, literal_column, or_, select, text, update
+from sqlalchemy import Text, and_, case, exists, func, literal_column, or_, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
@@ -1879,6 +1879,7 @@ async def fetch_source(
             raise  # removed meanwhile (refresh_due logs it)
         return await _failed(db, src, NewsError("format", f"not stored ({why})"), now=now, every=every, meter=meter)
     src = await db.get(NewsSource, src.id) or src
+    src.parsed_at = now  # what it listed has a seen_at after this (store's own now is later) – see prune
     src.failures, src.error, src.last_ok_at, src.next_fetch_at = 0, None, datetime.now(UTC), datetime.now(UTC) + every
     src.primed_at = src.primed_at or datetime.now(UTC)  # its first fetch is stored: from now on undated stories are news
     source_health.record(db, source_health.NEWS, src.key, ok=True, meter=meter, items=added, parse_errors=facts.get("unusable", 0))
@@ -2005,20 +2006,38 @@ async def refresh_due(*, force: bool | datetime = False, transport=None) -> dict
 PRUNE_BATCH = 500
 
 
+def prunable(cut: datetime):  # noqa: ANN201 - a SQL condition
+    """The stories the retention removes at this cut (see prune). An undated story only when its own source and every
+    source carrying it read their feed (news_sources.parsed_at) after its last sighting – none of them listed it then.
+    A sighting (seen_at) is a feed listing the same address (url_key, store); a source carrying it by title or CVE only
+    does not renew it."""
+    unread_since = or_(NewsSource.parsed_at.is_(None), NewsSource.parsed_at <= NewsItem.seen_at)
+    own = exists().where(NewsSource.id == NewsItem.source_id, unread_since).correlate(NewsItem)
+    carrier = exists().where(NewsItemSource.item_id == NewsItem.id, NewsSource.id == NewsItemSource.source_id, unread_since).correlate(NewsItem)
+    return and_(NewsItem.published_at < cut, or_(NewsItem.seen_at.is_(None), and_(NewsItem.seen_at < cut, ~own, ~carrier)))
+
+
+async def prune_count(db: AsyncSession, days: int) -> int:
+    """How many stories a retention of `days` would remove now (the settings ask before a shorter one is saved)."""
+    cut = datetime.now(UTC) - timedelta(days=max(7, int(days)))
+    return int(await db.scalar(select(func.count()).select_from(NewsItem).where(prunable(cut))) or 0)
+
+
 async def prune(db: AsyncSession) -> int:
     """Stories older than the retention (and who read them, their details) go – in short transactions of PRUNE_BATCH
-    stories each, so a big backlog never holds the database for long. One without a date of its own (dated by when it
-    was first seen) stays while its feed still lists it – deleted, it would come back as new with the next fetch.
+    stories each (dbm.delete_batched: no long statement, and a story another transaction is updating – the topics of
+    many stories at once – is left for the next prune instead of a deadlock).
+    A story without a date of its own (dated by when it was first seen, `seen_at` its last sighting) goes only when it
+    is not listed any more: its last sighting is older than the retention and its feed – its own source and every one
+    carrying it – was read since (news_sources.parsed_at) and no longer listed it. Only a feed listing the same address
+    renews the sighting; a source carrying it by title or CVE does not hold it. A feed answering "304 Not Modified"
+    for months, one failing, switched off or News switched off: nothing is known, the story stays (deleted, it would
+    come back as new – and be notified – the next time the feed is read).
     The cut is remembered (store() takes nothing older again – a raised keep_days does not bring deleted stories back
     as unread). The freed space is reused by Postgres (autovacuum)."""
     days = max(7, int((await config(db)).get("keep_days") or 90))
     cut = datetime.now(UTC) - timedelta(days=days)
-    old = and_(NewsItem.published_at < cut, or_(NewsItem.seen_at.is_(None), NewsItem.seen_at < cut))
-    gone = 0
-    while ids := list(await db.scalars(select(NewsItem.id).where(old).limit(PRUNE_BATCH))):
-        res = await db.execute(delete(NewsItem).where(NewsItem.id.in_(ids)))
-        await db.commit()
-        gone += res.rowcount or 0
+    gone = await dbm.delete_batched(db, NewsItem, prunable(cut), batch=PRUNE_BATCH)
     stamp = int(cut.timestamp())
     await db.execute(text("INSERT INTO counters (name, value) VALUES (:n, :v) ON CONFLICT (name) DO UPDATE SET value = GREATEST(counters.value, :v)"), {"n": PRUNED, "v": stamp})
     await db.commit()

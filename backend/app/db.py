@@ -316,6 +316,32 @@ async def release(db: AsyncSession) -> None:
     await db.commit()
 
 
+PRUNE_BATCH = 5000  # rows per transaction of a retention prune (delete_batched)
+
+
+async def delete_batched(db: AsyncSession, model, *where, batch: int | None = None) -> int:  # noqa: ANN001 - a mapped class
+    """The rows of `model` matching `where` deleted in short transactions of at most `batch` rows each (committed one by
+    one) – the retention prunes: no statement runs long (the statement timeout), no transaction holds many row locks
+    or a big cascade. Each batch takes its rows with FOR UPDATE SKIP LOCKED: a row another transaction holds (a
+    concurrent update of many stories, a delivery being marked) is left for the next prune instead of waiting on it.
+    That covers the rows of the table itself only: rows its ON DELETE CASCADE removes can still wait on locks (and, rarely,
+    end in a deadlock) – the statement timeout and the prune's per-step try/rollback (main.py) cover that; the rest goes
+    with the next prune. Returns how many rows went."""
+    from sqlalchemy import delete, select, tuple_
+
+    batch = batch or PRUNE_BATCH
+    pk = list(model.__table__.primary_key.columns)
+    pick = select(*pk).where(*where).limit(batch).with_for_update(skip_locked=True)
+    cond = pk[0].in_(pick.scalar_subquery()) if len(pk) == 1 else tuple_(*pk).in_(pick)
+    gone = 0
+    while True:
+        n = (await db.execute(delete(model).where(cond).execution_options(synchronize_session=False))).rowcount or 0
+        await db.commit()
+        gone += n
+        if n < batch:  # the rest is gone – or held by another transaction: the next prune takes it
+            return gone
+
+
 async def wait_ready(timeout: float = 60.0) -> None:
     """At the start: Postgres may still be starting (depends_on waits for its health check, a restart of the database
     alone does not) – a few tries before giving up."""

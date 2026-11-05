@@ -71,20 +71,20 @@ der Release-Pipeline, siehe [Release](#release)), schaltet die Datei `docker-com
 
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
-COBE_NEWS_VERSION=0.1.49                                   # eine Version, nicht latest – gilt für alle drei Images
+COBE_NEWS_VERSION=0.1.50                                   # eine Version, nicht latest – gilt für alle drei Images
 ```
 
 Die Datei ersetzt bei `app`, `db` und `proxy` nur das Image (der `build`-Teil fällt weg); alles andere – Volumes, Netze,
 `.env` – bleibt, wie es ist. Ohne `COBE_NEWS_VERSION` bricht `docker compose` mit einem Hinweis ab, statt still etwas
 anderes zu starten. Einzelne Images lassen sich per Digest festnageln: `COBE_NEWS_IMAGE`, `COBE_NEWS_DB_IMAGE`,
-`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.49@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
+`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.50@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
 **Bis 0.1.48** nahm die Datei nur `COBE_NEWS_IMAGE` (die App) – wer sie so nutzt, setzt jetzt `COBE_NEWS_VERSION` und
 nimmt `COBE_NEWS_IMAGE` heraus (sonst bliebe die App auf der alten Version). Vor dem Start die Signaturen prüfen
 (cosign ≥ 2, keyless – die Identität ist der Release-Workflow dieses Repositorys):
 
 ```bash
 for i in cobe-news cobe-news-db cobe-news-proxy; do
-  cosign verify ghcr.io/g0urmetd/$i:0.1.49 \
+  cosign verify ghcr.io/g0urmetd/$i:0.1.50 \
     --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -93,7 +93,7 @@ docker compose up -d --remove-orphans   # ohne --build
 docker compose config --images          # zeigt, welche Images Compose nimmt
 ```
 
-`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.49@sha256:<digest>` in der
+`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.50@sha256:<digest>` in der
 jeweiligen Image-Variable), startet genau das geprüfte Image, auch wenn der Tag später anders zeigen sollte. Ein Update:
 `COBE_NEWS_VERSION` auf die neue Version setzen, Signaturen prüfen, `docker compose pull && docker compose up -d
 --remove-orphans` (die Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen
@@ -156,7 +156,8 @@ von `depends_on`, `security_opt`, `mem_limit`, `scale` und `ipv4_address`.
    | `BIND`, `PORT` | Standard `127.0.0.1` und `8095` (nur Variante B) – auf einem Server meist `BIND=0.0.0.0`, dann `BASE_URL` auf den Namen, den die Browser benutzen (sonst warnt der Proxy im Log und antwortet mit 421) |
    | `APP_PORT` | http-Port der App, fest an `127.0.0.1` (Health-Check, Notzugang, Ziel des eigenen Proxys), Standard `8096` – neben einer lokalen Installation ändern |
    | `SECRET_KEY` | leer: Schlüsseldatei `secret.key` im Volume `data`; besser setzen und getrennt aufbewahren ([Daten](#daten)) |
-   | `BACKUP_PASSPHRASE` | Sicherungen verschlüsselt – besser nur dem cron-Job mitgeben (unten) |
+   | `BACKUP_PASSPHRASE` | Sicherungen verschlüsselt – hier für jeden sichtbar, der den Stack bearbeiten darf: besser die Datei (nächste Zeilen) oder nur dem cron-Job mitgeben (unten) |
+   | `BACKUP_SECRET_DIR`, `BACKUP_PASSPHRASE_FILE` | die Passphrase aus einer Datei: ein **absoluter** Ordner auf dem Host (lesbar für UID 10001), eingehängt unter `/run/backup-secret`, und der Pfad der Datei darin, z. B. `/run/backup-secret/backup-pass` – dann ist auch „Jetzt sichern“ verschlüsselt ([Sicherung](#sicherung-wiederherstellung-export)). Leer: ein leeres eigenes Volume `backup-secret`, keine Datei |
    | `EDGE_SUBNET`, `EDGE_RANGE`, `PROXY_IP` | Standard `172.31.250.0/24`, `172.31.250.128/25`, `172.31.250.10` – neben einer lokalen Installation (oder einem zweiten Stack) ändern |
 
    Passwörter nur aus Buchstaben und Ziffern (nichts zu quoten), z. B. `openssl rand -hex 24`. Ohne die beiden
@@ -223,6 +224,24 @@ docker run --rm -it --network news_db -v news_data:/data --read-only --tmpfs /tm
   "$IMG" python -m app.cli restore /data/backups/cobe-news-<Zeit>.tar   # .tar.enc: -e BACKUP_PASSPHRASE
 docker start news-app-1
 ```
+
+Eine Sicherung von einem anderen System zurück ins Volume (z. B. auf einem neuen Server, als Benutzer der App):
+`docker exec -i news-app-1 sh -c 'umask 077; mkdir -p /data/backups && cat > /data/backups/<Datei>' < <Datei>`. Bei einer
+`.tar.enc` auf einem neuen Server `--use-backup-key` an den `restore` hängen; bei einer `.tar` vorher (App angehalten) den
+aufbewahrten Schlüssel ins Volume schreiben – geprüft (nicht leer, mindestens 16 Byte), erst als neue Datei, dann
+ausgetauscht, der bisherige bleibt als `secret.key.before-restore-<Zeit>` (nichts wird überschrieben, auch nicht bei einem
+zweiten Lauf):
+
+```bash
+test -s cobe-news-secret.key && docker run --rm -i -v news_data:/data --network none "$IMG" sh -ec '
+  umask 077; cat > /data/secret.key.new
+  [ "$(wc -c < /data/secret.key.new)" -ge 16 ] || { rm -f /data/secret.key.new; echo "key empty or cut off - nothing changed" >&2; exit 1; }
+  [ ! -e /data/secret.key ] || cp -p /data/secret.key "/data/secret.key.before-restore-$(date -u +%Y%m%d-%H%M%S)"
+  mv /data/secret.key.new /data/secret.key' < cobe-news-secret.key
+```
+
+Alles Schritt für
+Schritt (sichern, herunterladen, einspielen, was man dafür braucht): Handbuch *Sicherung → Schritt für Schritt*.
 
 Eine Datei ins Volume `data` (z. B. für `CA_FILE=/data/ca.pem`): `docker cp ca.pem news-app-1:/data/ca.pem`.
 
@@ -675,9 +694,10 @@ Sperren interner Ziele über Namen muss der Proxy selbst übernehmen. XML wird v
 geprüft (in jeder Kodierung, an jeder Stelle); Datumsangaben außerhalb 1990–2100 gelten als „kein Datum“. Ein Feed,
 der einen Fehler auslöst, pausiert nur selbst – die Runde geht mit den anderen weiter. Meldungen älter als die
 Aufbewahrung werden nicht (wieder) übernommen – auch nicht nach einem späteren Erhöhen der Aufbewahrung; Meldungen
-ohne eigenes Datum bleiben, solange ihr Feed sie noch listet. Benachrichtigungsregeln schicken keinen Rückstand
-(Meldungen, die beim Abruf schon älter als ein Tag waren, etwa beim ersten Abruf einer neu eingeschalteten Quelle).
-Verbindungsfehler und Timeouts pausieren eine Quelle höchstens eine Stunde (oder ein Abrufintervall, wenn es länger
+ohne eigenes Datum bleiben, solange ihr Feed sie noch listet (siehe [Aufbewahrung](#aufbewahrung)).
+Benachrichtigungsregeln schicken keinen Rückstand (Meldungen, die beim Abruf schon älter als ein Tag waren, etwa beim
+ersten Abruf einer neu eingeschalteten Quelle – oder ohne eigenes Datum beim ersten Abruf nach dem Wiedereinschalten
+von News). Verbindungsfehler und Timeouts pausieren eine Quelle höchstens eine Stunde (oder ein Abrufintervall, wenn es länger
 ist). Den Platz gelöschter Meldungen nutzt PostgreSQL wieder (autovacuum).
 
 ### Quellen-Gesundheit
@@ -1329,6 +1349,38 @@ Runde, mehr als eine Zusammenfassung; „Kritisch“ bleibt stehen, bis man sie 
 - `./data` und alle Dateien darin sind nur für den App-Prozess lesbar (Verzeichnis 0700, Dateien 0600).
 - **Volume `cobe-news_tls`**: das selbstsignierte Zertifikat (bei `TLS_MODE=own` stattdessen `TLS_SOURCE`)
 
+### Aufbewahrung
+
+Die App räumt selbst auf: stündlich in der News-Runde (`main.FetchLoop._prune`), einmal am Tag in der
+Vendor-News-Runde (`vendor.daily_prunes` – auch bei ausgeschalteter Vendor News). Jeder Schritt läuft für sich:
+scheitert einer (Deadlock, Zeitlimit von 30 s je Anweisung), steht `prune <Schritt> failed` bzw. `vendor: pruning the
+… failed` im Log, die übrigen laufen weiter, und er wird in der nächsten Stunde wieder versucht. Gelöscht wird in kurzen
+Transaktionen (höchstens 5000 Zeilen, Meldungen 500); eine Zeile, die gerade eine andere Transaktion ändert, bleibt bis
+zum nächsten Lauf (`FOR UPDATE SKIP LOCKED` – kein Warten, kein Deadlock). Den Platz nutzt PostgreSQL wieder (autovacuum).
+
+| Daten (Tabelle) | Regel | Ab Werk / Bereich | Wo einstellen |
+|---|---|---|---|
+| Meldungen (`news_items`) mit weiteren Quellen, Gelesen-Markierungen, Details, Versandmarken (ON DELETE CASCADE) | älter als die Aufbewahrung (Veröffentlichung); eine Meldung ohne eigenes Datum erst, wenn ihr Feed – und jede weitere Quelle, die sie führt – seit ihrer letzten Sichtung gelesen wurde (HTTP 200) und sie nicht mehr listete: ein Feed, der lange „304“ antwortet, ausfällt, oder ausgeschaltete News löschen nichts. Als Sichtung zählt nur, dass ihr Feed oder ein anderer Feed **dieselbe Adresse** listet – eine weitere Quelle, die sie nur über Titel oder CVE führt, hält sie nicht. Was gelöscht wurde, wird nie wieder übernommen | 90 Tage, 7–365 | *Integrationen → News* (eine kürzere Frist nennt vorher die Zahl) |
+| Gelesen-Markierungen (`news_reads`, `vendor_reads`) | Meldungen und Befunde älter als 30 Tage zählen ohnehin als gelesen, ebenso alles unter der „Alle gelesen“-Marke; „ungelesen“ bleibt mit der Meldung bzw. solange dem Produkt gefolgt wird | 30 Tage | fest |
+| Stummschaltungen (`person_mutes`) | nach Ablauf | – | – |
+| Abruf-Statistik der Quellen (`source_fetch_stats`) | 60 Tage | fest | – |
+| Zustandswechsel der Quellen (`source_health_events`) | 60 Tage, der letzte je Quelle bleibt | fest | – |
+| Zustellprotokoll (`delivery_log`) | 30 Tage, höchstens 200 000 Einträge | fest | – |
+| Protokoll (`audit_log`) mit Adresse, Browser/System grob und Sitzungskennung | älter als die Aufbewahrung, täglich, in der Reihenfolge der Integritätskette (der neue Anfang wird als Eintrag `audit.pruned` in der Kette festgehalten, siehe [Protokoll](#protokoll-audit-log)) | 365 Tage, 90–3650 | *Protokoll → Aufbewahrung* |
+| Persönliche Zustellungen (`person_deliveries`) | entschiedene (gesendet, fehlgeschlagen, übersprungen) nach 90 Tagen; Abwesenheiten 8 Tage nach ihrem Ende | 90 Tage | fest |
+| Wochenrückblick-Versand (`team_weekly_sends`) | entschiedene nach 90 Tagen | 90 Tage | fest |
+| CVE beobachten: Ereignisse (`vendor_events`, Art `watch`) | 90 Tage; der Zustand einer CVE, sobald niemand sie mehr beobachtet | 90 Tage | fest |
+| Vendor-News-Ereignisse (Befunde, neue Version, Support-Ende) mit Versandmarken | solange das Produkt gefolgt und die Version eingetragen ist (eine geänderte Version ist eine neue) – sie sorgen dafür, dass jeder Befund nur einmal gemeldet wird | – | – |
+| Revisionen der Hinweise (`vendor_advisory_changes`) und Änderungs-Ereignisse | die letzten 20 je Hinweis, keine älter als ein Jahr (täglich) | 1 Jahr | fest |
+| Einzelabfragen je CVE (`vendor_fetch` `nvdcve:`, `cvelistcve:`, `osvcve:`) | 30 Tage (täglich) | 30 Tage | fest |
+| EPSS-Werte (`epss_scores`) | 30 Tage nicht mehr gefragt (täglich) | 30 Tage | fest |
+| Hinweise (`vendor_advisories` mit Produkt-Zuordnung und Stand) | bleiben – auch die nicht mehr gefolgter Produkte (wird wieder gefolgt, sind sie sofort da) | – | – |
+| API-Tokens | 30 Tage nach Widerruf oder Ablauf | fest | – |
+| Sitzungen | nach Ablauf (stündlich; vorher schon beim nächsten Aufruf) | – | Zeitlimits der Sitzungen (Handbuch, Anmeldung) |
+| Anmeldesperren (`auth_locks`), Passkey-Challenges, Zähler im Speicher | nach Ablauf (stündlich) | – | – |
+| Sicherungen (`data/backups`) | die letzten N; eine Sicherung vor einer Wiederherstellung 30 Tage | 7: 3/7/14/30/90 | *Einstellungen → Sicherung* |
+| Container-Logs | `json-file`, 3 × 20 MB je Container | – | `docker-compose.yml` (`x-logging`) |
+
 Zurücksetzen = `docker compose down -v` (löscht auch die Datenbank!), `data/secret.key` löschen, neu starten (neues
 Setup-Token im Log). Liegt dann noch eine `data/news.db` mit Daten da, wird sie beim Start wieder umgezogen – vorher
 wegräumen oder `SQLITE_IMPORT=0` setzen.
@@ -1457,16 +1509,31 @@ Benutzer) brauchen die erneute Bestätigung wie die Benutzerverwaltung.
 - **Mit `BACKUP_PASSPHRASE`** (`cobe-news-<Zeit>.tar.enc`, mindestens 12 Zeichen): die ganze Datei verschlüsselt
   (scrypt mit N=2^17 + AES-256-GCM in Blöcken – verändert, vertauscht oder abgeschnitten fällt beim Entschlüsseln auf;
   Dateien bis 0.1.23 mit N=2^15 lassen sich weiter öffnen) und **mit** dem Schlüssel. Für einen
-  neuen Server reichen dann Datei und Passphrase. Die Passphrase gehört nicht auf denselben Server – am besten nur dem
-  cron-Job mitgeben (unten), nicht in die `.env`.
+  neuen Server reichen dann Datei und Passphrase. Die Passphrase gehört nicht in die `.env` – nur dem cron-Job
+  mitgeben (unten) oder der App als Datei (nächster Absatz).
+
+**Passphrase-Datei** (`BACKUP_PASSPHRASE_FILE`, ab 0.1.50): damit auch „Jetzt sichern“ und der Rücksicherungs-Test der
+App verschlüsseln bzw. entschlüsseln, ohne dass die Passphrase in der Umgebung steht. Beide Compose-Dateien hängen
+`${BACKUP_SECRET_DIR:-backup-secret}` schreibgeschützt unter `/run/backup-secret` ein – ein Bind-Mount mit leerer Quelle
+bricht einen Stack (`:/run/…` ist ungültig), deshalb ist der Standard ein leeres eigenes Volume; gesetzt ein Ordner des
+Hosts (absolut, außerhalb von `data/`, lesbar für UID 10001, z. B. `/etc/cobe-news-secret` mit `backup-pass` 0400).
+Dazu `BACKUP_PASSPHRASE_FILE=/run/backup-secret/backup-pass` (`.env` bzw. Variablen des Stacks). Regeln:
+`BACKUP_PASSPHRASE` geht vor, wenn beide gesetzt sind (die Seite sagt, dass die Datei dann nicht gelesen wird); `--passphrase-file` der CLI geht beiden vor. Die Datei wird bei jedem
+Gebrauch gelesen (eine geänderte gilt sofort), Leerraum am Anfang und Ende zählt nicht (wie bei `--passphrase-file`),
+höchstens 4 KiB, UTF-8, mindestens 12 Zeichen. Fehlt sie oder ist sie nicht lesbar: keine Sicherung – nie eine
+unverschlüsselte an ihrer Stelle –, letzter Ausgang mit Code `passphrase_file`, die Seite nennt den Grund (`missing`,
+`unreadable`, `not_a_file`, `too_large`, `not_text`, `empty`, `short`); die App läuft weiter. Ins Log und auf die Seite
+kommt nur der Pfad, nie der Inhalt. `restore` und `restore-test` der CLI lesen die Datei ebenso.
 
 Täglich per cron, z. B. `/etc/cron.d/cobe-news-backup` (die Datei mit der Passphrase: `chmod 600`, root):
 
 ```
-30 2 * * * root cd /opt/cobe-news && docker compose exec -T -e BACKUP_PASSPHRASE="$(cat /root/.cobe-news-backup-pass)" app python -m app.cli backup >>/var/log/cobe-news-backup.log 2>&1 && rsync -a --exclude='.*' --exclude='*.partial' data/backups/ backup-host.corp.example:/srv/cobe-news/
+30 2 * * * root cd /opt/cobe-news && docker compose exec -T app python -m app.cli backup --passphrase-file - < /root/.cobe-news-backup-pass >>/var/log/cobe-news-backup.log 2>&1 && rsync -a --exclude='.*' --exclude='*.partial' data/backups/ backup-host.corp.example:/srv/cobe-news/
 ```
 
-Ohne Passphrase: `-e …` weglassen. Exit-Code 0 = gesichert; die Sicherungen zusätzlich auf ein anderes System kopieren.
+Die Passphrase über die Standardeingabe, nie als `-e BACKUP_PASSPHRASE="$(cat …)"` (das stünde in der Befehlszeile von `docker`,
+also in `ps` auf dem Host); mit [Passphrase-Datei](#sicherung-wiederherstellung-export) der App genügt der Befehl ohne Option.
+Ohne Passphrase: `--passphrase-file - < …` weglassen. Exit-Code 0 = gesichert; die Sicherungen zusätzlich auf ein anderes System kopieren.
 Während einer Sicherung oder Wiederherstellung liegen Dump und (verschlüsselt) Schlüssel kurz im Klartext in
 `data/.backup-work/` – **neben** `data/backups/`, nicht darin. Was ein abgebrochener Lauf dort (oder bis 0.1.21 als
 `.partial-…`/`.restore-…` in `data/backups/`) liegen ließ, räumt die nächste Sicherung, Wiederherstellung oder der
@@ -1476,7 +1543,7 @@ nächste Start der App weg, sobald es älter als 6 Stunden ist; `--exclude` häl
 
 ```bash
 docker compose stop app
-docker compose run --rm --no-deps app python -m app.cli restore /data/backups/cobe-news-<Zeit>.tar   # .tar.enc: -e BACKUP_PASSPHRASE=…
+docker compose run --rm --no-deps app python -m app.cli restore /data/backups/cobe-news-<Zeit>.tar   # .tar.enc: vorher read -rs BACKUP_PASSPHRASE; export BACKUP_PASSPHRASE, dann -e BACKUP_PASSPHRASE (nur der Name)
 docker compose start app
 ```
 
@@ -1523,7 +1590,11 @@ weder in der `.env` noch in der Shell-History. In die leere Datenbank wird ohne 
 **Export** (*Sicherung & Export*, oder `docker compose exec -T app python -m app.cli export --format csv --out
 /data/export.zip`): Regeln, Kanäle, Quellen, gefolgte Produkte mit Versionen und Benutzer als JSON oder CSV (ZIP, eine
 Datei je Bereich) – **ohne Geheimnisse**: bei Kanälen nur, welche gesetzt sind; bei Benutzern Name, Rolle, Herkunft,
-ob TOTP eingerichtet ist, letzte Anmeldung. Zum Nachlesen und Übertragen, keine Sicherung.
+ob TOTP eingerichtet ist, letzte Anmeldung. Zum Nachlesen und Übertragen in andere Werkzeuge (JSON für Skripte, CSV für
+Excel) – keine Sicherung, und Cobe News kann ihn nicht wieder einlesen.
+
+Schritt für Schritt (sichern, herunterladen, einspielen – lokal und mit Portainer, was man dafür braucht): Handbuch
+*Sicherung & Wiederherstellung → Schritt für Schritt*.
 
 ## Rücksicherungs-Test
 
@@ -1565,6 +1636,71 @@ Befehlszeile oder in einem Log). Z. B. `/etc/cron.d/cobe-news-restore-test`, son
 
 Exit-Code 0 = bestanden, 1 = fehlgeschlagen. Darunter: `docker compose exec -T app python -m app.cli restore-test
 [--passphrase-file -]`. Die Fehlercodes erklärt das Handbuch (*Sicherung → Rücksicherungs-Test*).
+
+## Protokoll (Audit-Log)
+
+Code: `backend/app/audit.py` (Schreiben, Schwärzen, Kette, Aufräumen, Lesen, CSV), `audit_api.py` (nur Admins),
+Tabelle `audit_log` (Migrationen 0017, 0032). Handbuch: *Betrieb → Protokoll*.
+
+- **Schreiben:** `audit.record()` in der Transaktion der Änderung; eine abgelehnte Änderung hinterlässt keinen Eintrag.
+  Der Kontext der Anfrage kommt aus der Middleware (`main._guard`: Client-Adresse, Weg `direct`/`bundled`/`proxy`/
+  `bundled_proxy`, Methode, Pfad ohne Query, Request-ID, Browser-Familie/Hauptversion/System – nie der ganze
+  User-Agent), die Sitzung aus `deps._session` (HMAC-Kurzkennung der Sitzungs-ID, Anmeldeart). Jede API-Antwort trägt
+  `X-Request-ID`; dieselbe ID steht in der Zugriffs-Log-Zeile (`rid=…`) und im Eintrag.
+- **Nie ein Geheimnis:** `audit.scrub` – geheim benannte Felder nur als „geändert“, Adressen jedes Schemas nur als
+  Origin (auch in Freitext, Zugangsdaten fallen weg), JWT/bekannte Token-Formen/lange zufällige Zeichenketten als
+  geheim, Steuer- und Richtungszeichen entfernt.
+- **Auffälliges** (`notable`, Gründe in `details.anomalies`, beim Schreiben bestimmt): Notfall-Konto außerhalb 07–19 Uhr
+  oder am Wochenende (Ortszeit `TZ`, sonst Europe/Berlin), Admin-Anmeldung von neuer Adresse (90 Tage), ≥ 3 Fehlversuche
+  vor der Anmeldung, Rolle → Admin, Aufbewahrung verkürzt, Protokoll exportiert; dazu die sicherheitsrelevanten Aktionen
+  (`audit.NOTABLE_ACTIONS`). Filter `notable=1`.
+- **Sperren begrenzt:** Kontosperre nur für bestehende Konten (`login.locked`, mit `stage`); ein unbekannter Name wird nie
+  geschrieben – je Adresse und Stunde ein Eintrag `login.locked_unknown` (höchstens 20/h), der Rest und Adresssperren
+  über 20/h in einer Zusammenfassung je Stunde. Eine Sitzung, die nach 5 falschen Codes (zweiter Faktor, erneute
+  Bestätigung, Passwortwechsel) endet: `sessions.revoked` mit `why: failures`.
+- **Integritätskette:** jeder Eintrag bekommt `seq`, `prev_hash` und `hash` = HMAC-SHA-256 (Schlüssel aus dem
+  Hauptschlüssel abgeleitet) über die kanonische Form. Versiegelt wird in jeder Runde der Hintergrundschleife (etwa
+  minütlich, `audit.seal`, Advisory-Lock, eigene Sitzung – nie die einer Anfrage), beim Öffnen des Protokolls, beim
+  Export und im stündlichen Aufräumen. Der Zustand (`settings` → `audit_chain`: Anker, Kopf, geprüft bis, Funde) trägt
+  selbst ein HMAC; ein Zustand, dessen MAC nicht passt oder der fehlt, ist ein Fund – nie ein Anlass, neu zu verankern.
+  Geprüft wird inkrementell ab der letzten Prüfung (`GET /api/admin/audit/chain`; läuft die stündliche Prüfung, kommt
+  sofort der letzte Stand mit `busy`) und stündlich die ganze Kette in Teilen (`audit.sweep`, 200 000 je Stunde). Funde
+  werden einmal als `audit.chain_problem` protokolliert und bleiben „Problem“, bis ein Operator sie bestätigt.
+- **Was sie beweist:** „seit dem Versiegeln unverändert, nichts gelöscht oder eingeschoben“ – gegenüber jemandem ohne
+  Hauptschlüssel. Nicht: dass ein Eintrag von der App stammt (ein vor dem Versiegeln eingefügter Eintrag wird
+  mitversiegelt; liegt seine Zeit mehr als 15 min vor der des vorigen, wird er als `late_entry` markiert), die neuesten
+  noch nicht versiegelten Einträge (bis etwa eine Minute), und nichts, was ein Inhaber des Hauptschlüssels tut.
+  **Zeuge:** stündlich die Log-Zeile `audit chain head: seq=… hash=… key=… anchor=…` (Logger `cobe_news.audit`) – in
+  ein externes Log-System schicken, dann ist auch ein Zurücksetzen des Endes belegbar.
+- **Neuer Schlüssel / Operator-Schritt:** passt der Schlüssel nicht (neuer `SECRET_KEY`, geändertes Schlüsselfeld),
+  zeigt die Seite `other_key` und versiegelt nichts mehr, bis `python -m app.cli verify-audit --accept-new-key` (oder
+  eine Wiederherstellung mit `--ignore-key`) die Kette ab ihrem neuesten Eintrag neu verankert – protokolliert als
+  `audit.chain_rekeyed` (auffällig), `rekeyed_at` steht dauerhaft auf der Seite. Damit werden auch geprüfte Funde
+  bestätigt.
+- **Kein Datenbank-Trigger:** ein Trigger, der UPDATE/DELETE ablehnt, würde mit jeder Sicherung als FUNCTION/TRIGGER im
+  Dump landen – die Wiederherstellung nimmt nur Tabellen, Indizes und Sequenzen an (`backup._toc_check`).
+- **Aufräumen:** in Kettenreihenfolge bis zum ersten Eintrag innerhalb der Aufbewahrung, sobald der älteste einen Tag
+  darüber liegt (also täglich). Zuerst ein `audit.pruned`-Eintrag mit dem neuen Anker (Position, Hash), versiegelt;
+  dann Pakete zu 20 000 in eigenen Transaktionen. Ein Anker jenseits des zuletzt erklärten ist ein Fund (`anchor`). Ein
+  Eintrag mehr als einen Tag in der Zukunft wird als `future_entry` markiert und hält das Aufräumen nicht auf.
+- **Export:** `GET /api/admin/audit/export` nur mit dem CSRF-Token im Header `X-CSRF-Token` (gilt auch für
+  `/api/admin/export`); Trennzeichen `delimiter=semicolon` (deutsche Oberfläche) oder Komma; höchstens 100 000 Zeilen,
+  sonst Kopfzeile `X-Audit-Truncated` und eine letzte Zeile `# truncated …`; Formelschutz am Zellanfang und nach `,`/`;`
+  (im JSON der Einzelheiten als `\u003d` usw.).
+- **Kommandozeile:** `export`, `new-setup-token`, `migrate-sqlite`, `restore-test`, `backup`, `restore`,
+  `reset-emergency`, `rotate-vapid` werden mit dem Akteur `cli` protokolliert.
+- **Leistung** (gemessen mit 2 Mio. Einträgen über 3 Jahre, PostgreSQL 18 lokal): Seiten, alle Filter (Konto, Art,
+  Adresse, Sitzung, Ziel, Aktion, Bereich, Auffälliges, Zeitraum), Trefferzahl, die Umgebung eines Eintrags und die
+  Akteurliste unter 25 ms; die Freitextsuche über einen Ausdruck mit Trigramm-Index (`ix_audit_log_search`,
+  Migration 0033; der Ausdruck in `audit.SEARCH_TEXT` muss genau dem des Index entsprechen): ab 3 Zeichen bei 450 000
+  Einträgen ohne Treffer < 1 ms, selten ~10 ms (Index 50 MB); kürzere Begriffe lesen die Tabelle (~60 ms). Versiegeln
+  ~16 000 Einträge/s: nach dem Update auf 0.1.50 versiegelt das erste stündliche Aufräumen die vorhandenen Einträge
+  (50 000 in ~4 s, 2 Mio. in ~2,5 min, in Paketen). Jedes Versiegeln schreibt die Zeile neu – die Tabelle wird etwa
+  doppelt so groß; `VACUUM` gibt den Platz nur zur Wiederverwendung frei, schrumpfen lässt sie `VACUUM FULL audit_log`
+  (exklusive Sperre, ~4 s je 450 000 Einträge; Aktionen, die einen Eintrag schreiben, warten so lange);
+  Prüfen ~25 000 Einträge/s (beim Öffnen höchstens 50 000, stündlich 200 000 neue und 200 000 der Gesamtprüfung).
+  Aufräumen von 1,3 Mio. Einträgen auf einmal (Aufbewahrung stark verkürzt) ~70 s in Paketen, ohne lange
+  Sperren; im Normalfall einmal am Tag einen Tag Einträge.
 
 ## API-Tokens und Metriken
 
@@ -1689,7 +1825,7 @@ Gearbeitet wird nie direkt auf `main` (geschützt), sondern in eigenen Branches 
 Pipeline. Ein Release startet nur mit einem Tag:
 
 ```bash
-git tag v0.1.49 && git push origin v0.1.49   # die Version aus backend/app/__init__.py
+git tag v0.1.50 && git push origin v0.1.50   # die Version aus backend/app/__init__.py
 ```
 
 Die einzige Pipeline, [`.github/workflows/release.yml`](../.github/workflows/release.yml), prüft dann, dass der Tag zu
@@ -1707,7 +1843,7 @@ sonst scheitert das Holen ohne Anmeldung (Portainer: „unauthorized“).
 Prüfen der Signaturen (die Images `-db` und `-proxy` gibt es ab 0.1.49):
 
 ```bash
-v=0.1.49
+v=0.1.50
 for i in cobe-news cobe-news-db cobe-news-proxy; do
   cosign verify ghcr.io/g0urmetd/$i:$v \
     --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \

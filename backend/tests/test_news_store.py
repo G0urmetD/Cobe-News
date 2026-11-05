@@ -249,7 +249,8 @@ async def test_undated_story_stays_while_listed_and_pruned_ones_never_come_back(
     sid = await _src("feed")
     await _store(sid, [_e("https://feed.example.org/u", "Undated", undated=True), _e("https://feed.example.org/d", "Dated", date=datetime.now(UTC) - timedelta(days=1))])
     async with db.session() as s:
-        await s.execute(update(NewsItem).values(published_at=datetime.now(UTC) - timedelta(days=30), seen_at=datetime.now(UTC) - timedelta(days=30)))
+        await s.execute(update(NewsItem).values(published_at=datetime.now(UTC) - timedelta(days=30)))
+        await s.execute(update(NewsItem).where(NewsItem.seen_at.is_not(None)).values(seen_at=datetime.now(UTC) - timedelta(days=30)))
         await s.commit()
     # still listed: its last sighting moves on, the prune keeps it
     await _store(sid, [_e("https://feed.example.org/u", "Undated", undated=True)])

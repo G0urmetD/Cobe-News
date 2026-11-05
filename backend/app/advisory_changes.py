@@ -310,6 +310,15 @@ def worse(item: dict) -> bool:
 # ---------------------------------------------------------------- writing
 
 
+async def next_revision(db: AsyncSession, advisory_id: str, revision: int) -> int:
+    """The number of a new revision: `revision` (one more than the state says) – or more, when kept revisions of this
+    advisory reach it already. The state goes with the advisory (withdrawn, unlinked) while its revisions and change
+    events stay (KEEP): stored again, it would count from 1 again – a revision number twice, and the change event's key
+    (change:<product>:<advisory>:<revision>) taken, so the change was never sent."""
+    top = await db.scalar(select(func.max(VendorAdvisoryChange.revision)).where(VendorAdvisoryChange.advisory_id == advisory_id))
+    return max(int(revision), int(top or 0) + 1)
+
+
 async def record(
     db: AsyncSession,
     adv: dict,
@@ -382,11 +391,13 @@ async def record(
 
 
 async def prune(db: AsyncSession, now: datetime | None = None) -> int:
-    """Revisions and change events older than KEEP go (daily, with the single lookups)."""
+    """Revisions and change events older than KEEP go (daily, vendor.daily_prunes) – in short batches (an event takes
+    its sent marks along: ON DELETE CASCADE)."""
+    from app import db as dbm
+
     cut = (now or datetime.now(UTC)) - KEEP
-    n = (await db.execute(delete(VendorAdvisoryChange).where(VendorAdvisoryChange.at < cut))).rowcount or 0
-    n += (await db.execute(delete(VendorEvent).where(VendorEvent.kind == "change", VendorEvent.created_at < cut))).rowcount or 0
-    await db.commit()
+    n = await dbm.delete_batched(db, VendorAdvisoryChange, VendorAdvisoryChange.at < cut)
+    n += await dbm.delete_batched(db, VendorEvent, VendorEvent.kind == "change", VendorEvent.created_at < cut, batch=2000)
     return int(n)
 
 

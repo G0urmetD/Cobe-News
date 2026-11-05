@@ -32,7 +32,7 @@ der Schublade.
 |---|---|---|---|
 | **News abrufen** | aus | an/aus | Hauptschalter. Aus: keine einzige Anfrage nach außen, die News-Seite zeigt „News sind ausgeschaltet“. |
 | **Abrufintervall je Quelle** | 30 Minuten | 15–1440 Minuten | Wie oft jede Quelle gefragt wird. Unveränderte Feeds kosten nur eine kurze Nachfrage. |
-| **Aufbewahrung** | 90 Tage | 7–365 Tage | Ältere Meldungen werden gelöscht, gelesene wie ungelesene. |
+| **Aufbewahrung** | 90 Tage | 7–365 Tage | Ältere Meldungen werden gelöscht, gelesene wie ungelesene. Eine Meldung ohne eigenes Datum bleibt, solange ihr Feed sie noch listet (oder ein anderer Feed dieselbe Adresse). Eine kürzere Frist nennt vor dem Speichern, wie viele Meldungen gehen – endgültig, sie werden auch später nicht wieder abgerufen. |
 | **Details aus der Quelle** | an | an/aus | Holt zu jeder Meldung das Advisory dahinter ([Details aus der Quelle](/docs/news-quellen#details-aus-der-quelle)). |
 
 Die Felder lassen sich erst bearbeiten, wenn der Hauptschalter an ist.

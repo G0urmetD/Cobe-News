@@ -44,6 +44,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app import db as dbm
 from app.models import NewsItem, NewsRead, PersonMute, ReaderState, SavedView, User, VendorEvent, VendorFollow, VendorRead
 
 AUTO_READ = timedelta(days=30)  # older than this (by arrival): read without a mark
@@ -379,6 +380,8 @@ async def prune(db: AsyncSession) -> dict[str, int]:
         .outerjoin(ReaderState, ReaderState.user_id == NewsRead.user_id)
         .where(NewsRead.unread.is_(False), or_(NewsItem.fetched_at < cut, and_(ReaderState.news_seq.is_not(None), NewsItem.seq <= ReaderState.news_seq)))
         .limit(CHUNK)
+        # a mark the person is changing right now ("Alle gelesen" writes many) is left for the next prune – no deadlock
+        .with_for_update(of=NewsRead, skip_locked=True)
     )
     for _ in range(100):
         rows = (await db.execute(old)).all()
@@ -388,7 +391,5 @@ async def prune(db: AsyncSession) -> dict[str, int]:
         await db.commit()
         out["news"] += len(rows)
     followed = select(VendorFollow.product)
-    res = await db.execute(delete(VendorRead).where(or_(and_(VendorRead.unread.is_(False), VendorRead.read_at < cut), VendorRead.product.not_in(followed))))
-    out["vendor"] = res.rowcount or 0
-    await db.commit()
+    out["vendor"] = await dbm.delete_batched(db, VendorRead, or_(and_(VendorRead.unread.is_(False), VendorRead.read_at < cut), VendorRead.product.not_in(followed)))
     return out

@@ -114,13 +114,16 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: R
 }
 
 /** A file from a GET endpoint – errors as ApiError (a plain link would save the error JSON as the file). */
-async function getFile(path: string): Promise<{ blob: Blob; filename: string }> {
+/** A download (a CSV, the export): with the CSRF token – a logged download is refused without it unless the browser
+ *  says the request is this site's own (Sec-Fetch-Site). The answer's headers come along (X-Audit-Truncated). */
+async function getFile(path: string): Promise<{ blob: Blob; filename: string; headers: Headers }> {
   const at = Date.now()
-  const res = await fetch(path, { credentials: "same-origin" })
+  if (!csrfToken()) await raw("GET", "/api/auth/config")
+  const res = await fetch(path, { credentials: "same-origin", headers: { "X-CSRF-Token": csrfToken() } })
   if (res.status !== 401) activity(path, at)
   if (!res.ok) throw errorOf(res.status, await res.json().catch(() => null))
   const filename = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "download"
-  return { blob: await res.blob(), filename }
+  return { blob: await res.blob(), filename, headers: res.headers }
 }
 
 export function saveBlob(blob: Blob, filename: string) {

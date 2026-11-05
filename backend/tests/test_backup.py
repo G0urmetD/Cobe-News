@@ -39,12 +39,14 @@ pytestmark = pytest.mark.skipif(shutil.which("pg_dump") is None or shutil.which(
 def backups_here(tmp_path):
     """Each test's backups in a folder of its own (the config is frozen: set and put back)."""
     cfg = get_config()
-    old = cfg.backup_dir, cfg.backup_passphrase
+    old = cfg.backup_dir, cfg.backup_passphrase, cfg.backup_passphrase_file
     object.__setattr__(cfg, "backup_dir", tmp_path / "backups")
     object.__setattr__(cfg, "backup_passphrase", "")
+    object.__setattr__(cfg, "backup_passphrase_file", "")
     yield tmp_path / "backups"
     object.__setattr__(cfg, "backup_dir", old[0])
     object.__setattr__(cfg, "backup_passphrase", old[1])
+    object.__setattr__(cfg, "backup_passphrase_file", old[2])
 
 
 async def _sources() -> int:
@@ -646,3 +648,176 @@ def test_a_key_file_another_process_is_writing_is_waited_for(key_file):
     key_file.touch(mode=0o600)
     threading.Timer(0.3, lambda: key_file.write_bytes(b"k" * 44)).start()
     assert crypto.master() == b"k" * 44
+
+
+# ---------------------------------------------------------------- BACKUP_PASSPHRASE_FILE (0.1.50)
+
+
+def _phrase_file(tmp_path, content: bytes, name: str = "backup-pass") -> Path:
+    d = tmp_path / "secret"
+    d.mkdir(exist_ok=True)
+    f = d / name
+    f.write_bytes(content)
+    f.chmod(0o400)
+    return f
+
+
+def test_the_passphrase_file_is_read_without_its_newline(tmp_path):
+    f = _phrase_file(tmp_path, b"eine lange Passphrase aus der Datei\n")
+    assert backup.read_passphrase_file(f) == "eine lange Passphrase aus der Datei"
+    assert backup.read_passphrase_file(_phrase_file(tmp_path, b"  mit Leerraum drumherum  \r\n", "b")) == "mit Leerraum drumherum"
+
+
+@pytest.mark.parametrize(
+    ("content", "why"),
+    [(None, "missing"), (b"", "empty"), (b"\n\n", "empty"), (b"x" * 5000, "too_large"), (b"\xff\xfe kein utf-8", "not_text"), ("dir", "not_a_file")],
+)
+def test_a_passphrase_file_that_cannot_be_used_says_why_never_what(tmp_path, content, why):
+    if content is None:
+        f = tmp_path / "nicht-da"
+    elif content == "dir":
+        f = tmp_path / "ein-ordner"
+        f.mkdir()
+    else:
+        f = _phrase_file(tmp_path, content)
+    with pytest.raises(backup.PassphraseFileError) as exc:
+        backup.read_passphrase_file(f)
+    assert exc.value.why == why and exc.value.code == "passphrase_file" and str(f) in str(exc.value)
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any file")
+def test_an_unreadable_passphrase_file(tmp_path):
+    f = _phrase_file(tmp_path, b"eine lange Passphrase\n")
+    f.chmod(0)
+    try:
+        with pytest.raises(backup.PassphraseFileError) as exc:
+            backup.read_passphrase_file(f)
+        assert exc.value.why == "unreadable" and "10001" in str(exc.value)
+    finally:
+        f.chmod(0o600)
+
+
+async def test_backup_now_encrypts_with_the_passphrase_file(backups_here, tmp_path, admin_client):
+    """The app's own backups ("Jetzt sichern") encrypted without the passphrase in the environment: the file is read
+    when needed, the page knows where the passphrase comes from – never the passphrase."""
+    phrase = "Passphrase-aus-dem-Secret-42"
+    f = _phrase_file(tmp_path, f"{phrase}\n".encode())
+    object.__setattr__(get_config(), "backup_passphrase_file", str(f))
+    st = (await admin_client.get("/api/admin/backup")).json()
+    assert st["with_key"] is True and st["passphrase"] == {"source": "file", "file": str(f), "file_ignored": False, "ok": True, "error": None, "detail": None}
+    assert phrase not in json.dumps(st)
+    assert (await admin_client.post("/api/admin/backup")).status_code == 202
+    st = await _done(admin_client)
+    assert st["last"]["ok"] and st["last"]["encrypted"] is True and st["last"]["name"].endswith(".tar.enc")
+    plan = backup.prepare(backups_here / st["last"]["name"], phrase)
+    try:
+        assert plan.auth == "passphrase" and plan.backup_key == crypto.master().decode()
+    finally:
+        shutil.rmtree(plan.work)
+    # the restore test of the app opens it, too
+    from app import restore_test
+
+    async with db.session() as s:
+        assert (await restore_test.status(s))["passphrase"] is True
+
+
+async def test_backup_passphrase_wins_over_the_file(backups_here, tmp_path):
+    """Both set: BACKUP_PASSPHRASE – a cron job's `exec -e BACKUP_PASSPHRASE` keeps working beside a mounted file."""
+    cfg = get_config()
+    object.__setattr__(cfg, "backup_passphrase", "die-aus-der-Umgebung-1")
+    object.__setattr__(cfg, "backup_passphrase_file", str(_phrase_file(tmp_path, b"die-aus-der-Datei-22\n")))
+    assert await backup.passphrase_state() == {"source": "env", "file": cfg.backup_passphrase_file, "file_ignored": True, "ok": True, "error": None, "detail": None}
+    res = await backup.create()
+    with pytest.raises(backup.BackupError, match="cannot decrypt"):
+        backup.prepare(res.path, "die-aus-der-Datei-22")
+    shutil.rmtree(backup.prepare(res.path, "die-aus-der-Umgebung-1").work)
+
+
+async def test_a_missing_passphrase_file_fails_the_backup_never_a_plain_one(backups_here, tmp_path, admin_client):
+    """A named file that is not there (not mounted, wrong path): no backup at all – not an unencrypted one in its place;
+    the page shows why, the app keeps running."""
+    object.__setattr__(get_config(), "backup_passphrase_file", str(tmp_path / "nicht-gemountet"))
+    st = (await admin_client.get("/api/admin/backup")).json()
+    assert st["with_key"] is False and st["passphrase"]["error"] == "missing" and "nicht-gemountet" in st["passphrase"]["detail"]
+    assert (await admin_client.post("/api/admin/backup")).status_code == 202
+    st = await _done(admin_client)
+    assert st["last"]["ok"] is False and st["last"]["code"] == "passphrase_file" and st["backups"] == []
+    assert not backups_here.exists() or not any(backups_here.iterdir())
+
+
+async def test_a_short_phrase_in_the_file_is_refused_and_never_logged(backups_here, tmp_path, caplog):
+    object.__setattr__(get_config(), "backup_passphrase_file", str(_phrase_file(tmp_path, b"kurz-geheim\n")))
+    assert (await backup.passphrase_state())["error"] == "short"
+    with pytest.raises(backup.BackupError, match="too short") as exc:
+        await backup.create()
+    assert exc.value.code == "passphrase"
+    assert "kurz-geheim" not in caplog.text and "kurz-geheim" not in json.dumps(await backup.passphrase_state())
+
+
+def test_cli_passphrase_file_reads_the_same_way(tmp_path):
+    f = _phrase_file(tmp_path, b"eine lange Passphrase\n")
+    assert cli._passphrase(["--passphrase-file", str(f)]) == "eine lange Passphrase"
+    assert cli._passphrase([]) is None  # the app's own (backup.app_passphrase)
+    with pytest.raises(backup.BackupError, match="not found"):
+        cli._passphrase(["--passphrase-file", str(tmp_path / "fehlt")])
+
+
+def test_a_fifo_never_blocks_the_read(tmp_path):
+    """Review 0.1.50 L6: open() on a FIFO waits for a writer forever – opened without blocking, refused by fstat."""
+    fifo = tmp_path / "backup-pass"
+    os.mkfifo(fifo)
+    with pytest.raises(backup.PassphraseFileError) as exc:
+        backup.read_passphrase_file(fifo)  # returns at once (the test would hang otherwise)
+    assert exc.value.why == "not_a_file" and "pipe" in str(exc.value)
+
+
+@pytest.mark.skipif(not Path("/dev/zero").exists(), reason="no /dev/zero")
+def test_a_device_is_refused_before_anything_is_read():
+    with pytest.raises(backup.PassphraseFileError) as exc:
+        backup.read_passphrase_file("/dev/zero")
+    assert exc.value.why == "not_a_file"
+
+
+def test_a_symlink_to_a_regular_file_counts_one_to_a_fifo_does_not(tmp_path):
+    """Docker and Kubernetes secrets are often links – followed once, at the open; the check is on what was opened."""
+    target = _phrase_file(tmp_path, b"eine lange Passphrase im Ziel\n")
+    link = tmp_path / "link"
+    link.symlink_to(target)
+    assert backup.read_passphrase_file(link) == "eine lange Passphrase im Ziel"
+    fifo = tmp_path / "fifo"
+    os.mkfifo(fifo)
+    bad = tmp_path / "link-to-fifo"
+    bad.symlink_to(fifo)
+    with pytest.raises(backup.PassphraseFileError) as exc:
+        backup.read_passphrase_file(bad)
+    assert exc.value.why == "not_a_file"
+    gone = tmp_path / "dangling"
+    gone.symlink_to(tmp_path / "nicht-da")
+    with pytest.raises(backup.PassphraseFileError, match="not found"):
+        backup.read_passphrase_file(gone)
+
+
+async def test_a_hanging_read_never_freezes_the_app(backups_here, tmp_path, monkeypatch):
+    """The file is read in a thread with a time limit: a mount that hangs makes the page say "unreadable" and the backup
+    fail – the event loop goes on meanwhile."""
+    import time as _time
+
+    object.__setattr__(get_config(), "backup_passphrase_file", str(_phrase_file(tmp_path, b"eine lange Passphrase\n")))
+    monkeypatch.setattr(backup, "PASSPHRASE_READ_TIMEOUT", 0.3)
+    monkeypatch.setattr(backup, "read_passphrase_file", lambda path: _time.sleep(1.5) or "nie")
+    ticks = 0
+
+    async def tick():
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.05)
+            ticks += 1
+
+    t = asyncio.create_task(tick())
+    try:
+        st = await backup.passphrase_state()
+        assert st["error"] == "unreadable" and "no answer" in st["detail"] and ticks >= 3  # the loop ran meanwhile
+        with pytest.raises(backup.PassphraseFileError):
+            await backup.create()
+    finally:
+        t.cancel()

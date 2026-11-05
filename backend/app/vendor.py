@@ -439,7 +439,7 @@ async def _write_plan(db: AsyncSession, a: dict, plan: dict, now: datetime) -> N
     revision, changed_at = plan["revision"], None
     if plan["change"]:
         c = plan["change"]
-        revision += 1
+        revision = await changes_svc.next_revision(db, a["id"], revision + 1)
         changed_at = now
         await changes_svc.record(db, a, revision=revision, changes=c["diff"], impact=c["impact"], products=c["products"], targets=c["targets"], relevant=c["relevant"], now=now)
     elif not plan["write"]:
@@ -879,7 +879,7 @@ async def _side_changes(db: AsyncSession, ids: list[str], linked: dict[str, set[
         tg = [targets[k] for k in keys if k in targets]
         impact, relevant = await asyncio.to_thread(changes_svc.impacts, tg, a.source, a.data or {}, None if gone else a.data or {}) if tg else ([], set())
         st = states.get(a.id)
-        revision = (st.revision if st is not None else 1) + 1
+        revision = await changes_svc.next_revision(db, a.id, (st.revision if st is not None else 1) + 1)
         row = {"id": a.id, "source": a.source, "ident": a.ident, "title": a.title, "url": a.url, "severity": a.severity, "cves": a.cves or [], "data": a.data or {}}
         await changes_svc.record(db, row, revision=revision, changes=entries, impact=impact, products=keys, targets=tg, relevant=relevant, now=now)
         if not gone:
@@ -2243,11 +2243,9 @@ async def prune_events(db: AsyncSession, fs: list[VendorFollow], vers: dict) -> 
             (VendorEvent.kind == "eol") & VendorEvent.scope.is_not(None) & VendorEvent.scope.not_in(keep_eol),
         ),
     )
-    gone = list(await db.scalars(select(VendorEvent.id).where(stale)))  # only what goes – not every event, hourly
-    for i in range(0, len(gone), 500):
-        await db.execute(delete(VendorEvent).where(VendorEvent.id.in_(gone[i : i + 500])))
-        await db.commit()
-    return len(gone)
+    # only what goes, in short batches (each event takes its sent marks along); a row another transaction holds (a
+    # delivery being marked) is left for the next full evaluation
+    return await dbm.delete_batched(db, VendorEvent, stale, batch=500)
 
 
 async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
@@ -2426,27 +2424,41 @@ async def prune_lookups(db: AsyncSession, now: datetime | None = None) -> int:
     each is asked again after at most a week anyway, so an old row only grows the table (security review L8)."""
     now = now or datetime.now(UTC)
     old = or_(VendorFetch.last_fetch_at.is_(None), VendorFetch.last_fetch_at < now - LOOKUP_KEEP)
-    n = (await db.execute(delete(VendorFetch).where(or_(*(VendorFetch.key.startswith(p, autoescape=True) for p in PER_CVE)), old))).rowcount or 0
-    await db.commit()
-    return int(n)
+    return await dbm.delete_batched(db, VendorFetch, or_(*(VendorFetch.key.startswith(p, autoescape=True) for p in PER_CVE)), old)
+
+
+PRUNE_RETRY = timedelta(hours=1)  # a daily prune that failed: tried again this much later, not a day later
+
+
+async def daily_prunes(db: AsyncSession, now: datetime | None = None) -> dict[str, int | None]:
+    """Once a day (and after a failure an hour later): the old single lookups, the old advisory revisions and change
+    events, the EPSS scores nobody asked for a month – whether Vendor News is switched on or not (story details make
+    single lookups and EPSS keeps scores without it). Each one on its own: a failure is logged and rolled back, the
+    others run. Returns what each removed (None: failed); {} when not due."""
+    from app import epss
+
+    now = now or datetime.now(UTC)
+    if _pruned[0] is not None and now - _pruned[0] < PRUNE_EVERY:
+        return {}
+    out: dict[str, int | None] = {}
+    for name, fn in (("single lookups", lambda: prune_lookups(db, now)), ("advisory revisions", lambda: changes_svc.prune(db, now)), ("epss", lambda: epss._prune(db))):
+        try:
+            out[name] = n = await fn()
+            if n:
+                log.info("vendor: %d %s removed (retention)", n, name)
+        except Exception:  # noqa: BLE001 - logged; the other prunes run, this one again in PRUNE_RETRY
+            out[name] = None
+            await db.rollback()
+            log.exception("vendor: pruning the %s failed", name)
+    # all done: the next in a day; one failed: in PRUNE_RETRY (pretending the last run was that much less than a day ago)
+    _pruned[0] = now if all(v is not None for v in out.values()) else now - PRUNE_EVERY + PRUNE_RETRY
+    return out
 
 
 async def after_round(db: AsyncSession, cfg: dict, force: bool = False) -> None:
     """OSV and EPSS: they look at the findings (and EPSS at the stories) – after the round's records are stored. Each
-    one's failure is its own (logged, its state pauses), never the round's. Once a day the old single lookups go."""
+    one's failure is its own (logged, its state pauses), never the round's. (The daily prunes: daily_prunes.)"""
     from app import epss, osv
-
-    now = datetime.now(UTC)
-    if _pruned[0] is None or now - _pruned[0] >= PRUNE_EVERY:
-        _pruned[0] = now
-        try:
-            if n := await prune_lookups(db, now):
-                log.info("vendor: %d old single lookups removed", n)
-            if n := await changes_svc.prune(db, now):
-                log.info("vendor: %d old advisory revisions and change events removed", n)
-        except Exception:  # noqa: BLE001
-            await db.rollback()
-            log.exception("pruning the single lookups failed")
 
     if cfg.get("osv", True):
         try:
@@ -2512,6 +2524,8 @@ class VendorLoop:
                     except Exception:  # noqa: BLE001 - never stops Vendor News
                         await db.rollback()
                         log.exception("story products round failed")
+                    # the retention of single lookups, revisions and EPSS scores – also with Vendor News switched off
+                    await daily_prunes(db)
                     cfg = await config(db)
                     if cfg.get("enabled", True):
                         await after_round(db, cfg, force)

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useSearchParams } from "react-router"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, Copy, DatabaseBackup, FileDown, FileJson, FileSpreadsheet, KeyRound, Loader2, Lock, ShieldCheck } from "lucide-react"
+import { AlertTriangle, ArrowRight, BookOpen, Copy, DatabaseBackup, FileDown, FileJson, FileSpreadsheet, Info, KeyRound, Loader2, Lock, Server, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Pill } from "@/components/cobe/badges"
 import { Section } from "@/components/cobe/common"
@@ -15,11 +16,12 @@ import { Field } from "@/components/cobe/form"
 import { SubTabs } from "@/components/cobe/sub-tabs"
 import { Ts } from "@/components/cobe/time"
 import { api, ApiError, saveBlob } from "@/lib/api"
-import { BACKUP_KEY, backupErrorKey, backupState, fmtBytes, removedBy, restoreCommand, STATE_COLOR, useBackup, type BackupFile, type BackupStatus } from "@/lib/backup"
+import { BACKUP_KEY, backupErrorKey, backupState, fmtBytes, nowNote, removedBy, restoreCommand, STATE_COLOR, useBackup, type BackupStatus } from "@/lib/backup"
 import { copyWithToast } from "@/lib/clipboard"
 import { docPath } from "@/lib/docs"
 import { errorText, isStale } from "@/lib/errors"
 import { withReauth } from "@/lib/reauth"
+import { cn } from "@/lib/utils"
 import { restoreAlert, restoreState, useRestoreTest } from "@/lib/restore-test"
 import { RestoreTestPane } from "@/pages/settings-restore-test"
 import { Loading, SaveBar } from "@/pages/settings-shared"
@@ -46,12 +48,13 @@ export function BackupSettings() {
   return (
     <>
       <SubTabs parts={parts} active={tab} to={(k) => (k === "backup" ? "?" : `?tab=${k}`)} label={t("settings.nav.backup")} />
-      {tab === "restore" ? <RestoreTestPane /> : tab === "export" ? <ExportPane /> : <BackupPane />}
+      {tab === "restore" ? <RestoreTestPane /> : tab === "export" ? <ExportPane /> : <BackupPane restoreConfigured={restore?.configured} />}
     </>
   )
 }
 
-function BackupPane() {
+/** `restoreConfigured`: the throwaway database of the restore test is set up (undefined: not known yet). */
+function BackupPane({ restoreConfigured }: { restoreConfigured?: boolean }) {
   const { t } = useTranslation()
   const q = useBackup()
   if (!q.data) {
@@ -63,10 +66,10 @@ function BackupPane() {
       </Section>
     )
   }
-  return <BackupCard s={q.data} />
+  return <BackupCard s={q.data} restoreConfigured={restoreConfigured} />
 }
 
-function BackupCard({ s }: { s: BackupStatus }) {
+function BackupCard({ s, restoreConfigured }: { s: BackupStatus; restoreConfigured?: boolean }) {
   const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const [posting, setPosting] = useState(false)
@@ -91,7 +94,7 @@ function BackupCard({ s }: { s: BackupStatus }) {
       const r = await api.post<{ started: boolean; status: BackupStatus }>("/api/admin/backup")
       mine.current = true
       qc.setQueryData(BACKUP_KEY, r.status)
-      toast.info(t("backup.started"))
+      toast.info(t(r.status.with_key ? "backup.started" : "backup.startedPlain"))
     } catch (e) {
       const msg = e instanceof ApiError && typeof e.data.message === "string" ? `${errorText(t, e)} (${e.data.message})` : errorText(t, e)
       toast.error(msg)
@@ -109,6 +112,7 @@ function BackupCard({ s }: { s: BackupStatus }) {
   }[state]
   const files = showAll ? s.backups : s.backups.slice(0, SHOWN)
   const command = restoreCommand(s.backups[0]?.name ?? t("backup.fileName"), s.dir)
+  const note = nowNote(s)
 
   return (
     <Section
@@ -142,7 +146,9 @@ function BackupCard({ s }: { s: BackupStatus }) {
                 (<Ts at={last.at} rel />)
               </span>
               {last.size != null && <span className="text-xs text-muted-foreground tabular-nums">{fmtBytes(last.size, i18n.language)}</span>}
-              {last.rows != null && <span className="text-xs text-muted-foreground tabular-nums">{t("backup.rows", { count: last.rows })}</span>}
+              {last.rows != null && (
+                <span className="text-xs text-muted-foreground tabular-nums">{t("backup.rows", { count: last.rows, n: last.rows.toLocaleString(i18n.language) })}</span>
+              )}
               <KeyPill encrypted={!!last.encrypted} />
             </div>
           ) : (
@@ -160,18 +166,8 @@ function BackupCard({ s }: { s: BackupStatus }) {
           )}
         </div>
 
-        {/* 2. the key: in the backups or kept apart */}
-        {s.with_key ? (
-          <p className="flex gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
-            <Lock className="mt-0.5 size-3.5 shrink-0" />
-            <span>{t("backup.withKey")}</span>
-          </p>
-        ) : (
-          <p className="flex gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs">
-            <KeyRound className="mt-0.5 size-3.5 shrink-0 text-warning" />
-            <span>{t("backup.withoutKey")}</span>
-          </p>
-        )}
+        {/* 2. the key: what "Jetzt sichern" makes – encrypted with the key, failing (the passphrase file), or plain */}
+        <KeyNote s={s} />
 
         {/* 3. what to change: retention */}
         <RetentionForm key={`${s.keep}|${s.rev}`} s={s} />
@@ -184,8 +180,8 @@ function BackupCard({ s }: { s: BackupStatus }) {
           {s.backups.length === 0 ? (
             <p className="text-xs text-muted-foreground">{t("backup.filesEmpty")}</p>
           ) : (
-            <ul className="divide-y rounded-lg border">
-              <li className="hidden grid-cols-[minmax(0,1fr)_11rem_6rem_9rem] gap-3 px-3 py-2 text-xs text-muted-foreground sm:grid" aria-hidden>
+            <ul className={cn("divide-y rounded-lg border", FILE_GRID)}>
+              <li className={cn("hidden px-3 py-2 text-xs text-muted-foreground sm:grid", FILE_ROW)} aria-hidden>
                 <span>{t("backup.col.name")}</span>
                 <span>{t("backup.col.at")}</span>
                 <span className="text-right">{t("backup.col.size")}</span>
@@ -203,7 +199,17 @@ function BackupCard({ s }: { s: BackupStatus }) {
           )}
         </div>
 
+        {/* 5. download and restore: on the server only – and what the restore test is (a trial run, nothing changes) */}
         <div className="space-y-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
+          <p className="flex items-center gap-1.5 font-medium text-foreground">
+            <Server className="size-3.5 shrink-0" aria-hidden /> {t("backup.serverOnlyTitle")}
+          </p>
+          <p>{t("backup.serverOnly", { dir: s.dir })}</p>
+          <p>
+            <Link to={docPath("sicherung", "schritt-fuer-schritt")} className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline">
+              <BookOpen className="size-3.5 shrink-0" aria-hidden /> {t("backup.stepsLink")}
+            </Link>
+          </p>
           <p>{t("backup.restoreHint")}</p>
           {command.startsWith("read ") && <p>{t("backup.restoreEncHint")}</p>}
           <div className="flex items-start gap-2">
@@ -212,16 +218,35 @@ function BackupCard({ s }: { s: BackupStatus }) {
               <Copy />
             </Button>
           </div>
+          <p className="flex gap-1.5 border-t border-border/60 pt-2">
+            <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
+            <span>
+              {t("backup.restoreTestNote")}
+              {restoreConfigured === false && <> {t("backup.restoreTestOff")}</>}{" "}
+              <Link to="?tab=restore" className="font-medium whitespace-nowrap text-primary underline-offset-2 hover:underline">
+                {t("backup.restoreTestLink")}
+              </Link>
+            </span>
+          </p>
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
-        <span className="text-xs text-muted-foreground">
+        <span className="min-w-0 flex-1 basis-64 text-xs text-muted-foreground">
           {s.running && s.running_since ? (
             <>
               {t("backup.runningSince")} <Ts at={s.running_since} rel />
             </>
           ) : (
-            t("backup.nowHint")
+            <span className="inline-flex gap-1.5">
+              {note === "encrypted" ? (
+                <Lock className="mt-px size-3.5 shrink-0" aria-hidden />
+              ) : note === "broken" ? (
+                <AlertTriangle className="mt-px size-3.5 shrink-0 text-sev-critical" aria-hidden />
+              ) : (
+                <Info className="mt-px size-3.5 shrink-0" aria-hidden />
+              )}
+              <span>{t(`backup.nowNote.${note}`)}</span>
+            </span>
           )}
         </span>
         <Button onClick={() => void backupNow()} disabled={busy} title={busy ? t("backup.running") : undefined}>
@@ -276,33 +301,133 @@ function RetentionForm({ s }: { s: BackupStatus }) {
   )
 }
 
-function KeyPill({ encrypted }: { encrypted: boolean }) {
+/** The list's columns: one grid for the head and every row (subgrid) – the widths come from the longest entry, never
+ *  a fixed width a pill could stick out of. Below sm each row is a small block of its own. */
+const FILE_GRID = "sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto_minmax(0,auto)]"
+const FILE_ROW = "sm:col-span-full sm:grid-cols-subgrid sm:gap-x-4"
+
+/** What the key column says, explained on hover, focus and tap (UX.md: jargon gets its explanation). */
+function KeyNote({ s }: { s: BackupStatus }) {
   const { t } = useTranslation()
-  return encrypted ? (
-    <Pill color="--success" title={t("backup.encryptedHint")}>
-      <Lock /> {t("backup.encrypted")}
-    </Pill>
-  ) : (
-    <Pill color="--muted-foreground" title={t("backup.plainHint")}>
-      {t("backup.plain")}
-    </Pill>
+  const p = s.passphrase
+  const masterKey = (
+    <TapTip text={t("backup.masterKey")}>
+      <span className="underline decoration-muted-foreground/60 decoration-dotted underline-offset-4">{t("backup.masterKeyQ")}</span>
+    </TapTip>
+  )
+  if (s.with_key) {
+    const source = p.source === "file" ? `BACKUP_PASSPHRASE_FILE: ${p.file ?? ""}` : "BACKUP_PASSPHRASE"
+    return (
+      <div className="flex gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
+        <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <div className="min-w-0 space-y-1 break-words">
+          <p>{t("backup.withKey", { source })}</p>
+          {p.file_ignored && <p>{t("backup.withKeyIgnored")}</p>}
+          <p>{masterKey}</p>
+        </div>
+      </div>
+    )
+  }
+  if (p.error) {
+    return (
+      <div role="alert" className="flex gap-2 rounded-lg border border-sev-critical/40 bg-sev-critical/10 p-3 text-xs">
+        <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-sev-critical" aria-hidden />
+        <div className="min-w-0 space-y-1 break-words">
+          <p className="font-medium">{t("backup.passFile.title")}</p>
+          <p>{t(`backup.passFile.${p.error}`, { defaultValue: t("backup.err.passphrase_file") })}</p>
+          {p.detail && p.detail !== s.last?.error && (
+            <p className="font-mono text-[11px] text-muted-foreground" title={t("backup.errDetail")}>
+              {p.detail}
+            </p>
+          )}
+          <p>
+            <Link to={docPath("sicherung", "passphrase-datei")} className="font-medium text-primary underline-offset-2 hover:underline">
+              {t("backup.howToEncrypt")}
+            </Link>
+          </p>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="flex gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs">
+      <KeyRound className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
+      <div className="min-w-0 space-y-1 break-words">
+        <p>{t("backup.withoutKey")}</p>
+        <p className="flex flex-wrap gap-x-4 gap-y-1">
+          {masterKey}
+          <Link to={docPath("sicherung", "passphrase-datei")} className="font-medium text-primary underline-offset-2 hover:underline">
+            {t("backup.howToEncrypt")}
+          </Link>
+        </p>
+      </div>
+    </div>
   )
 }
 
-function FileRow({ f }: { f: BackupFile }) {
+/** A tooltip that also opens on a tap: Radix opens one on hover and keyboard focus, but closes it on a click and never
+ *  opens it from a touch – here a tap opens it, a tap elsewhere closes it (its content is a dismissable layer). */
+function TapTip({ text, children, className }: { text: string; children: React.ReactNode; className?: string }) {
+  const [open, setOpen] = useState(false)
+  const touch = useRef(false)
+  return (
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn("inline-flex max-w-full cursor-help rounded-full text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50", className)}
+          onPointerDown={(e) => {
+            touch.current = e.pointerType !== "mouse"
+          }}
+          onClick={(e) => {
+            if (!touch.current) return // a mouse click: Radix closes it, as everywhere else
+            e.preventDefault() // keeps Radix from closing it again
+            setOpen(true)
+          }}
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-left leading-relaxed">
+        <span className="block">{text}</span>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function KeyPill({ encrypted }: { encrypted: boolean }) {
+  const { t } = useTranslation()
+  // wraps onto a second line where the column is narrow (h-auto) – never wider than its cell
+  const wrap = "h-auto min-h-5 max-w-full py-0.5 leading-tight whitespace-normal"
+  return encrypted ? (
+    <TapTip text={t("backup.encryptedHint")}>
+      <Pill color="--success" fg="--success-fg" className={wrap}>
+        <Lock /> {t("backup.encrypted")}
+      </Pill>
+    </TapTip>
+  ) : (
+    <TapTip text={t("backup.plainHint")}>
+      <Pill color="--muted-foreground" className={wrap}>
+        <KeyRound /> {t("backup.plain")}
+      </Pill>
+    </TapTip>
+  )
+}
+
+function FileRow({ f }: { f: BackupStatus["backups"][number] }) {
   const { t, i18n } = useTranslation()
   return (
-    <li className="grid gap-1 px-3 py-2 text-xs sm:grid-cols-[minmax(0,1fr)_11rem_6rem_9rem] sm:items-center sm:gap-3">
-      <span className="min-w-0 font-mono break-all">{f.name}</span>
-      <span className="flex gap-1.5">
+    <li className={cn("grid gap-1 px-3 py-2 text-xs sm:items-center", FILE_ROW)}>
+      <span className="min-w-0 font-mono wrap-break-word">{f.name}</span>
+      <span className="flex gap-1.5 whitespace-nowrap">
         <span className="text-muted-foreground sm:hidden">{t("backup.col.at")}:</span>
         <Ts at={f.at} />
       </span>
-      <span className="flex gap-1.5 tabular-nums sm:justify-end">
+      <span className="flex gap-1.5 whitespace-nowrap tabular-nums sm:justify-end">
         <span className="text-muted-foreground sm:hidden">{t("backup.col.size")}:</span>
         {fmtBytes(f.size, i18n.language)}
       </span>
-      <span>
+      <span className="min-w-0">
         <KeyPill encrypted={f.encrypted} />
       </span>
     </li>
@@ -328,6 +453,15 @@ function ExportPane() {
   return (
     <Section title={t("backup.export.title")} description={t("backup.export.desc")} actions={<HelpLink chapter="sicherung" section="export" topic={t("backup.export.title")} />}>
       <div className="space-y-3 p-5 text-sm">
+        <div className="flex gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
+          <span className="min-w-0">
+            {t("backup.export.notBackup")}{" "}
+            <Link to="?" className="inline-flex items-center gap-0.5 font-medium whitespace-nowrap text-primary underline-offset-2 hover:underline">
+              {t("backup.export.toBackup")} <ArrowRight className="size-3" aria-hidden />
+            </Link>
+          </span>
+        </div>
         <p className="text-muted-foreground">{t("backup.export.what")}</p>
         <p className="flex gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
           <Lock className="mt-0.5 size-3.5 shrink-0" />

@@ -127,7 +127,6 @@ def target() -> URL | None:
 
 
 async def status(s: AsyncSession) -> dict:
-    cfg = get_config()
     raw = await settings_store.get(s, SECTION)
     conf = _conf(raw)
     last = await settings_store.get(s, LAST)
@@ -152,9 +151,18 @@ async def status(s: AsyncSession) -> dict:
         "next_at": next_at(conf, last_at, now).isoformat() if scheduled else None,
         # no test for longer than the period and a day: the cron job (mode host) or the app's schedule does not run
         "overdue": bool(url is not None and conf["enabled"] and last_at is not None and now - last_at > every + timedelta(days=1)),
-        "passphrase": bool(cfg.backup_passphrase),
+        "passphrase": (await _app_phrase())[0] != "",
         "newest": newest,
     }
+
+
+async def _app_phrase() -> tuple[str, str | None]:
+    """The app's own passphrase (backup.app_passphrase_async: off the event loop) – and why there is none when its file
+    cannot be read."""
+    try:
+        return await backup.app_passphrase_async(), None
+    except backup.BackupError as exc:
+        return "", str(exc)
 
 
 async def _record(value: dict) -> None:
@@ -274,7 +282,7 @@ def _newest() -> dict | None:
 async def run(*, passphrase: str | None = None, trigger: str = "manual") -> dict:
     """One test of the newest backup (see the module text) – its outcome, also recorded. Never raises for a failed test."""
     cfg = get_config()
-    phrase = cfg.backup_passphrase if passphrase is None else passphrase
+    phrase, phrase_error = await _app_phrase() if passphrase is None else (passphrase, None)
     t0 = time.monotonic()
     out: dict = {"ok": False, "trigger": trigger, "started_at": datetime.now(UTC).isoformat(), "head": db.head()}
     lock_conn = None
@@ -299,6 +307,8 @@ async def run(*, passphrase: str | None = None, trigger: str = "manual") -> dict
         out["name"] = newest["name"]
         out["encrypted"] = newest["encrypted"]
         if newest["encrypted"] and not phrase:
+            if phrase_error:
+                raise Failed("passphrase", f"the newest backup is encrypted and {phrase_error}")
             raise Failed("passphrase", "the newest backup is encrypted and the app has no BACKUP_PASSPHRASE – run the test from the host (scripts/restore-test.sh)")
         async with asyncio.timeout(TIMEOUT_S):
             try:

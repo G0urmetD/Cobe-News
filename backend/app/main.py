@@ -31,7 +31,7 @@ from app.auth_api import issue_setup_token
 from app.auth_api import router as auth_router
 from app.changelog import router as changelog_router
 from app.config import get_config
-from app.deps import client_ip, via_https
+from app.deps import client_ip, client_route, via_https
 from app.docs import router as docs_router
 from app.delivery_log_api import router as delivery_log_router
 from app.notify_api import router as notify_router
@@ -125,11 +125,18 @@ class FetchLoop:
             await _step("push", self._push)
             await _step("welcome", self._welcome)
             await _step("weekly", self._weekly)
+            await _step("audit seal", self._audit_seal)
             if time.monotonic() - self.last_hourly > 3600:
                 self.last_hourly = time.monotonic()
                 await _step("prune", self._prune)
                 await _step("sessions", self._sessions)
                 await _step("directory sync", self._directory)
+
+    @staticmethod
+    async def _audit_seal() -> None:
+        """The audit log's new entries sealed into its chain every round (a minute at most unsealed) – nothing to do:
+        one indexed probe; another sealer at work: left to it."""
+        await audit.seal(batches=4)
 
     async def _tls(self) -> None:
         what = await asyncio.to_thread(tls.ensure)
@@ -178,28 +185,49 @@ class FetchLoop:
         if sent:
             log.info("push: %s", sent)
 
-    async def _prune(self) -> None:
-        async with db.session() as s:
-            gone = await news_svc.prune(s)
-            stats = await source_health.prune(s)
-            await personal.prune(s)
-            await cve_watch.prune(s)
-            from app import weekly
+    @staticmethod
+    def _prunes() -> list[tuple[str, object]]:
+        """The hourly prunes in their order – looked up each time (a test replaces one)."""
+        from app import weekly
 
-            await weekly.prune(s)
-            await api_tokens.prune(s)
-            logged = await audit.prune(s)
-            await delivery_log.prune(s)  # the delivery log: RETENTION_DAYS
-            await reader.prune(s)  # expired mutes, read marks the watermark or the age cover
-            await lock_store.prune(s)  # brute-force locks that ran out
-        if gone:
-            log.info("news: %s old stories removed", gone)
-        if stats:
-            log.info("source health: %s old fetch records removed", stats)
-        if logged:
-            log.info("audit: %s entries past the retention removed", logged)
-        bruteforce.purge()
-        passkeys_api.purge()
+        return [
+            ("news", news_svc.prune),
+            ("source health", source_health.prune),
+            ("personal deliveries", personal.prune),
+            ("cve watch", cve_watch.prune),
+            ("weekly", weekly.prune),
+            ("api tokens", api_tokens.prune),
+            ("audit", audit.prune),
+            ("delivery log", delivery_log.prune),  # RETENTION_DAYS, at most MAX_ROWS
+            ("reader", reader.prune),  # expired mutes, read marks the watermark or the age cover
+            ("auth locks", lock_store.prune),  # brute-force locks that ran out
+        ]
+
+    async def _prune(self) -> dict[str, object]:
+        """Every prune on its own: one that fails (a deadlock, the statement timeout, a bad setting) is logged and rolled
+        back – the others run all the same, and the in-memory purges always (a failing database step must never keep
+        the brute-force counters growing). Returns what each removed (None: it failed)."""
+        out: dict[str, object] = {}
+        try:
+            async with db.session() as s:
+                for name, fn in self._prunes():
+                    try:
+                        out[name] = await fn(s)
+                    except Exception:  # noqa: BLE001 - logged; the next prune (and the next hour) go on
+                        out[name] = None
+                        log.exception("prune %s failed", name)
+                        with contextlib.suppress(Exception):
+                            await s.rollback()
+        finally:
+            bruteforce.purge()
+            passkeys_api.purge()
+        if out.get("news"):
+            log.info("news: %s old stories removed", out["news"])
+        if out.get("source health"):
+            log.info("source health: %s old fetch records removed", out["source health"])
+        if out.get("audit"):
+            log.info("audit: %s entries past the retention removed", out["audit"])
+        return out
 
     async def _sessions(self) -> None:
         async with db.session() as s:
@@ -403,13 +431,21 @@ def create_app() -> FastAPI:
                 suspicious.csrf_failed(request.method, request.url.path, client_ip(request), cookie=bool(csrf), header=bool(sent))  # throttled
                 return _secure_headers(request, JSONResponse({"detail": {"code": "csrf_failed"}}, status_code=403), api)
         t0 = time.monotonic()
-        # the client address for the audit log (app/audit.py) – an account's actions record where they came from
-        ip_token = audit.set_ip(client_ip(request)) if api else None
+        # a request id (in the access log line, the answer's X-Request-ID and the audit log – they can be matched) and
+        # the request's context for the audit log (app/audit.py): where it came from, how, and the browser coarse
+        rid = secrets.token_hex(6)
+        ctx_token = None
+        if api:
+            ip, via = client_route(request)
+            family, version, system = audit.parse_ua(request.headers.get("user-agent"))
+            ctx = audit.RequestContext(ip, via, request.method, request.url.path[:300], rid, family, version, system)
+            ctx_token = audit.set_request(ctx)
         try:
             resp = await call_next(request)
         finally:
-            if ip_token is not None:
-                audit.reset_ip(ip_token)
+            if ctx_token is not None:
+                audit.reset_request(ctx_token)
+        resp.headers["X-Request-ID"] = rid
         if api and not csrf and not token:
             # double submit: readable by the page (it sends it back as X-CSRF-Token), useless to another site
             resp.set_cookie(csrf_name, secrets.token_urlsafe(32), httponly=False, secure=cfg.cookie_secure, samesite="strict", path="/")
@@ -417,7 +453,7 @@ def create_app() -> FastAPI:
                 resp.delete_cookie(sessions.CSRF_COOKIE, path="/")  # the unprefixed one of older versions
         _secure_headers(request, resp, api)
         if api and request.url.path != "/api/health":
-            access.info("%s %s %s %s %.0fms", client_ip(request), request.method, request.url.path, resp.status_code, (time.monotonic() - t0) * 1000)
+            access.info("%s %s %s %s %.0fms rid=%s", client_ip(request), request.method, request.url.path, resp.status_code, (time.monotonic() - t0) * 1000, rid)
         return resp
 
     static = cfg.static_dir

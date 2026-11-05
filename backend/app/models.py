@@ -44,6 +44,10 @@ class NewsSource(Base):
     # when its first fetch was stored (None: never, or switched on again / new address since) – until then its stories
     # without a date of their own are backlog: nothing tells how old they are
     primed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # when the last fetch began whose answer was read and stored (HTTP 200 – not a 304, not a failure): what the feed
+    # listed then got its stories' `seen_at` after this time. An undated story whose seen_at is older was not listed
+    # any more – only such a story may go with the retention (news.prune); None: never read since migration 0031
+    parsed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 def _arrived_as_backlog(ctx) -> bool:  # noqa: ANN001
@@ -1042,6 +1046,22 @@ class AuditEntry(Base):
         Index("ix_audit_log_actor", "actor_id", "at"),
         Index("ix_audit_log_action", "action", "at"),
         Index("ix_audit_log_target", "target_type", "target_id", "at"),
+        # migration 0032: the filters of the second step and the chain
+        Index("ix_audit_log_kind", "actor_kind", "at", postgresql_where=text("actor_kind <> 'user'")),
+        Index("ix_audit_log_ip", "ip", "at", postgresql_where=text("ip IS NOT NULL")),
+        Index("ix_audit_log_session", "session_ref", "at", postgresql_where=text("session_ref IS NOT NULL")),
+        Index("ix_audit_log_notable", "at", "id", postgresql_where=text("notable")),
+        Index("ux_audit_log_seq", "seq", unique=True, postgresql_where=text("seq IS NOT NULL")),
+        Index("ix_audit_log_unsealed", "id", postgresql_where=text("seq IS NULL")),
+        # migration 0033: the search over one expression (audit.SEARCH_TEXT), trigram
+        Index(
+            "ix_audit_log_search",
+            text(
+                "lower(actor_name || ' ' || actor_display || ' ' || action || ' ' || coalesce(target_label, '') || ' ' || "
+                "coalesce(target_id, '') || ' ' || coalesce(ip, '')) gin_trgm_ops"
+            ),
+            postgresql_using="gin",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
@@ -1056,6 +1076,26 @@ class AuditEntry(Base):
     target_label: Mapped[str | None] = mapped_column(Text)
     ip: Mapped[str | None] = mapped_column(Text)
     details: Mapped[dict] = mapped_column(Json, default=dict)
+    # who, more closely (0032): the role then, the emergency account, how its session was signed in, a keyed short
+    # reference of that session (audit.session_ref – never its token or id)
+    actor_role: Mapped[str | None] = mapped_column(Text)
+    actor_emergency: Mapped[bool | None] = mapped_column(Boolean)
+    auth_method: Mapped[str | None] = mapped_column(Text)
+    session_ref: Mapped[str | None] = mapped_column(Text)
+    # from where: browser and system coarse (never the full user agent), the request (no query string), how it arrived
+    ua_family: Mapped[str | None] = mapped_column(Text)
+    ua_version: Mapped[str | None] = mapped_column(Text)
+    ua_os: Mapped[str | None] = mapped_column(Text)
+    req_method: Mapped[str | None] = mapped_column(Text)
+    req_path: Mapped[str | None] = mapped_column(Text)
+    request_id: Mapped[str | None] = mapped_column(Text)
+    req_via: Mapped[str | None] = mapped_column(Text)  # direct | bundled | proxy | bundled_proxy
+    app_version: Mapped[str | None] = mapped_column(Text)
+    notable: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))  # security-relevant or an anomaly
+    # the chain (audit.seal / audit.verify): position, the previous entry's hash, the HMAC over this canonical entry
+    seq: Mapped[int | None] = mapped_column(BigInteger)
+    prev_hash: Mapped[str | None] = mapped_column(Text)
+    hash: Mapped[str | None] = mapped_column(Text)
 
 
 # ---------------------------------------------------------------- delivery log (app/delivery_log.py, migration 0018)

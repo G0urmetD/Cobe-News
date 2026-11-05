@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import de from "@/i18n/de"
 import en from "@/i18n/en"
-import { backupErrorKey, backupState, fmtBytes, removedBy, restoreCommand, STATE_COLOR } from "@/lib/backup"
+import { backupErrorKey, backupState, fmtBytes, nowNote, removedBy, restoreCommand, STATE_COLOR, type BackupPassphrase } from "@/lib/backup"
 
 describe("fmtBytes", () => {
   it("uses decimal units and the reader's separator", () => {
@@ -51,7 +51,7 @@ describe("retention and restore", () => {
     expect(lines[2]).toBe("docker compose run --rm --no-deps -e BACKUP_PASSPHRASE app python -m app.cli restore /data/backups/cobe-news-20261029-120000.tar.enc")
   })
   it("has a text in both languages for every error kind of a backup", () => {
-    for (const code of ["busy", "no_pg_dump", "timeout", "dump", "passphrase", "failed"]) {
+    for (const code of ["busy", "no_pg_dump", "timeout", "dump", "passphrase", "passphrase_file", "failed"]) {
       const key = backupErrorKey({ ok: false, at: "", code }) as keyof typeof de
       expect(de[key], key).toBeTruthy()
       expect(en[key as keyof typeof en], key).toBeTruthy()
@@ -65,5 +65,32 @@ describe("i18n", () => {
     const keys = (m: Record<string, string>) => Object.keys(m).filter((k) => k.startsWith("backup.") || k.includes("backup"))
     expect(keys(de).sort()).toEqual(keys(en).sort())
     expect(keys(de).length).toBeGreaterThan(40)
+  })
+})
+
+describe("the app's passphrase and “Jetzt sichern”", () => {
+  const none: BackupPassphrase = { source: null, file: null, file_ignored: false, ok: false, error: null, detail: null }
+  const file = (name: string, encrypted: boolean) => ({ name, size: 1, at: "2026-11-04T10:00:00Z", encrypted })
+  it("says before the backup whether it will be encrypted – and names the difference to encrypted ones in the list", () => {
+    expect(nowNote({ with_key: true, passphrase: { ...none, source: "file", ok: true }, backups: [] })).toBe("encrypted")
+    expect(nowNote({ with_key: false, passphrase: none, backups: [file("a.tar", false)] })).toBe("plain")
+    expect(nowNote({ with_key: false, passphrase: none, backups: [file("a.tar", false), file("b.tar.enc", true)] })).toBe("plainBesideEncrypted")
+    expect(nowNote({ with_key: false, passphrase: { ...none, source: "file", error: "missing" }, backups: [file("b.tar.enc", true)] })).toBe("broken")
+  })
+  it("has a text in both languages for every note and every reason the passphrase file cannot be used", () => {
+    const keys = [
+      ...["encrypted", "plain", "plainBesideEncrypted", "broken"].map((n) => `backup.nowNote.${n}`),
+      ...["missing", "unreadable", "not_a_file", "too_large", "not_text", "empty", "short"].map((w) => `backup.passFile.${w}`),
+    ]
+    for (const key of keys) {
+      expect(de[key as keyof typeof de], key).toBeTruthy()
+      expect(en[key as keyof typeof en], key).toBeTruthy()
+    }
+  })
+  it("keeps the key pills short enough for one line in the list", () => {
+    for (const lang of [de, en]) {
+      expect(lang["backup.encrypted"].length).toBeLessThanOrEqual(40)
+      expect(lang["backup.plain"].length).toBeLessThanOrEqual(50)
+    }
   })
 })

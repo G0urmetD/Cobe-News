@@ -29,7 +29,7 @@ import uuid
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import Integer, and_, case, delete, func, insert, literal, select
+from sqlalchemy import Integer, and_, case, func, insert, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import DeliveryLog, NotifyChannel
@@ -266,12 +266,12 @@ async def health(db: AsyncSession, channel_ids: list[uuid.UUID] | None = None, n
 
 
 async def prune(db: AsyncSession, days: int = RETENTION_DAYS) -> int:
-    """Entries older than `days` – and beyond MAX_ROWS the oldest."""
-    res = await db.execute(delete(DeliveryLog).where(DeliveryLog.at < datetime.now(UTC) - timedelta(days=days)))
-    gone = res.rowcount or 0
+    """Entries older than `days` – and beyond MAX_ROWS the oldest (in short batches)."""
+    from app import db as dbm
+
+    gone = await dbm.delete_batched(db, DeliveryLog, DeliveryLog.at < datetime.now(UTC) - timedelta(days=days))
     edge = await db.scalar(select(DeliveryLog.at).order_by(DeliveryLog.at.desc()).offset(MAX_ROWS).limit(1))
     if edge is not None:
-        res = await db.execute(delete(DeliveryLog).where(DeliveryLog.at <= edge))
-        gone += res.rowcount or 0
+        gone += await dbm.delete_batched(db, DeliveryLog, DeliveryLog.at <= edge)
     await db.commit()
     return gone

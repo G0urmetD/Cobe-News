@@ -21,7 +21,7 @@ Backup & export* (group "Operations", [open directly](/settings/backup)).
 | File | When |
 |---|---|
 | `cobe-news-YYYYMMDD-HHMMSS.tar` | without a passphrase – not encrypted, **without** the key |
-| `cobe-news-YYYYMMDD-HHMMSS.tar.enc` | with `BACKUP_PASSPHRASE` – encrypted, **with** the key |
+| `cobe-news-YYYYMMDD-HHMMSS.tar.enc` | with a passphrase – encrypted, **with** the key |
 | `…-pre-restore.tar` or `.tar.enc` | automatically, right before a restore |
 
 The time in the name is UTC.
@@ -41,6 +41,158 @@ is done, the oldest beyond that are deleted – **also those made by cron**.
 > [!WARNING]
 > A backup on the same server does not help when the server fails. Also copy the files to another system – see
 > [cron](#cron).
+
+## Step by step: back up, download, restore {#schritt-fuer-schritt}
+
+The backups are **on the server only**. There is deliberately no download or restore in the browser – a backup holds
+all the data. Downloading (copying to another system) and restoring are done by command on the server. The
+[restore test](#ruecksicherungs-test), on the other hand, is only a trial run: it restores the newest backup into a
+throwaway database and changes nothing in your data.
+
+The examples use the file `cobe-news-20261104-123000.tar.enc`; the output of the backup and the list on the page name
+the real one.
+
+### What you need {#was-man-braucht}
+
+| What | What for |
+|---|---|
+| the backup file | step 2 below – a copy outside the server |
+| for `.tar.enc`: the **passphrase** | decrypts the file; the master key is inside. Keep it in a password manager, not on the same server |
+| for `.tar`: a copy of the **master key** | only on a **new** server – on the same server it is there already. Without it everything is there, only the stored secrets (webhook URLs, SMTP/LDAP passwords, the Entra secret, TOTP) have to be entered again |
+| the password of the database role | for the local install it is in the `.env`; with Portainer the throwaway container needs `POSTGRES_APP_PASSWORD` from the stack's variables |
+| the same or a newer Cobe News | an older backup is brought up to the version's state, one of a **newer** version is refused. The version is in the output (`Backup of … – Cobe News 0.1.50 …`) |
+
+The [master key](term:masterkey) is made at the first start as `secret.key` in the data folder (or comes from
+`SECRET_KEY`). It can be read on the server only – copy it once and keep it offline (password manager, encrypted
+stick), never in tickets or chats:
+
+```bash
+umask 077
+docker exec cobe-news-app cat /data/secret.key > cobe-news-secret.key   # Portainer: news-app-1 instead of cobe-news-app
+```
+
+If `SECRET_KEY` is in the `.env` or in the stack's variables, that is the key – keep that value.
+
+### Local install (docker compose) {#schritte-lokal}
+
+In the installation folder, e.g. `/opt/cobe-news`; the containers are `cobe-news-app` and `cobe-news-db`, the files are
+on the host under `data/backups/`.
+
+**1. Back up** – "Back up now" in the app, or by command:
+
+```bash
+cd /opt/cobe-news
+docker compose exec -T app python -m app.cli backup
+docker compose exec -T app python -m app.cli backup --passphrase-file - < /root/.cobe-news-backup-pass
+```
+
+The first line encrypts with the app's passphrase ([passphrase file](#passphrase-datei)) or, without one, not at all.
+The second hands the passphrase over through standard input – it is on no command line.
+
+**2. Download** – `docker compose cp` writes the copy as your user (only the container may read the files in
+`data/backups/`), `scp` takes it to another system:
+
+```bash
+docker compose cp app:/data/backups/cobe-news-20261104-123000.tar.enc .
+scp cobe-news-20261104-123000.tar.enc backup-host.corp.example:/srv/cobe-news/
+```
+
+All at once, without half-written and hidden files, as in the [cron example](#cron):
+`sudo rsync -a --exclude='.*' --exclude='*.partial' data/backups/ backup-host.corp.example:/srv/cobe-news/`.
+
+**3. Restore** – on the same server, the file is still in `data/backups/`:
+
+```bash
+cd /opt/cobe-news
+docker compose stop app
+docker compose run --rm --no-deps app python -m app.cli restore /data/backups/cobe-news-20261104-123000.tar.enc
+docker compose start app
+```
+
+Type `RESTORE` to confirm; the current state is backed up first. The command opens a `.tar.enc` with the app's
+passphrase file; without one, read the passphrase first and hand it over:
+`read -rs BACKUP_PASSPHRASE && export BACKUP_PASSPHRASE`, then `docker compose run --rm --no-deps -e BACKUP_PASSPHRASE app …`
+(see [Restore](#wiederherstellung)).
+
+**On a new server** – install Cobe News (do not start it yet), then:
+
+```bash
+cd /opt/cobe-news
+sudo mkdir -p data/backups
+sudo cp /path/to/cobe-news-20261104-123000.tar.enc data/backups/
+sudo cp /path/to/cobe-news-secret.key data/secret.key   # only for a .tar
+sudo chown -R 10001 data && sudo chmod 600 data/secret.key
+docker compose build && docker compose up -d --wait db
+docker compose run --rm --no-deps -e BACKUP_PASSPHRASE app python -m app.cli restore /data/backups/cobe-news-20261104-123000.tar.enc --use-backup-key
+docker compose up -d
+```
+
+For `.tar.enc` first `read -rs BACKUP_PASSPHRASE && export BACKUP_PASSPHRASE`; `--use-backup-key` takes the key from
+the backup. For `.tar` without `-e BACKUP_PASSPHRASE` and without `--use-backup-key` – the key is in `data/` already.
+More: [New server](#neuer-server).
+
+### Portainer stack {#schritte-portainer}
+
+No checkout on the host: the containers are named after the stack, here `news` – `news-app-1`, `news-db-1`, the volumes
+`news_data` (with `backups/` and `secret.key` in it) and `news_db18`. The commands run on the Docker host (SSH), not in
+Portainer.
+
+**1. Back up** – "Back up now" in the app, or by command:
+
+```bash
+docker exec news-app-1 python -m app.cli backup
+docker exec -i news-app-1 python -m app.cli backup --passphrase-file - < /root/.cobe-news-backup-pass
+```
+
+**2. Download** – one file with `docker cp`, all at once with `tar` out of the container (without half-written and
+hidden files), then away with `scp`:
+
+```bash
+docker cp news-app-1:/data/backups/cobe-news-20261104-123000.tar.enc .
+mkdir -p /srv/cobe-news-backups && docker exec news-app-1 tar -C /data/backups -cf - --exclude='./.*' --exclude='*.partial' . | tar -C /srv/cobe-news-backups -xf -
+scp cobe-news-20261104-123000.tar.enc backup-host.corp.example:/srv/cobe-news/
+```
+
+**3. Restore** – if the file is no longer in the volume (e.g. on a new server), put it there first, as the app's user:
+
+```bash
+docker exec -i news-app-1 sh -c 'umask 077; mkdir -p /data/backups && cat > /data/backups/cobe-news-20261104-123000.tar.enc' < cobe-news-20261104-123000.tar.enc
+```
+
+Then stop the app, restore the backup in a throwaway container with the same image, the database network and the
+volume `data`, and start the app. Password and passphrase come from the shell, not from the command line:
+
+```bash
+IMG=$(docker inspect -f '{{.Config.Image}}' news-app-1)
+docker stop news-app-1
+read -rs POSTGRES_PASSWORD && export POSTGRES_PASSWORD   # the value of POSTGRES_APP_PASSWORD from the stack
+read -rs BACKUP_PASSPHRASE && export BACKUP_PASSPHRASE   # only for .tar.enc
+docker run --rm -it --network news_db -v news_data:/data --read-only --tmpfs /tmp --cap-drop ALL \
+  --security-opt no-new-privileges:true -e POSTGRES_HOST=db -e POSTGRES_USER=cobe_news_app -e POSTGRES_PASSWORD \
+  -e BACKUP_PASSPHRASE "$IMG" python -m app.cli restore /data/backups/cobe-news-20261104-123000.tar.enc
+unset POSTGRES_PASSWORD BACKUP_PASSPHRASE
+docker start news-app-1
+```
+
+Type `RESTORE` to confirm. If `SECRET_KEY` is in the stack's variables, add `-e SECRET_KEY` (set it with `read -rs`
+the same way first).
+
+**On a new server** – create the stack as usual (it starts empty and makes a key of its own), put the file into the
+volume as above, then:
+
+- for `.tar.enc`: add `--use-backup-key` to the `restore` command – the backup's key replaces the new one (which stays
+  next to it as `secret.key.before-restore-…`).
+- for `.tar`: after `docker stop` and before the `restore`, write the kept key into the volume. The command checks the
+  file is not empty, writes a new file first and then swaps it in; the previous key stays next to it as
+  `secret.key.before-restore-<time>` (a second run overwrites nothing either):
+
+```bash
+test -s cobe-news-secret.key && docker run --rm -i -v news_data:/data --network none "$IMG" sh -ec '
+  umask 077; cat > /data/secret.key.new
+  [ "$(wc -c < /data/secret.key.new)" -ge 16 ] || { rm -f /data/secret.key.new; echo "key empty or cut off - nothing changed" >&2; exit 1; }
+  [ ! -e /data/secret.key ] || cp -p /data/secret.key "/data/secret.key.before-restore-$(date -u +%Y%m%d-%H%M%S)"
+  mv /data/secret.key.new /data/secret.key' < cobe-news-secret.key
+```
 
 ## Back up now {#jetzt-sichern}
 
@@ -65,13 +217,29 @@ message. Common reasons:
 
 | Message | Fix |
 |---|---|
-| The passphrase (BACKUP_PASSPHRASE) is too short | use at least 12 characters |
+| The passphrase is too short | use at least 12 characters |
 | pg_dump did not answer in time | check database and memory, try again |
 | pg_dump failed | read the technical message and `docker compose logs app` |
 
-Below is the list of backups on the server (file, created, size, key – "Encrypted, with key" or "Without key"), the
-newest 10, all with "Show all". Next to it are the commands to restore the newest backup, with the button "Copy the
-restore commands".
+| The passphrase file (BACKUP_PASSPHRASE_FILE) could not be read | the box above the list names the reason – [passphrase file](#passphrase-datei) |
+
+Below is the list of backups on the server (file, created, size, encryption), the newest 10, all with "Show all":
+
+| Shown | Meaning |
+|---|---|
+| Encrypted · key included | `.tar.enc`: to restore it – also on a new server – the file and the passphrase are enough |
+| Not encrypted · keep the key separately | `.tar`: complete, restores as it is on this server; on a new server it also needs a copy of the master key ([What you need](#was-man-braucht)) |
+
+Hover, keyboard focus or a tap shows the same explanation on the label. So an unencrypted backup is not worthless – it
+only lacks the key for the stored secrets.
+
+Next to the button the page says what "Back up now" will make: "Encrypted, with the master key" when the app has a
+passphrase, otherwise "Will be unencrypted – the app itself knows no passphrase". Encrypted backups beside it in the
+list come from a command with a passphrase (e.g. the cron job) – that is why both kinds can stand side by side.
+
+Below that: where the backups are and that download and restore work on the server only (with the link to
+[Step by step](#schritt-fuer-schritt)), the commands to restore the newest backup with the button "Copy the restore
+commands", and a note on the [restore test](#ruecksicherungs-test).
 
 By command on the server (same result, same retention):
 
@@ -88,7 +256,7 @@ Cobe News stores secrets (webhook URLs, SMTP and LDAP passwords, the Entra secre
 encrypted in the database. The **master key** for that is `SECRET_KEY` in the [.env](term:envfile) or, if that is
 empty, the file `data/secret.key`.
 
-| | without a passphrase (`.tar`) | with `BACKUP_PASSPHRASE` (`.tar.enc`) |
+| | without a passphrase (`.tar`) | with a passphrase (`.tar.enc`) |
 |---|---|---|
 | File encrypted | no | yes, the whole file |
 | Master key included | no – secrets stay encrypted with it | yes |
@@ -98,15 +266,60 @@ empty, the file `data/secret.key`.
 **Passphrase:** at least 12 characters, otherwise nothing is backed up. Encryption uses scrypt and AES-256-GCM in
 blocks – a changed, reordered or truncated file is noticed when decrypting.
 
-- If `BACKUP_PASSPHRASE` is in the `.env`, every backup is encrypted, also "Back up now". The page then says "Backups
-  are encrypted with BACKUP_PASSPHRASE …".
-- **Better:** do **not** put the passphrase into the `.env`, hand it only to the cron job (see [cron](#cron)). Then the
-  cron backups are encrypted, and "Back up now" makes a backup without the key.
+Where the passphrase comes from – it is never shown and never logged:
+
+- **Only the cron job** hands it over (see [cron](#cron)): the cron backups are encrypted, "Back up now" makes an
+  unencrypted one. That is how both kinds end up side by side.
+- **The app has it as a file** (`BACKUP_PASSPHRASE_FILE`, see [passphrase file](#passphrase-datei)): every backup is
+  encrypted, also "Back up now", without the passphrase being in the `.env` or in Portainer's variables. The page then
+  says "“Back up now” encrypts with the app's passphrase …".
+- **`BACKUP_PASSPHRASE` in the `.env`**: works like the file, but stands in plain text in the `.env` (with Portainer
+  visible to everyone who may edit the stack). The file is better.
 - Keep the passphrase away from the server, e.g. in a password manager. Without it a `.tar.enc` cannot be opened.
 
 **Keep the master key separately:** `SECRET_KEY` (or a copy of `data/secret.key`) does not belong with the backups but
 in another safe place. Without it the secrets of a `.tar` backup cannot be read – webhook URLs, passwords, the Entra
 secret and TOTP then have to be set up again.
+
+### The app's passphrase as a file {#passphrase-datei}
+
+So that "Back up now" and the app's restore test also make and open encrypted backups, the app reads the passphrase
+from a file. A folder of the host is mounted read-only at `/run/backup-secret` for that.
+
+**1. Create the file** – not under `data/` (that folder is copied with the backups), readable for the container's user
+(UID 10001):
+
+```bash
+sudo mkdir -p /etc/cobe-news-secret
+sudo bash -c 'umask 077; read -rsp "Passphrase: " P; echo; printf "%s\n" "$P" > /etc/cobe-news-secret/backup-pass'
+sudo chown -R 10001 /etc/cobe-news-secret
+sudo chmod 700 /etc/cobe-news-secret && sudo chmod 400 /etc/cobe-news-secret/backup-pass
+```
+
+**2. Two settings** – in the `.env` for the local install, under *Environment variables* with Portainer:
+
+```
+BACKUP_SECRET_DIR=/etc/cobe-news-secret
+BACKUP_PASSPHRASE_FILE=/run/backup-secret/backup-pass
+```
+
+**3. Apply** – `docker compose up -d` locally, *Update the stack* with Portainer. The page then shows "“Back up now”
+encrypts with the app's passphrase (BACKUP_PASSPHRASE_FILE: /run/backup-secret/backup-pass)".
+
+Rules:
+
+- If both `BACKUP_PASSPHRASE` and `BACKUP_PASSPHRASE_FILE` are set, `BACKUP_PASSPHRASE` counts – the file is not read
+  then (the page says so). A command with `--passphrase-file` comes before both; without a passphrase option it takes
+  the file.
+- The file is read at every backup; a changed one counts at once. Whitespace at the start and end (the newline) does not
+  count, at least 12 characters.
+- If the file is missing or cannot be read, "Back up now" makes **no** backup – not an unencrypted one either. The page
+  names the reason (missing, not readable, empty, too short …), the app keeps running.
+- The `restore` command (`docker compose run … app python -m app.cli restore …`) reads the file the same way – no
+  `read -rs BACKUP_PASSPHRASE` needed.
+- Without the two settings Compose mounts an empty volume of its own (`backup-secret`) – nothing changes.
+- The passphrase is then on the server, like the master key. It protects the copies that leave the server; keep it
+  separately all the same (password manager) – without it no `.tar.enc` can be opened.
 
 > [!NOTE]
 > During a backup or restore the dump and (when encrypting) the key lie unencrypted for a moment in
@@ -136,15 +349,18 @@ sudo chmod 600 /root/.cobe-news-backup-pass
 **3. Create the cron file** – `/etc/cron.d/cobe-news-backup` with one line:
 
 ```
-30 2 * * * root cd /opt/cobe-news && docker compose exec -T -e BACKUP_PASSPHRASE="$(cat /root/.cobe-news-backup-pass)" app python -m app.cli backup >>/var/log/cobe-news-backup.log 2>&1 && rsync -a --exclude='.*' --exclude='*.partial' data/backups/ backup-host.corp.example:/srv/cobe-news/
+30 2 * * * root cd /opt/cobe-news && docker compose exec -T app python -m app.cli backup --passphrase-file - < /root/.cobe-news-backup-pass >>/var/log/cobe-news-backup.log 2>&1 && rsync -a --exclude='.*' --exclude='*.partial' data/backups/ backup-host.corp.example:/srv/cobe-news/
 ```
 
 **4. Test** – run the command once by hand as root and check `/var/log/cobe-news-backup.log`. Afterwards the page shows
-"Backed up", and the file is in the list with "Encrypted, with key".
+"Backed up", and the file is in the list with "Encrypted · key included".
 
 Notes:
 
-- Without a passphrase: leave out `-e BACKUP_PASSPHRASE=…` – then be sure to keep the master key separately.
+- The passphrase goes through standard input (`--passphrase-file -`), never as `-e BACKUP_PASSPHRASE="$(cat …)"`:
+  that would put it on the command line of `docker`, which every process list of the host shows (`ps`).
+- If the app has a [passphrase file](#passphrase-datei), `… app python -m app.cli backup` without an option is enough.
+- Without a passphrase: leave out `--passphrase-file - < …` – then be sure to keep the master key separately.
 - `rsync` needs SSH access from root to the target system (`backup-host.corp.example` is an example). It only copies
   when the backup worked (`&&`). `--exclude` keeps half-written files from being copied.
 - Never write the passphrase into a log, the `.env`, tickets or chats.
@@ -175,6 +391,8 @@ read -rs BACKUP_PASSPHRASE && export BACKUP_PASSPHRASE
 docker compose run --rm --no-deps -e BACKUP_PASSPHRASE app python -m app.cli restore /data/backups/cobe-news-20261030-023000.tar.enc
 unset BACKUP_PASSPHRASE
 ```
+
+If the app has a [passphrase file](#passphrase-datei), the first command is enough for both – it reads the file itself.
 
 **3. Confirm** – the command shows what it restores (date, version, schema, rows) and whether the file is genuine
 (`Genuine: encrypted with the passphrase.` or `Genuine: signed with this installation's key.`). Type `RESTORE` to
@@ -290,7 +508,8 @@ now" first.
 > [!WARNING]
 > If the newest backup is encrypted with a passphrase the app does **not** know (recommended: `BACKUP_PASSPHRASE` only
 > in the cron job, see [cron](#cron)), the app's test fails with the code `passphrase`. Then let the host start the
-> test: [By host cron](#ruecksicherungs-test-host).
+> test: [By host cron](#ruecksicherungs-test-host) – or give the app the passphrase as a file:
+> [passphrase file](#passphrase-datei).
 
 `POSTGRES_RESTORE_PASSWORD` must be at least 16 characters long. If it is shorter, the database's set-up stops and the app
 does not start – `setup-env.sh` generates 40 characters.
@@ -361,7 +580,7 @@ If a test fails, the page names a code:
 | `unsafe` | the target is the app's database or role, or the test's role has too many rights (superuser, may create databases or roles, may connect to the app's database, is a member of the app's role, does not own the throwaway database) | `docker compose up -d` (the database sets the rights again at every start), read `docker compose logs db`; never grant rights by hand |
 | `busy` | another test is running (not recorded as an outcome) | wait |
 | `no_backup` | there is no backup | "Back up now" |
-| `passphrase` | the newest backup is encrypted, the app does not know the passphrase | [By host cron](#ruecksicherungs-test-host) |
+| `passphrase` | the newest backup is encrypted, the app does not know the passphrase (or its passphrase file cannot be read – the message says why) | [By host cron](#ruecksicherungs-test-host) or [passphrase file](#passphrase-datei) |
 | `verify` | the file failed a check: wrong passphrase, signature of another key or none, missing or foreign files, checksum, table of contents, schema of a newer version | read the message – a restore of this backup would fail too |
 | `connect` | the throwaway database cannot be reached (wrong password, role or database missing) | `docker compose up -d`, `docker compose logs db` |
 | `restore` | `pg_restore` or `psql` reported an error | read the message and `docker compose logs app` |
@@ -421,7 +640,9 @@ If the address (`BASE_URL`) changes with the move, the redirect URI for Entra ID
 
 ## Export {#export}
 
-The export holds the settings to read or carry over – **no backup** and **without secrets**.
+The export holds the settings to read or to carry over into other tools – JSON for scripts and tools, CSV for Excel.
+It is **no backup** and **cannot be read back**: Cobe News has no import, and the export holds neither stories nor
+secrets. Backups are made with a [backup](#schritt-fuer-schritt).
 
 In *Settings → Backup & export*, section "Export":
 
