@@ -3,14 +3,16 @@ Mattermost, ntfy, Gotify, a generic HTTP webhook) and **rules** (what: severitie
 several channels.
 
 - after every fetch round (the background loop): every channel that is not pausing gets the stories its switched-on
-  rules bring – only stories that arrived after the rule was created/switched on and the channel was added to it,
-  each story at most once per channel (also when two rules bring it),
+  rules bring – only stories that arrived after the rule was created/switched on and the channel was added to it (by
+  arrival number: a fetch under way at that moment still counts – arrived_after), each story at most once per channel
+  (also when two rules bring it); a further source counts for a rule only by a fresh carry (news_item_sources.fresh),
 - up to BATCH stories one message each; more in one summary (at most LIST stories listed, the rest counted),
 - the channels are sent to side by side, each with its own deadline: a slow or failing channel never holds back the
   others. A failure keeps the stories for the next try, with a growing pause (2 min … 6 h, longer when the service
   asks for it with 429 / retry_after) and the error on the channel,
 - a rule whose filter is widened (more severities, sources or kinds) sends what newly matches only from then on – not
-  everything older (NotifyRule.earlier),
+  everything older (NotifyRule.earlier); a story that changes after the widening in a dimension the widening concerns
+  (news.touched: rated higher, carried fresh by an added source, …) is judged by the new filter,
 - incremental: a round looks at the rules only when a story or Vendor News event arrived, a channel or rule changed, a
   channel's retry is due, or FULL_EVERY passed (a story rated higher since) – otherwise it costs two small queries,
 - at least once: each message is marked as sent right after it went out, in a short transaction of its own (a story or
@@ -46,15 +48,18 @@ from urllib.parse import urlencode, urlsplit
 import aiosmtplib
 import httpx
 from jinja2 import Environment, FileSystemLoader
-from sqlalchemy import ColumnElement, Uuid, and_, exists, false, func, literal, or_, select, text, true, update
+from sqlalchemy import Boolean, ColumnElement, Integer, Text, Uuid, and_, cast, column, exists, false, func, literal, or_, select, text, true, update
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import advisory_changes, audit, bounded, delivery_log
 from app import db as dbm
+from app import keywords as words_svc
 from app import netaddr
 from app import news as news_svc
 from app import quiet
+from app import systems as systems_svc
 from app import settings as settings_store
 from app import vendor_titles as titles
 from app.config import get_config, tls_verify
@@ -62,6 +67,7 @@ from app.plaintext import neutral
 from app.crypto import decrypt_str
 from app.models import (
     NewsItem,
+    NewsItemSource,
     NewsSource,
     NotifyChannel,
     NotifyDelivery,
@@ -161,6 +167,8 @@ LABELS = {
         "why_test": "Testnachricht für „{rule}“",
         "edit_test": "Kanäle & Regeln",
         "quote": "„{}“",
+        "also": "{source} (auch {own})",
+        "hit": "Treffer",
     },
     "en": {
         "sev": {"critical": "Critical", "high": "High", "medium": "Medium", "low": "Low", "info": "Info"},
@@ -188,6 +196,8 @@ LABELS = {
         "why_test": "Test message for “{rule}”",
         "edit_test": "Channels & rules",
         "quote": "“{}”",
+        "also": "{source} (also {own})",
+        "hit": "Match",
     },
 }
 # (text, background) for mails – mail clients know no oklch
@@ -304,11 +314,14 @@ class Story:
     # product. The mail marks such a story and lists it first (priority)
     ours: list[str] = field(default_factory=list)
     product_keys: list[str] = field(default_factory=list)
+    # "Treffer": what the rule that brought it matched by – its systems (catalogue names) and its own words (rule_hits)
+    hits: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # feed text: no direction or control characters in any channel (app/plaintext.py)
         self.title, self.summary, self.source, self.product = (neutral(x) for x in (self.title, self.summary, self.source, self.product))
         self.ours = [neutral(x) for x in self.ours or []]
+        self.hits = [neutral(x) for x in self.hits or []]
 
     @property
     def headline(self) -> str:
@@ -557,7 +570,8 @@ def _compact_name(s: Story) -> str:
 
 
 def _facts(s: Story, lang: str) -> dict:
-    """A story's facts line: the product (when known), its CVEs (CVES_SHOWN, then "+N"), its topics (news.TOPICS order)."""
+    """A story's facts line: the product (when known), its CVEs (CVES_SHOWN, then "+N"), its topics (news.TOPICS order)
+    – and what the rule matched it by ("Treffer: PAN-OS")."""
     topics = CARD_LABELS[lang]["topics"]
     cves = list(dict.fromkeys(s.cves or []))
     return {
@@ -565,12 +579,28 @@ def _facts(s: Story, lang: str) -> dict:
         "cves": cves[:CVES_SHOWN],
         "cves_more": f"+{len(cves) - CVES_SHOWN}" if len(cves) > CVES_SHOWN else "",
         "topics": [{"label": topics[t], "hot": t in HOT_TOPICS} for t in news_svc.TOPICS if t in (s.topics or [])],
+        "hits": hit_line(s, lang),
     }
 
 
 def _facts_text(f: dict) -> str:
     cves = " ".join(x for x in (", ".join(f["cves"]), f["cves_more"]) if x)
-    return " · ".join(x for x in (f["product"], cves, ", ".join(t["label"] for t in f["topics"])) if x)
+    return " · ".join(x for x in (f["product"], cves, ", ".join(t["label"] for t in f["topics"]), f.get("hits") or "") if x)
+
+
+HITS_SHOWN = 3  # names in a story's "Treffer"
+
+
+def hits_text(s: Story) -> str:
+    """The names a story matched by, one line: "PAN-OS, Palo Alto Networks" (HITS_SHOWN, then "+N")."""
+    h = [one_line(x)[:60] for x in s.hits or [] if x]
+    return ", ".join(h[:HITS_SHOWN]) + (f" +{len(h) - HITS_SHOWN}" if len(h) > HITS_SHOWN else "")
+
+
+def hit_line(s: Story, lang: str) -> str:
+    """ "Treffer: PAN-OS" / "Match: PAN-OS" – "" when the rule chose no systems or words."""
+    text_ = hits_text(s)
+    return f"{LABELS[lang]['hit']}: {text_}" if text_ else ""
 
 
 def _dark_css() -> str:
@@ -833,6 +863,7 @@ def card_fields(s: "Story", lang: str) -> list[tuple[str, str]]:
     cl = CARD_LABELS[lang]
     out = [(cl["tlp"], cl["tlp_green"])] if s.tlp == "GREEN" else []
     out += [(cl["product"], s.product)] if s.product else []
+    out += [(LABELS[lang]["hit"], hits_text(s))] if s.hits else []
     return [*out, (cl["source"], s.source), (cl["category"], category(s, lang))]
 
 
@@ -1090,6 +1121,8 @@ def render_webhook(channel: str, rules: list[str], stories: list[Story], total: 
                 "product": s.product,
                 # additive: "GREEN" for a CSAF provider's TLP:GREEN document (share internally only), else ""
                 "tlp": s.tlp or "",
+                # 0.1.53, additive: what the rule matched it by – its systems (catalogue names) and own words; [] else
+                "match": list(s.hits or []),
             }
             for s in stories
         ],
@@ -1579,13 +1612,39 @@ async def deliver(
 # ---------------------------------------------------------------- the rules → the channels
 
 
-def _story(i: NewsItem, s: NewsSource) -> Story:
+def _story(i: NewsItem, s: NewsSource, hits: list[str] | None = None) -> Story:
     b = news_svc.BUILTIN_BY_KEY.get(s.key) if s.builtin else None
     topics = [t for t in news_svc.TOPICS if t in (i.topics or [])]
     return Story(
         str(i.id), i.title, i.summary, i.url, i.severity, s.name, i.published_at, list(i.cves or []), topics=topics, source_kind=b.category if b else "custom",
-        product_keys=[str(k) for k in i.products or []],
+        product_keys=[str(k) for k in i.products or []], hits=list(hits or []),
     )
+
+
+async def source_labels(db: AsyncSession, rows: list[tuple[NewsItem, NewsSource, NotifyRule]]) -> dict[uuid.UUID, str]:
+    """The source a message names for a story a rule brought for one of ITS sources: the story was stored for another
+    (its own source, A) and is carried by the rule's (B, news_item_sources) – "B (auch A)", not A alone, which the rule
+    never asked for. Only for rules that name sources and stories whose own source is none of them; the first carrying
+    source of the rule's by name, switched on (news.visible). One query for all of them."""
+    want = [(i, s, r) for i, s, r in rows if r.sources and str(i.source_id) not in {str(x) for x in r.sources}]
+    if not want:
+        return {}
+    q = (
+        select(NewsItemSource.item_id, NewsSource.id, NewsSource.name)
+        .join(NewsSource, NewsSource.id == NewsItemSource.source_id)
+        .where(NewsItemSource.item_id.in_([i.id for i, _, _ in want]), NewsSource.enabled.is_(True))
+        .order_by(NewsSource.name, NewsSource.id)
+    )
+    by: dict[uuid.UUID, list[tuple[str, str]]] = {}
+    for iid, sid, name in (await db.execute(q)).all():
+        by.setdefault(iid, []).append((str(sid), name))
+    out = {}
+    for i, s, r in want:
+        mine = {str(x) for x in r.sources}
+        hit = next((name for sid, name in by.get(i.id, []) if sid in mine), None)
+        if hit:
+            out[i.id] = neutral(LABELS.get(r.lang, LABELS["de"])["also"].format(source=hit, own=s.name))
+    return out
 
 
 async def rule_scopes(db: AsyncSession, rule_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[str]]:
@@ -1680,8 +1739,11 @@ def card_product(data: dict | None, matched: list[dict]) -> str:
 # time since the rule (and the link) and what the channel got already; the dry run (dry_run) adds only the time window.
 
 
-def news_filter(rule: NotifyRule) -> list:
-    """The stories a rule lets through (NewsSource joined as the story's own source – news.visible)."""
+def news_filter(rule: NotifyRule, *, quiet_too: bool = False) -> list:
+    """The stories a rule lets through (NewsSource joined as the story's own source – news.visible). `quiet_too` (the
+    dry run – what the rule covers): a topic or system a story has only quietly counts as well – right after the
+    upgrade every story's systems are quiet (the first backfill), and a "Palo Alto + Kritisch" preview over 30 days
+    showed nothing. The live round never: an older story is no news because of a recompute."""
     where = [
         # no backlog: a source switched on later (or the news switched on for the first time) brings up to 200 older
         # stories at once – only what was fresh when it arrived is sent (news._backlog: decided once, when stored – the
@@ -1695,16 +1757,58 @@ def news_filter(rule: NotifyRule) -> list:
     # (pending: not sent to the channel yet); one gained quietly (a full recompute: an exploit list switched on or its
     # first import, a new rule version – news.loud_topic) never: an older story is no news because of that
     if topics := rule_topics(rule):
-        where.append(news_svc.loud_topic(topics))
-    # carried by a switched-on source (of the rule's, when it names some) – also as a further source ("also in")
+        where.append(news_svc.has_topic(topics) if quiet_too else news_svc.loud_topic(topics))
+    # carried by a switched-on source (of the rule's, when it names some) – also as a further source ("also in"), when
+    # that carry was fresh: a source switched on after weeks lists older stories others stored meanwhile – shown under
+    # its name, not sent (news_item_sources.fresh, decided as `backlog`)
     ids = news_svc._ids(rule.sources)
-    where.append(news_svc.visible(ids) if ids or not rule.sources else false())  # only unreadable ids: nothing, not "all"
+    where.append(news_svc.visible(ids, fresh=True) if ids or not rule.sources else false())  # only unreadable ids: nothing, not "all"
+    # "Betrifft": one of the rule's systems (exact or named – not only quietly: a catalogue change sends no older story)
+    # or one of its words; a story that becomes a match only later (its details arrive) is sent then, once
+    if (b := _concerns(rule_systems(rule) or None, rule_keywords(rule) or None, quiet_too=quiet_too)) is not None:
+        where.append(b)
+    # "Nicht senden, wenn enthalten": before everything else – such a story never comes by this rule
+    if (x := words_svc.none_of(rule_exclude(rule))) is not None:
+        where.append(x)
     return where
+
+
+def _concerns(systems: list[dict] | None, words: list[str] | None, *, quiet_too: bool = False) -> ColumnElement | None:
+    """SQL "Betrifft" of news: one of the systems (systems.loud – entries the catalogue no longer knows stand for no
+    story; `quiet_too`: also one it has only quietly – the dry run) or one of the words – None: neither chosen (no
+    restriction)."""
+    if systems is None and words is None:
+        return None
+    want = systems_svc.wanted(systems or [])
+    parts = [systems_svc.has(want) if quiet_too else systems_svc.loud(want)]
+    if (w := words_svc.clause(words or [])) is not None:
+        parts.append(w)
+    return or_(*parts)
 
 
 def rule_topics(rule: NotifyRule) -> list[str]:
     """The rule's topics as news.TOPICS knows them (in their order) – empty: every story, whatever its topics."""
     return [t for t in news_svc.TOPICS if t in (getattr(rule, "topics", None) or [])]
+
+
+def rule_systems(rule: NotifyRule) -> list[dict]:
+    """The rule's systems as stored ([{"vendor"} | {"product"}]) – empty: every system."""
+    return systems_svc.entries(getattr(rule, "systems", None))
+
+
+def rule_keywords(rule: NotifyRule) -> list[str]:
+    return [str(x) for x in getattr(rule, "keywords", None) or [] if str(x).strip()]
+
+
+def rule_exclude(rule: NotifyRule) -> list[str]:
+    return [str(x) for x in getattr(rule, "exclude", None) or [] if str(x).strip()]
+
+
+def rule_hits(i: NewsItem, rule: NotifyRule, want: list[str] | None = None) -> list[str]:
+    """What a story matched `rule` by: the names of its systems (systems.hits – `want`: systems.wanted of the rule's,
+    when known already) and the rule's words in its title or teaser – [] when the rule chose neither."""
+    out = systems_svc.hits(list(i.systems or []), list(i.quiet_systems or []), want if want is not None else systems_svc.wanted(rule_systems(rule)), f"{i.title} {i.summary or ''}") if rule_systems(rule) else []
+    return out + [w for w in words_svc.hits(i.search or "", rule_keywords(rule)) if w not in out]
 
 
 def _teams_clause(teams) -> ColumnElement:  # noqa: ANN001
@@ -1724,7 +1828,16 @@ def vendor_filter(rule: NotifyRule, teams) -> list | None:  # noqa: ANN001
     if rule.severities:
         where.append(or_(VendorEvent.kind.not_in(SEVERITY_KINDS), VendorEvent.severity.in_(list(rule.severities))))
     where.append(_teams_clause(teams))
+    # the rule's systems: the event's product (a vendor: each of its catalogue products); its words and exclusions are
+    # for news only
+    if chosen := rule_systems(rule):
+        where.append(_of_systems(systems_svc.product_keys(chosen)))
     return where
+
+
+def _of_systems(keys: list[str]) -> ColumnElement:
+    """SQL: the Vendor News event's product is one of these – none (the catalogue knows none of them): no event."""
+    return VendorEvent.product.in_(keys) if keys else false()
 
 
 def health_filter(rule: NotifyRule) -> list | None:
@@ -1734,9 +1847,28 @@ def health_filter(rule: NotifyRule) -> list | None:
     return [SourceHealthEvent.notify.is_(True)]
 
 
-async def pending(db: AsyncSession, rule: NotifyRule, channel_id: uuid.UUID, since: datetime) -> list[tuple[NewsItem, NewsSource]]:
-    """The stories `rule` brings to a channel: arrived after `since`, matching, not sent to that channel yet."""
-    where = [NewsItem.fetched_at > since, *news_filter(rule), *_earlier_news(rule)]
+def arrived_after(*bounds: tuple[datetime, int | None]) -> list:
+    """SQL: the story arrived after each of these bounds – (the time, the arrival number then): the rule switched on, the
+    channel added. By the number where it is known (news.last_seq when it happened): a fetch under way at that moment
+    set its stories' fetched_at when it began, they become visible when it commits – after the bound, but with an
+    earlier time, so a time cursor never sent them. The time for a bound from before the numbers were kept (and a story
+    without one)."""
+    out = []
+    for at, seq in bounds:
+        if seq is None:
+            out.append(NewsItem.fetched_at > at)
+        else:
+            out.append(or_(NewsItem.seq > int(seq), and_(NewsItem.seq.is_(None), NewsItem.fetched_at > at)))
+    return out
+
+
+async def pending(
+    db: AsyncSession, rule: NotifyRule, channel_id: uuid.UUID, since: datetime, added: tuple[datetime, int | None] | None = None
+) -> list[tuple[NewsItem, NewsSource]]:
+    """The stories `rule` brings to a channel: arrived after the rule was switched on and the channel added to it
+    (arrived_after – `since` alone: after that time), matching, not sent to that channel yet."""
+    bounds = [(rule.active_since, rule.active_seq), added] if added is not None else [(since, None)]
+    where = [*arrived_after(*bounds), *news_filter(rule), *_earlier_news(rule)]
     sent = exists().where(and_(NotifyDelivery.channel_id == channel_id, NotifyDelivery.item_id == NewsItem.id))
     stmt = select(NewsItem, NewsSource).join(NewsSource, NewsSource.id == NewsItem.source_id).where(*where, ~sent).order_by(NewsItem.published_at.desc()).limit(PENDING_MAX)
     return [(i, s) for i, s in (await db.execute(stmt)).all()]
@@ -1750,30 +1882,63 @@ EARLIER_MAX = 10  # filters kept per rule; more: the two oldest become one (stri
 
 def rule_filter(rule: NotifyRule, teams: list | None = None) -> dict:
     """What a rule lets through, normalised: severities / sources / topics / teams None = all (a rule's empty list).
-    `teams`: the rule's team filter (notify_rule_teams – not on the rule row)."""
+    `teams`: the rule's team filter (notify_rule_teams – not on the rule row). "Betrifft": systems (as texts:
+    systems.text_of) and words (folded) – both None: every story; exclude: the words that keep a story away (None:
+    none)."""
     return {
         "severities": sorted(rule.severities or []) or None,
         "sources": sorted(str(x) for x in rule.sources or []) or None,
         "topics": sorted(rule_topics(rule)) or None,
         "kinds": sorted(rule_kinds(rule)),
         "teams": sorted(str(x) for x in teams or []) or None,
+        "systems": sorted({systems_svc.text_of(e) for e in rule_systems(rule)}) or None,
+        "keywords": words_svc.folded(rule_keywords(rule)) or None,
+        "exclude": words_svc.folded(rule_exclude(rule)) or None,
     }
 
 
+def _concern(x: dict) -> tuple[set[str], set[str]] | None:
+    """A filter's "Betrifft" of news (systems, words) – None: no restriction (neither chosen; a filter of before 0.1.53).
+    Two earlier filters merged keep it of their own ("concern", _both_concern): their `systems` are the Vendor News
+    events' then (None: every product), which a news "Betrifft" of words only (no systems) must not narrow."""
+    if "concern" in x:
+        c = x["concern"]
+        return None if c is None else (set(c[0] or []), set(c[1] or []))
+    s, k = x.get("systems"), x.get("keywords")
+    return None if s is None and k is None else (set(s or []), set(k or []))
+
+
 def widens(old: dict, new: dict) -> bool:
-    """`new` lets through something `old` did not: another severity, source, topic, kind or team (or "all" instead of a
-    choice). A filter of before topics existed has none (`topics` missing: all)."""
+    """`new` lets through something `old` did not: another severity, source, topic, kind, team, system or word (or "all"
+    instead of a choice), or an exclusion less. A filter of before topics (0.1.47) or systems (0.1.53) existed has
+    none (missing: all)."""
 
     def more(a: list | None, b: list | None) -> bool:
         return a is not None and (b is None or bool(set(b) - set(a)))
 
+    was, now = _concern(old), _concern(new)
     return (
         more(old["severities"], new["severities"])
         or more(old["sources"], new["sources"])
         or more(old.get("topics"), new.get("topics"))
         or bool(set(new["kinds"]) - set(old["kinds"]))
         or more(old.get("teams"), new.get("teams"))
+        # "Betrifft" is systems OR words: another system or word, or no restriction any more
+        or (was is not None and (now is None or bool(now[0] - was[0]) or bool(now[1] - was[1])))
+        or bool(set(old.get("exclude") or []) - set(new.get("exclude") or []))
     )
+
+
+def _both_concern(a: dict, b: dict) -> list | None:
+    """The news "Betrifft" both filters let through, at most (stricter, never wider): [systems, words] of both – None:
+    neither restricts."""
+    x, y = _concern(a), _concern(b)
+    if x is None and y is None:
+        return None
+    if x is None or y is None:
+        s, k = x or y
+        return [sorted(s), sorted(k)]
+    return [sorted(x[0] & y[0]), sorted(x[1] & y[1])]
 
 
 def _both(a: list | None, b: list | None) -> list | None:
@@ -1792,33 +1957,110 @@ def widened(rule: NotifyRule, before: dict, seq: int, at: datetime) -> None:
     keep.append({**before, "seq": int(seq), "at": at.isoformat()})
     while len(keep) > EARLIER_MAX:
         a, b = keep[0], keep[1]
+        concern = _both_concern(a, b)
         merged = {
             "severities": _both(a["severities"], b["severities"]),
             "sources": _both(a["sources"], b["sources"]),
             "topics": _both(a.get("topics"), b.get("topics")),
             "kinds": sorted(set(a["kinds"]) & set(b["kinds"])),
             "teams": _both(a.get("teams"), b.get("teams")),
+            # news: systems OR words of both (concern); Vendor News: the products of both (None – every product – only
+            # when neither was limited: a filter of words alone never limited the events)
+            "concern": concern,
+            "systems": _both(a.get("systems"), b.get("systems")),
+            "keywords": concern[1] if concern is not None else None,
+            # what either kept away stays away
+            "exclude": sorted(set(a.get("exclude") or []) | set(b.get("exclude") or [])) or None,
         }
         keep[:2] = [{**merged, "seq": max(a["seq"], b["seq"]), "at": max(_at(a), _at(b)).isoformat()}]
     rule.earlier = keep
 
 
+_TS = TIMESTAMP(timezone=True)
+
+
+def _then(dim: str, at: datetime, now: ColumnElement) -> ColumnElement:
+    """SQL: a story's value of a dimension kept as a list of changes (news_items.changes "sev": the rating, "text": the
+    search text – news.noted) as it was at `at`: the value before the first change after it, else today's."""
+    c = func.jsonb_array_elements(NewsItem.changes.op("->", return_type=JSONB)(literal(dim, Text))).table_valued(column("value", JSONB)).alias()
+    when = cast(c.c.value.op("->>", return_type=Text)(literal(0, Integer)), _TS)
+    first = select(c.c.value.op("->>", return_type=Text)(literal(1, Integer))).select_from(c).where(when > at).order_by(when).limit(1).scalar_subquery()
+    return func.coalesce(first, now)
+
+
+def _had(entries: ColumnElement, quiet_: ColumnElement, dim: str, want: list[str], at: datetime) -> ColumnElement:
+    """SQL: the story had one of `want` (topics, system entries) loudly at `at` – gained before it (news_items.changes
+    `dim`: when, per entry) or with the story itself (no time)."""
+    e = func.jsonb_array_elements_text(entries).table_valued(column("value", Text)).alias()
+    when = NewsItem.changes.op("->", return_type=JSONB)(literal(dim, Text)).op("->>", return_type=Text)(e.c.value)
+    return select(1).select_from(e).where(e.c.value.in_(sorted(set(want))), ~quiet_.op("?", return_type=Boolean)(e.c.value), or_(when.is_(None), cast(when, _TS) <= at)).exists()
+
+
+def _selected_then(ids: list[uuid.UUID], at: datetime) -> ColumnElement:
+    """SQL: one of these sources carried the story at `at` – its own source, or a fresh carry noted before then (a carry
+    of before 0.1.53 has no time: before)."""
+    carry = select(NewsItemSource.item_id).where(
+        NewsItemSource.source_id.in_(ids), NewsItemSource.fresh.is_(True), or_(NewsItemSource.carried_at.is_(None), NewsItemSource.carried_at <= at)
+    )
+    return or_(NewsItem.source_id.in_(ids), NewsItem.id.in_(carry))
+
+
 def _earlier_news(rule: NotifyRule) -> list:
-    """Per widening: a story up to its number counts only when it matched the filter before as well."""
+    """Per widening: a story up to its number counts only when, in each dimension the filter before restricted
+    (severities, sources, topics, "Betrifft", exclusions), it matched that filter as well – or that very dimension
+    changed after the widening so that only then did the story match the filter the widening brought (news.noted):
+    rated higher into a severity the widening added, carried fresh by a source it added, a topic or system gained
+    loudly, a title or teaser that names a word now. Then the rule judges the change, as it would any change from then
+    on. A change of another dimension (a fresh carry, its details, when the widening added a severity) sends nothing:
+    the story matched the wider filter at the widening already, and the widening's point is to not send those. The
+    filter a widening brought is the one before the next widening (the rule as it is now for the last); a dimension it
+    did not restrict ("all"): the filter before decides alone."""
+    earlier = list(rule.earlier or [])
+    if not earlier:
+        return []
+    afters = [*earlier[1:], rule_filter(rule)]
     out = []
-    for x in rule.earlier or []:
-        match = [] if "news" in x["kinds"] else [false()]
-        if x["severities"] is not None:
-            match.append(NewsItem.severity.in_(list(x["severities"])))
-        if x["sources"] is not None:
-            ids = news_svc._ids(x["sources"])
-            match.append(news_svc.carried(ids) if ids else false())
-        if x.get("topics") is not None:
-            want = [t for t in x["topics"] if t in news_svc.TOPICS]
-            match.append(news_svc.loud_topic(want) if want else false())
-        if match:
-            out.append(or_(NewsItem.seq > int(x["seq"]), and_(*match)))
+    for x, after in zip(earlier, afters, strict=True):
+        if "news" not in x["kinds"]:
+            out.append(NewsItem.seq > int(x["seq"]))
+            continue
+        if dims := _changed_into(x, after):
+            out.append(or_(NewsItem.seq > int(x["seq"]), and_(*dims)))
     return out
+
+
+def _changed_into(x: dict, after: dict) -> list:
+    """SQL per dimension `x` (a filter before a widening, at x["at"]) restricted: the story matches `x` there, or did not
+    match `after` (the filter the widening brought) there at the widening – it changed into it since."""
+    at = _at(x)
+    dims = []
+    if x["severities"] is not None:
+        was = NewsItem.severity.in_(list(x["severities"]))
+        dims.append(or_(was, _then("sev", at, NewsItem.severity).not_in(list(after["severities"]))) if after["severities"] else was)
+    if x["sources"] is not None:
+        ids = news_svc._ids(x["sources"])
+        was = news_svc.carried(ids, fresh=True) if ids else false()
+        now_ids = news_svc._ids(after["sources"]) if after["sources"] else []
+        dims.append(or_(was, ~_selected_then(now_ids, at)) if now_ids else was)
+    if x.get("topics") is not None:
+        want = [t for t in x["topics"] if t in news_svc.TOPICS]
+        was = news_svc.loud_topic(want) if want else false()
+        now_topics = [t for t in after.get("topics") or [] if t in news_svc.TOPICS]
+        dims.append(or_(was, ~_had(NewsItem.topics, NewsItem.quiet_topics, "topics", now_topics, at)) if now_topics else was)
+    if (c := _concern(x)) is not None:
+        was = _concerns(systems_svc.of_text(sorted(c[0])), sorted(c[1]))
+        then = []
+        if (n := _concern(after)) is not None:
+            if n[0]:
+                then.append(_had(NewsItem.systems, NewsItem.quiet_systems, "systems", systems_svc.wanted(systems_svc.of_text(sorted(n[0]))) or [""], at))
+            if rx := words_svc.pattern(sorted(n[1])):
+                then.append(_then("text", at, NewsItem.search).op("~", return_type=Boolean)(rx))
+        dims.append(or_(was, ~or_(*then)) if then else was)
+    if (ex := words_svc.none_of(x.get("exclude") or [])) is not None:
+        # what the filter after keeps away was in the text then (it changed since): judged by the text of now
+        rx = words_svc.pattern(after.get("exclude") or [])
+        dims.append(or_(ex, _then("text", at, NewsItem.search).op("~", return_type=Boolean)(rx)) if rx else ex)
+    return dims
 
 
 def _vendor_kinds(kinds: list[str]) -> list[str]:
@@ -1848,6 +2090,8 @@ def _earlier_vendor(rule: NotifyRule) -> list:
             match.append(or_(VendorEvent.kind.not_in(SEVERITY_KINDS), VendorEvent.severity.in_(list(x["severities"]))))
         if x.get("teams") is not None:
             match.append(_of_teams([uuid.UUID(t) for t in x["teams"]]))
+        if x.get("systems") is not None:  # only words chosen (systems None): Vendor News events are not limited by them
+            match.append(_of_systems(systems_svc.product_keys(systems_svc.of_text(x["systems"]))))
         out.append(or_(VendorEvent.created_at > _at(x), and_(*match)))
     return out
 
@@ -1959,6 +2203,7 @@ VENDOR_LABELS = {
         "fix": "Fix",
         "exploited": "aktiv ausgenutzt",
         "now_exploited": "Jetzt aktiv ausgenutzt",
+        "rated_higher": "Jetzt höher eingestuft: {to} (vorher {was})",
         "version": "{product} {version}: neue Version {latest} verfügbar",
         "version_text": "Release-Linie {line} – aktuellste Version {latest}.",
         "eol_soon": "{product} {version}: Ende des Supports am {date}",
@@ -1991,6 +2236,7 @@ VENDOR_LABELS = {
         "fix": "Fix",
         "exploited": "actively exploited",
         "now_exploited": "Now actively exploited",
+        "rated_higher": "Now rated higher: {to} (was {was})",
         "version": "{product} {version}: new version {latest} available",
         "version_text": "Release line {line} – latest version {latest}.",
         "eol_soon": "{product} {version}: end of support on {date}",
@@ -2051,6 +2297,11 @@ def vendor_story(ev: VendorEvent, lang: str) -> Story:
         title = f"{where}: {d.get('ident') or ''} – {head}".strip(" –")
         if d.get("now_exploited"):
             title = f"{lb['now_exploited']}: {title}"
+        elif isinstance(rated := d.get("rated_higher"), dict):
+            # "now rated higher" (vendor._evaluate_product): first NVD's "awaiting analysis", now 9.8
+            sev = LABELS.get(lang, LABELS["de"])["sev"]
+            to, was = str(rated.get("to") or ev.severity), str(rated.get("from") or "")
+            title = f"{lb['rated_higher'].format(to=sev.get(to, to), was=sev.get(was, was))}: {title}"
         tlp = "GREEN" if d.get("tlp") == "GREEN" else ""
         if tlp:
             title = TLP_PREFIX + title  # also in a subject, a compact list and a desktop notification
@@ -2161,7 +2412,7 @@ async def channel_pending(db: AsyncSession, ch: NotifyChannel, lang_of=None) -> 
     """Everything the switched-on rules of a channel bring, once – with the first rule (by name) that brought it."""
     links = (
         await db.execute(
-            select(NotifyRule, NotifyRuleChannel.added_at)
+            select(NotifyRule, NotifyRuleChannel.added_at, NotifyRuleChannel.added_seq)
             .join(NotifyRuleChannel, NotifyRuleChannel.rule_id == NotifyRule.id)
             .where(NotifyRuleChannel.channel_id == ch.id, NotifyRule.enabled.is_(True))
             .order_by(NotifyRule.name, NotifyRule.id)
@@ -2169,11 +2420,16 @@ async def channel_pending(db: AsyncSession, ch: NotifyChannel, lang_of=None) -> 
     ).all()
     out: dict[tuple[str, uuid.UUID], Row] = {}
     brought: dict[uuid.UUID, list[uuid.UUID]] = {}  # per news story: every rule that brought it ("eure Produkte")
-    for rule, added in links:
+    carried: list[tuple[NewsItem, NewsSource, NotifyRule]] = []  # stories a rule brought for a further source of its
+    for rule, added, added_seq in links:
         since = max(rule.active_since, added)
         if "news" in rule_kinds(rule):
-            for i, s in await pending(db, rule, ch.id, since):
-                out.setdefault(("news", i.id), Row(_story(i, s), rule, ("news", i.id)))
+            want = systems_svc.wanted(rule_systems(rule))
+            for i, s in await pending(db, rule, ch.id, since, (added, added_seq)):
+                if ("news", i.id) not in out:
+                    # what it matched by and its source: of the rule that brings it (the first by name)
+                    out[("news", i.id)] = Row(_story(i, s, hits=rule_hits(i, rule, want)), rule, ("news", i.id))
+                    carried.append((i, s, rule))
                 brought.setdefault(i.id, []).append(rule.id)
         for ev in await vendor_pending(db, rule, ch.id, since):
             out.setdefault(("vendor", ev.id), Row(vendor_story(ev, rule.lang), rule, ("vendor", ev.id)))
@@ -2184,6 +2440,8 @@ async def channel_pending(db: AsyncSession, ch: NotifyChannel, lang_of=None) -> 
     scopes = await rule_scopes(db, sorted({r for rs in brought.values() for r in rs}))
     scope = {str(i): scope_of(rs, scopes) for i, rs in brought.items()} if scopes else None
     await with_products(db, [r.story for r in out.values()], scope)
+    for iid, label in (await source_labels(db, carried)).items():
+        out[("news", iid)].story.source = label
     return list(out.values())
 
 
@@ -2598,7 +2856,9 @@ def _bucket(d: datetime) -> datetime:
 async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], days: int, now: datetime | None = None) -> dict:
     """What `rule` (a rule as it is being edited – not stored) would have brought in the last `days` days: the stored
     stories, Vendor News events and source health changes it matches – by the same filters as the live round
-    (news_filter, vendor_filter, health_filter), as if a channel had been linked to it all along. Nothing is sent and
+    (news_filter, vendor_filter, health_filter), as if a channel had been linked to it all along; a topic or system a
+    story has only quietly counts too (what the rule covers – the first backfill after the upgrade makes every story's
+    systems quiet, the live round sends on loud ones only). Nothing is sent and
     nothing written: one read-only transaction (statement timeout DRY_TIMEOUT_MS), rolled back.
 
     The messages a day are estimated as the round sends them: what arrives within the same minute comes in one round –
@@ -2608,6 +2868,8 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
     lang = rule.lang if rule.lang in LABELS else "de"
     restricted = {"severity": bool(rule.severities), "source": bool(rule.sources), "topic": bool(rule_topics(rule)), "teams": bool(teams)}
     wanted = set(rule_topics(rule))
+    want_systems = systems_svc.wanted(rule_systems(rule))
+    concern = bool(rule_systems(rule) or rule_keywords(rule))
     items: list[dict] = []
     buckets: dict[datetime, int] = {}
     total = 0
@@ -2617,17 +2879,29 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
         await db.execute(text(f"SET LOCAL statement_timeout = {int(DRY_TIMEOUT_MS)}"))
         minute = func.date_trunc("minute", NewsItem.fetched_at)
         if "news" in rule_kinds(rule):
-            where = [NewsItem.fetched_at > since, NewsItem.fetched_at <= now, *news_filter(rule)]
+            where = [NewsItem.fetched_at > since, NewsItem.fetched_at <= now, *news_filter(rule, quiet_too=True)]
             counted = select(minute, func.count()).select_from(NewsItem).join(NewsSource, NewsSource.id == NewsItem.source_id)  # visible() expects the own source joined
             for b, n in (await db.execute(counted.where(*where).group_by(minute))).all():
                 buckets[_bucket(b)] = buckets.get(_bucket(b), 0) + int(n)
                 total += int(n)
             stmt = select(NewsItem, NewsSource).join(NewsSource, NewsSource.id == NewsItem.source_id).where(*where).order_by(NewsItem.fetched_at.desc()).limit(DRY_LIMIT)
-            for i, src in (await db.execute(stmt)).all():
-                # the topics it matched by (the rule's that the story has) – shown as "Thema: …"
+            found = (await db.execute(stmt)).all()
+            labels = await source_labels(db, [(i, src, rule) for i, src in found])  # "B (auch A)" as the message says it
+            for i, src in found:
+                # the topics it matched by (the rule's that the story has) – shown as "Thema: …"; its systems and words
                 hit = [t for t in news_svc.TOPICS if t in wanted and t in (i.topics or [])]
                 items.append(
-                    {"kind": "news", "id": str(i.id), "title": i.title, "severity": i.severity, "at": i.fetched_at.isoformat(), "source": src.name, "topics": hit, "match": {"kind": "news", **restricted, "teams": False}}
+                    {
+                        "kind": "news",
+                        "id": str(i.id),
+                        "title": i.title,
+                        "severity": i.severity,
+                        "at": i.fetched_at.isoformat(),
+                        "source": labels.get(i.id, src.name),
+                        "topics": hit,
+                        "hits": rule_hits(i, rule, want_systems),
+                        "match": {"kind": "news", **restricted, "teams": False, "concern": concern},
+                    }
                 )
         match = vendor_filter(rule, list(teams))
         if match is not None:
@@ -2648,7 +2922,8 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
                         "severity": ev.severity,
                         "at": ev.created_at.isoformat(),
                         "source": st.source,
-                        "match": {"kind": kind, "severity": severity_counts, "source": False, "topic": False, "teams": restricted["teams"]},
+                        "hits": [label_now(ev.product)] if rule_systems(rule) else [],
+                        "match": {"kind": kind, "severity": severity_counts, "source": False, "topic": False, "teams": restricted["teams"], "concern": bool(rule_systems(rule))},
                     }
                 )
         match = health_filter(rule)
@@ -2660,7 +2935,18 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
                 total += int(n)
             for hv in await db.scalars(select(SourceHealthEvent).where(*where).order_by(SourceHealthEvent.created_at.desc()).limit(DRY_LIMIT)):
                 st = health_story(hv, lang)
-                items.append({"kind": "source_health", "id": str(hv.id), "title": st.title, "severity": st.severity, "at": hv.created_at.isoformat(), "source": st.source, "match": {"kind": "source_health", "severity": False, "source": False, "topic": False, "teams": False}})
+                items.append(
+                    {
+                        "kind": "source_health",
+                        "id": str(hv.id),
+                        "title": st.title,
+                        "severity": st.severity,
+                        "at": hv.created_at.isoformat(),
+                        "source": st.source,
+                        "hits": [],
+                        "match": {"kind": "source_health", "severity": False, "source": False, "topic": False, "teams": False, "concern": False},
+                    }
+                )
     finally:
         await db.rollback()
     per_day: dict[str, dict] = {}

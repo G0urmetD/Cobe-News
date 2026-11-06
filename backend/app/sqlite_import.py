@@ -93,6 +93,16 @@ COLUMNS_NOT_IN_SQLITE = frozenset(
         ("users", "temp_password_at"),  # the import's time for a temporary password brought along (run), else NULL
         ("news_sources", "parsed_at"),  # 0.1.50: NULL – undated stories stay until their feed was read once (news.prune)
         ("users", "pending_role"),  # 0.1.52: NULL – no raise to admin waits
+        ("news_items", "changes"),  # 0.1.53: '{}' – nothing changed since the story arrived
+        ("news_item_sources", "carried_at"),  # 0.1.53: NULL – an imported carry is long decided
+        ("news_item_sources", "fresh"),  # 0.1.53: false – an imported carry is long decided, it sends nothing more
+        ("notify_rules", "active_seq"),  # 0.1.53: NULL – the rule's time decides, as before
+        ("notify_rule_channels", "added_seq"),  # 0.1.53: NULL – the link's time decides, as before
+        ("news_items", "systems"),  # 0.1.53: '[]' – the background job computes them after the import (systems.systems_round)
+        ("news_items", "quiet_systems"),  # 0.1.53: '[]' – what that job finds is quiet
+        ("notify_rules", "systems"),  # 0.1.53: '[]' – a rule without systems, keywords and exclusions, as before
+        ("notify_rules", "keywords"),
+        ("notify_rules", "exclude"),
     }
 )
 

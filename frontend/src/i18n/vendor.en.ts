@@ -399,7 +399,7 @@ const vendorEn: Record<string, string> = {
   "notify.kind.vendor_versionHint":
     "Vendor News: newer version in the line, end of support in less than 6 months, a warning 90 and 30 days before the end of support of each version entered, end of support reached.",
   "notify.kindsMissing": "Pick at least one kind.",
-  "notify.severitiesHintVendor": "Applies to stories and vulnerabilities; “new version / EOL” comes regardless.",
+  "notify.severitiesHintVendor": "Applies to stories, vulnerabilities and revised advisories (their new severity); “new version / EOL” comes regardless.",
   "notify.vendorOnce":
     "Vendor News reports each vulnerability once per product and version. What is already known when a new version is first checked is on the page, but not sent.",
 

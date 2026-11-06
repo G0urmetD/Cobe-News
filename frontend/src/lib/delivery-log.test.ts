@@ -92,7 +92,18 @@ describe("the log's query", () => {
 describe("the dry run", () => {
   const form = { severities: ["critical" as const], sources: ["s1"], lang: "de" as const, kinds: ["vendor_vuln" as const], teams: ["t1"] }
   it("sends only what decides the matches – sources only with news", () => {
-    expect(dryRunBody(form, 7)).toEqual({ severities: ["critical"], sources: [], topics: [], lang: "de", kinds: ["vendor_vuln"], teams: ["t1"], days: 7 })
+    expect(dryRunBody(form, 7)).toEqual({
+      severities: ["critical"],
+      sources: [],
+      topics: [],
+      lang: "de",
+      kinds: ["vendor_vuln"],
+      teams: ["t1"],
+      systems: [],
+      keywords: [],
+      exclude: [],
+      days: 7,
+    })
     expect(dryRunBody({ ...form, kinds: ["news"] }, 1).sources).toEqual(["s1"])
   })
   it("sends the topics only with news", () => {

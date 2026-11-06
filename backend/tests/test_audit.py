@@ -400,6 +400,7 @@ REVIEWED_NOT_SECRET = {
     "auth_source": "local | ldap | entra",
     "key": "a news source's or catalogue product's key",
     "keys": "the subscription's keys object is never logged (push_api is no admin action)",
+    "keywords": "a notification rule's own words (Schlagwörter) – plain text an admin chose to match stories by",
     "url": "logged as its origin only (audit._url_origin) – a webhook's or feed's path and query never",
     "site": "a news source's home page (origin only, as url)",
     "ca_cert": "a CA certificate is public (PEM, cut to TEXT_MAX)",

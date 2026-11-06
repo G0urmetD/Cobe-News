@@ -157,6 +157,7 @@ class FetchLoop:
                 await _step("tls", self._tls)
             await _step("news", self._news)
             await _step("topics", self._topics)
+            await _step("systems", self._systems)
             if time.monotonic() - self.last_health > source_health.EVALUATE_EVERY_S:
                 self.last_health = time.monotonic()
                 await _step("source health", self._health)
@@ -196,6 +197,14 @@ class FetchLoop:
         change, the KEV's first fetch); nothing to do: one read of a counter."""
         async with db.session() as s:
             await news_svc.backfill_topics(s)
+
+    async def _systems(self) -> None:
+        """The stories' catalogue systems (the notification rules' "Systeme"): once after the upgrade, then for the
+        products whose catalogue entry changed (systems.systems_round, quiet); nothing to do: no read at all."""
+        from app import systems
+
+        async with db.session() as s:
+            await systems.systems_round(s)
 
     async def _health(self) -> None:
         """The sources' states compared with the last known ones – a change worth a message goes out with the notify step."""

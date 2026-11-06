@@ -17,6 +17,10 @@ export interface Option {
   icon?: React.ReactNode
   /** options with a group are listed under its heading (`groups`), in the order the groups first appear */
   group?: string
+  /** the chip's text when chosen (default: the label) */
+  chip?: string
+  /** further words the search finds it by (a product: its vendor) */
+  keywords?: string[]
 }
 
 /** The headings of grouped options; `all`: the label of a row choosing every option of the group at once. */
@@ -24,6 +28,14 @@ export interface OptionGroup {
   key: string
   label: string
   all?: string
+}
+
+/** The search finds what contains every typed word (label or keywords) – no fuzzy match: "vmware" must not bring
+ * "Apache ActiveMQ" or "TeamViewer" because their letters occur in that order. */
+export function containsAll(value: string, search: string, keywords?: string[]): number {
+  const hay = [value, ...(keywords ?? [])].join(" ").toLocaleLowerCase()
+  const words = search.toLocaleLowerCase().split(/\s+/).filter(Boolean)
+  return words.every((w) => hay.includes(w)) ? 1 : 0
 }
 
 /** Filter/multi-select dropdown with search: "filter" for the news filters, "field" (chips) in forms. */
@@ -82,7 +94,7 @@ export function MultiSelect({
             {selected.length === 0 && <span className="px-1 text-muted-foreground">{label}</span>}
             {selected.map((o) => (
               <span key={o.value} className="inline-flex items-center gap-1 rounded-md bg-secondary px-1.5 py-0.5 text-xs font-medium">
-                {o.label}
+                {o.chip ?? o.label}
                 <span
                   role="button"
                   tabIndex={-1}
@@ -112,7 +124,7 @@ export function MultiSelect({
               }
         }
       >
-        <Command ref={listRef} {...(searchable ? {} : { tabIndex: -1, "aria-label": label, onKeyDown: listKeys, className: "outline-none" })}>
+        <Command ref={listRef} filter={containsAll} {...(searchable ? {} : { tabIndex: -1, "aria-label": label, onKeyDown: listKeys, className: "outline-none" })}>
           {searchable && <CommandInput placeholder={t("common.search")} />}
           <CommandList className="scroll-shadow max-h-[min(32rem,max(9rem,calc(var(--radix-popover-content-available-height)_-_6rem)))] [scrollbar-width:thin]!">
             <CommandEmpty>{t("common.noResults")}</CommandEmpty>
@@ -134,7 +146,7 @@ export function MultiSelect({
                   {opts.map((o) => {
                     const active = value.includes(o.value)
                     return (
-                      <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)} data-checked={active} className="gap-2">
+                      <CommandItem key={o.value} value={o.label} keywords={o.keywords} onSelect={() => toggle(o.value)} data-checked={active} className="gap-2">
                         {o.icon}
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className={cn("truncate", active && "font-medium")}>{o.label}</span>

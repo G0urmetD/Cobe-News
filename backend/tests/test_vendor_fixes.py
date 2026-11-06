@@ -126,11 +126,29 @@ async def test_nvd_then_vendor_advisory_notifies_once(admin_client, sites):
         await vendor.store(s, [_nvd("CVE-2026-7777")], vendor.build_index())
         assert await vendor.evaluate_events(s) == 1  # the NVD record
     async with db.session() as s:
-        # the vendor's advisory of the same CVE a round later: the same vulnerability, already notified
+        # the vendor's advisory of the same CVE a round later: the same vulnerability, already notified – no second
+        # "new" event; the vendor rates it critical (NVD: high), so one "now rated higher" (0.1.53: a rule of
+        # "critical" never got the first one)
         await vendor.store(s, [_fresh_pan("CVE-2026-7777", "< 11.2.4-h30", ">= 11.2.4-h30")], vendor.build_index())
-        assert await vendor.evaluate_events(s) == 0
+        assert await vendor.evaluate_events(s) == 1
+        assert await vendor.evaluate_events(s, full=True) == 0
         evs = [e for e in await _events(s) if not e.baseline]
-    assert len(evs) == 1 and evs[0].scope == "vuln:panos:11.2.4-h23"
+    assert [e.scope for e in evs] == ["vuln:panos:11.2.4-h23"] * 2
+    assert not evs[0].key.startswith("rated:") and evs[0].severity == "high"
+    assert evs[1].key.startswith("rated:critical:") and evs[1].data["rated_higher"] == {"from": "high", "to": "critical"}
+
+
+async def test_nvd_then_vendor_advisory_of_the_same_rating_notifies_once(admin_client, sites):
+    """The original guarantee of H1, where the vendor rates as NVD did: one event per CVE, nothing more."""
+    await _follow(admin_client, "panos", "11.2.4-h23")
+    await _round()
+    async with db.session() as s:
+        await vendor.store(s, [_nvd("CVE-2026-7778") | {"severity": "critical", "cvss": 9.3}], vendor.build_index())
+        assert await vendor.evaluate_events(s) == 1
+    async with db.session() as s:
+        await vendor.store(s, [_fresh_pan("CVE-2026-7778", "< 11.2.4-h30", ">= 11.2.4-h30")], vendor.build_index())
+        assert await vendor.evaluate_events(s) == 0
+        assert len([e for e in await _events(s) if not e.baseline]) == 1
 
 
 # ---------------------------------------------------------------- H3: an idle round stays cheap, events do not pile up

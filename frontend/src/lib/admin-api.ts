@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { api, type ApiUser, type Role } from "@/lib/api"
 import type { NewsSeverity, NewsTopic } from "@/lib/news-api"
+import type { RuleSystem } from "@/lib/rule-filters"
 
 // ---------------------------------------------------------------- notifications
 
@@ -92,6 +93,11 @@ export interface NotifyRule {
   kinds: RuleKind[]
   /** Teams: Vendor News events of these teams' products only ([] = every product) */
   teams: string[]
+  /** "Betrifft": catalogue vendors or products (news and Vendor News) – OR own words (news); both empty: no restriction */
+  systems?: RuleSystem[]
+  keywords?: string[]
+  /** news: a story whose title or teaser has one of these words never comes by this rule */
+  exclude?: string[]
   created_at: string
   active_since: string
   /** what an edit is made on – an edit of an older state is refused (409 "stale") */
@@ -112,6 +118,9 @@ export interface RuleIn {
   lang: "de" | "en"
   kinds: RuleKind[]
   teams: string[]
+  systems: RuleSystem[]
+  keywords: string[]
+  exclude: string[]
 }
 
 export interface SmtpSettings {

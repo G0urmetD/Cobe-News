@@ -402,7 +402,7 @@ const vendorDe: Record<string, string> = {
   "notify.kind.vendor_versionHint":
     "Vendor News: neuere Version in der Linie, Support-Ende in weniger als 6 Monaten, Vorwarnung 90 und 30 Tage vor dem Support-Ende jeder eingetragenen Version, Support-Ende erreicht.",
   "notify.kindsMissing": "Mindestens eine Art auswählen.",
-  "notify.severitiesHintVendor": "Gilt für Meldungen und Schwachstellen; „Neue Version / EOL“ kommt unabhängig davon.",
+  "notify.severitiesHintVendor": "Gilt für Meldungen, Schwachstellen und geänderte Advisories (deren neue Schwere); „Neue Version / EOL“ kommt unabhängig davon.",
   "notify.vendorOnce":
     "Vendor News meldet jede Schwachstelle einmal pro Produkt und Version. Was beim ersten Prüfen einer neuen Version schon bekannt ist, steht auf der Seite, wird aber nicht verschickt.",
 

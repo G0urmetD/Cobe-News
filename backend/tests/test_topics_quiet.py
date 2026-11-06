@@ -91,11 +91,11 @@ async def test_switching_on_an_exploit_list_sends_no_old_story(admin_client, hoo
     assert [await _topics(i.id) for i in items] == [(["poc"], ["poc"])] * len(items)  # shown – quietly
     await _dispatch()
     assert await _delivered() == 0 and hooks.to("hooks.slack.com") == []
-    # the dry run (the same matcher) agrees
+    # the dry run says what the rule covers (0.1.53): the topic gained quietly counts there – shown, never sent
     notify_api._dry_at.clear()
     r = await admin_client.post("/api/admin/notify/rules/dry-run", json={"kinds": ["news"], "topics": ["poc"], "days": 1})
     assert r.status_code == 200, r.text
-    assert r.json()["count"] == 0
+    assert r.json()["count"] == 25
     # a list's new entry for one of them is no news for that story (it has the topic) – a new entry for a CVE an old
     # story names that had none yet is: sent once
     other = (await _old_stories(src, ["CVE-2021-7777"], title="Noch eine Lücke {n}"))[0]

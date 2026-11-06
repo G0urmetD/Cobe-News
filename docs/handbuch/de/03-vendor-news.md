@@ -449,7 +449,12 @@ ausgenutzt“) und färben die Zahl am Seitenpunkt rot – diese zuerst updaten.
 
 **Benachrichtigung:** Die Regelart „Schwachstelle betrifft eines unserer Systeme“ meldet jede Schwachstelle **einmal
 pro Produkt und Version**. Wird eine schon bekannte Schwachstelle später aktiv ausgenutzt (z. B. neu im KEV), kommt
-genau einmal **„Jetzt aktiv ausgenutzt: …“**. Nicht verschickt wird, was beim ersten Prüfen eines neu gefolgten
+genau einmal **„Jetzt aktiv ausgenutzt: …“**. Wird sie später **höher eingestuft** – NVD hatte sie noch nicht
+bewertet („Awaiting Analysis“, gespeichert als Info) und gibt ihr Tage danach 9,8, oder der Hersteller stuft höher ein
+als NVD –, kommt **„Jetzt höher eingestuft: Kritisch (vorher Info): …“** mit der neuen Schwere; eine Regel nur für
+„Kritisch“ und „Hoch“ bekommt sie so auch dann, wenn die erste Meldung nicht zu ihr passte. Das geschieht nur nach oben
+und je Stufe höchstens einmal; eine Regel, die beide Stufen abdeckt (etwa alle Schweregrade), bekommt so eine zweite
+Nachricht zum selben Befund. Nicht verschickt wird, was beim ersten Prüfen eines neu gefolgten
 Produkts oder einer neuen bzw. geänderten Version schon bekannt ist (es steht auf der Seite), und Hinweise, die älter
 als 30 Tage sind – außer frisch im KEV. Regeln richten Admins ein, siehe
 [Benachrichtigungen](/docs/benachrichtigungen#regeln).
@@ -638,7 +643,7 @@ Auch in Vendor News merkt sich Cobe News **pro Person**, was du gesehen hast –
 Schwachstelle eines gefolgten Produkts (dieselbe CVE bei zwei Produkten sind zwei Befunde, denn du prüfst sie je
 Produkt).
 
-- **Neu** ist ein Befund, der als Neuigkeit gemeldet wurde – oder erneut, z. B. weil er jetzt aktiv ausgenutzt wird – und
+- **Neu** ist ein Befund, der als Neuigkeit gemeldet wurde – oder erneut, z. B. weil er jetzt aktiv ausgenutzt oder höher eingestuft wird – und
   den du seitdem nicht geöffnet hast. Was beim ersten Abruf eines Produkts schon da war ([Erstabruf](#erstabruf)), ist
   nicht neu; was vor mehr als 30 Tagen kam, zählt als gelesen.
 - Die Kachel zeigt „3 neu“, die Zeilen der schlimmsten Befunde einen Punkt. **Öffnen** der Schublade markiert die Befunde

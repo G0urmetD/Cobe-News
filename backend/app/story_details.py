@@ -753,6 +753,7 @@ async def enrich_round(db: AsyncSession, *, limit: int = 60) -> int:
         if item is None or source is None:
             continue
         det = await db.get(StoryDetail, item_id)
+        before = det.data if det is not None else None  # the details so far: unchanged ones bring no system loudly
         kind, ident, _ = plan(source.key, item.url, [c.upper() for c in item.cves or []])
         if kind == "none":
             if det is None:
@@ -806,6 +807,11 @@ async def enrich_round(db: AsyncSession, *, limit: int = 60) -> int:
             if fol is None:
                 fol = await followed(db)
             await set_products(db, item.id, products_of(d, fol))
+            # and the catalogue products they concern (the notification rules' "Systeme") – details that arrived or
+            # changed: loud (a rule naming one sends the story now, once); the same again: quiet
+            from app import systems
+
+            await systems.set_exact(db, item.id, systems.exact(d), quiet=d == before)
             await db.commit()
         done += 1
         if done >= limit:

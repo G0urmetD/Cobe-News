@@ -3,6 +3,7 @@ import { api } from "@/lib/api"
 import { polledPages } from "@/lib/poll"
 import type { ChannelDelivery, ChannelType, RuleKind } from "@/lib/admin-api"
 import type { NewsSeverity, NewsTopic } from "@/lib/news-api"
+import { type RuleSystem, applicable } from "@/lib/rule-filters"
 
 // The delivery log (Zustellprotokoll, backend app/delivery_log.py) and the rule's dry run (Probelauf) – types, queries
 // and the pure helpers the pages use (tested in delivery-log.test.ts).
@@ -151,6 +152,9 @@ export interface DryRunIn {
   lang: "de" | "en"
   kinds: RuleKind[]
   teams: string[]
+  systems: RuleSystem[]
+  keywords: string[]
+  exclude: string[]
   days: DryDays
 }
 
@@ -163,7 +167,9 @@ export interface DryRunItem {
   source: string
   /** a story: the rule's topics it has (what it matched by) */
   topics?: NewsTopic[]
-  match: { kind: RuleKind; severity: boolean; source: boolean; topic?: boolean; teams: boolean }
+  /** what it matched the rule's systems and words by ("PAN-OS", "Citrix Bleed") */
+  hits?: string[]
+  match: { kind: RuleKind; severity: boolean; source: boolean; topic?: boolean; teams: boolean; concern?: boolean }
 }
 
 export interface DryRunResult {
@@ -179,13 +185,35 @@ export interface DryRunResult {
   flood_limit: number
 }
 
-/** The body of the dry run: the form as it is now (not saved) – only what decides what the rule brings. */
+/** The body of the dry run: the form as it is now (not saved) – only what decides what the rule brings, and of that
+ *  only what applies to its kinds (rule-filters.applicable – the same the rule is saved with). */
 export function dryRunBody(
-  v: { severities: NewsSeverity[]; sources: string[]; topics?: NewsTopic[]; lang: "de" | "en"; kinds: RuleKind[]; teams: string[] },
+  v: {
+    severities: NewsSeverity[]
+    sources: string[]
+    topics?: NewsTopic[]
+    lang: "de" | "en"
+    kinds: RuleKind[]
+    teams: string[]
+    systems?: RuleSystem[]
+    keywords?: string[]
+    exclude?: string[]
+  },
   days: DryDays,
 ): DryRunIn {
-  const news = v.kinds.includes("news")
-  return { severities: v.severities, sources: news ? v.sources : [], topics: news ? (v.topics ?? []) : [], lang: v.lang, kinds: v.kinds, teams: v.teams, days }
+  const x = applicable(v)
+  return {
+    severities: x.severities,
+    sources: x.sources,
+    topics: x.topics,
+    lang: x.lang,
+    kinds: x.kinds,
+    teams: x.teams,
+    systems: x.systems,
+    keywords: x.keywords,
+    exclude: x.exclude,
+    days,
+  }
 }
 
 /** Why an item matched, as short parts: its kind, and severity / source / team where the rule chose some. */
@@ -195,6 +223,7 @@ export function matchParts(t: T, x: DryRunItem): string[] {
   if (x.match.source) out.push(t("dlog.dry.bySource", { source: x.source }))
   if (x.match.topic && x.topics?.length) out.push(t("dlog.dry.byTopic", { topics: x.topics.map((k) => t(`news.topic.${k}`)).join(", ") }))
   if (x.match.teams) out.push(t("dlog.dry.byTeams"))
+  if (x.match.concern && x.hits?.length) out.push(t("dlog.dry.byHits", { names: x.hits.join(", ") }))
   return out
 }
 

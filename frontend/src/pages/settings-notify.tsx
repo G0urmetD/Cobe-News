@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 import { type QueryClient, useQueryClient } from "@tanstack/react-query"
-import { BellRing, Loader2, Pencil, Plus, RadioTower, Trash2 } from "lucide-react"
+import { AlertTriangle, BellRing, Loader2, Pencil, Plus, RadioTower, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,7 +15,8 @@ import { EmptyState, Section } from "@/components/cobe/common"
 import { HelpLink } from "@/components/cobe/doc-markdown"
 import { Explained } from "@/components/cobe/explained"
 import { EnableCard, Field, LockedFields, ToggleRow } from "@/components/cobe/form"
-import { MultiSelect } from "@/components/cobe/multi-select"
+import { ChipInput } from "@/components/cobe/chip-input"
+import { MultiSelect, type Option, type OptionGroup } from "@/components/cobe/multi-select"
 import { api } from "@/lib/api"
 import { type NotifyChannel, type NotifyRule, RULE_KINDS, type RuleIn, type RuleKind, useChannels, useRules, useSmtp } from "@/lib/admin-api"
 import { errorCategoryText, mailServerMissing, uiLang } from "@/lib/channels"
@@ -31,7 +32,20 @@ import { ChannelIcon, ChannelsPane } from "@/pages/settings-channels"
 import { DeliveryLogPane } from "@/pages/settings-delivery-log"
 import { DryRunPanel } from "@/pages/settings-dry-run"
 import { Loading, SaveBar, SettingsCard, SheetActions, SheetBody, SheetLoading, StaleNotice } from "@/pages/settings-shared"
-import { isoList } from "@/lib/bidi"
+import {
+  SEVERITY_KINDS,
+  SYSTEM_KINDS,
+  SYSTEMS_MAX,
+  type CatalogVendor,
+  applicable,
+  catalogVendors,
+  offSources,
+  ruleSummary,
+  systemOf,
+  systemValue,
+  vendorOf,
+} from "@/lib/rule-filters"
+import { useVendorCatalog } from "@/lib/vendor-api"
 
 function SeverityPicker({ value, onChange }: { value: NewsSeverity[]; onChange: (v: NewsSeverity[]) => void }) {
   const { t } = useTranslation()
@@ -63,15 +77,80 @@ function TopicPicker({ value, onChange }: { value: NewsTopic[]; onChange: (v: Ne
   )
 }
 
-function SourcePicker({ value, onChange, options }: { value: string[]; onChange: (v: string[]) => void; options: { id: string; name: string }[] }) {
+/** Sources to choose – a switched-off one marked "(aus)": it brings nothing while it is off. */
+function SourcePicker({ value, onChange, options }: { value: string[]; onChange: (v: string[]) => void; options: { id: string; name: string; enabled?: boolean }[] }) {
   const { t } = useTranslation()
   return (
     <MultiSelect
       variant="field"
       label={t("notify.allSources")}
-      options={options.map((s) => ({ value: s.id, label: s.name }))}
+      options={options.map((s) => ({ value: s.id, label: s.enabled === false ? t("notify.sourceOff", { name: s.name }) : s.name }))}
       value={value.filter((id) => options.some((s) => s.id === id))}
       onChange={onChange}
+    />
+  )
+}
+
+/** The catalogue by vendor (GET /api/vendor/catalog) – null while it loads. */
+function useCatalogVendors(): CatalogVendor[] | undefined {
+  const products = useVendorCatalog().data?.products
+  return useMemo(() => (products ? catalogVendors(products) : undefined), [products])
+}
+
+/**
+ * "Systeme": the whole catalogue, by vendor – first "Alle Produkte von <Hersteller>" (also those added later), then
+ * its products; searched by product and vendor (any of its spellings). A system the catalogue no longer knows stays as
+ * a chip until removed.
+ */
+function SystemsPicker({ value, onChange, vendors }: { value: RuleIn["systems"]; onChange: (v: RuleIn["systems"]) => void; vendors: CatalogVendor[] | undefined }) {
+  const { t } = useTranslation()
+  const groups: OptionGroup[] = []
+  const options: Option[] = []
+  for (const v of vendors ?? []) {
+    groups.push({ key: v.id, label: v.name })
+    options.push({
+      value: systemValue({ vendor: v.name }),
+      label: t("notify.systemsAllOf", { vendor: v.name }),
+      chip: t("notify.systemsVendorChip", { vendor: v.name }),
+      group: v.id,
+      keywords: v.names,
+    })
+    for (const p of v.products) options.push({ value: systemValue({ product: p.key }), label: p.label, group: v.id, keywords: v.names })
+  }
+  // a vendor chosen under another of its spellings ("VMware" for "Broadcom (VMware)") is its one option; one no longer
+  // in the catalogue is shown (and removable) as it is
+  const shown = [
+    ...new Set(
+      value.map((s) => {
+        const v = "vendor" in s && vendors ? vendorOf(vendors, s.vendor) : undefined
+        return v ? systemValue({ vendor: v.name }) : systemValue(s)
+      }),
+    ),
+  ]
+  if (vendors) {
+    for (const c of shown) {
+      if (options.some((o) => o.value === c)) continue
+      const s = systemOf(c)
+      if (s) options.push({ value: c, label: t("notify.systemGoneName", { name: "vendor" in s ? s.vendor : s.product }), group: "gone" })
+    }
+    if (options.some((o) => o.group === "gone")) groups.unshift({ key: "gone", label: t("notify.systemGone") })
+  }
+  return (
+    <MultiSelect
+      variant="field"
+      label={vendors ? t("notify.allSystems") : t("news.loading")}
+      options={options}
+      groups={groups}
+      value={shown}
+      onChange={(x) =>
+        onChange(
+          x
+            .slice(0, SYSTEMS_MAX)
+            .map(systemOf)
+            .filter((y): y is NonNullable<typeof y> => !!y),
+        )
+      }
+      contentClassName="w-80"
     />
   )
 }
@@ -119,6 +198,9 @@ const toBody = (r: NotifyRule, patch: Partial<RuleIn> = {}): RuleIn => ({
   lang: r.lang,
   kinds: r.kinds,
   teams: r.teams ?? [],
+  systems: r.systems ?? [],
+  keywords: r.keywords ?? [],
+  exclude: r.exclude ?? [],
   ...patch,
 })
 
@@ -187,6 +269,7 @@ function RuleList({ onEdit, onChannels }: { onEdit: (r: NotifyRule | "new") => v
   const sources = useAdminNews().data?.sources ?? []
   const teamList = useTeams().data ?? []
   const ruleTeams = (r: NotifyRule) => (r.teams ?? []).map((id) => teamList.find((x) => x.id === id)?.name ?? "?")
+  const vendors = useCatalogVendors()
   // a switch being saved stays disabled until the list holds the rule's new version – a second click before that
   // would be sent with the old version and refused as "changed by someone else"
   const [pending, setPending] = useState<ReadonlySet<string>>(new Set())
@@ -253,7 +336,6 @@ function RuleList({ onEdit, onChannels }: { onEdit: (r: NotifyRule | "new") => v
         q.data.length > 0 && (
           <ul className={none ? "divide-y border-t" : "divide-y"}>
             {q.data.map((r) => {
-              const names = r.sources.map((id) => sources.find((s) => s.id === id)?.name).filter(Boolean)
               const used = r.channels.map((id) => channels.find((c) => c.id === id)).filter((c): c is NotifyChannel => !!c)
               return (
                 <li key={r.id} className="flex items-start gap-3 px-5 py-3">
@@ -265,15 +347,7 @@ function RuleList({ onEdit, onChannels }: { onEdit: (r: NotifyRule | "new") => v
                       <bdi>{r.name}</bdi>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {r.kinds.map((k) => t(`notify.kind.${k}`)).join(", ") +
-                        " · " +
-                        (r.severities.length ? r.severities.map((s) => t(`news.sev.${s}`)).join(", ") : t("notify.allSeverities")) +
-                        " · " +
-                        (names.length ? isoList(names) : t("notify.allSources")) +
-                        (r.topics?.length && r.kinds.includes("news") ? " · " + t("notify.topicsList", { names: r.topics.map((x) => t(`news.topic.${x}`)).join(", ") }) : "") +
-                        (ruleTeams(r).length ? " · " + t("notify.teamsList", { names: isoList(ruleTeams(r)) }) : "") +
-                        " · " +
-                        (r.lang === "en" ? "English" : "Deutsch")}
+                      {ruleSummary(t, r, { sourceName: (id) => sources.find((s) => s.id === id)?.name, teamNames: ruleTeams(r), vendors })}
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {used.length ? used.map((c) => <ChannelChip key={c.id} c={c} />) : <Pill color="--warning">{t("notify.noChannel")}</Pill>}
@@ -337,6 +411,9 @@ function RuleEditor({
           lang: uiLang(i18n.language),
           kinds: ["news"],
           teams: [],
+          systems: [],
+          keywords: [],
+          exclude: [],
         },
   )
   const [v, setV] = useState<RuleIn>(initial)
@@ -347,15 +424,21 @@ function RuleEditor({
   const teamsOn = !!useTeamsSettings().data?.enabled
   const teamList = useTeams().data ?? []
   const vendorKinds = v.kinds.some((k) => k === "vendor_vuln" || k === "vendor_version" || k === "vendor_change")
+  const news = v.kinds.includes("news")
+  const vendors = useCatalogVendors()
+  const offChosen = offSources(v.sources, sources)
   const valid = v.name.trim().length >= 2 && v.channels.length > 0 && v.kinds.length > 0
   const kind = (k: RuleKind, on: boolean) => setV({ ...v, kinds: on ? RULE_KINDS.filter((x) => x === k || v.kinds.includes(x)) : v.kinds.filter((x) => x !== k) })
   const body = { ...v, name: v.name.trim() }
   const dirty = JSON.stringify(body) !== JSON.stringify(initial)
   const save = async () => {
     setBusy(true)
+    // only what applies to the chosen kinds – what the form shows and the dry run tries; the form keeps the rest while
+    // it is open (a kind switched off and on again brings its fields back as they were)
+    const sent = applicable(body)
     try {
-      if (rule) await api.put(`/api/admin/notify/rules/${rule.id}`, { ...body, version })
-      else await api.post("/api/admin/notify/rules", body)
+      if (rule) await api.put(`/api/admin/notify/rules/${rule.id}`, { ...sent, version })
+      else await api.post("/api/admin/notify/rules", sent)
       toast.success(t("common.saved"))
       refreshNotify(qc)
       onDone()
@@ -415,20 +498,48 @@ function RuleEditor({
           {v.kinds.length === 0 && <p className="pb-3 text-xs text-destructive">{t("notify.kindsMissing")}</p>}
         </section>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label={t("notify.severities")}
-            hint={t(v.kinds.includes("vendor_vuln") || v.kinds.includes("vendor_change") ? "notify.severitiesHintVendor" : "notify.severitiesHint")}
-          >
-            <SeverityPicker value={v.severities} onChange={(x) => setV({ ...v, severities: x })} />
-          </Field>
-          {v.kinds.includes("news") && (
-            <Field label={t("notify.sources")} hint={t("notify.sourcesHint")}>
-              <SourcePicker value={v.sources} onChange={(x) => setV({ ...v, sources: x })} options={sources} />
+          {/* severities: for news, vulnerabilities and revised advisories – versions, EOL and source health have their own */}
+          {v.kinds.some((k) => SEVERITY_KINDS.includes(k)) && (
+            <Field
+              label={t("notify.severities")}
+              hint={t(v.kinds.includes("vendor_vuln") || v.kinds.includes("vendor_change") ? "notify.severitiesHintVendor" : "notify.severitiesHint")}
+            >
+              <SeverityPicker value={v.severities} onChange={(x) => setV({ ...v, severities: x })} />
             </Field>
           )}
-          {v.kinds.includes("news") && (
+          {news && (
+            <Field label={t("notify.sources")} hint={t("notify.sourcesHint")}>
+              <SourcePicker value={v.sources} onChange={(x) => setV({ ...v, sources: x })} options={sources} />
+              {offChosen.off.length > 0 && (
+                <p role={offChosen.onlyOff ? "alert" : undefined} className={cn("flex items-start gap-1.5 text-xs", offChosen.onlyOff ? "text-destructive" : "text-warning")}>
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                  {t(offChosen.onlyOff ? "notify.sourcesOnlyOff" : "notify.sourcesSomeOff", { count: offChosen.off.length })}
+                </p>
+              )}
+            </Field>
+          )}
+          {news && (
             <Field label={<Explained label={t("notify.topics")} text={t("notify.topicsExplain")} />} hint={t("notify.topicsHint")} className="sm:col-span-2">
               <TopicPicker value={v.topics} onChange={(x) => setV({ ...v, topics: x })} />
+            </Field>
+          )}
+          {v.kinds.some((k) => SYSTEM_KINDS.includes(k)) && (
+            <Field
+              label={<Explained label={t("notify.systems")} text={t("notify.systemsExplain")} />}
+              hint={t(news ? "notify.systemsHint" : "notify.systemsHintVendor")}
+              className="sm:col-span-2"
+            >
+              <SystemsPicker value={v.systems} onChange={(x) => setV({ ...v, systems: x })} vendors={vendors} />
+            </Field>
+          )}
+          {news && (
+            <Field label={t("notify.keywords")} hint={t("notify.keywordsHint")}>
+              <ChipInput value={v.keywords} onChange={(x) => setV({ ...v, keywords: x })} placeholder={t("notify.keywordsPlaceholder")} />
+            </Field>
+          )}
+          {news && (
+            <Field label={t("notify.exclude")} hint={t("notify.excludeHint")}>
+              <ChipInput value={v.exclude} onChange={(x) => setV({ ...v, exclude: x })} placeholder={t("notify.excludePlaceholder")} />
             </Field>
           )}
         </div>
