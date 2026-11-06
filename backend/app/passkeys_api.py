@@ -269,8 +269,10 @@ async def _refuse(db, key: str, ip: str, why: str) -> JSONResponse:  # noqa: ANN
     log.info("passkey sign-in refused: %s", why)
     f = bruteforce.register_failure(key, ip, lock_account=False)
     await db.rollback()
-    if f.ip_blocked:  # not each refusal (anyone can send them) – the block of the address, as after wrong passwords
-        audit.record(db, audit.SYSTEM, "login.ip_blocked", audit.target("ip", bruteforce.source_key(ip), bruteforce.source_key(ip)), {"blocked_for_s": bruteforce.IP_BLOCK, "via": "passkey"}, ip=ip)
+    src = bruteforce.source_key(ip)
+    # not each refusal (anyone can send them) – the block of the address, as after wrong passwords (bounded an hour)
+    if f.ip_blocked and audit.note_block(src):
+        audit.record(db, audit.SYSTEM, "login.ip_blocked", audit.target("ip", src, src), {"blocked_for_s": bruteforce.IP_BLOCK, "via": "passkey"}, ip=ip)
         await db.commit()
     await db.close()  # the delay must not hold a database connection
     await lock_store.flush()  # a block it set survives a restart

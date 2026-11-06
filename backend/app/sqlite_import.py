@@ -91,6 +91,7 @@ COLUMNS_NOT_IN_SQLITE = frozenset(
         ("notify_rules", "topics"),  # 0.1.47: '[]' – a rule without topics, as before
         ("vendor_advisory_products", "quiet"),  # 0.1.47: links of the relink after a catalogue change – false
         ("users", "temp_password_at"),  # the import's time for a temporary password brought along (run), else NULL
+        ("news_sources", "parsed_at"),  # 0.1.50: NULL – undated stories stay until their feed was read once (news.prune)
     }
 )
 

@@ -281,6 +281,14 @@ def test_every_action_has_a_case_or_a_reason():
         "catalog.refreshed",  # test_catalog_refresh_is_logged
         "passkey.sign_count_warning",  # test_passkey_sign_in_and_counter_warning
         "delivery.resent",  # test_resend_is_logged
+        "login.locked_unknown",  # test_unknown_names_are_counted_not_named
+        "setup.token_issued",
+        "backup.imported",  # test_cli_actions_are_logged
+        "team.sync_started",  # test_team_sync_names_the_admin
+        "audit.chain_problem",  # test_chain_finds_a_changed_entry
+        "audit.chain_rekeyed",  # test_another_master_key_waits_for_the_operator
+        "audit.pruned",  # test_late_and_future_entries_are_marked_and_the_future_does_not_hold_the_prune
+        "restore_test.done",  # test_cli_actions_are_logged
     }
     covered = {a for a, _, act in CASES if act is not None} | elsewhere | {"team.member_added"}
     assert set(audit.ACTIONS) == covered, set(audit.ACTIONS) ^ covered
@@ -402,6 +410,8 @@ REVIEWED_NOT_SECRET = {
     "sign_count_warning_at": "a time",
     "auth_context": "an Entra authentication context id (C1–C99) – a name, not a secret",
     "temp_password_days": "how many days a temporary password is valid (a number, settings section sessions)",
+    "actor_emergency": "a flag of the audit log (\"enc\" inside \"emergency\")",
+    "auth_method": "how a session was signed in (password, passkey …)",
 }
 
 
@@ -560,7 +570,7 @@ async def test_csv_export_is_formula_safe_and_filtered(admin_client):
     assert all(not cell[:1] in "=+-@" for row in rows for cell in row if cell)
     assert audit.cell("-1") == "'-1" and audit.cell("\tx") == "'\tx" and audit.cell("ok") == "ok"
     # the export itself is logged (with its filters)
-    assert (await _entries("audit.exported"))[-1].details == {"filters": {"group": "teams"}}
+    assert (await _entries("audit.exported"))[-1].details == {"filters": {"group": "teams"}, "anomalies": ["audit_export"]}
 
 
 # ---------------------------------------------------------------- retention
@@ -572,7 +582,7 @@ async def test_retention_and_prune(admin_client):
     for bad in (89, 3651):
         assert (await admin_client.put("/api/admin/audit/settings", json={"keep_days": bad})).status_code == 422
     async with db.session() as s:
-        for days in (10, 200, 400):
+        for days in (400, 200, 10):  # written in time order (the prune goes in chain order and stops at a young one)
             e = audit.record(s, audit.SYSTEM, "settings.changed", None, {"days": days})
             e.at = datetime.now(UTC) - timedelta(days=days)
         await s.commit()
@@ -687,8 +697,11 @@ async def test_sign_in_and_lockouts(client):
     # an unknown name that is no name (a password typed into the field): never in the log
     for _ in range(5):
         await client.post("/api/auth/login", json={"username": "P@ss wort!" + SECRET, "password": "x"})
-    assert (await _entries("login.locked"))[-1].target_label == "?"
+    assert len(await _entries("login.locked")) == 1  # no lock entry for it – the name is never written
+    unknown = await _entries("login.locked_unknown")
+    assert len(unknown) == 1 and unknown[0].target_type == "ip" and unknown[0].details["names"] == 1
     assert SECRET not in json.dumps([(e.target_label, e.details) for e in await _entries()])
+    assert "P@ss" not in json.dumps([(e.target_label, e.target_id, e.details) for e in await _entries()])
 
 
 async def test_admin_sign_in_is_logged(client):

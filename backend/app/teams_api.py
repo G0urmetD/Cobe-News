@@ -358,6 +358,7 @@ async def sync_team(tid: uuid.UUID, admin: Admin, db: Db) -> dict:
     if len(teams._tasks) >= BUSY:
         raise api_error(409, "busy")
     await db.execute(update(TeamGroup).where(TeamGroup.team_id == t.id).values(state="loading").execution_options(synchronize_session=False))
+    audit.record(db, admin, "team.sync_started", _team_target(t))  # who started it – the load itself is the sync's (team.synced)
     await db.commit()
     teams.start({t.id})
     return {"started": True}

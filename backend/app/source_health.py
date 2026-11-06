@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from sqlalchemy import delete, func, or_, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
@@ -661,16 +661,10 @@ async def evaluate(db: AsyncSession, now: datetime | None = None) -> int:
 async def prune(db: AsyncSession, now: datetime | None = None) -> int:
     """Stats older than KEEP, in short transactions of PRUNE_BATCH rows; events older than KEEP except each source's
     newest (its last known state)."""
+    from app.db import delete_batched
+
     cut = (now or utcnow()) - KEEP
-    gone = 0
-    while True:
-        ids = select(SourceFetchStat.id).where(SourceFetchStat.at < cut).limit(PRUNE_BATCH).scalar_subquery()
-        n = (await db.execute(delete(SourceFetchStat).where(SourceFetchStat.id.in_(ids)))).rowcount or 0
-        await db.commit()
-        gone += n
-        if n < PRUNE_BATCH:
-            break
+    gone = await delete_batched(db, SourceFetchStat, SourceFetchStat.at < cut, batch=PRUNE_BATCH)
     newest = select(func.max(SourceHealthEvent.n)).group_by(SourceHealthEvent.kind, SourceHealthEvent.key).scalar_subquery()
-    await db.execute(delete(SourceHealthEvent).where(SourceHealthEvent.created_at < cut, SourceHealthEvent.n.not_in(newest)))
-    await db.commit()
+    await delete_batched(db, SourceHealthEvent, SourceHealthEvent.created_at < cut, SourceHealthEvent.n.not_in(newest), batch=PRUNE_BATCH)
     return gone

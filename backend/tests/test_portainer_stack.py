@@ -79,10 +79,20 @@ def test_three_services_and_nothing_from_a_checkout(local, portainer):
             source = vol.split(":", 1)[0]
             assert not source.startswith((".", "/", "~")), vol  # named volumes (TLS_SOURCE: the user's choice)
     assert not re.search(r"(^|[\s\"'=:])\.\.?/", re.sub(r"#[^\n]*", "", text)), "a relative path in the stack file"
-    assert set(portainer["volumes"]) == {"data", "tls", "db18"} and set(local["volumes"]) == {"tls", "db18"}
+    # backup-secret: the empty default of BACKUP_SECRET_DIR – the folder with the passphrase file stays optional (0.1.50)
+    assert set(portainer["volumes"]) == {"data", "tls", "backup-secret", "db18"} and set(local["volumes"]) == {"tls", "backup-secret", "db18"}
     # the local install: no bind mount of deploy/ any more – the files are in the images
     for svc in local["services"].values():
         assert not any("deploy/" in v for v in svc.get("volumes", [])), svc.get("volumes")
+
+
+def test_the_backup_passphrase_file_is_optional_in_both(local, portainer):
+    """BACKUP_PASSPHRASE_FILE and its folder: a bind mount with an empty source breaks a stack – the default is an empty
+    volume of its own, read-only; the variable empty: no passphrase file."""
+    for f in (local, portainer):
+        app = f["services"]["app"]
+        assert "${BACKUP_SECRET_DIR:-backup-secret}:/run/backup-secret:ro" in app["volumes"]
+        assert app["environment"]["BACKUP_PASSPHRASE_FILE"] == "${BACKUP_PASSPHRASE_FILE:-}"
 
 
 def test_the_local_install_keeps_its_names(local):

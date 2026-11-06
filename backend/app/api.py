@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import ConfigDict, Field, ValidationError, field_validator
-from sqlalchemy import Text, and_, cast, delete, exists, false, func, literal, or_, select
+from sqlalchemy import Text, and_, cast, delete, exists, false, func, literal, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import array as pg_array
@@ -470,6 +470,13 @@ async def get_settings(admin: Admin, db: Db) -> dict:
     return {**cfg, "rev": int(cfg.get("rev") or 0)}
 
 
+@router.get("/admin/settings/news/prune-preview")
+async def prune_preview(admin: Admin, db: Db, keep_days: int = Query(ge=7, le=365)) -> dict:
+    """How many stories a shorter retention would delete with the next hourly prune – asked before it is saved (the
+    stories go for good: what the retention deleted is never fetched again)."""
+    return {"keep_days": keep_days, "count": await news_svc.prune_count(db, keep_days)}
+
+
 @router.put("/admin/settings/news")
 async def put_settings(body: dict, request: Request, admin: Admin, db: Db) -> dict:
     try:
@@ -482,6 +489,10 @@ async def put_settings(body: dict, request: Request, admin: Admin, db: Db) -> di
         audit.record(db, admin, "settings.changed", audit.target("settings", "news", "news"), {"changes": changes})
     out = await settings_store.put_rev(db, "news", data, parsed.rev)
     if data["enabled"] and not before.get("enabled"):
+        # switched on again: like a source switched on again – each feed's first fetch is a baseline (what a feed
+        # listed undated meanwhile is backlog, not news); the stored stories, their read marks and cut stay
+        await db.execute(update(NewsSource).values(primed_at=None))
+        await db.commit()
         request.app.state.wake()  # switched on: the first round right away
     return out
 
@@ -595,9 +606,8 @@ async def patch_source(sid: uuid.UUID, body: SourcePatch, admin: Admin, db: Db) 
     if moved or switched_on:
         # asked in the next round, as a new feed: no pause or error of before, its first fetch the baseline again
         s.next_fetch_at, s.failures, s.error, s.primed_at = None, 0, None, None
+    # the same host, another path or query: the URL logged as changed only (audit.diff – both look the same once cleaned)
     if delta := audit.diff(before, {"name": s.name, "url": s.url, "enabled": s.enabled}):
-        if "url" in delta and delta["url"]["from"] == delta["url"]["to"]:
-            delta["url"] = {"changed": True}  # the same host, another path or query: logged as changed only (audit._url_origin)
         audit.record(db, admin, "source.changed", audit.target("news_source", s.id, s.name), {"changes": delta, "builtin": s.builtin})
     try:
         await db.commit()

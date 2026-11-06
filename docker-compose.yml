@@ -54,6 +54,9 @@ services:
       POSTGRES_USER: cobe_news_app
       POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?missing in .env – run scripts/setup-env.sh once (docs/BETRIEB.md)}
       BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}       # set: backups encrypted, with the key (docs/BETRIEB.md: Sicherung)
+      # or the passphrase from a file, e.g. /run/backup-secret/backup-pass – the folder BACKUP_SECRET_DIR (below);
+      # BACKUP_PASSPHRASE wins when both are set
+      BACKUP_PASSPHRASE_FILE: ${BACKUP_PASSPHRASE_FILE:-}
       # the restore test's throwaway database (its own role, no right on the app's database – the db image makes both
       # when the password is set; empty: no restore test). docs/BETRIEB.md: Rücksicherungs-Test
       POSTGRES_RESTORE_PASSWORD: ${POSTGRES_RESTORE_PASSWORD:-}
@@ -65,6 +68,9 @@ services:
     volumes:
       - ./data:/data
       - ${TLS_SOURCE:-tls}:/tls   # the app writes its self-signed certificate here (or reads your own to watch its expiry)
+      # optional: a folder on the host with the backup passphrase (absolute path, readable for UID 10001) – empty: an
+      # empty volume of its own (docs/BETRIEB.md: Sicherung, Passphrase-Datei)
+      - ${BACKUP_SECRET_DIR:-backup-secret}:/run/backup-secret:ro
     networks:
       - edge
       - db
@@ -198,4 +204,5 @@ networks:
 
 volumes:
   tls:
+  backup-secret:
   db18:

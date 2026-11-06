@@ -9,6 +9,11 @@ A backup is one file in BACKUP_DIR (default data/backups, 0600):
   encrypted with the passphrase (crypto.seal_file: scrypt + AES-256-GCM). A restore on a new server needs only the
   file and the passphrase.
 
+The app's own passphrase ("Jetzt sichern", the restore test): BACKUP_PASSPHRASE, else the file BACKUP_PASSPHRASE_FILE
+names (a read-only mount or a Docker secret – read each time it is needed, so a changed file counts at once). Both set:
+BACKUP_PASSPHRASE wins (an environment set for one command keeps working beside a file; --passphrase-file of the CLI wins over both). A file
+that is named but cannot be read is an error – no backup, never an unencrypted one instead.
+
 The dump and the row counts come from one snapshot (pg_export_snapshot → pg_dump --snapshot): the counts in the
 manifest are exactly what the dump holds, and a restore checks them.
 
@@ -31,6 +36,7 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import tarfile
 import tempfile
@@ -54,13 +60,15 @@ BACKUP_LOCK = 0x636E_626B  # pg_try_advisory_lock: one backup at a time (UI, CLI
 DUMP_TIMEOUT_S = 1800
 KEEP_CHOICES = (3, 7, 14, 30, 90)
 MIN_PASSPHRASE = 12  # BACKUP_PASSPHRASE: shorter ones are refused (scrypt slows guessing down, a short phrase still falls)
+PASSPHRASE_FILE_MAX = 4096  # bytes: a passphrase file is short – anything bigger is the wrong file
+PASSPHRASE_READ_TIMEOUT = 5.0  # s: reading it off the event loop – a hung mount answers "unreadable", never freezes the app
 SECTION = "backup"  # settings: {"keep": 7, "rev": n}
 LAST = "backup_last"  # settings: the last backup's outcome (also a failed one)
 
 
 class BackupError(Exception):
     """A backup or restore did not happen; the message says why (nothing was changed). `code` names the kind for the
-    UI (backup.err.<code>): busy, no_pg_dump, timeout, dump, passphrase, failed."""
+    UI (backup.err.<code>): busy, no_pg_dump, timeout, dump, passphrase, passphrase_file, failed."""
 
     def __init__(self, message: str, code: str = "failed") -> None:
         super().__init__(message)
@@ -75,6 +83,106 @@ class Result:
     seconds: float
     encrypted: bool
     rows: dict[str, int]
+
+
+class PassphraseFileError(BackupError):
+    """BACKUP_PASSPHRASE_FILE (or --passphrase-file) cannot be used – `why` for the UI (backup.passFile.<why>): missing,
+    unreadable, not_a_file, too_large, not_text, empty. The message names the path and the reason, never the content."""
+
+    def __init__(self, path: Path, why: str, reason: str) -> None:
+        super().__init__(f"passphrase file {path}: {reason}", "passphrase_file")
+        self.why = why
+
+
+# ---------------------------------------------------------------- the passphrase
+
+
+def read_passphrase_file(path: str | Path) -> str:
+    """The passphrase in a file – the whole file, whitespace around it (the newline of `printf '%s\\n'`) removed, as
+    app.cli --passphrase-file has always read it. Only a regular file: opened without blocking (O_NONBLOCK – a FIFO
+    would wait for a writer forever), then checked on the open descriptor (fstat) – a folder, pipe or device
+    (/dev/zero) is refused before anything is read. A symlink to a regular file counts (Docker and Kubernetes secrets
+    are links); it is followed once, at the open, so the check and the read concern the same file."""
+    p = Path(path)
+    try:
+        fd = os.open(p, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+    except FileNotFoundError:
+        raise PassphraseFileError(p, "missing", "not found (mounted? the path is the one inside the container)") from None
+    except IsADirectoryError:
+        raise PassphraseFileError(p, "not_a_file", "a folder, not a file") from None
+    except PermissionError:
+        raise PassphraseFileError(p, "unreadable", "not readable – the app runs as UID 10001 (chown 10001, chmod 400)") from None
+    except OSError as exc:
+        raise PassphraseFileError(p, "unreadable", f"cannot be read ({exc.strerror or type(exc).__name__})") from None
+    try:
+        st = os.fstat(fd)
+        if stat.S_ISDIR(st.st_mode):
+            raise PassphraseFileError(p, "not_a_file", "a folder, not a file")
+        if not stat.S_ISREG(st.st_mode):
+            raise PassphraseFileError(p, "not_a_file", "not a regular file (a pipe, socket or device)")
+        if st.st_size > PASSPHRASE_FILE_MAX:
+            raise PassphraseFileError(p, "too_large", f"larger than {PASSPHRASE_FILE_MAX} bytes – not a passphrase file")
+        try:
+            raw = os.read(fd, PASSPHRASE_FILE_MAX + 1)
+        except OSError as exc:
+            raise PassphraseFileError(p, "unreadable", f"cannot be read ({exc.strerror or type(exc).__name__})") from None
+    finally:
+        os.close(fd)
+    if len(raw) > PASSPHRASE_FILE_MAX:
+        raise PassphraseFileError(p, "too_large", f"larger than {PASSPHRASE_FILE_MAX} bytes – not a passphrase file")
+    try:
+        phrase = raw.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        raise PassphraseFileError(p, "not_text", "not UTF-8 text") from None
+    if not phrase:
+        raise PassphraseFileError(p, "empty", "empty")
+    return phrase
+
+
+def app_passphrase() -> str:
+    """The passphrase the app itself has: BACKUP_PASSPHRASE, else the file BACKUP_PASSPHRASE_FILE names, else "" (no
+    encryption). PassphraseFileError when the file is named but cannot be used."""
+    cfg = get_config()
+    if cfg.backup_passphrase:
+        return cfg.backup_passphrase
+    if cfg.backup_passphrase_file:
+        return read_passphrase_file(cfg.backup_passphrase_file)
+    return ""
+
+
+async def app_passphrase_async() -> str:
+    """app_passphrase() off the event loop, at most PASSPHRASE_READ_TIMEOUT – the file may sit on a mount that hangs."""
+    cfg = get_config()
+    if cfg.backup_passphrase or not cfg.backup_passphrase_file:
+        return app_passphrase()  # nothing to read
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(app_passphrase), PASSPHRASE_READ_TIMEOUT)
+    except TimeoutError:
+        raise PassphraseFileError(Path(cfg.backup_passphrase_file), "unreadable", f"no answer within {PASSPHRASE_READ_TIMEOUT:.0f} s (a mount that hangs?)") from None
+
+
+async def passphrase_state() -> dict:
+    """What the page says about the app's passphrase – never the passphrase itself. `ok`: backups from the app are
+    encrypted; `error` (missing, unreadable, …, short): "Jetzt sichern" fails until it is fixed."""
+    cfg = get_config()
+    out = {
+        "source": "env" if cfg.backup_passphrase else "file" if cfg.backup_passphrase_file else None,
+        "file": cfg.backup_passphrase_file or None,
+        "file_ignored": bool(cfg.backup_passphrase and cfg.backup_passphrase_file),
+        "ok": False,
+        "error": None,
+        "detail": None,
+    }
+    try:
+        phrase = await app_passphrase_async()
+    except PassphraseFileError as exc:
+        out.update(error=exc.why, detail=str(exc))
+        return out
+    if phrase and len(phrase) < MIN_PASSPHRASE:
+        out.update(error="short", detail=f"the passphrase is too short (at least {MIN_PASSPHRASE} characters)")
+        return out
+    out["ok"] = bool(phrase)
+    return out
 
 
 # ---------------------------------------------------------------- helpers
@@ -219,11 +327,15 @@ async def create(*, reason: str = "", passphrase: str | None = None, actor=None)
     last outcome). `passphrase` None: BACKUP_PASSPHRASE from the environment."""
     t0 = time.monotonic()
     cfg = get_config()
-    phrase = cfg.backup_passphrase if passphrase is None else passphrase
-    if phrase and len(phrase) < MIN_PASSPHRASE:
-        exc = BackupError(f"the passphrase is too short (at least {MIN_PASSPHRASE} characters) – no backup made", "passphrase")
-        await _record({"ok": False, "at": datetime.now(UTC).isoformat(), "code": exc.code, "error": str(exc)})
-        raise exc
+    try:
+        phrase = await app_passphrase_async() if passphrase is None else passphrase
+        if phrase and len(phrase) < MIN_PASSPHRASE:
+            raise BackupError(f"the passphrase is too short (at least {MIN_PASSPHRASE} characters) – no backup made", "passphrase")
+    except BackupError as exc:
+        # a named passphrase file that cannot be read: no backup – never an unencrypted one in its place
+        await _record({"ok": False, "at": datetime.now(UTC).isoformat(), "code": exc.code, "error": str(exc)[:300]})
+        log.warning("backup failed: %s", exc)
+        raise
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     tag = f"-{reason}" if reason else ""
     d = backup_dir()
@@ -404,6 +516,7 @@ async def status(s: AsyncSession) -> dict:
     conf = await settings_store.get(s, SECTION)
     last = await settings_store.get(s, LAST)
     busy = await running(s)
+    phrase = await passphrase_state()
     return {
         "running": busy,
         "running_since": _job["since"] if busy and _job["task"] is not None and not _job["task"].done() else None,
@@ -411,7 +524,8 @@ async def status(s: AsyncSession) -> dict:
         "keep_choices": list(KEEP_CHOICES),
         "rev": int(conf.get("rev") or 0),
         "dir": str(cfg.backup_dir),
-        "with_key": bool(cfg.backup_passphrase),
+        "with_key": phrase["ok"],  # "Jetzt sichern" encrypts (and takes the master key along)
+        "passphrase": phrase,
         "last": last if last.get("at") else None,
         "backups": listing()[:100],
     }
@@ -455,7 +569,7 @@ def _unpack(path: Path, work: Path, passphrase: str) -> tuple[dict, str]:
     sealed = crypto.is_sealed(path)
     if sealed:
         if not passphrase:
-            raise BackupError("the backup is encrypted: BACKUP_PASSPHRASE (or --passphrase-file) needed")
+            raise BackupError("the backup is encrypted: BACKUP_PASSPHRASE, BACKUP_PASSPHRASE_FILE or --passphrase-file needed")
         tar_path = work / "archive.tar"
         try:
             with path.open("rb") as src, tar_path.open("wb") as dst:

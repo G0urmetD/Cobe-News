@@ -93,10 +93,36 @@ function NewsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 function NewsForm({ initial, busy, onSave }: { initial: NewsSettings; busy: boolean; onSave: (v: NewsSettings) => void }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [v, setV] = useState(initial)
   const changed = JSON.stringify(v) !== JSON.stringify(initial)
   const valid = v.every_min >= 15 && v.every_min <= 1440 && v.keep_days >= 7 && v.keep_days <= 365
+  const [asking, setAsking] = useState(false)
+  // a shorter retention deletes stories with the next hourly cleanup – for good (they are never fetched again): the
+  // number that would go is asked first, and the save waits for a yes
+  const submit = async () => {
+    if (v.keep_days < initial.keep_days) {
+      setAsking(true)
+      try {
+        const { count } = await api.get<{ count: number }>(`/api/admin/settings/news/prune-preview?keep_days=${v.keep_days}`)
+        if (
+          count > 0 &&
+          !(await confirmAction({
+            title: t("settings.news.keepTitle"),
+            text: t("settings.news.keepText", { count, n: count.toLocaleString(i18n.language), days: v.keep_days }),
+            confirm: t("settings.news.keepConfirm"),
+          }))
+        )
+          return
+      } catch (e) {
+        toast.error(errorText(t, e))
+        return
+      } finally {
+        setAsking(false)
+      }
+    }
+    onSave(v)
+  }
   return (
     <>
       <SheetBody>
@@ -132,7 +158,7 @@ function NewsForm({ initial, busy, onSave }: { initial: NewsSettings; busy: bool
       </SheetBody>
       <SheetActions>
         <FetchNow enabled={initial.enabled} />
-        <SaveBar busy={busy} dirty={changed} disabled={!valid} onSave={() => onSave(v)} />
+        <SaveBar busy={busy || asking} dirty={changed} disabled={!valid} onSave={() => void submit()} />
       </SheetActions>
     </>
   )

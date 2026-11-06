@@ -166,6 +166,9 @@ async def fresh_db(tmp_path, monkeypatch):
     # ask hosts the older tests' mocks do not serve (tests/test_structured.py switches them on and mocks them)
     monkeypatch.setitem(settings_store.DEFAULTS, "vendor", {**settings_store.DEFAULTS["vendor"], **STRUCTURED_OFF})
     bruteforce.reset()
+    from app import audit
+
+    audit.reset_floods()  # the hour's counts of locks of unknown names and address blocks
     passkeys_api.reset()  # pending WebAuthn challenges and the sign-in start counts
     monkeypatch.setattr(bruteforce, "DELAY_STEP", 0.0)
     monkeypatch.setattr(notify, "transport", None)
@@ -178,9 +181,16 @@ async def fresh_db(tmp_path, monkeypatch):
 
 
 class Browser(httpx.AsyncClient):
-    """A browser: its own cookies, and the CSRF token sent back with every write (double submit)."""
+    """A browser: its own cookies, the CSRF token sent back with every write (double submit) and with a logged download
+    (the page's api.getFile sends it: the audit log's CSV, the data export), and – as a browser's fetch() does –
+    Sec-Fetch-Site: same-origin (a test of a cross-site request sets its own headers)."""
 
     async def request(self, method, url, *a, headers=None, **kw):
+        headers = {"Sec-Fetch-Site": "same-origin", **(headers or {})}
+        if method.upper() == "GET" and "export" in str(url) and "x-csrf-token" not in {k.lower() for k in headers}:
+            if "cobe_news_csrf" not in self.cookies:
+                await super().request("GET", "/api/auth/config")
+            headers = {"X-CSRF-Token": self.cookies.get("cobe_news_csrf", ""), **headers}
         if method.upper() not in ("GET", "HEAD", "OPTIONS"):
             if "cobe_news_csrf" not in self.cookies:
                 await super().request("GET", "/api/auth/config")

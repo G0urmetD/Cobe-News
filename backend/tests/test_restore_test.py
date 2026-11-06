@@ -69,13 +69,15 @@ def throwaway():
 @pytest.fixture(autouse=True)
 def backups_here(tmp_path):
     cfg = get_config()
-    old = cfg.backup_dir, cfg.backup_passphrase
+    old = cfg.backup_dir, cfg.backup_passphrase, cfg.backup_passphrase_file
     object.__setattr__(cfg, "backup_dir", tmp_path / "backups")
     object.__setattr__(cfg, "backup_passphrase", "")
+    object.__setattr__(cfg, "backup_passphrase_file", "")
     metrics.reset()
     yield tmp_path / "backups"
     object.__setattr__(cfg, "backup_dir", old[0])
     object.__setattr__(cfg, "backup_passphrase", old[1])
+    object.__setattr__(cfg, "backup_passphrase_file", old[2])
 
 
 @pytest.fixture
@@ -152,6 +154,20 @@ async def test_encrypted_backup_needs_the_passphrase(target, backups_here):
     assert not out["ok"] and out["code"] == "verify" and "decrypt" in out["error"]
     out = await restore_test.run(passphrase="eine-lange-test-passphrase", trigger="cli")
     assert out["ok"] and out["auth"] == "passphrase" and out["trigger"] == "cli", out
+
+
+async def test_the_app_opens_an_encrypted_backup_with_its_passphrase_file(target, backups_here, tmp_path):
+    """BACKUP_PASSPHRASE_FILE (0.1.50): the app's own test decrypts with the file; a file it cannot read is the reason
+    the test names."""
+    await backup.create(passphrase="eine-lange-test-passphrase")
+    f = tmp_path / "backup-pass"
+    f.write_text("eine-lange-test-passphrase\n")
+    object.__setattr__(get_config(), "backup_passphrase_file", str(f))
+    out = await restore_test.run()
+    assert out["ok"] and out["auth"] == "passphrase", out
+    object.__setattr__(get_config(), "backup_passphrase_file", str(tmp_path / "fehlt"))
+    out = await restore_test.run()
+    assert not out["ok"] and out["code"] == "passphrase" and "not found" in out["error"], out
 
 
 async def test_damaged_backup_fails_and_changes_nothing(target, backups_here):

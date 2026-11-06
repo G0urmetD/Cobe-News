@@ -317,11 +317,8 @@ async def send(db: AsyncSession, smtp: dict) -> int:
 
 
 async def prune(db: AsyncSession, days: int = 90) -> int:
-    res = await db.execute(
-        TeamWeeklySend.__table__.delete().where(TeamWeeklySend.status.in_(("sent", "failed", "skipped")), TeamWeeklySend.created_at < datetime.now(UTC) - timedelta(days=days))
-    )
-    await db.commit()
-    return res.rowcount or 0
+    """Decided weekly reviews older than `days` (hourly, in batches)."""
+    return await dbm.delete_batched(db, TeamWeeklySend, TeamWeeklySend.status.in_(("sent", "failed", "skipped")), TeamWeeklySend.created_at < datetime.now(UTC) - timedelta(days=days))
 
 
 # ---------------------------------------------------------------- the content

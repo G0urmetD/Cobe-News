@@ -1038,11 +1038,11 @@ async def dispatch(db: AsyncSession) -> dict[str, int]:
 
 async def prune(db: AsyncSession, days: int = 90) -> int:
     """Decided rows older than `days` (the events themselves go with the news' pruning)."""
-    res = await db.execute(delete(PersonDelivery).where(PersonDelivery.status != "pending", PersonDelivery.status != "sending", PersonDelivery.created_at < datetime.now(UTC) - timedelta(days=days)))
+    now = datetime.now(UTC)
+    n = await dbm.delete_batched(db, PersonDelivery, PersonDelivery.status.not_in(("pending", "sending")), PersonDelivery.created_at < now - timedelta(days=days))
     # absences over for longer than an event lives (MAX_AGE): no row of theirs can be routed any more
-    await db.execute(delete(PersonAbsence).where(PersonAbsence.ends_at < datetime.now(UTC) - MAX_AGE - timedelta(days=1)))
-    await db.commit()
-    return res.rowcount or 0
+    await dbm.delete_batched(db, PersonAbsence, PersonAbsence.ends_at < now - MAX_AGE - timedelta(days=1))
+    return n
 
 
 async def send_teams_test(db: AsyncSession, p: PersonNotify) -> None:

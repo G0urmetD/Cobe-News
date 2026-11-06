@@ -22,7 +22,7 @@ from app import settings as settings_store
 from app.auth import bruteforce, directory, entra, ldap_dir, lock_store, passwords, sessions
 from app.auth_api import admins_count, user_out
 from app.crypto import encrypt_str
-from app.deps import ActiveSession, Admin, Db, NoNul, api_error, require_reauth
+from app.deps import ActiveSession, Admin, Db, DownloadGuard, NoNul, api_error, require_reauth
 from app.models import AuditEntry, GroupMapping, Team, TeamMember, User, UserPasskey, UserSession
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -687,7 +687,7 @@ async def backup_settings(body: BackupSettingsIn, admin: Admin, sess: ActiveSess
 
 
 @router.get("/export")
-async def export(admin: Admin, sess: ActiveSession, db: Db, format: Literal["json", "csv"] = "json") -> Response:  # noqa: A002 - the query name
+async def export(admin: Admin, sess: ActiveSession, db: Db, _guard: DownloadGuard, format: Literal["json", "csv"] = "json") -> Response:  # noqa: A002 - the query name
     """Rules, channels, sources, followed products with versions and users – without any secret, but with every user's
     name and e-mail: a fresh proof of identity first, as for the user administration."""
     from app import backup

@@ -2,6 +2,57 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.50 – Protokoll mit Zusammenhang und Integritätskette, Aufbewahrung robust, Sicherungen verständlich
+
+### Neu
+- **Protokoll, aufgeklappter Eintrag**: „Wer“ (Rolle damals, Notfall-Konto, Anmeldeart, Sitzung), „Woher“ (Adresse mit Einordnung, Weg über Proxy, Browser/System grob, Anfrage und Anfrage-ID), „Was genau“ (Ort in der App, Feldnamen, Vorher/Nachher farbig, Verlauf des Ziels) und „Zusammenhang“ (gleiche Sitzung, gleiche Adresse in 24 Std., vorige Anmeldung, Hinweise).
+- **Protokoll, Filtern direkt am Wert**: kleine Symbole neben jedem Wert (filtern, öffnen, kopieren), Filter-Chips mit Trefferzahl, Schalter „Nur Auffälliges“, Zeitraum mit 24 Std./7/30/90 Tagen; Eintrag als JSON kopieren.
+- **Protokoll, Integritätskette**: Jeder Eintrag ist mit dem vorigen verkettet und mit dem Hauptschlüssel signiert, etwa minütlich versiegelt; Prüfung beim Öffnen und stündlich, `python -m app.cli verify-audit`, ein Fund wird selbst protokolliert und bleibt sichtbar, bis er bestätigt wird. Der Zustand der Kette ist selbst signiert; ein veränderter Zustand oder ein anderer Schlüssel wird angezeigt und nie von selbst neu verankert – das tut nur ein Admin auf dem Server (`verify-audit --accept-new-key` oder eine Wiederherstellung mit `--ignore-key`), protokolliert als „Protokoll-Kette neu verankert“. Jedes Aufräumen hält den neuen Anfang als Eintrag in der Kette fest. Stündlich steht das Ende der Kette als Zeile im Log (`audit chain head: …`) – zum Weiterleiten an ein externes Log-System. Was die Kette beweist und was nicht, steht im Handbuch (Betrieb → Protokoll).
+- **Protokoll, Auffälligkeiten**: Notfall-Konto nachts/am Wochenende, neue Adresse eines Admins, Fehlversuche vor der Anmeldung, Rolle auf Admin, kürzere Aufbewahrung, Export, nachträglich geschriebene oder in der Zukunft datierte Einträge werden markiert.
+- **Anfrage-ID**: Jede API-Antwort trägt eine (`X-Request-ID`, im Zugriffs-Log als `rid=…`, im Protokolleintrag).
+- **`BACKUP_PASSPHRASE_FILE`** (mit `BACKUP_SECRET_DIR`): Die App liest die Passphrase aus einer Datei – so ist auch „Jetzt sichern“ verschlüsselt, ohne Passphrase in der .env oder in Portainer. `BACKUP_PASSPHRASE` geht vor; eine fehlende oder unlesbare Datei verhindert die Sicherung und steht auf der Seite.
+- **Handbuch „Schritt für Schritt: sichern, herunterladen, einspielen“** für die lokale Installation und Portainer, mit allem, was man dafür braucht (Passphrase bzw. Kopie von secret.key, Datenbank-Passwort, Version).
+
+### Verbessert
+- **Protokoll-Suche mit eigenem Index**: ab 3 Zeichen in Millisekunden, auch bei Hunderttausenden Einträgen (Migration 0033).
+- **Zahlen mit Tausendertrennzeichen** (Export-Hinweis, Aufbewahrung der Nachrichten, Zeilen einer Sicherung); auf schmalen Bildschirmen zeigt der Kettenstatus bei einem Problem einen kurzen Text.
+- **Protokoll**: alle Angaben in den Einzelheiten mit Namen und lesbaren Werten (Größen in MB, Dauern, Gründe, Auslöser, Schritte) statt technischer Schlüssel; der Rücksicherungs-Test von der Kommandozeile erscheint als „ausgeführt“ mit Ergebnis.
+- **Sicherung**: Die Liste zeigt „Verschlüsselt · Schlüssel enthalten“ bzw. „Unverschlüsselt · Schlüssel getrennt aufbewahren“ – mit Erklärung per Hover, Fokus und Antippen; die Anzeige ragt nicht mehr aus der Tabelle.
+- **Passphrase-Datei** wird nur als normale Datei gelesen (ein Symlink darauf zählt, z. B. ein Docker-Secret), ohne zu blockieren – eine Pipe, ein Gerät oder ein hängender Mount lässt die App nicht stehen, die Seite meldet „nicht lesbar“.
+- **Handbuch**: Der cron-Befehl gibt die Passphrase über die Standardeingabe (`--passphrase-file -`), nicht per `-e BACKUP_PASSPHRASE="$(cat …)"` – so steht sie in keiner Prozessliste; das Einspielen eines aufbewahrten Schlüssels (Portainer) prüft die Datei und behält den bisherigen unter einem Namen mit Zeitstempel.
+- **Sicherung**: Neben „Jetzt sichern“ steht, ob die Sicherung verschlüsselt wird; liegen verschlüsselte Sicherungen vom cron-Job daneben, wird der Unterschied erklärt. Ein neuer Hinweis sagt, dass Sicherungen nur auf dem Server liegen und Herunterladen und Einspielen dort per Befehl geschehen; der Rücksicherungs-Test ist nur eine Probe in einer Wegwerf-Datenbank.
+- **Export** deutlich als „keine Sicherung, nicht wieder einlesbar“ gekennzeichnet (JSON für Tools, CSV für Excel).
+- **Protokoll-Export**: Trennzeichen nach Sprache (Deutsch: Semikolon), Hinweis und letzte Zeile, wenn bei 100 000 Einträgen gekürzt wird, mehr Spalten (Sitzung, Browser, Anfrage, Kette).
+- **Protokoll**: Akteur-Liste schnell und sortiert, neue Indizes für Adresse, Sitzung, Auffälliges und Akteurart; Aufräumen einmal am Tag in Paketen; „Prüfung läuft …“ statt Warten während der stündlichen Prüfung.
+- **Protokoll**: Die Kommandozeile protokolliert jetzt auch `export`, `new-setup-token`, `migrate-sqlite` und `restore-test`; ein von Hand gestarteter Team-Abgleich nennt den Admin; Entscheidungen bei einer Verzeichnis-Anmeldung tragen deren Adresse.
+- **Kürzere Aufbewahrung der News fragt nach**: Vorher steht da, wie viele Meldungen beim nächsten Aufräumen endgültig gelöscht werden; bestätigt wird mit „Löschen und speichern“.
+- **Übersicht der Aufbewahrung**: Betriebs-Referenz und Handbuch (Betrieb) listen alle Daten mit Frist, Vorgabe und wo sie einzustellen ist – auch die bisher nicht beschriebenen (persönliche Zustellungen und Wochenrückblick 90 Tage, CVE-beobachten-Ereignisse 90 Tage, EPSS-Werte und Einzelabfragen 30 Tage, Gelesen-Markierungen 30 Tage, Vendor-News-Ereignisse solange gefolgt).
+
+### Fixes
+- **Protokoll-Kette**: Fehlen die neuesten Einträge, merken das auch die Prüfung beim Öffnen und die stündliche Prüfung – nicht erst die Kommandozeile. `verify-audit --accept-new-key` bestätigt einen gerade gefundenen Fehler im selben Lauf; „Prüfung läuft …“ aktualisiert sich selbst.
+- **Aufräumen läuft Schritt für Schritt**: Scheitert ein Aufräumschritt (etwa an einer Sperre in der Datenbank), laufen die übrigen trotzdem – bisher blieben dann bis zur nächsten Stunde auch Protokoll, Zustellprotokoll, Gelesen-Markierungen und Anmeldesperren liegen, bei einem dauerhaften Fehler für immer. Die Vendor-News-Schritte (Einzelabfragen, Revisionen, EPSS) laufen jeder für sich und nach einem Fehler eine Stunde später erneut statt erst am nächsten Tag.
+- **Kein Deadlock mehr beim Löschen alter Meldungen**: Die Aufbewahrung löscht in kurzen Portionen und überspringt Zeilen, die gerade ein anderer Vorgang ändert – sie kommen beim nächsten Lauf dran.
+- **Meldungen ohne eigenes Datum kommen nicht mehr als neu zurück**: Antwortete ein Feed länger als die Aufbewahrung mit „unverändert“ (304), fiel er aus oder waren News ausgeschaltet, löschte die Aufbewahrung seine noch gelisteten Meldungen ohne Datum – beim nächsten Abruf kamen sie als neu, ungelesen und mit Benachrichtigung wieder. Jetzt geht eine solche Meldung erst, wenn ihr Feed (und jeder weitere Feed mit derselben Adresse) seit ihrer letzten Sichtung gelesen wurde und sie nicht mehr listet.
+- **News wieder einschalten schickt keinen Rückstand**: Der erste Abruf nach dem Wiedereinschalten des Hauptschalters gilt wie bei einer wieder eingeschalteten Quelle als Ausgangsstand.
+- **Änderungen eines wieder aufgetauchten Hinweises werden gemeldet**: Kam ein entfernter Hinweis später wieder, begann seine Revisionszählung von vorn – die nächste Änderung bekam eine schon vergebene Nummer, ihre Benachrichtigung ging nie hinaus. Die Zählung geht jetzt weiter.
+- **Aufräumen auch bei ausgeschalteter Vendor News**: Alte Einzelabfragen, Revisionen und EPSS-Werte werden auch dann entfernt.
+- **Protokoll-Export** schlug während des Versiegelns durch einen anderen Prozess nicht mehr fehl; ein Eintrag mit Zeit in der Zukunft hält das Aufräumen nicht mehr auf.
+- **Protokoll**: Ein ungültiger Seiten-Cursor oder ein extremes Datum ergibt 422 statt 500; eine Adressänderung auf demselben Host erscheint als „geändert“ statt als zwei gleiche Werte; lange Produkt-Kennungen werden nicht mehr als „geheim“ geschwärzt.
+
+### Sicherheit
+- **Protokoll**: Eine Sitzung, die nach fünf falschen Codes (zweiter Faktor, erneute Bestätigung, Passwortwechsel) endet, wird protokolliert; Kontosperren nennen den Schritt.
+- **Protokoll**: Sperren unbekannter Anmeldenamen nennen den Namen nie mehr (er könnte ein Passwort sein) und sind pro Stunde begrenzt – kein Fluten des Protokolls über geteilte Adressen.
+- **Protokoll- und Daten-Export** nur noch mit dem CSRF-Token der Seite – nicht per direkt eingegebener Adresse oder Link von außen.
+- **CSV-Formelschutz** auch nach Komma/Semikolon innerhalb einer Zelle.
+- **Schwärzung erweitert**: Zugangsdaten in Adressen jedes Schemas, Adressen in Freitext, JWT und bekannte Token-Formen, `Authorization`, Steuer- und Richtungszeichen (auch in der Oberfläche isoliert).
+
+### Betrieb
+- **Migration 0031** (neue Spalte `news_sources.parsed_at`): Meldungen ohne eigenes Datum bleiben nach dem Update, bis ihr Feed einmal neu gelesen wurde.
+- **Migration 0032**: neue Spalten und Indizes im Protokoll. Nach dem Update werden die vorhandenen Einträge versiegelt (rund 16 000 je Sekunde); danach ist die Tabelle etwa doppelt so groß – `VACUUM` macht den Platz nur wieder nutzbar, verkleinern lässt sie `VACUUM FULL audit_log` (kurze exklusive Sperre, etwa 4 s je 450 000 Einträge; Handbuch Betrieb → Protokoll).
+- **Migration 0033**: Suchindex für das Protokoll.
+- Browser (grob), Sitzungskennung und Adresse im Protokoll unterliegen der Protokoll-Aufbewahrung (Handbuch: Betrieb → Protokoll).
+- **Compose-Dateien**: neues optionales Volume `backup-secret` (leer, solange `BACKUP_SECRET_DIR` nicht gesetzt ist).
+
 ## 0.1.49 – Stack ohne Einmal-Container, ein Schalter hinter eigenem Reverse Proxy, neue Alert-Mail
 
 ### Verbessert

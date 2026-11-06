@@ -237,48 +237,64 @@ async def _next_after_password(db, sess: UserSession, user: User) -> str:  # noq
 async def _finish(db, sess: UserSession, user: User, stage: str, response: Response, **extra) -> dict:
     token = await sessions.promote(db, sess, stage)
     if stage == "active":
+        failed = bruteforce.failures(bruteforce.lock_key(user))
         bruteforce.register_success(bruteforce.lock_key(user))
         user.last_login_at = datetime.now(UTC)
         user.last_login_ip = sess.ip
-        _signed_in(db, user, sess.ip, sess.method)
+        await _signed_in(db, user, sess.ip, sess, failed)
     await db.commit()
     sessions.set_cookie(response, token)
     return {"next": "done" if stage == "active" else stage, **({"user": user_out(user)} if stage == "active" else {}), **extra}
 
 
-def _signed_in(db, user: User, ip: str | None, method: str | None) -> None:  # noqa: ANN001
+async def _signed_in(db, user: User, ip: str | None, sess: UserSession, failed: int = 0) -> None:  # noqa: ANN001
     """An admin's sign-in in the audit log (a reader's last sign-in is on the account – every one would flood the log),
-    with how it was signed in (sessions.METHODS: password, password_totp, ldap, ldap_totp, passkey, entra)."""
+    with how it was signed in (sessions.METHODS: password, password_totp, ldap, ldap_totp, passkey, entra), its new
+    session and the anomalies of a sign-in (audit.signin_anomalies: the emergency account at night or at the weekend, a
+    new address, failed attempts right before it)."""
     if user.role == "admin":
-        audit.record(db, user, "login.success", audit.user_target(user), {"source": user.auth_source, "method": method}, ip=ip)
+        flags, extra = await audit.signin_anomalies(db, user, ip, failed)
+        audit.record(db, user, "login.success", audit.user_target(user), {"source": user.auth_source, "method": sess.method, **extra}, ip=ip, session=sess, anomalies=flags)
 
 
-_NAME_SHAPE = re.compile(r"^[A-Za-z0-9._@~-]{1,64}$")
-
-
-async def _lock_target(db, key: str) -> audit.Target:  # noqa: ANN001
-    """The account a lock key names (bruteforce.lock_key) – or, unknown, the typed name when it looks like one (a
-    password typed into the name field never lands in the log)."""
+async def _lock_target(db, key: str) -> audit.Target | None:  # noqa: ANN001
+    """The account a lock key names (bruteforce.lock_key) – None for a name that is no account: it is never logged (it
+    may be a password typed into the name field), the lock only counted (audit.note_unknown_lock)."""
     kind, _, rest = key.partition(":")
     u = None
     if kind == "local":
         u = await db.scalar(select(User).where(User.username == rest, User.auth_source == "local"))
     elif kind in ("ldap", "entra") and rest:
         u = await db.scalar(select(User).where(User.auth_source == kind, User.external_id == rest))
-    if u is not None:
-        return audit.user_target(u)
-    return audit.target("account", None, rest if _NAME_SHAPE.match(rest) else "?")
+    return audit.user_target(u) if u is not None else None
 
 
 async def _fail(
-    db, key: str, ip: str, code: str = "invalid_credentials", *, emergency: bool = False, lock: bool = True, sess: UserSession | None = None
+    db,
+    key: str,
+    ip: str,
+    code: str = "invalid_credentials",
+    *,
+    emergency: bool = False,
+    lock: bool = True,
+    sess: UserSession | None = None,
+    stage: str = "password",
 ) -> JSONResponse:
     """A failed check, counted on the lock key (bruteforce.lock_key – local:<name>, ldap:<objectGUID> …). `lock=False`:
-    counted, but never locks the account (a session's own counter ends it instead)."""
+    counted, but never locks the account (a session's own counter ends it instead). `stage`: which check failed
+    (password, mfa, enroll, reauth, password_change, totp_setup) – in the audit entries of a lock or an ended session."""
     f = bruteforce.register_failure(key, ip, lock_account=lock and not emergency, emergency=emergency)
-    # not each failure (anyone can send them) – the lock it started, the block of the address (a few per address at most)
+    src = bruteforce.source_key(ip)
+    # not each failure (anyone can send them) – the lock it started (an existing account; a name that is no account is
+    # only counted: the first per address and hour, the rest in the hour's summary), the block of the address
     if f.locked_for:
-        audit.record(db, audit.SYSTEM, "login.locked", await _lock_target(db, key), {"locked_for_s": f.locked_for}, ip=ip)
+        tgt = await _lock_target(db, key)
+        if tgt is not None:
+            audit.record(db, audit.SYSTEM, "login.locked", tgt, {"locked_for_s": f.locked_for, "stage": stage}, ip=ip)
+        else:
+            await audit.flush_floods(db)  # the last hour's summary first, when that hour is over
+            if audit.note_unknown_lock(src):
+                audit.record(db, audit.SYSTEM, "login.locked_unknown", audit.target("ip", src, src), {"names": 1, "locked_for_s": f.locked_for, "stage": stage}, ip=ip)
     if f.emergency_alert:
         # the emergency admin is never locked – its checks are slowed down beyond the budget (bruteforce.emergency_brake);
         # that somebody is guessing its password is worth a line and an entry (once an hour at most: bruteforce)
@@ -289,16 +305,23 @@ async def _fail(
             bruteforce.source_key(ip),
         )
         audit.record(
-            db, audit.SYSTEM, "login.emergency_slowed", await _lock_target(db, key), {"failures_1h": f.emergency_alert, "budget": bruteforce.EMERGENCY_BUDGET}, ip=ip
+            db, audit.SYSTEM, "login.emergency_slowed", await _lock_target(db, key), {"failures_1h": f.emergency_alert, "budget": bruteforce.EMERGENCY_BUDGET, "stage": stage}, ip=ip
         )
-    if f.ip_blocked:
-        audit.record(db, audit.SYSTEM, "login.ip_blocked", audit.target("ip", bruteforce.source_key(ip), bruteforce.source_key(ip)), {"blocked_for_s": bruteforce.IP_BLOCK}, ip=ip)
+    if f.ip_blocked and audit.note_block(src):
+        audit.record(db, audit.SYSTEM, "login.ip_blocked", audit.target("ip", src, src), {"blocked_for_s": bruteforce.IP_BLOCK, "stage": stage}, ip=ip)
     revoked = False
     if sess is not None:
         n = int((sess.pending or {}).get("failures", 0)) + 1
         if n >= MFA_MAX_FAILURES or f.locked_for:
             await sessions.revoke(db, sess.id)
             revoked = True
+            # a session that got past the password ended by its own misses: worth knowing (a known password and a
+            # guessed second factor, a taken-over session guessing its proof of identity) – bounded, it needs a session
+            owner = await db.get(User, sess.user_id)
+            if owner is not None:
+                audit.record(
+                    db, audit.SYSTEM, "sessions.revoked", audit.user_target(owner), {"why": "failures", "stage": stage, "failures": n, "session_stage": sess.stage}, ip=ip, session=sess
+                )
         else:
             sess.pending = {**(sess.pending or {}), "failures": n}
     await db.commit()
@@ -461,7 +484,7 @@ async def mfa(body: CodeIn, got: MfaSession, request: Request, response: Respons
             raise api_error(429, "too_many_attempts")
         await db.refresh(sess)
         if not await _check_totp(db, user, body.code):
-            return await _fail(db, key, ip, "invalid_code", emergency=user.is_emergency, sess=sess)
+            return await _fail(db, key, ip, "invalid_code", emergency=user.is_emergency, sess=sess, stage="mfa")
         sessions.with_totp(sess)
         return await _finish(db, sess, user, await next_after_mfa(db, sess, user), response)
 
@@ -522,7 +545,7 @@ async def enroll_start(got: EnrollSession, db: Db) -> dict:
 async def enroll_confirm(body: CodeIn, got: EnrollSession, request: Request, response: Response, db: Db):
     sess, user = got
     if not _enroll_confirm(sess, user, body.code):
-        return await _fail(db, bruteforce.lock_key(user), client_ip(request), "invalid_code", lock=False, sess=sess)  # no account lock – the session ends after 5
+        return await _fail(db, bruteforce.lock_key(user), client_ip(request), "invalid_code", lock=False, sess=sess, stage="enroll")  # no account lock – the session ends after 5
     audit.record(db, user, "account.totp_enabled", audit.user_target(user), {"at_signin": True})
     sessions.with_totp(sess)  # the code of the new app was checked in this sign-in
     return await _finish(db, sess, user, "active", response)
@@ -656,9 +679,10 @@ async def oidc_callback(
     sess, _ = await sessions.create(db, user, "pre", ip, user_agent(request), method="entra")
     token = await sessions.promote(db, sess, stage)
     if stage == "active":
+        failed = bruteforce.failures(bruteforce.lock_key(user))
         bruteforce.register_success(bruteforce.lock_key(user))
         user.last_login_at, user.last_login_ip = datetime.now(UTC), ip
-        _signed_in(db, user, ip, sess.method)
+        await _signed_in(db, user, ip, sess, failed)
     # mfa / enroll: the sign-in page asks for the code or the set-up (GET /auth/state names the stage)
     await db.commit()
     resp = RedirectResponse(st["to"], status_code=302)
@@ -731,7 +755,7 @@ async def reauth(body: ConfirmIn, sess: ActiveSession, user: Reader, request: Re
         await db.refresh(sess)
         if user.auth_source == "entra":
             if not await _check_totp(db, user, body.code or ""):
-                return await _fail(db, key, ip, "invalid_code", lock=False, sess=sess)
+                return await _fail(db, key, ip, "invalid_code", lock=False, sess=sess, stage="reauth")
             sess.pending = {**{k: v for k, v in (sess.pending or {}).items() if k != "failures"}, "entra_totp_at": int(time.time())}
             await db.commit()
             return {"ok": True, "next": "entra"}
@@ -743,7 +767,7 @@ async def reauth(body: ConfirmIn, sess: ActiveSession, user: Reader, request: Re
         if ok and user.totp_secret_enc:
             ok = bool(body.code) and await _check_totp(db, user, body.code or "")
         if not ok:
-            return await _fail(db, key, ip, "reauth_failed", emergency=user.is_emergency, lock=False, sess=sess)
+            return await _fail(db, key, ip, "reauth_failed", emergency=user.is_emergency, lock=False, sess=sess, stage="reauth")
         sess.reauth_at = sessions.now()
         sess.pending = {k: v for k, v in (sess.pending or {}).items() if k != "failures"}
         await db.commit()
@@ -772,7 +796,7 @@ async def my_password(body: NewPasswordIn, user: Reader, sess: ActiveSession, re
         if not free or not go:
             raise api_error(429, "too_many_attempts")
         if not await passwords.averify_password(user.password_hash, body.current_password or ""):
-            return await _fail(db, key, ip, emergency=user.is_emergency, lock=False, sess=sess)
+            return await _fail(db, key, ip, emergency=user.is_emergency, lock=False, sess=sess, stage="password_change")
     await _set_password(db, user, body.new_password)
     await sessions.revoke_all(db, user.id, except_id=sess.id)  # other browsers sign in again
     audit.record(db, user, "account.password_changed", audit.user_target(user), {"other_sessions_ended": True})
@@ -811,7 +835,7 @@ async def _reauth(db, user: User, sess: UserSession, body: ReauthIn, request: Re
         else:
             ok, code = False, "invalid_credentials"
         if not ok:
-            return await _fail(db, key, ip, code, emergency=user.is_emergency, lock=False, sess=sess)
+            return await _fail(db, key, ip, code, emergency=user.is_emergency, lock=False, sess=sess, stage="reauth")
     return None
 
 
@@ -842,7 +866,7 @@ async def my_totp_start(body: ReauthIn, user: Reader, sess: ActiveSession, reque
 @router.post("/me/totp/confirm")
 async def my_totp_confirm(body: CodeIn, user: Reader, sess: ActiveSession, request: Request, db: Db):
     if not _enroll_confirm(sess, user, body.code):
-        return await _fail(db, bruteforce.lock_key(user), client_ip(request), "invalid_code", lock=False)
+        return await _fail(db, bruteforce.lock_key(user), client_ip(request), "invalid_code", lock=False, stage="totp_setup")
     audit.record(db, user, "account.totp_enabled", audit.user_target(user))
     await db.commit()
     return user_out(user)
