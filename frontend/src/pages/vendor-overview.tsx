@@ -79,6 +79,7 @@ import { ProductChangedHint } from "@/components/cobe/advisory-changes"
 import { ScorePill } from "@/components/cobe/score"
 import { useReview } from "@/lib/version-review"
 import { ReviewPanel } from "@/pages/vendor-review"
+import { isoList } from "@/lib/bidi"
 
 type OnOpen = (key: string, finding?: string) => void
 type Layout = "cards" | "list"
@@ -355,7 +356,7 @@ export function Overview({ onOpen, scope: sc, onSuggest }: { onOpen: OnOpen; sco
 /** "Mein Team | Alle" – the products of the viewer's teams, or every followed product. */
 function ScopeSwitch({ value, onChange, teams }: { value: VendorScope; onChange: (s: VendorScope) => void; teams: { id: string; name: string }[] }) {
   const { t } = useTranslation()
-  const names = teams.map((x) => x.name).join(", ")
+  const names = isoList(teams.map((x) => x.name))
   return (
     <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={value} onValueChange={(v) => v && onChange(v as VendorScope)} aria-label={t("vendor.scope.label")}>
       <ToggleGroupItem value="team" title={t("vendor.scope.teamHint", { names })}>
@@ -646,7 +647,7 @@ export const ProductCard = memo(function ProductCard({ item, onOpen }: { item: O
                 {v.review?.due && <DuePill days={v.review.age_days} />}
                 {(v.label || v.count) && (
                   <span className="min-w-0 truncate text-muted-foreground">
-                    {v.label}
+                    {v.label && <bdi>{v.label}</bdi>}
                     {v.label && v.count ? " · " : ""}
                     {v.count ? t("vendor.devices", { count: v.count }) : ""}
                   </span>

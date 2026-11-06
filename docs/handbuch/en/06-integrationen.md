@@ -340,6 +340,18 @@ When several sources name the same vulnerability, this order decides for each ve
 4. the NVD's copy of the vendor's data – here too CISA's (ADP) only where the vendor does not name the product,
 5. OSV last: it only decides a "possibly affected" and adds a missing fixed version, but never changes a clear verdict.
 
+Also:
+
+- A CSAF document of the BSI (WID) is no vendor advisory: it sums up several CVEs and the vendors' data. Next to the
+  CVE records of its CVEs it decides only where they do not. If it names a product without a version ("every
+  version") and the CVE records say "not affected", the verdict is "possibly affected"; its "not affected" (for
+  example from per-line bounds that merge two CVEs) never counts against an "affected" of the CVE records.
+- If the vendor names its affected ranges in the CVE record and explicitly not your version (every other version
+  "unaffected", or the fix of your line), but the NVD's analysis has a range that includes it, the verdict is
+  "possibly affected" – not "affected".
+- A release above the end of an affected range of the same line counts as fixed (GitLab `>=12.8, <12.9.8`: 12.9.8
+  contains the fix).
+
 ### Switching a source off {#weitere-quellen-aus}
 
 Switch off and "Save":

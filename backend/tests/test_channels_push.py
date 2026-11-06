@@ -125,7 +125,7 @@ def test_ntfy_payload_plain_and_without_line_breaks_where_none_belong():
     assert p["click"] == "https://news.corp.example:8095/?story=00000000-0000-4000-8000-000000000001"
     assert "https://news.example.org/a%20b%29%28" in p["message"]
     assert {notify.ntfy_payload(TOPIC, "t", "m", s, "https://x.example/", [])["priority"] for s in ("critical", "high", "medium", "low", "info")} == {5, 4, 3, 2, 1}
-    # a summary: the title says how many, the click opens Cobe News
+    # a summary: the title says how many, the click opens the news list (only the shown stories known: not all six)
     title, message, sev, click = notify.render_push("Regel", [_story(severity="low"), _story(severity="high")] * 3, 6, "en")
     assert title.startswith("6 new security stories") and sev == "high" and click == "https://news.corp.example:8095/"
 

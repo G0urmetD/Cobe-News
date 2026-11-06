@@ -52,7 +52,7 @@ from app.config import get_config, tls_verify
 from app.crypto import decrypt_str
 from app.models import NewsItem, NewsItemSource, NewsSource, VendorAdvisory, VendorAdvisoryProduct, VendorAdvisoryState, VendorEvent, VendorFetch, VendorFollow, VendorKev, VendorVersion
 from app.news import NewsError
-from app.vendor_match import ORDER, Verdict, evaluate, name_matches, name_words
+from app.vendor_match import ORDER, THIRD_PARTY, Verdict, evaluate, name_matches, name_words, with_third_party
 from app.vendor_match import _cna_names as cna_names
 from app.vendor_versions import VEEAM_BUILD_DEPTH, V, parse
 
@@ -114,23 +114,56 @@ class _Gen:
 
 
 gen = _Gen()
-_pgen: dict[str, int] = {}  # per product: its advisories or its follow changed
+_pgen: dict[str, int] = {}  # per product: its advisories or its follow changed (the view is recomputed before it is shown)
+_sgen: dict[str, int] = {}  # per product: data it shows changed (EPSS scores, exploit lists) – the old view may be shown meanwhile
 
 
-def bump(products: "list[str] | set[str] | None" = None) -> None:
+def bump(products: "list[str] | set[str] | None" = None, *, soft: bool = False) -> None:
     """Cached views recomputed: of these products only (an advisory stored for them, their follow or versions edited) –
-    or of all (None: the KEV, the catalogue)."""
+    or of all (None: the catalogue, the settings, EPSS). `soft`: only data the views show changed (EPSS, exploit lists –
+    not what decides a verdict). A change for all and a soft one let the overview, the badge and the counts show the
+    previous view until the new one is ready (product_view, stale_wait) – recomputed in the background right away
+    (_warm); one of the product's own advisories or versions is recomputed before it is shown. KEV and EUVD need no
+    bump of the views: each view knows the KEV entries and EUVD CVEs of its own CVEs (_shared)."""
     gen.value += 1
     if products is None:
         gen.epoch += 1
-        _views.clear()
+        kev_changed()  # everything may have changed: the KEV and the EUVD CVEs are read again too
+        euvd_changed()
         from app import epss
 
         epss.invalidate()  # the stored scores are read again with the views
+        _warm_soon()
         return
     for k in products:
-        _pgen[k] = _pgen.get(k, 0) + 1
-        _views.pop(k, None)
+        if soft:
+            _sgen[k] = _sgen.get(k, 0) + 1
+        else:
+            _pgen[k] = _pgen.get(k, 0) + 1
+    if soft and products:
+        _warm_soon()
+
+
+async def bump_cves(db: AsyncSession, cves: "set[str] | list[str]", *, soft: bool = True) -> int:
+    """The views of the products whose advisories name one of these CVEs (EPSS scores or exploit lists changed for
+    them) – not every product's. Returns how many products."""
+    want = sorted({str(c).upper() for c in cves or [] if c})
+    if not want:
+        gen.value += 1
+        return 0
+    keys: set[str] = set()
+    for i in range(0, len(want), 5000):
+        part = want[i : i + 5000]
+        keys.update(
+            await db.scalars(
+                select(VendorAdvisoryProduct.product)
+                .join(VendorAdvisory, VendorAdvisory.id == VendorAdvisoryProduct.advisory_id)
+                .where(VendorAdvisory.cves.op("?|")(pg_array(part)))
+                .distinct()
+            )
+        )
+    bump(keys, soft=soft)
+    return len(keys)
 
 
 def reset() -> None:
@@ -147,6 +180,12 @@ def reset() -> None:
     _related.clear()
     _pruned[0] = None
     cve_watch.reset()
+    _views.clear()
+    _failed.clear()
+    _sgen.clear()
+    _kev_cache.clear()
+    _euvd_cache.clear()
+    _warm_on[0] = False
     bump()
 
 
@@ -1099,6 +1138,7 @@ async def kev_store(db: AsyncSession, body: bytes) -> tuple[int, list[dict], boo
     fetch: every story again, by the background job). (entries, newly listed, first fetch) – in the caller's transaction."""
     rows = await asyncio.to_thread(src.parse_kev, body)
     known = set(await db.scalars(select(VendorKev.cve)))
+    kev_changed()  # (again after the caller's commit: kev_received, sync_kev)
     await db.execute(delete(VendorKev))
     if rows:
         await db.execute(pg_insert(VendorKev).on_conflict_do_nothing(), rows)
@@ -1122,7 +1162,8 @@ async def kev_received(db: AsyncSession, body: bytes) -> int:
     st.last_fetch_at = datetime.now(UTC)
     st.error = None
     await db.commit()
-    bump()
+    kev_changed()
+    bump([])  # the views know the KEV entries of their CVEs (_shared): none is recomputed for an unrelated entry
     log.debug("vendor kev: %d entries from the news fetch (%+d)", n, n - before)
     return n
 
@@ -1155,7 +1196,9 @@ async def sync_kev(db: AsyncSession, every: timedelta, force: bool) -> int | Non
             n, _, _ = await kev_store(db, body)
             _ok(st, every, n)
             _record(db, st, meter, items=max(0, n - before) if before else 0)  # new entries (not the whole catalogue the first time)
-            bump()
+            await db.commit()
+            kev_changed()
+            bump([])  # the views know the KEV entries of their CVEs (_shared)
         else:
             _ok(st, every)
             _record(db, st, meter)
@@ -1369,23 +1412,70 @@ async def sync_structured(db: AsyncSession, cfg: dict, products: list[dict], eve
 SEV_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 
 
-async def kev_index(db: AsyncSession) -> dict[str, VendorKev]:
-    return {k.cve: k for k in await db.scalars(select(VendorKev))}
+@dataclass(frozen=True, slots=True)
+class Kev:
+    """One entry of CISA's KEV as the views read it (a plain copy: kept across requests, not tied to a session)."""
+
+    cve: str
+    vendor: str
+    product: str
+    name: str
+    date_added: str
+    due: str
+    ransomware: bool
 
 
-async def euvd_cves(db: AsyncSession) -> set[str]:
+_kev_cache: dict[str, object] = {}  # "gen" → the KEV's generation, "rows" → {cve: Kev}
+_kev_gen = [0]
+
+
+def kev_changed() -> None:
+    """The KEV table was written (kev_store): the cached copy is read again."""
+    _kev_gen[0] += 1
+
+
+async def kev_index(db: AsyncSession) -> dict[str, Kev]:
+    """The KEV by CVE – read once per change of the table, not on every request (the overview, the badge and the
+    counts each asked for all ~1500 rows)."""
+    if _kev_cache.get("gen") == _kev_gen[0]:
+        return _kev_cache["rows"]  # type: ignore[return-value]
+    at = _kev_gen[0]
+    rows = {k.cve: Kev(k.cve, k.vendor or "", k.product or "", k.name or "", k.date_added or "", k.due or "", bool(k.ransomware)) for k in await db.scalars(select(VendorKev))}
+    if at == _kev_gen[0]:
+        _kev_cache.update(gen=at, rows=rows)
+    return rows
+
+
+EUVD_TTL = 300.0  # seconds: the EUVD CVEs are read again at the latest then (a story removed by the retention)
+_euvd_cache: dict[str, object] = {}  # "gen", "at", "cves"
+_euvd_gen = [0]
+
+
+def euvd_changed() -> None:
+    """Stories were stored (news.store): the EUVD CVEs are read again with the next request."""
+    _euvd_gen[0] += 1
+
+
+async def euvd_cves(db: AsyncSession) -> frozenset[str]:
     """CVEs ENISA's EUVD lists as exploited – from the news (source enisa-euvd, if switched on): its own stories and
-    those of the CISA KEV it carries too (the same CVE is one story, "also in")."""
+    those of the CISA KEV it carries too (the same CVE is one story, "also in"). Read once per change of the stories
+    (euvd_changed) or EUVD_TTL – a request used to ask several times (1.9 ms, 3 200 buffers each)."""
+    now = time.monotonic()
+    if _euvd_cache.get("gen") == _euvd_gen[0] and now - float(_euvd_cache.get("at") or 0) < EUVD_TTL:
+        return _euvd_cache["cves"]  # type: ignore[return-value]
+    at = _euvd_gen[0]
     out: set[str] = set()
     euvd = await db.scalar(select(NewsSource.id).where(NewsSource.key == "enisa-euvd"))
-    if euvd is None:
-        return out
-    # its own stories and those it carries: two index lookups (an OR of both would read every story)
-    own = select(NewsItem.cves).where(NewsItem.source_id == euvd)
-    carried = select(NewsItem.cves).join(NewsItemSource, NewsItemSource.item_id == NewsItem.id).where(NewsItemSource.source_id == euvd)
-    for cves in await db.scalars(own.union_all(carried)):
-        out.update(str(c).upper() for c in cves or [])
-    return out
+    if euvd is not None:
+        # its own stories and those it carries: two index lookups (an OR of both would read every story)
+        own = select(NewsItem.cves).where(NewsItem.source_id == euvd)
+        carried = select(NewsItem.cves).join(NewsItemSource, NewsItemSource.item_id == NewsItem.id).where(NewsItemSource.source_id == euvd)
+        for cves in await db.scalars(own.union_all(carried)):
+            out.update(str(c).upper() for c in cves or [])
+    got = frozenset(out)
+    if at == _euvd_gen[0]:
+        _euvd_cache.update(gen=at, at=now, cves=got)
+    return got
 
 
 def stored_v(product: dict, text: str | None) -> V | None:
@@ -1467,19 +1557,35 @@ def _cve_records(g: dict) -> dict[str, tuple]:
     return out
 
 
+STORED_CVES = 30  # a stored CSAF document keeps its first 30 CVEs (story_details.csaf_advisory)
+
+
+def _all_judged(a: VendorAdvisory, judged: set[str]) -> bool:
+    """Every CVE of a third party's document has a record that judged the product (vendor_match.with_third_party). A
+    document with the full STORED_CVES may name more than were stored: never complete."""
+    cves = {str(c).upper() for c in a.cves or []}
+    return bool(cves) and len(a.cves or []) < STORED_CVES and cves <= judged
+
+
 def group_verdict(product: dict, g: dict, text: str | None) -> Verdict | None:
     """The verdict of one vulnerability for one version: the vendor decides; its CVE records (cve_verdict) only where the
-    vendor's data does not. (Called very often by target_versions: the common groups – an NVD record alone, a vendor
-    advisory with NVD records only – take the short way they always took.)"""
+    vendor's data does not. A third party's document (the BSI's CSAF) is no vendor: next to the CVE records it decides
+    only where they do not (vendor_match.with_third_party). (Called very often by target_versions: the common groups –
+    an NVD record alone, a vendor advisory with NVD records only – take the short way they always took.)"""
     a: VendorAdvisory = g["primary"]
     if not (g["cve"] or g["osv"]):
         verdict = evaluate(product, a.source, a.data or {}, text)
         if a.source == "nvd" or not g["nvd"]:
             return verdict
         extra = None
+        judged: set[str] = set()  # the CVEs whose record judged the product
         for n in g["nvd"]:
             r = evaluate(product, "nvd", n.data or {}, text)
             extra = r if extra is None or (r and ORDER[r.status] > ORDER[extra.status]) else extra
+            if r is not None:
+                judged.add(n.ident.upper())
+        if verdict is not None and verdict.detail.get("by") in THIRD_PARTY:
+            return with_third_party(verdict, extra, _all_judged(a, judged))
         if verdict is None or (verdict.status not in ("affected", "not_affected") and extra is not None and ORDER[extra.status] > ORDER[verdict.status]):
             verdict = extra or verdict
         return verdict
@@ -1490,9 +1596,14 @@ def group_verdict(product: dict, g: dict, text: str | None) -> Verdict | None:
         return cve_verdict(product, nvd, cvl, osv, text)
     verdict = evaluate(product, a.source, a.data or {}, text)
     extra = None
-    for n, c, o in _cve_records(g).values():
+    judged = set()
+    for cve, (n, c, o) in _cve_records(g).items():
         r = cve_verdict(product, n, c, o, text)
         extra = r if extra is None or (r and ORDER[r.status] > ORDER[extra.status]) else extra
+        if r is not None:
+            judged.add(cve.upper())
+    if verdict is not None and verdict.detail.get("by") in THIRD_PARTY:
+        return with_third_party(verdict, extra, _all_judged(a, judged))
     if verdict is None or (verdict.status not in ("affected", "not_affected") and extra is not None and ORDER[extra.status] > ORDER[verdict.status]):
         verdict = extra or verdict
     return verdict
@@ -1887,32 +1998,160 @@ async def load_advs(db: AsyncSession, product: str) -> list[Adv]:
     return await asyncio.to_thread(_advs, rows)
 
 
-_views: dict[str, tuple[tuple, dict]] = {}  # product → (what it was computed from, the view)
+@dataclass(slots=True)
+class _View:
+    key: tuple  # (epoch, soft generation, own generation, follow updated_at, versions) it was computed for
+    cves: frozenset  # every CVE of the product's advisories
+    shared: tuple  # the KEV entries and EUVD CVEs among them when it was computed (_shared)
+    view: dict
+    stale_since: float | None = None  # monotonic time a request first found it out of date
+
+
+STALE_MAX = 300.0  # seconds: a view out of date longer than this is not shown any more – the request waits for the new one
+_failed: dict[str, float] = {}  # product → when its last computation failed: no previous view shown until one succeeds
+
+
+_views: dict[str, _View] = {}  # product → its last view (kept after a change: shown while the new one is computed)
 _flight: dict[str, tuple[tuple, asyncio.Task]] = {}  # product → the computation running now (single flight)
 _stamp = [0]
+# a request that may show the previous view (the overview, the badge, the counts) waits this long for the new one –
+# then shows the previous one; the new one is stored when it is ready (a full bump: 4–9 s for 48 products)
+STALE_WAIT = 0.15
 
 
-async def product_view(db: AsyncSession, f: VendorFollow, vers: list[VendorVersion], *, kev: dict | None = None, euvd: set[str] | None = None) -> dict:
+def _key(f: VendorFollow, vers: list[VendorVersion]) -> tuple:
+    return (gen.epoch, _sgen.get(f.product, 0), _pgen.get(f.product, 0), f.updated_at, tuple((v.id, v.version, v.updated_at) for v in vers))
+
+
+def _shared(cves: frozenset, kev: dict, euvd: "set[str] | frozenset[str]") -> tuple:
+    """What a view shows of the shared lists – the KEV entries and EUVD CVEs of its own CVEs: a change of the lists
+    that touches none of them keeps the view (KEV and EUVD are read on every request, the views are not)."""
+    k = frozenset((c, x.date_added, x.due, x.ransomware) for c in kev.keys() & cves if (x := kev[c]) is not None)
+    return (k, frozenset(cves & euvd) if euvd else frozenset())
+
+
+def stale_deadline(wait: float | None) -> float | None:
+    """The point in time a request that may show the previous view stops waiting for the new one (wait seconds)."""
+    return None if wait is None else asyncio.get_running_loop().time() + wait
+
+
+async def product_view(
+    db: AsyncSession, f: VendorFollow, vers: list[VendorVersion], *, kev: dict | None = None, euvd: "set[str] | frozenset[str] | None" = None, deadline: float | None = None
+) -> dict:
     """Everything the page shows of one followed product – cached until its advisories, its follow or versions, the
-    KEV or the EUVD list change. Computed once at a time per product (concurrent requests wait for the same result)."""
+    KEV entries or EUVD CVEs of its CVEs change. Computed once at a time per product (concurrent requests wait for the
+    same result). `deadline` (loop time, stale_deadline): a change for all (bump()) or of shown data only (soft) – the
+    previous view is shown when the new one is not ready by then (stale while revalidate, stale_deadline); one of the product's own
+    advisories, its follow or its versions changed: always the new one."""
     kev = kev if kev is not None else await kev_index(db)
     euvd = euvd if euvd is not None else await euvd_cves(db)
-    ck = (gen.epoch, _pgen.get(f.product, 0), f.updated_at, tuple((v.id, v.version, v.updated_at) for v in vers), len(kev), hash(frozenset(euvd)))
+    key = _key(f, vers)
     hit = _views.get(f.product)
-    if hit and hit[0] == ck:
-        return hit[1]
+    if hit is not None and hit.key == key and hit.shared == _shared(hit.cves, kev, euvd):
+        return hit.view
+    now = time.monotonic()
+    if hit is not None and hit.stale_since is None:
+        hit.stale_since = now
+    # the previous view only while the new one is on its way: not after a failed computation (the error shows, as
+    # before 0.1.51 – never an old "not affected" without a hint), not when it has been out of date for STALE_MAX
+    stale_ok = (
+        deadline is not None
+        and hit is not None
+        and hit.key[2:] == key[2:]
+        and f.product not in _failed
+        and now - (hit.stale_since or now) < STALE_MAX
+    )
     run = _flight.get(f.product)
-    if run is None or run[0] != ck:
-        run = (ck, asyncio.ensure_future(_compute_view(f, vers, kev, euvd)))
+    if run is None or run[0] != key:
+        run = (key, asyncio.ensure_future(_refresh(f, vers, kev, euvd, key, background=stale_ok)))
+        run[1].add_done_callback(_retrieved)
         _flight[f.product] = run
+    task = run[1]
+    if stale_ok and not task.done():
+        # only what all products share changed (or data it shows): the previous view, unless the new one is quick
+        left = deadline - asyncio.get_running_loop().time()
+        if left <= 0:
+            return hit.view
+        try:
+            return await asyncio.wait_for(asyncio.shield(task), left)
+        except TimeoutError:
+            return hit.view
+    return await asyncio.shield(task)
+
+
+def _retrieved(task: asyncio.Task) -> None:
+    """A computation nobody waits for any more (the previous view was shown): its error is taken here (logged by
+    _refresh) – no "Task exception was never retrieved"."""
+    if not task.cancelled():
+        task.exception()
+
+
+def _background() -> asyncio.Semaphore:
+    """Recomputations while the previous view is shown go one at a time: 48 at once (one request of the badge after a
+    change for all) held the interpreter so long that the requests showing the previous views took seconds too."""
+    loop = asyncio.get_running_loop()
+    if _bg[0] is None or _bg[0][0] is not loop:
+        _bg[0] = (loop, asyncio.Semaphore(1))
+    return _bg[0][1]
+
+
+_bg: list[tuple[asyncio.AbstractEventLoop, asyncio.Semaphore] | None] = [None]
+
+
+async def _refresh(f: VendorFollow, vers: list[VendorVersion], kev: dict, euvd: "set[str] | frozenset[str]", key: tuple, *, background: bool = False) -> dict:
+    """One computation of a view – stored by itself when it is done (also when nobody waits for it any more).
+    `background`: the previous view is shown meanwhile – one such computation at a time (_background)."""
     try:
-        view = await asyncio.shield(run[1])
+        if background:
+            async with _background():
+                view, cves = await _compute_view(f, vers, kev, euvd)
+        else:
+            view, cves = await _compute_view(f, vers, kev, euvd)
+        _failed.pop(f.product, None)
+        if _key(f, vers)[:3] == key[:3]:
+            _views[f.product] = _View(key, cves, _shared(cves, kev, euvd), view)  # not when something changed meanwhile
+        return view
+    except Exception:
+        # no previous view any more for this product until a computation succeeds: the requests get the error
+        _failed[f.product] = time.monotonic()
+        log.exception("vendor view of %s could not be computed", f.product)
+        raise
     finally:
-        if _flight.get(f.product) is run and run[1].done():
+        run = _flight.get(f.product)
+        if run is not None and run[0] == key:
             _flight.pop(f.product, None)
-    if (gen.epoch, _pgen.get(f.product, 0)) == ck[:2]:
-        _views[f.product] = (ck, view)  # not when something changed while it was computed
-    return view
+
+
+_warm_on = [False]  # the vendor loop runs (main.py): a change for all recomputes the views in the background at once
+_warm_task: list[asyncio.Task | None] = [None]
+WARM_DELAY = 2.0  # seconds: several changes in a row (EPSS batches, a round) are one recomputation
+
+
+def _warm_soon() -> None:
+    if not _warm_on[0]:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    if _warm_task[0] is None or _warm_task[0].done():
+        _warm_task[0] = loop.create_task(_warm())
+
+
+async def _warm() -> None:
+    """After a change for all: every followed product's view computed anew, one after the other – the overview, the
+    badge and the counts meanwhile show the previous views, and find the new ones ready afterwards."""
+    await asyncio.sleep(WARM_DELAY)
+    try:
+        async with dbm.session() as db:
+            fs = await follows(db)
+            vers = await versions_of(db, [f.id for f in fs])
+            kev, euvd = await kev_index(db), await euvd_cves(db)
+            await dbm.release(db)
+            for f in fs:
+                await product_view(db, f, vers.get(f.id, []), kev=kev, euvd=euvd)
+    except Exception:  # noqa: BLE001 - the next request computes what is missing
+        log.exception("vendor views: the background recomputation failed")
 
 
 STRUCTURED = ("csaf", "cvelist", "epss", "osv")  # the structured sources, each switched on its own (settings)
@@ -1933,7 +2172,7 @@ def counts(a: VendorAdvisory | Adv, off: frozenset[str]) -> bool:
     return not (a.source == "csaf" and "csaf" in off and (a.data or {}).get("feed"))
 
 
-async def _compute_view(f: VendorFollow, vers: list[VendorVersion], kev: dict, euvd: set[str]) -> dict:
+async def _compute_view(f: VendorFollow, vers: list[VendorVersion], kev: dict, euvd: "set[str] | frozenset[str]") -> tuple[dict, frozenset]:
     p = product_of(f) or {"key": f.product, "label": f.product, "vendor": "", "category": "other", "scheme": "generic"}
     async with dbm.session() as db:  # its own session: a request that waits for it may end first
         advs = await load_advs(db, f.product)
@@ -1951,7 +2190,8 @@ async def _compute_view(f: VendorFollow, vers: list[VendorVersion], kev: dict, e
         await _add_epss(found)
     await _add_exploits(found)
     _stamp[0] += 1
-    return {"product": p, "findings": found, "targets": targets, "stamp": _stamp[0]}
+    cves = frozenset(str(c).upper() for a in advs for c in a.cves or [])
+    return {"product": p, "findings": found, "targets": targets, "stamp": _stamp[0]}, cves
 
 
 async def _add_epss(found: list[dict]) -> None:
@@ -2275,9 +2515,13 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
     answered = await _answered(db)
     if not (await config(db)).get("csaf", True):
         answered |= {f"csaf:{x['key']}" for x in csaf_providers.providers()}  # switched off: nothing to wait for
+    from app import advisory_cleanup
+
+    held = await advisory_cleanup.waiting(db)  # a keyword search the cleanup reset: waited for as well
     for f in fs:
         p = product_of(f)
-        if p is None or not _ready(p, answered):
+        # held for the keyword search only while the round still asks it (a catalogue change may have ended it)
+        if p is None or not _ready(p, answered) or (p["key"] in held and _keyword_search(p)):
             continue
         vs = vers.get(f.id, [])
         view = await product_view(db, f, vs, kev=kev, euvd=euvd)
@@ -2432,16 +2676,24 @@ PRUNE_RETRY = timedelta(hours=1)  # a daily prune that failed: tried again this 
 
 async def daily_prunes(db: AsyncSession, now: datetime | None = None) -> dict[str, int | None]:
     """Once a day (and after a failure an hour later): the old single lookups, the old advisory revisions and change
-    events, the EPSS scores nobody asked for a month – whether Vendor News is switched on or not (story details make
+    events, the EPSS scores nobody asked for a month, the advisories of products no longer followed (advisory_cleanup)
+    – whether Vendor News is switched on or not (story details make
     single lookups and EPSS keeps scores without it). Each one on its own: a failure is logged and rolled back, the
     others run. Returns what each removed (None: failed); {} when not due."""
-    from app import epss
+    from app import advisory_cleanup, epss
 
     now = now or datetime.now(UTC)
     if _pruned[0] is not None and now - _pruned[0] < PRUNE_EVERY:
         return {}
     out: dict[str, int | None] = {}
-    for name, fn in (("single lookups", lambda: prune_lookups(db, now)), ("advisory revisions", lambda: changes_svc.prune(db, now)), ("epss", lambda: epss._prune(db))):
+    steps = (
+        ("single lookups", lambda: prune_lookups(db, now)),
+        ("advisory revisions", lambda: changes_svc.prune(db, now)),
+        ("epss", lambda: epss._prune(db)),
+        # after the revisions: an advisory with a revision within a year stays (advisory_cleanup)
+        ("unfollowed advisories", lambda: advisory_cleanup.prune(db, now)),
+    )
+    for name, fn in steps:
         try:
             out[name] = n = await fn()
             if n:
@@ -2543,6 +2795,7 @@ class VendorLoop:
                 self.running = False
 
     async def run(self) -> None:
+        _warm_on[0] = True  # from now on a change for all recomputes the views in the background (product_view)
         while True:
             self.event.clear()
             try:

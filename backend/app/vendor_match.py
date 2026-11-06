@@ -46,6 +46,31 @@ def worst(a: Verdict | None, b: Verdict | None) -> Verdict | None:
     return a if ORDER[a.status] >= ORDER[b.status] else b
 
 
+# Where a verdict comes from – Verdict.detail["by"]; the drawer says "laut Hersteller" only for the vendor's own word:
+#   vendor  the vendor's advisory (Palo Alto, Fortinet, Veeam), a CSAF provider's own document, the CNA's affected
+#           rows of a CVE record (they name the product's vendor – eval_cna matches no other)
+#   nvd     the NVD's own analysis (CPE configurations)
+#   adp     CISA's ADP enrichment of a CVE record
+#   bsi     a CSAF document of the BSI (CERT-Bund) – a third party that sums up the vendors' data
+#   csaf    a CSAF document of another publisher that is not a provider of csaf.yaml
+#   osv     an OSV record (the ecosystem's advisory database)
+BY_VENDOR = "vendor"
+THIRD_PARTY = frozenset({"bsi", "csaf"})
+
+
+def _from(v: Verdict | None, by: str | None) -> Verdict | None:
+    """The verdict with its origin – one that already has one keeps it (a combination takes the deciding side's)."""
+    if v is not None and by and "by" not in v.detail:
+        v.detail = {**v.detail, "by": by}
+    return v
+
+
+def _like(base: Verdict | None, status: str, reason: str, fixed: str | None = None) -> Verdict:
+    """A verdict derived from another one (a version we cannot compare, a short version …): the same origin."""
+    by = base.detail.get("by") if base is not None else None
+    return Verdict(status, reason, fixed, {"by": by} if by else {})
+
+
 # ---------------------------------------------------------------- helpers
 
 
@@ -731,7 +756,12 @@ def _adp_rows(blocks: list) -> list:
     return out
 
 
-def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
+def eval_cna(product: dict, affected: list, v: V | None, by: str = BY_VENDOR) -> Verdict | None:
+    """CVE 5 affected rows (the CNA's – `by` "vendor" – or CISA's ADP rows, `by` "adp")."""
+    return _from(_eval_cna(product, affected, v), by)
+
+
+def _eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
     scheme = product.get("scheme") or "generic"
     names = _cna_names(product)
     results: list[Verdict] = []
@@ -751,7 +781,12 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                 continue
             if any(name_matches(prod, n, vendor) for n in product.get("excluded_names") or []):
                 continue  # another product the names would take (Dovecot: OX Dovecot Pro)
-            versions = [_range_row(x) for x in a.get("versions") or [] if isinstance(x, dict)]
+            raw = [x for x in a.get("versions") or [] if isinstance(x, dict)]
+            # commit ranges (the Linux kernel's versionType "git": "6fa01ccd… < 8dbed691…") say nothing about a release –
+            # read as versions they were an "affected, fix 8dbed691…" for every kernel; the semver rows decide
+            versions = [_range_row(x) for x in raw if str(x.get("versionType") or "").lower() != "git"]
+            if raw and not versions:
+                continue
             if not any(x.get("status") == "affected" for x in versions) and a.get("defaultStatus") != "affected":
                 continue
             relevant = True
@@ -764,6 +799,7 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                 continue  # SharePoint 2019's row for an installed 2016 build
             matched = False
             row_spoke = False
+            above_fix = False  # above the end of an affected range of the installed version's line: fixed there
             # NetScaler writes FIPS/NDcPP builds as lines of their own ("13.1-FIPS"): for a standard build they count
             # only where the record has no standard row for that line (12.1 – then they stay "possibly")
             plain = {k.key[:2] for x in versions if not _FLAVOUR.search(str(x.get("version") or "")) and (k := _cna_version(scheme, x.get("version"))) is not None}
@@ -801,6 +837,11 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                         tops.append(end)
                     inside = (start is None or v >= start) and (end is None or upto(v, end, incl, line))
                     if not inside:
+                        if status == "affected" and end is not None and not incl and not line and len(end.key) >= 3 and (start is None or v >= start) and _same_line(v, end):
+                            # only an exclusive bound is a fix ("< 12.9.8"); "≤ 12.9.7" or "≤ 12.9.*" names the last
+                            # affected release known – above it the defaultStatus still speaks; a two-part end ("< 12.9")
+                            # is no fix of the whole major line 12 (12.10.1): the defaultStatus decides
+                            above_fix = True  # GitLab ">=12.8, <12.9.8" for 12.9.8, PAN-OS "12.2.0 < 12.2.4" for 12.2.4-h1
                         continue
                     matched = True
                     st = _apply_changes(scheme, status, x.get("changes"), v)
@@ -840,7 +881,11 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                         else:
                             results.append(Verdict("possible", "not_listed"))
             spoke = spoke or row_spoke or not versions
-            if not matched and (row_spoke or not versions or not depth):
+            if not matched and above_fix:
+                # the fixed release (or a later one) of a line the row names: fixed – not the defaultStatus, which is
+                # about the versions the rows do not name (PAN-OS writes "affected" there, its older lines)
+                results.append(Verdict("not_affected", "fixed"))
+            elif not matched and (row_spoke or not versions or not depth):
                 d = a.get("defaultStatus")
                 if d == "affected":
                     results.append(Verdict("affected", "default_affected"))
@@ -867,6 +912,27 @@ def eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
     if tops and all(v >= t for t in tops):
         return Verdict("not_affected", "newer_than_listed")
     return Verdict("possible", "not_listed")
+
+
+def _vendor_ranges(product: dict, affected: list) -> bool:
+    """The product's own vendor wrote the CNA rows, with ranges (vendor_unaffected: its "not affected" may outweigh NVD's
+    range). The rows' vendor is the catalogue's (its vendor or CNA names – not only a CPE's), and they delimit ranges
+    (lessThan / lessThanOrEqual): a CNA listing single versions with defaultStatus "unaffected" (VulDB, MITRE) leaves
+    NVD's analysis as it is."""
+    names = [str(wv) for wv, _ in product.get("cna") or []] + [n for n in _vendor_names(str(product.get("vendor") or "")) if n]
+    if not names:
+        return False
+    wanted = [w for _, w in _cna_names(product)]
+    for src in affected or []:
+        for a in (src.get("affectedData") or []) if isinstance(src, dict) else []:
+            if not isinstance(a, dict):
+                continue
+            vendor, prod = str(a.get("vendor") or ""), str(a.get("product") or "")
+            if not any(name_matches(prod, w, vendor) for w in wanted) or not any(_same_vendor(vendor, n) for n in names):
+                continue
+            if any(isinstance(x, dict) and (x.get("lessThan") or x.get("lessThanOrEqual")) for x in (_range_row(r) for r in a.get("versions") or [] if isinstance(r, dict))):
+                return True
+    return False
 
 
 def _apply_changes(scheme: str, status, changes, v: V) -> str:
@@ -931,7 +997,7 @@ def eval_cvelist(product: dict, data: dict, v: V | None) -> Verdict | None:
         return None
     got = eval_cna(product, data.get("cna") or [], v)
     if got is None and data.get("adp") and product.get("cpes"):
-        got = eval_cna(_adp_product(product), _adp_rows(data.get("adp")), v)
+        got = eval_cna(_adp_product(product), _adp_rows(data.get("adp")), v, "adp")
     return got
 
 
@@ -985,7 +1051,7 @@ def eval_osv(product: dict, data: dict, v: V | None) -> Verdict | None:
 def eval_nvd(product: dict, data: dict, v: V | None) -> Verdict | None:
     if not filter_ok(product, data):
         return None
-    a = eval_configs(product, data.get("configs") or [], v)
+    a = _from(eval_configs(product, data.get("configs") or [], v), "nvd")
     cna, adp = data.get("cna") or [], data.get("adp") or []
     if "adp" not in data and len(cna) > 1:
         cna, adp = cna[:1], cna[1:]  # stored before 0.1.47 (one list, the CNA's block first): the others are ADPs
@@ -994,9 +1060,15 @@ def eval_nvd(product: dict, data: dict, v: V | None) -> Verdict | None:
         # CISA's ADP only where the CNA does not name the product and NVD's analysis decides nothing (none, or only
         # "possibly": vCenter's exact update CPEs, CVE-2024-37080 – CISA's "8.0 < 8.0u2d" settles it) – never over a
         # clear NVD verdict (VMware Cloud Foundation CVE-2022-22948: CISA "4.0 – < 5.0", NVD "< 4.4.1")
-        b = eval_cna(_adp_product(product), _adp_rows(adp), v)
+        b = eval_cna(_adp_product(product), _adp_rows(adp), v, "adp")
     if a is None or b is None:
         return a or b
+    if a.status == "affected" and b.status == "not_affected" and b.reason in ("out_of_range", "fixed") and b.detail.get("by") == BY_VENDOR and _vendor_ranges(product, cna):
+        # the vendor names its affected ranges and says this version is not affected – outside of them with every
+        # other version "unaffected" (defaultStatus), or the fix of its line (GitLab CVE-2026-84284: "19.3 < 19.3.6"
+        # for 19.3.7) –, NVD's range takes in more (PAN-OS CVE-2026-0262: NVD "< 10.2.7", the vendor 10.2 on only;
+        # GitLab: NVD "< 19.4.2"): one says no, the other yes – "possibly", with both named
+        return Verdict("possible", "vendor_unaffected", a.fixed, {"by": "nvd"})
     if a.status == "affected" or b.status == "affected":
         return a if a.status == "affected" else b
     if b.status == "not_affected" and a.status in ("possible", "not_affected"):
@@ -1221,11 +1293,59 @@ def entries_for(product: dict, data: dict) -> list[dict]:
     return out
 
 
+# CSAF publishers that are the vendor itself (the stories' own documents of Siemens, Cisco, Fortinet – older records
+# without the provider key); every other provider-less document comes from a coordinator (the BSI's WID)
+VENDOR_PUBLISHERS = ("siemens", "cisco", "fortinet")
+
+
+def csaf_by(data: dict) -> str:
+    """Who speaks in a CSAF document: "vendor" (a CSAF provider of csaf.yaml – its documents are checked to be its own
+    –, or a vendor's document that came with a story), "bsi" (CERT-Bund's WID documents) or "csaf" (another publisher)."""
+    if data.get("provider"):
+        return BY_VENDOR
+    pub = str(data.get("publisher") or "").strip().lower()
+    if pub.startswith("bsi") or str(data.get("kind") or "") == "bsi":
+        return "bsi"
+    if any(pub.startswith(n) for n in VENDOR_PUBLISHERS) or str(data.get("kind") or "") in VENDOR_PUBLISHERS:
+        return BY_VENDOR
+    return "csaf"
+
+
 def eval_csaf(product: dict, data: dict, v: V | None) -> Verdict | None:
     best = None
     for e in entries_for(product, data):
         best = worst(best, eval_ranges(product.get("scheme") or "generic", e, v))
-    return best
+    return _from(best, csaf_by(data))
+
+
+def with_third_party(own: Verdict | None, records: Verdict | None, complete: bool = True) -> Verdict | None:
+    """A third party's verdict (a BSI document: csaf_by "bsi"/"csaf") next to the CVE records of its CVEs (the CNA –
+    the vendor –, the NVD, CISA, OSV): the third party sums up several CVEs and the vendors' data, it does not decide
+    against them.
+    - "every version affected" without a version (all_listed) against records that say "not affected": "possibly",
+      with the source named (BSI lists "Red Hat Enterprise Linux" for a package of it)
+    - "not affected" against records that say "affected": the records (BSI's per-line bounds "<3.16.0, <3.15.2"
+      merge two CVEs – one of them affects 3.15.2, CVE-2026-103995)
+    - "possibly" (or nothing): the records where they decide – their "not affected" only when `complete`: every CVE
+      of the document has a record that judged the product (a CVE without one, or whose record does not name the
+      product, may be the one that affects the version: the third party's "possibly" stays)
+    Otherwise the third party's verdict stays (its range, where the records do not decide)."""
+    if own is None:
+        return records
+    if records is None:
+        return own
+    who = own.detail.get("by")
+    if own.status == "affected" and own.reason == "all_listed":
+        if records.status == "not_affected":
+            return Verdict("possible", "all_listed_disputed", None, {"by": who} if who else {})
+        if records.status == "affected":
+            return records  # the records' range (with its fix) is more precise than "every version"
+        return own
+    if own.status == "not_affected" and records.status == "affected":
+        return records
+    if own.status not in ("affected", "not_affected") and (records.status == "affected" or (records.status == "not_affected" and complete)):
+        return records
+    return own
 
 
 
@@ -1273,19 +1393,19 @@ def evaluate(product: dict, source: str, data: dict, version: str | None) -> Ver
         version = version_input.effective(product, version)
         if version is None:
             base = evaluate(product, source, data, None)
-            return Verdict("possible", "unparsed_version") if base is not None and base.status != "not_affected" else base
+            return _like(base, "possible", "unparsed_version") if base is not None and base.status != "not_affected" else base
     v = parse(scheme, version) if version else None
     if scheme == "cisco" and v is not None and ios_classic(v.text):
         # classic IOS (15.9(3)M9): compared within its train only – a listed release says "affected", nothing says
         # "not affected" (the next train may be unassessed)
         got = _evaluate(product, source, data, v)
         if got is not None and got.status == "not_affected":
-            return Verdict("possible", "ios_train")
+            return _like(got, "possible", "ios_train")
         return got
     if version and v is None and scheme not in ("cloud",):
         # a version we cannot compare: never "not affected" – but only for advisories that concern the product at all
         base = evaluate(product, source, data, None)
-        return Verdict("possible", "unparsed_version") if base is not None and base.status != "not_affected" else base
+        return _like(base, "possible", "unparsed_version") if base is not None and base.status != "not_affected" else base
     if scheme == "veeam" and v is not None and v.depth < VEEAM_BUILD_DEPTH:
         # "12.3.2" without its build: decided only where the first and the last build of 12.3.2 get the same verdict
         pad = VEEAM_BUILD_DEPTH - v.depth
@@ -1293,7 +1413,7 @@ def evaluate(product: dict, source: str, data: dict, version: str | None) -> Ver
         hi = _evaluate(product, source, data, V(v.key + (VEEAM_TOP,) * pad, v.text))
         if lo is None or hi is None or lo.status == hi.status:
             return lo or hi
-        return Verdict("possible", "build_needed", lo.fixed or hi.fixed)
+        return _like(lo, "possible", "build_needed", lo.fixed or hi.fixed)
     if v is not None and scheme not in ("panos", "windows", "ivanti", "cloud", "distro", "sap") and v.depth < (depth := _depth(product)):
         # a short version ("7.4" for FortiOS, "1.25" for nginx) stands for every release inside it: decided only where
         # all of them the data can tell apart get the same verdict – never "not affected" because 7.4 = 7.4.0 is
@@ -1306,30 +1426,30 @@ def evaluate(product: dict, source: str, data: dict, version: str | None) -> Ver
             if len({g.status for g in known}) == 1 and len(known) == len(got):
                 return known[0]
             fix = next((g.fixed for g in known if g.status == "affected" and g.fixed), None)
-            return Verdict("possible", "short_version", fix)
+            return _like(next((g for g in known if g.status == "affected"), known[0]), "possible", "short_version", fix)
     return _evaluate(product, source, data, v)
 
 
 def _evaluate(product: dict, source: str, data: dict, v: V | None) -> Verdict | None:
     scheme = product.get("scheme") or "generic"
     if source == "veeam":
-        return eval_veeam(product, data, v)
+        return _from(eval_veeam(product, data, v), BY_VENDOR)
     if source == "paloalto":
-        return eval_paloalto(product, data, v)
+        return _from(eval_paloalto(product, data, v), BY_VENDOR)
     if source == "fortinet":
-        return eval_fortinet(product, data, v)
+        return _from(eval_fortinet(product, data, v), BY_VENDOR)
     if source == "csaf":
         return eval_csaf(product, data, v)
     if source == "nvd":
         if scheme == "cloud":
             r = eval_nvd(product, data, None)
-            return Verdict("service", "cloud") if r is not None else None
+            return _like(r, "service", "cloud") if r is not None else None
         return eval_nvd(product, data, v)
     if source == "cvelist":
         if scheme == "cloud":
             r = eval_cvelist(product, data, None)
-            return Verdict("service", "cloud") if r is not None else None
+            return _like(r, "service", "cloud") if r is not None else None
         return eval_cvelist(product, data, v)
     if source == "osv":
-        return eval_osv(product, data, v) if scheme != "cloud" else None
+        return _from(eval_osv(product, data, v), "osv") if scheme != "cloud" else None
     return None

@@ -11,6 +11,7 @@ import { QueryError } from "@/components/cobe/query-state"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
 import { type ReviewItem, confirmAll, confirmVersion, groupByTeam, refreshReview, useReview } from "@/lib/version-review"
+import { iso } from "@/lib/bidi"
 
 /**
  * "Versionen prüfen" above the overview (filter "zu prüfen"): the versions not confirmed within the interval that the
@@ -136,9 +137,9 @@ function Row({ i, busy, onOpen, onOne, onAll }: { i: ReviewItem; busy: string | 
         {i.versions.map((v) => (
           <li key={v.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
             <span className="font-mono font-medium break-all">{v.version}</span>
-            {v.label && <span className="text-muted-foreground">{v.label}</span>}
+            {v.label && <bdi className="text-muted-foreground">{v.label}</bdi>}
             <span className="text-warning">{t("review.since", { count: v.age_days })}</span>
-            {v.confirmed_by && <span className="text-muted-foreground">· {t("review.by", { name: v.confirmed_by })}</span>}
+            {v.confirmed_by && <span className="text-muted-foreground">· {t("review.by", { name: iso(v.confirmed_by) })}</span>}
             {i.can_confirm && (
               <Button variant="outline" size="xs" className="ml-auto" disabled={!!busy} onClick={() => onOne(v.id)} title={t("review.confirmHint")}>
                 {busy === `v:${v.id}` ? <Loader2 className="animate-spin" /> : <Check />} {t("review.confirm")}

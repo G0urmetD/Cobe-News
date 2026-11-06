@@ -58,12 +58,33 @@ tab) and "Close".
   Vendor News ([more](#unsere-produkte)) – it applies on top of all other filters.
 - The browser also remembers source, severity, topic and "Concerns our products" for your account (when you have no
   default view).
-- "Reset filter" clears source, severity, topic and "Concerns our products".
+- **Time range**: only stories from a span of time. Quick picks: *Last hour*, *Today* (from 00:00), *Yesterday*,
+  *24 hours*, *7 days*, *30 days* and *Since my last visit*. Or a **custom range** with *From* and *To* (date and time
+  in your browser's local time, e.g. CET); an empty field is an open end, a date without a time in *To* includes the
+  whole day. *Time refers to* picks whether the story's date counts (**Published**, the default) or when Cobe News
+  fetched it (**Received** – also older stories a source only delivers now). While a range is on, the button shows it
+  briefly ("Today", "05/11 08:00 – now") and a chip appears below ("Time range: today, since 00:00 ×") with the number
+  of hits; the × removes it. The range applies to the list, the quick filters' numbers, "Unread only" and "Mark all
+  read".
+- **Since my last visit** counts from the moment you last chose "Mark all read" **without** a filter (before that:
+  since your account was created) – next to it how long ago that was ("14 hours ago"). It counts by arrival; unlike
+  "Unread only", a story stays in the list when you open it.
+- In the link and in a saved view a quick pick is kept by its name, not as a fixed time: a view "Today" shows the then
+  current day tomorrow too. A custom range is stored with its points in time.
+- "Reset filter" clears source, severity, topic, "Concerns our products" and the time range.
 - **Unread only**: hides what is read. **Show muted**: also shows the stories whose CVEs you all muted (pale) – otherwise
   they are left out.
 - **Views**: save the filters under a name, make one the default, share it as a link ([Views](/docs/erste-schritte#ansichten)).
 - "Mark all read" acts on exactly the unread stories that currently match the search and filters
   ([Read and unread](/docs/erste-schritte#gelesen)).
+
+### From a notification {#aus-benachrichtigung}
+
+A notification with several stories links them together: `https://<cobe-news>/?ids=<id>,<id>,…` (at most 50). The
+list then shows exactly these stories, newest first – read or not, muted ones too – and the chip "From the
+notification: 3 stories ×". The other filters rest meanwhile; the ×, "Reset filter" or changing a filter leads back to
+the normal list. A story deleted meanwhile (retention time) is simply missing. "Mark all read" marks only these stories
+here. Such a link never becomes part of a saved view; with `&story=<id>` it opens one of the stories right away.
 
 ### Each story only once {#doppelte}
 

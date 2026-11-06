@@ -20,6 +20,7 @@ import { errorText } from "@/lib/errors"
 import { PERSONAL_KINDS, type PersonalKind, type PersonalNotify, type WayState, upcoming, usePersonalNotify, wayState } from "@/lib/teams-api"
 import { SaveBar, SettingsCard, SheetActions, SheetBody, SheetLoading } from "@/pages/settings-shared"
 import { AbsencePart, QuietPart, WeeklyPart } from "@/pages/settings-delivery"
+import { isoList } from "@/lib/bidi"
 
 const SEVERITIES = ["critical", "high", "medium", "low", "info"] as const
 
@@ -141,7 +142,7 @@ function PersonalForm({ initial }: { initial: PersonalNotify }) {
             <ul className="flex flex-wrap gap-1.5">
               {initial.products.map((p) => (
                 <li key={p.key}>
-                  <Pill color="--primary" title={t("personal.fromTeams", { teams: p.teams.join(", ") })} className="h-auto max-w-full py-0.5 whitespace-normal">
+                  <Pill color="--primary" title={t("personal.fromTeams", { teams: isoList(p.teams) })} className="h-auto max-w-full py-0.5 whitespace-normal">
                     <span className="[overflow-wrap:anywhere]">{p.label}</span>
                   </Pill>
                 </li>

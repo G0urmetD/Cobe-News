@@ -2,6 +2,53 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.51 – Zeitfilter für News, Abgleich nach Quelle, Download verschlüsselter Sicherungen
+
+### Neu
+- **News: Filter „Zeitraum“** – Letzte Stunde, Heute, Gestern, 24 Stunden, 7 Tage, 30 Tage, „Seit meinem letzten Besuch“ oder ein eigener Zeitraum (Von/Bis mit Uhrzeit, Ortszeit); wahlweise nach Veröffentlichung oder Eingang. Aktiver Zeitraum als Chip mit Trefferzahl, im Link und in Ansichten (Schnellauswahl bleibt relativ: „Heute“ ist immer heute). Er gilt auch für die Schnellfilter-Zahlen, „Nur ungelesene“ und „Alle als gelesen“ (markiert nur, was der Filter zeigt).
+- **Verschlüsselte Sicherungen herunterladen**: `.tar.enc` lassen sich in der App herunterladen – mit Rückfrage (die Datei braucht zum Einspielen die Passphrase) und erneuter Bestätigung der Identität; der Download steht als auffälliger Eintrag im Protokoll. Gestreamt, nur Sicherungen aus der Liste, höchstens 6 je Stunde und einer zur Zeit je Admin; das mitgelieferte nginx reicht ihn ungepuffert durch. Unverschlüsselte Sicherungen bleiben auf dem Server („Nur auf dem Server“, mit Grund).
+
+### Verbessert
+- **Vendor News ohne Hänger**: Nach einer Änderung für alle (Katalog, Einstellungen, EPSS) zeigen Übersicht, Seitenleisten-Zahl und Zähler die bisherigen Bewertungen, bis die neuen im Hintergrund berechnet sind – statt 4–9 Sekunden zu blockieren; KEV- und EUVD-Änderungen berechnen nur die betroffenen Produkte neu, EPSS- und Exploit-Listen nur die Produkte mit den geänderten CVEs.
+- **CVE beobachten** liest die Hinweise über einen neuen Index (Migration 0034) – die Liste lädt in Millisekunden statt mehreren hundert; **/api/v1/vendor/findings** sortiert nur noch einmal je Datenstand.
+- **News-Suche unter 3 Zeichen** liefert die Liste ohne Zahlen, mit Hinweis wie im Protokoll – schnell statt bis 550 ms.
+- **Die Seite nennt den Grund**: Datenbank nicht erreichbar, Serverfehler, Server nicht erreichbar; ist der Browser offline, erscheint ein Hinweis statt endlosem „Wird geladen …“.
+- **Eingegebene Namen können die Anzeige nicht mehr verdrehen**: Enthält ein Name oder eine Bezeichnung (Versionen, Regeln, Kanäle, Teams, Verzeichnisnamen, Zustellprotokoll) Schriftzeichen mit anderer Schreibrichtung oder unsichtbare Richtungszeichen, wird er abgeschirmt – der Text daneben bleibt in der richtigen Reihenfolge, und niemand kann so einen Wert vortäuschen. Die Oberfläche bleibt Deutsch und Englisch.
+- **Vendor News**: Abgeschaltet zeigt die Seitenleiste weder Zahl noch roten Punkt; der Versionen-Reiter zeigt „Update verfügbar → …“ wie die Karte, wenn endoflife.date den neueren Fix noch nicht kennt; schlägt jeder Abruf fehl, steht „Abruf fehlgeschlagen“ statt „Erster Abruf läuft“.
+- **„Cobe News öffnen“ führt zum Inhalt**: Bei einer Meldung öffnet der Knopf (Mail, Slack, Teams, Klick auf ntfy/Gotify/Desktop-Push) genau diese Meldung; bei mehreren die News-Liste gefiltert auf genau die Meldungen der Nachricht (`/?ids=…`, bis 50, sonst die ganze Liste) mit Chip „Aus der Benachrichtigung“. Vendor-News-Befunde eines Produkts öffnen das Produkt, eine weitergeleitete Meldung sich selbst.
+- **Ortszeit auch in Chat-Karten und Weiterleitungen**: Teams, Slack, Discord, Telegram, Mattermost, ntfy, Gotify und „An mein Team weiterleiten“ zeigen die Zeit in Ortszeit mit Zone statt UTC – Kanäle in Europe/Berlin, die persönliche Teams-Karte in der Zeitzone der Person.
+- **Persönliche Teams-Karte und Push in derselben Reihenfolge wie die Mail**: zuerst aktiv ausgenutzte und kritische Meldungen, dann nach Schwere.
+- **Jeder Grund einer Bewertung nennt seine Quelle**: „laut Hersteller“ nur noch, wo das Urteil vom Hersteller kommt, sonst „laut NVD“, „laut CISA (ADP)“, „laut BSI“, „laut OSV“ oder „Quelle: …“.
+- **Vendor News räumt alte Hinweise auf**: Hinweise (NVD, Palo Alto, Veeam, cvelistV5, OSV) zu Produkten, denen niemand mehr folgt oder die ausgeschaltet sind, werden ein Jahr nach ihrem letzten Speichern gelöscht – täglich in kleinen Portionen. Sie bleiben, solange eine ihrer CVEs beobachtet wird, eine gespeicherte Meldung sie nennt oder Meldungs-Details auf sie zeigen, oder solange sie im letzten Jahr eine Revision hatten. CSAF-Dokumente und Fortinet-Hinweise bleiben immer (sie ließen sich nicht vollständig neu abrufen).
+- **Wieder folgen holt alles neu**: Folgt ihr einem Produkt wieder (oder schaltet es ein), beginnen seine Abfragen von vorn und holen gelöschte Hinweise vollständig zurück; die Auswertung wartet darauf, und wie bei einem neu gefolgten Produkt wird nichts Altes gemeldet.
+- **Sicherungsliste** ordnet ihre Spalten nach der eigenen Breite – auch auf mittleren Bildschirmen ragt nichts heraus.
+
+### Fixes
+- **Keine stille veraltete Bewertung**: Schlägt die Neuberechnung eines Produkts fehl, zeigen Übersicht, Seitenleisten-Zahl und Zähler nicht dauerhaft den alten Stand – der Fehler wird angezeigt und protokolliert; ein Stand, der länger als fünf Minuten veraltet ist, wird nicht mehr gezeigt.
+- **Zweiteilige Grenzen** („< 12.9“) gelten nicht als Fix der ganzen Hauptlinie – es entscheidet der Standardstatus des Eintrags; ein BSI-Dokument mit voller gespeicherter CVE-Liste gilt nie als vollständig bewertet.
+- **Wieder gefolgtes Produkt** wird auch dann bewertet, wenn seine zurückgesetzte Stichwortsuche nach einer Katalogänderung nicht mehr läuft.
+- **„Datenbank nicht erreichbar“** (503) nur noch bei Fehlern der Datenbank – ein abgewiesener Verbindungsversuch eines Webhook- oder Mail-Tests bleibt ein normaler Fehler.
+- **Kein neues falsches „nicht betroffen“**: Ein „möglicherweise“ eines BSI-Dokuments wird nur noch zu „nicht betroffen“, wenn jede seiner CVEs einen CVE-Eintrag hat, der das Produkt bewertet; nur eine ausschließende Grenze („< 12.9.8“) gilt als Fix der Linie; „laut Hersteller nicht betroffen“ stuft das „betroffen“ der NVD nur herab, wenn der Hersteller selbst Bereiche angibt.
+- **Aufräumen verliert nichts bei gemeinsamer CPE**: Ein Hinweis, den die Abfrage eines noch gefolgten Produkts liefert (Windows-Server-Rollen, Firefox/ESR, PAN-OS/Panorama …), bleibt; wieder folgen wartet auch auf die Stichwortsuche. BSI-Dokumente aus Meldungen, die kein Produkt betreffen, werden nach einem Jahr aufgeräumt.
+- **Katalog-Pflege**: Das Stundenbudget zählt jede gesendete Anfrage genau einmal (bisher doppelt – das Budget war halbiert, daher „stopped: budget“ bei jedem Lauf); ist die NVD nicht erreichbar, endet der Schritt bei der ersten Störung.
+- **Versionen**: unsichtbare Zeichen und Richtungszeichen werden entfernt, Vollbreiten-Ziffern gelten als normale; dieselbe Version mit derselben Bezeichnung wird mit Hinweis abgelehnt.
+- **News-Quellen**: derselbe Feed in anderer Schreibweise (Host groß, IDNA, Standard-Port) wird als vorhanden erkannt.
+- **HEAD-Anfragen** funktionieren überall, wo GET öffentlich ist; ohne Datenbank antwortet `/api/health` mit 503 statt 500.
+- **News**: Ein Link `?story=` mit ungültiger Kennung zeigt „Meldung nicht mehr vorhanden“; ein unbekannter Bewertungsgrund erscheint als Satz statt als Textschlüssel („Microsoft Patchday“ wird lesbar angezeigt).
+- **Sicherung**: „Ein Download zur Zeit“ gilt auch bei gleichzeitigen Anfragen.
+- **Vendor News**: Ein unbekanntes Produkt zeigt im Kopf nicht mehr dauerhaft „Wird geladen …“.
+- **BSI-Warnungen gelten nicht mehr als Herstellerhinweis**: „alle Versionen“ ohne Versionsangabe wird gegen CVE-Einträge, die „nicht betroffen“ sagen, zu „möglicherweise betroffen“; ein „nicht betroffen“ des BSI zählt nie mehr gegen ein „betroffen“ der CVE-Einträge (z. B. Python 3.15.2, CVE-2026-103995).
+- **Hersteller gegen NVD-Analyse**: Sagt der Hersteller ausdrücklich „nicht betroffen“ (außerhalb seiner Bereiche oder Fix der Linie), die NVD-Analyse aber „betroffen“, steht „möglicherweise betroffen“ mit beiden Quellen.
+- **Fix-Releases**: Ein Release über dem Ende eines betroffenen Bereichs derselben Linie gilt als behoben (GitLab 12.9.8, PAN-OS 12.2.4-h1, PHP 8.5.12).
+- **Linux-Kernel**: Commit-Bereiche werden nicht mehr als Versionen gelesen – vorher „betroffen, Fix in <Commit>“ für Kernel, die das Problem nicht haben.
+
+### Betrieb
+- **Migration 0034**: Index auf `vendor_advisories.ident`.
+- **Speicher**: Empfehlung `APP_MEM=768m` ab etwa 30 Produkten oder 20 000 Hinweisen, `1g` ab 100 Produkten (Standard bleibt 512m); Handbuch: sehr große Sicherungen (ab etwa 1 GB) besser per `docker cp` kopieren.
+- **Release-Pipeline**: Die drei Images werden zuerst nur unter ihrem Digest abgelegt und signiert; erst wenn alle drei gebaut und signiert sind (und Signaturen und Attestierungen geprüft), bekommen genau diese Digests den Versions-Tag – ohne Neubau. `latest` zeigt nur auf das höchste Release; ein abgebrochener Lauf hinterlässt keinen halben Stand.
+- **Erster Lauf nach dem Update**: Auf einer Installation, die schon lange Produkte entfolgt hat, löscht der erste tägliche Lauf viele Hinweise auf einmal (gemessen: rund 150 000 in 22 s, ohne spürbare Wartezeit).
+- **Eigener Reverse Proxy**: den Pfad `/api/admin/backup/files/` ungepuffert durchreichen (Handbuch).
+
 ## 0.1.50 – Protokoll mit Zusammenhang und Integritätskette, Aufbewahrung robust, Sicherungen verständlich
 
 ### Neu

@@ -1,6 +1,9 @@
-# Release: runs only when a release tag is pushed (e.g. `git tag v0.1.47 && git push origin v0.1.47`) – never on
+# Release: runs only when a release tag is pushed (e.g. `git tag v0.1.51 && git push origin v0.1.51`) – never on
 # commits or pull requests. First all checks; only when they are green the three images (app, database, proxy) are
-# built, pushed to ghcr.io and signed, and the GitHub release is written from the matching CHANGELOG.md section.
+# built and pushed to ghcr.io by digest only (no tag yet) and signed; only when all three are built and signed, and the
+# signatures and attestations check out, the job "publish" puts the version tag on the three signed digests – and
+# `latest`, only when this tag is the highest release so far (a backport never moves it back) – without a rebuild;
+# then the GitHub release is written from the matching CHANGELOG.md section.
 name: release
 
 on:
@@ -112,8 +115,9 @@ jobs:
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
 
+  # build and sign – by digest only: nothing here moves a tag, so a failure leaves no tag behind (only untagged digests)
   image:
-    name: Images (amd64 + arm64), signed
+    name: Images (amd64 + arm64), by digest, signed
     needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -144,9 +148,6 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
           labels: |
             org.opencontainers.image.title=Cobe News
             org.opencontainers.image.description=Self-hosted security news and vendor advisories
@@ -157,8 +158,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
           provenance: mode=max
           sbom: true
@@ -168,9 +168,6 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.DB_IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
           labels: |
             org.opencontainers.image.title=Cobe News database
             org.opencontainers.image.description=PostgreSQL 18 for Cobe News – sets up the app's own role at every start
@@ -181,8 +178,7 @@ jobs:
         with:
           context: deploy/postgres
           platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta-db.outputs.tags }}
+          outputs: type=image,name=${{ env.DB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta-db.outputs.labels }}
           provenance: mode=max
           sbom: true
@@ -192,9 +188,6 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.PROXY_IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
           labels: |
             org.opencontainers.image.title=Cobe News proxy
             org.opencontainers.image.description=nginx for Cobe News – TLS, known host names only, certificate watch
@@ -205,14 +198,15 @@ jobs:
         with:
           context: deploy/nginx
           platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta-proxy.outputs.tags }}
+          outputs: type=image,name=${{ env.PROXY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta-proxy.outputs.labels }}
           provenance: mode=max
           sbom: true
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
+      # the digest of each multi-arch index – it holds the images and their provenance and SBOM attestations, so the
+      # signature covers all of it and still holds for every tag put on that digest later
       - name: Sign the images (keyless)
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -224,9 +218,105 @@ jobs:
           cosign sign --yes "${DB_IMAGE}@${DB_DIGEST}"
           cosign sign --yes "${PROXY_IMAGE}@${PROXY_DIGEST}"
 
+  # the tags – only after all three are built and signed: the version on the signed digests (no rebuild, the same
+  # index), `latest` only when this tag is the highest release; one at a time across tags (two releases never race
+  # for latest)
+  publish:
+    name: Tags on the signed digests (version, latest)
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: release-tags
+      cancel-in-progress: false
+    outputs:
+      latest: ${{ steps.latest.outputs.move }}
+    env:
+      DIGEST: ${{ needs.image.outputs.digest }}
+      DB_DIGEST: ${{ needs.image.outputs.db-digest }}
+      PROXY_DIGEST: ${{ needs.image.outputs.proxy-digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # all release tags: is this the highest?
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      # before any tag: each digest signed by this workflow at this tag, and carrying its provenance and SBOM
+      # (an attestation manifest per platform in the index)
+      - name: Check signatures and attestations
+        run: |
+          set -euo pipefail
+          for ref in "${IMAGE}@${DIGEST}" "${DB_IMAGE}@${DB_DIGEST}" "${PROXY_IMAGE}@${PROXY_DIGEST}"; do
+            cosign verify "$ref" \
+              --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com >/dev/null
+            n=$(docker buildx imagetools inspect --raw "$ref" \
+              | jq '[.manifests[] | select(.annotations["vnd.docker.reference.type"] == "attestation-manifest")] | length')
+            if [ "$n" -lt 2 ]; then
+              echo "::error::$ref: $n attestation manifests, expected one per platform (provenance + SBOM)"
+              exit 1
+            fi
+            echo "$ref: signed, $n attestation manifests"
+          done
+
+      - id: latest
+        name: Is this the highest release so far?
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          highest=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+          if [ "$TAG" = "$highest" ]; then
+            echo "move=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG is the highest release – latest moves to it"
+          else
+            echo "move=false" >> "$GITHUB_OUTPUT"
+            echo "$TAG is not the highest release ($highest) – latest stays"
+          fi
+
+      # `imagetools create` with a single source copies it as it is: the same index under a new tag (checked below –
+      # a different digest would not be what was signed)
+      - name: Version tag (and latest) on the signed digests
+        env:
+          TAG: ${{ github.ref_name }}
+          MOVE_LATEST: ${{ steps.latest.outputs.move }}
+        run: |
+          set -euo pipefail
+          v="${TAG#v}"
+          put() {
+            docker buildx imagetools create --tag "$1:$3" "$1@$2"
+            got=$(docker buildx imagetools inspect --format '{{json .Manifest}}' "$1:$3" | jq -r .digest)
+            if [ "$got" != "$2" ]; then
+              echo "::error::$1:$3 points to $got, not to the signed $2"
+              exit 1
+            fi
+            echo "$1:$3 → $2"
+          }
+          put "$IMAGE" "$DIGEST" "$v"
+          put "$DB_IMAGE" "$DB_DIGEST" "$v"
+          put "$PROXY_IMAGE" "$PROXY_DIGEST" "$v"
+          if [ "$MOVE_LATEST" = true ]; then
+            put "$IMAGE" "$DIGEST" latest
+            put "$DB_IMAGE" "$DB_DIGEST" latest
+            put "$PROXY_IMAGE" "$PROXY_DIGEST" latest
+          fi
+
   release:
     name: GitHub release
-    needs: image
+    needs: [image, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -242,6 +332,7 @@ jobs:
           DIGEST: ${{ needs.image.outputs.digest }}
           DB_DIGEST: ${{ needs.image.outputs.db-digest }}
           PROXY_DIGEST: ${{ needs.image.outputs.proxy-digest }}
+          LATEST: ${{ needs.publish.outputs.latest }}
         run: |
           set -euo pipefail
           v="${TAG#v}"
@@ -266,7 +357,13 @@ jobs:
             echo "| \`${DB_IMAGE}:${v}\` | \`${DB_DIGEST}\` |"
             echo "| \`${PROXY_IMAGE}:${v}\` | \`${PROXY_DIGEST}\` |"
             echo
-            echo "All three signed with cosign (keyless, GitHub OIDC). Portainer: docker-compose.portainer.yml of this tag (COBE_NEWS_VERSION=${v})."
+            echo "All three signed with cosign (keyless, GitHub OIDC) – the signature covers the digest, every tag on it verifies."
+            if [ "$LATEST" = true ]; then
+              echo "\`latest\` points to this release."
+            else
+              echo "\`latest\` stays on a higher release (this one is a backport)."
+            fi
+            echo "Portainer: docker-compose.portainer.yml of this tag (COBE_NEWS_VERSION=${v})."
           } >> notes.md
 
       - name: Create the release

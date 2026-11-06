@@ -531,6 +531,108 @@ async def status(s: AsyncSession) -> dict:
     }
 
 
+# ---------------------------------------------------------------- download (admin UI, encrypted backups only)
+
+# An unencrypted backup holds the whole database readable – it never leaves the server through the browser (docker cp,
+# docs/handbuch: Sicherung → Schritt für Schritt). An encrypted one is useless without the passphrase: an admin may
+# download it after a fresh proof of identity, logged (backup.downloaded), a few per hour, one at a time.
+DOWNLOADS_PER_HOUR = 6
+DOWNLOAD_CHUNK = 1 << 20  # bytes read per step (in a thread – the event loop never waits on the disk)
+DOWNLOAD_SLOT_MAX = 6 * 3600.0  # s: a slot older than this belongs to a download that never finished – freed
+_dl_starts: dict[str, list[float]] = {}  # admin id → monotonic start times of the last hour
+_dl_running: dict[str, tuple[str, float]] = {}  # admin id → (the download's token, when it was claimed)
+
+
+class DownloadRefused(Exception):
+    """Not offered: `status`/`code` for the API (404 not_found, 403 backup_not_encrypted, 409 backup_download_busy,
+    429 backup_download_rate_limited with `retry` seconds)."""
+
+    def __init__(self, status: int, code: str, retry: int | None = None) -> None:
+        super().__init__(code)
+        self.status, self.code, self.retry = status, code, retry
+
+
+@dataclass(frozen=True)
+class Download:
+    name: str
+    size: int
+    dev: int
+    ino: int
+    token: str = ""  # its claim on the admin's slot (release_download frees only its own)
+
+
+def _open_backup(name: str) -> tuple[int, os.stat_result]:
+    """The backup's file opened read-only: never through a symlink (O_NOFOLLOW), never blocking (O_NONBLOCK), a regular
+    file only (fstat on the open descriptor)."""
+    try:
+        fd = os.open(get_config().backup_dir / name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    except OSError:
+        raise DownloadRefused(404, "not_found") from None
+    st = os.fstat(fd)
+    if not stat.S_ISREG(st.st_mode):
+        os.close(fd)
+        raise DownloadRefused(404, "not_found")
+    return fd, st
+
+
+def prepare_download(name: str, user_id: str) -> Download:
+    """An encrypted backup of the list, checked for a download by this admin – names only from BACKUP_DIR's listing and
+    its pattern (no path, no hidden or half-written file, nothing outside the folder), a few per hour, one at a time."""
+    m = NAME_RX.match(name)
+    if not m or name not in {x["name"] for x in listing()}:
+        raise DownloadRefused(404, "not_found")
+    if not m.group(2):
+        raise DownloadRefused(403, "backup_not_encrypted")
+    now = time.monotonic()
+    held = _dl_running.get(user_id)
+    if held is not None and now - held[1] < DOWNLOAD_SLOT_MAX:
+        raise DownloadRefused(409, "backup_download_busy")
+    starts = [t for t in _dl_starts.get(user_id, []) if now - t < 3600]
+    if len(starts) >= DOWNLOADS_PER_HOUR:
+        raise DownloadRefused(429, "backup_download_rate_limited", retry=int(3600 - (now - starts[0])) + 1)
+    fd, st = _open_backup(name)
+    os.close(fd)  # opened again by the stream itself – an answer that is never sent leaves nothing open
+    starts.append(now)
+    _dl_starts[user_id] = starts
+    # the slot is claimed here, in the same step as the check (no await in between): a second request in parallel finds
+    # it taken. Freed by release_download – when the stream ends, fails or is cancelled, or the answer is never sent
+    token = secrets.token_hex(8)
+    _dl_running[user_id] = (token, now)
+    return Download(name=name, size=st.st_size, dev=st.st_dev, ino=st.st_ino, token=token)
+
+
+def release_download(dl: Download, user_id: str) -> None:
+    """Frees the admin's slot – only when it is still this download's (a newer one, after a stale slot, keeps its own).
+    Called more than once for one download (the stream's end and the answer's end): harmless."""
+    held = _dl_running.get(user_id)
+    if held is not None and held[0] == dl.token:
+        del _dl_running[user_id]
+
+
+async def stream_download(dl: Download, user_id: str):  # noqa: ANN201 - an async iterator of bytes
+    """The file in chunks, never whole in memory – the same file that was checked (device and inode), exactly the size
+    announced (Content-Length). A backup removed by the retention meanwhile is still read to its end (open descriptor).
+    The slot was claimed by prepare_download; freed here at the end (also on an error or a cancel)."""
+    fd = -1
+    try:
+        fd, st = _open_backup(dl.name)
+        if (st.st_dev, st.st_ino) != (dl.dev, dl.ino):
+            raise DownloadRefused(404, "not_found")  # replaced since the check: the answer ends short, never another file
+        left = dl.size
+        while left > 0:
+            chunk = await asyncio.to_thread(os.read, fd, min(DOWNLOAD_CHUNK, left))
+            if not chunk:
+                break
+            left -= len(chunk)
+            yield chunk
+        if left:
+            log.warning("backup download %s ended %d bytes short", dl.name, left)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        release_download(dl, user_id)
+
+
 # ---------------------------------------------------------------- restore
 
 

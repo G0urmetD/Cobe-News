@@ -12,6 +12,7 @@ import hmac
 import logging
 import os
 import secrets
+import socket
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -20,6 +21,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeout
 
 from app import __version__, api_tokens, api_v1, audit, audit_api, bodylimit, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, reader, restore_test, sessions_api, source_health, sqlite_import, suspicious, teams, tls, update_check, vendor, webpush
 from app import news as news_svc
@@ -50,6 +53,31 @@ access = logging.getLogger("cobe_news.access")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 SAFE = ("GET", "HEAD", "OPTIONS")
+# what a request meets when the database is not there: SQLAlchemy's connection errors, the pool's wait running out, and
+# the driver's own (asyncpg raises socket errors as they are – a stopped container's name no longer resolves)
+DB_UNAVAILABLE: tuple[type[Exception], ...] = (OperationalError, InterfaceError, PoolTimeout, ConnectionError, socket.gaierror, TimeoutError)
+# the generic ones (a refused connection, a timeout, a name that does not resolve) are the database's only when they come
+# out of its driver or SQLAlchemy – the same errors from an outbound request (a webhook or SMTP test) stay a 500
+DB_ONLY: tuple[type[Exception], ...] = (OperationalError, InterfaceError, PoolTimeout)
+DB_MODULES = ("asyncpg", "sqlalchemy", "app.db")
+
+
+def from_db(exc: BaseException) -> bool:
+    """Was this raised inside the database layer (its own frames, or an error it wraps)?"""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, DB_ONLY):
+            return True
+        tb = cur.__traceback__
+        while tb is not None:
+            name = str(tb.tb_frame.f_globals.get("__name__") or "")
+            if name == DB_MODULES[2] or name.startswith((f"{DB_MODULES[0]}.", f"{DB_MODULES[1]}.")) or name in DB_MODULES[:2]:
+                return True
+            tb = tb.tb_next
+        cur = cur.__cause__ or cur.__context__
+    return False
 # style-src: stylesheets of this origin only – no inline <style> element (an injected one could read the page with CSS
 # selectors); style attributes stay allowed (style-src-attr: Radix positions popovers and menus with them, and an
 # attribute has no selectors). The build keeps the libraries from injecting <style> elements (frontend
@@ -405,6 +433,18 @@ def create_app() -> FastAPI:
     async def _invalid(request: Request, exc: RequestValidationError) -> JSONResponse:
         return JSONResponse({"detail": {"code": "invalid", "errors": str(exc.errors())[:500]}}, status_code=422)
 
+    async def _unavailable(request: Request, exc: Exception) -> JSONResponse:
+        # the database gone or not answering (stopped, restarting, its address not resolving): 503 "unavailable" – the
+        # page says so instead of a bare 500 (0.1.51). Logged once per request, without the stack trace. A refused
+        # connection or a timeout from anywhere else is no database outage: it stays a 500 with its stack trace
+        if not from_db(exc):
+            raise exc
+        log.warning("request %s %s: database unavailable (%s)", request.method, request.url.path, type(exc).__name__)
+        return JSONResponse({"detail": {"code": "unavailable"}}, status_code=503, headers={"Retry-After": "10"})
+
+    for unavailable in DB_UNAVAILABLE:
+        app.add_exception_handler(unavailable, _unavailable)
+
     @app.exception_handler(api_tokens.TokenError)
     async def _token_refused(request: Request, exc: api_tokens.TokenError) -> JSONResponse:
         return exc.response
@@ -462,7 +502,8 @@ def create_app() -> FastAPI:
             app.mount("/assets", StaticFiles(directory=static / "assets"), name="assets")
         root = static.resolve()
 
-        @app.get("/{path:path}", include_in_schema=False)
+        # GET and HEAD (uptime monitors, link checkers ask with HEAD – 0.1.50 answered 405)
+        @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         async def spa(path: str):
             # a NUL: Path.resolve() cannot take one (a 500) – nginx refuses it already, the app's own port does not
             if path.startswith("api/") or path == "api" or "\x00" in path:

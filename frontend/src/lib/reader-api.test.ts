@@ -3,6 +3,7 @@ import type { InfiniteData } from "@tanstack/react-query"
 import de from "@/i18n/de"
 import en from "@/i18n/en"
 import { listKeeps, type NewsItem, type NewsPage, withRead } from "@/lib/news-api"
+import { NO_RANGE } from "@/lib/news-range"
 import {
   applyView,
   badgeText,
@@ -55,7 +56,17 @@ describe("news filter in the address", () => {
     expect(next.get("story")).toBe("abc")
     expect(next.get("future")).toBe("1")
     expect(next.has("tab")).toBe(false) // the old Neu | Gelesen tabs
-    expect(readNewsFilter(next)).toEqual({ sources: [SRC], severities: ["high", "critical"], topics: [], q: "gitlab", unread: true, muted: false, ours: false })
+    expect(readNewsFilter(next)).toEqual({
+      sources: [SRC],
+      severities: ["high", "critical"],
+      topics: [],
+      q: "gitlab",
+      unread: true,
+      muted: false,
+      ours: false,
+      range: NO_RANGE,
+      ids: [],
+    })
     const cleared = writeNewsFilter(next, { sources: [], severities: [], q: "", unread: false })
     expect([...cleared.keys()].sort()).toEqual(["future", "story"])
     // "Betrifft unsere Produkte" in the address (saved views and shared links carry it)

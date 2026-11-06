@@ -84,7 +84,8 @@ export interface VersionVerdict {
   /** why (vendor.reason.<key>) */
   reason: string
   fixed: string | null
-  detail: { platform?: string; after?: string; lines?: { line: string; affected: string; fixed: string }[]; line?: string; released?: string }
+  /** by: where the verdict comes from (vendor, nvd, adp, bsi, csaf, osv – backend vendor_match.BY_VENDOR …) */
+  detail: { platform?: string; after?: string; lines?: { line: string; affected: string; fixed: string }[]; line?: string; released?: string; by?: string }
   /** Dringlichkeit of this version (the value alone) */
   score?: number
 }
@@ -293,7 +294,8 @@ export interface OverviewItem {
 }
 
 export interface VendorOverview {
-  status: { enabled: boolean; last_ok_at: string | null; errors: number; fetched: boolean }
+  /** failed: nothing has answered yet and every source asked failed */
+  status: { enabled: boolean; last_ok_at: string | null; errors: number; fetched: boolean; failed?: boolean }
   items: OverviewItem[]
   /** the answer is limited to the viewer's teams ("Mein Team") */
   team_scope?: boolean

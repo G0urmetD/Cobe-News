@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import de from "@/i18n/de"
 import en from "@/i18n/en"
-import { backupErrorKey, backupState, fmtBytes, nowNote, removedBy, restoreCommand, STATE_COLOR, type BackupPassphrase } from "@/lib/backup"
+import { backupErrorKey, backupFileUrl, backupState, canDownload, fmtBytes, nowNote, removedBy, restoreCommand, STATE_COLOR, type BackupPassphrase } from "@/lib/backup"
 
 describe("fmtBytes", () => {
   it("uses decimal units and the reader's separator", () => {
@@ -92,5 +92,28 @@ describe("the app's passphrase and “Jetzt sichern”", () => {
       expect(lang["backup.encrypted"].length).toBeLessThanOrEqual(40)
       expect(lang["backup.plain"].length).toBeLessThanOrEqual(50)
     }
+  })
+})
+
+describe("download of encrypted backups", () => {
+  it("offers only an encrypted backup, its name as one path segment", () => {
+    expect(canDownload({ encrypted: true })).toBe(true)
+    expect(canDownload({ encrypted: false })).toBe(false)
+    expect(backupFileUrl("cobe-news-20261104-123000.tar.enc")).toBe("/api/admin/backup/files/cobe-news-20261104-123000.tar.enc")
+    expect(backupFileUrl("../secret.key")).toBe("/api/admin/backup/files/..%2Fsecret.key")
+  })
+  it("has every text in both languages", () => {
+    const keys = [
+      "backup.col.download",
+      ...["button", "running", "label", "title", "text", "confirm", "done", "serverOnly", "plainWhy"].map((k) => `backup.dl.${k}`),
+      "errors.backup_not_encrypted",
+      "errors.backup_download_busy",
+      "errors.backup_download_rate_limited",
+    ]
+    for (const key of keys) {
+      expect(de[key as keyof typeof de], key).toBeTruthy()
+      expect(en[key as keyof typeof en], key).toBeTruthy()
+    }
+    expect(de["backup.dl.plainWhy"]).toContain("Unverschlüsselte Sicherungen nur auf dem Server – sie enthalten die ganze Datenbank")
   })
 })

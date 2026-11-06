@@ -27,7 +27,7 @@ Alles, was die Installation selbst betrifft (Adresse, Zertifikat, Netz, Datenban
 | `APP_PORT` | http-Port der App, fest an `127.0.0.1` gebunden: für den Health-Check, Prometheus auf demselben Host ([Metriken](/docs/api#prometheus-konfiguration)) und einen eigenen Reverse Proxy auf demselben Host | `8096` |
 | `COMPOSE_FILE` | `docker-compose.yml:docker-compose.http.yml` schaltet die Umleitung von http auf https ein ([HTTPS](#http-umleitung)) | nicht gesetzt |
 | `HTTP_PORT` | http-Port, der nur auf https umleitet (nur mit `COMPOSE_FILE` wie oben) | `8094` |
-| `COBE_NEWS_VERSION` | die veröffentlichten, signierten Images statt des lokalen Builds (App, Datenbank, Proxy), z. B. `0.1.50` – nur mit `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; Signaturen vorher mit cosign prüfen (docs/BETRIEB.md). Bis 0.1.48 hieß das `COBE_NEWS_IMAGE` (nur die App) | nicht gesetzt (lokaler Build) |
+| `COBE_NEWS_VERSION` | die veröffentlichten, signierten Images statt des lokalen Builds (App, Datenbank, Proxy), z. B. `0.1.51` – nur mit `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; Signaturen vorher mit cosign prüfen (docs/BETRIEB.md). Bis 0.1.48 hieß das `COBE_NEWS_IMAGE` (nur die App) | nicht gesetzt (lokaler Build) |
 
 ### Zertifikat {#env-zertifikat}
 
@@ -565,7 +565,9 @@ curl -s http://127.0.0.1:8096/api/health
 ```
 
 Antwort im Normalfall: `{"ok":true,"version":"{{version}}"}`. Docker nutzt dieselbe Abfrage für den Zustand `healthy`
-in `docker compose ps`; erst dann startet der Proxy. Diese Abfrage erscheint nicht im Zugriffslog.
+in `docker compose ps`; erst dann startet der Proxy. Diese Abfrage erscheint nicht im Zugriffslog. Ohne Datenbank (gestoppt,
+nicht erreichbar, keine Antwort binnen 3 Sekunden) kommt `503` mit `{"ok":false}`. Uptime-Monitore dürfen auch mit
+`HEAD` fragen – wie bei der Seite selbst und beim Kalender-Abo.
 
 Mehr als „läuft“ – Zustand der Quellen, offene Zustellungen, Alter der letzten Sicherung, Ergebnis des
 Rücksicherungs-Tests – liefert `/metrics` für Prometheus, mit einem eigenen Token: [Metriken](/docs/api#metriken).
@@ -633,6 +635,14 @@ nach außen, keine Verbindung ins Internet. Die Daten liegen im Volume `cobe-new
 Das Schema kommt aus Migrationen und wird bei jedem Start der App auf den Stand ihrer Version gebracht. Die
 Speichergrenze des Containers setzt `DB_MEM` (ab Werk `512m`); bei sehr vielen Meldungen und Vendor-News-Daten hilft mehr.
 
+**Speicher der App (`APP_MEM`, ab Werk `512m`).** Die App hält die ausgewerteten Befunde der gefolgten Produkte im
+Speicher (die Vendor-News-Seite, die Zahlen in der Seitenleiste). Gemessen mit 0.1.50: eine kleine Installation (10
+Produkte, rund 5 000 Hinweise) braucht um 200 MiB; 48 Produkte mit 50 000 Hinweisen und 30 000 Meldungen brauchten
+unter Last (20 gleichzeitige Nutzer) 430 MiB – gut, aber knapp unter der Grenze. Ab etwa 30 gefolgten Produkten oder
+mehr als 20 000 Hinweisen `APP_MEM=768m` setzen (ab 100 Produkten `1g`) und `docker stats cobe-news-app` im Blick
+behalten. Erreicht die App die Grenze, beendet Docker sie und startet sie neu (`docker inspect cobe-news-app --format
+'{{.State.OOMKilled}}'` zeigt `true`).
+
 ### Ein Blick hinein {#db-zugriff}
 
 ```bash
@@ -666,9 +676,11 @@ wieder versucht.
 | Widerrufene und abgelaufene API-Tokens | 30 Tage | – |
 | Sicherungen | die letzten 7, vor einer Wiederherstellung 30 Tage | 3–90: [Sicherung](/docs/sicherung#aufbewahrung) |
 | Container-Logs | 3 × 20 MB je Container | – |
+| Hinweise von Vendor News (NVD, Hersteller) zu Produkten, denen niemand mehr folgt | ein Jahr, nachdem sie zuletzt gespeichert oder geändert wurden – außer eine ihrer CVEs wird beobachtet, steht in einer Meldung, der Hinweis wurde im letzten Jahr geändert oder eine Abfrage eines gefolgten Produkts liefert ihn noch (etwa dieselbe Windows-Server-CPE); CSAF- und Fortinet-Hinweise bleiben | – |
 
-Die Hinweise von Vendor News selbst (NVD, Hersteller, CSAF) bleiben, auch für nicht mehr gefolgte Produkte – folgt ihr
-einem Produkt wieder, sind sie sofort da. Die vollständige Liste steht in `docs/BETRIEB.md` („Aufbewahrung“).
+Folgt ihr einem Produkt wieder, holt Cobe News seine Hinweise beim nächsten Abruf vollständig neu und wertet erst danach
+aus – wie bei einem neu gefolgten Produkt kommt dabei keine Benachrichtigung über Altes. Die vollständige Liste steht in
+`docs/BETRIEB.md` („Aufbewahrung“).
 
 ## Protokoll {#protokoll}
 
@@ -763,7 +775,7 @@ Markierte Einträge tragen ein Warndreieck, die Gründe stehen unter **Zusammenh
 - **Einstellungen:** Nachrichten, Vendor News (auch das Intervall von „Versionen prüfen“), E-Mail-Versand, Teams,
   Passkeys ein/aus, Sicherung, Rücksicherungs-Test, Protokoll.
 - **Sicherung & Export:** Sicherung erstellt, alte Sicherungen entfernt, Sicherung zurückgespielt (Kommandozeile),
-  Rücksicherungs-Test gestartet (in der App) und ausgeführt mit Ergebnis (Kommandozeile), Export heruntergeladen (in der App und mit
+  Rücksicherungs-Test gestartet (in der App) und ausgeführt mit Ergebnis (Kommandozeile), eine verschlüsselte Sicherung heruntergeladen (in der App, mit Datei und Größe – unter „Nur Auffälliges“), Export heruntergeladen (in der App und mit
   `python -m app.cli export`), eine SQLite-Datei übernommen (`migrate-sqlite`), Protokoll exportiert, und eine
   [Lücke oder Änderung in der Kette](#protokoll-kette).
 - **Verzeichnis-Sync:** was AD oder Entra ID am Zugang ändern – Konten aus- oder wieder eingeschaltet, Rollen aus der

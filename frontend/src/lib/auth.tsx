@@ -40,8 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ])
       times.current = state.session
       dispatch({ type: "loaded", config, stage: state.stage, user: state.user })
-    } catch {
-      dispatch({ type: "failed" })
+    } catch (e) {
+      dispatch({ type: "failed", error: e })
     }
   }, [])
 

@@ -21,3 +21,17 @@ def neutral(text: str, control: str = " ") -> str:
         return ""
     text = str(text).replace("\r\n", "\n").replace("\r", "\n")
     return _CONTROL.sub(control, _DIRECTION.sub("", text))
+
+
+# invisible format characters a label never needs: Unicode Cf without the zero-width (non-)joiner (U+200C/U+200D – some
+# scripts and emoji sequences need them)
+_KEEP_CF = frozenset("\u200c\u200d")
+
+
+def label(text: str) -> str:
+    """A short name typed by a person (a version's label "RZ Nord"): NFC, no direction or other invisible format
+    characters (the page isolates right-to-left text itself – <bdi>), no control characters, blanks collapsed."""
+    import unicodedata
+
+    t = re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(text or "")))
+    return "".join(c for c in t if c in _KEEP_CF or unicodedata.category(c) not in ("Cf", "Cc")).strip()

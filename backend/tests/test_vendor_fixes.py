@@ -401,7 +401,7 @@ def test_veeam_catalogue_uses_the_cpes_nvd_has():
 
 
 async def test_badge_counts_affected_products_like_the_overview(admin_client, reader_client):
-    assert (await reader_client.get("/api/vendor/badge")).json() == {"affected": 0, "exploited": False}
+    assert (await reader_client.get("/api/vendor/badge")).json() == {"affected": 0, "exploited": False, "enabled": True}
     await _follow(admin_client, "panos", "11.2.4-h23")
     await _follow(admin_client, "gitlab")  # followed, nothing stored for it
     async with db.session() as s:

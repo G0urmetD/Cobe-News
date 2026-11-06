@@ -265,7 +265,7 @@ async def test_vendor_daily_prunes_each_on_its_own_and_a_failure_is_retried_with
     t = datetime.now(UTC)
     async with db.session() as s:
         out = await vendor.daily_prunes(s, t)
-        assert out == {"single lookups": None, "advisory revisions": 0, "epss": 0}
+        assert out == {"single lookups": None, "advisory revisions": 0, "epss": 0, "unfollowed advisories": 0}
         assert await vendor.daily_prunes(s, t + timedelta(minutes=30)) == {}  # not yet
         assert (await vendor.daily_prunes(s, t + timedelta(minutes=61)))["single lookups"] is None  # an hour later, not a day
         monkeypatch.setattr(vendor, "prune_lookups", changes)

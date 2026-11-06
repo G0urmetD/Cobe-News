@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api"
 import { AuthProvider } from "@/lib/auth"
 import { ConfirmHost } from "@/components/cobe/confirm"
 import { ReauthHost } from "@/components/cobe/reauth"
+import { OfflineNotice } from "@/components/cobe/offline-notice"
 import { PageErrorBoundary, retryable } from "@/components/cobe/query-state"
 
 const queryClient = new QueryClient({
@@ -32,6 +33,7 @@ function Root() {
           <App />
           <ConfirmHost />
           <ReauthHost />
+          <OfflineNotice />
           <Toaster position="bottom-center" richColors closeButton />
         </TooltipProvider>
       </AuthProvider>

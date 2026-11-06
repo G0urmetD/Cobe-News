@@ -41,6 +41,7 @@ import {
 } from "@/lib/teams-api"
 import { IntegrationSheetContent, Loading, SaveBar, SettingsCard, SheetActions, SheetBody, SheetLoading } from "@/pages/settings-shared"
 import { AbsenceEditor, AbsenceLine, TeamWeeklyPart } from "@/pages/settings-delivery"
+import { isoList } from "@/lib/bidi"
 
 type Part = "general" | "groups" | "members" | "products" | "weekly"
 const PARTS: Part[] = ["general", "groups", "members", "products", "weekly"]
@@ -342,7 +343,7 @@ function GeneralPart({ team, onDone }: { team: Team | null; onDone: (id: string 
   const remove = async () => {
     if (!team) return
     if (team.rules.length) {
-      toast.error(t("errors.team_in_rules_named", { rules: team.rules.join(", ") }))
+      toast.error(t("errors.team_in_rules_named", { rules: isoList(team.rules) }))
       return
     }
     if (!(await confirmAction({ title: t("teams.deleteTitle"), text: t("teams.deleteText", { name: team.name }), confirm: t("common.remove") }))) return
@@ -386,7 +387,7 @@ function GeneralPart({ team, onDone }: { team: Team | null; onDone: (id: string 
           </Field>
         )}
         {!team && <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("teams.createNext")}</p>}
-        {team && team.rules.length > 0 && <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("teams.usedByRules", { rules: team.rules.join(", ") })}</p>}
+        {team && team.rules.length > 0 && <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("teams.usedByRules", { rules: isoList(team.rules) })}</p>}
       </SheetBody>
       <SheetActions>
         {team ? (
@@ -730,7 +731,7 @@ function MembersPart({ team, settings }: { team: Team; settings: TeamsSettings }
                   <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
                     {team.products.length > 0 && (
                       <span className="block" data-member-products>
-                        {m.products.length ? t("teams.members.gets", { products: m.products.join(", ") }) : t("teams.members.getsNone")}
+                        {m.products.length ? t("teams.members.gets", { products: isoList(m.products) }) : t("teams.members.getsNone")}
                       </span>
                     )}
                     {m.absence && (

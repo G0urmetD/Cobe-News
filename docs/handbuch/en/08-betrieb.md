@@ -27,7 +27,7 @@ Everything about the installation itself (address, certificate, network, databas
 | `APP_PORT` | http port of the app, always bound to `127.0.0.1`: for the health check, Prometheus on the same host ([Metrics](/docs/api#prometheus-konfiguration)) and your own reverse proxy on the same host | `8096` |
 | `COMPOSE_FILE` | `docker-compose.yml:docker-compose.http.yml` switches on the redirect from http to https ([HTTPS](#http-umleitung)) | not set |
 | `HTTP_PORT` | http port that only redirects to https (only with `COMPOSE_FILE` as above) | `8094` |
-| `COBE_NEWS_VERSION` | the released, signed images instead of the local build (app, database, proxy), e.g. `0.1.50` – only with `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; verify the signatures with cosign first (docs/BETRIEB.md). Up to 0.1.48 this was `COBE_NEWS_IMAGE` (the app only) | not set (local build) |
+| `COBE_NEWS_VERSION` | the released, signed images instead of the local build (app, database, proxy), e.g. `0.1.51` – only with `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; verify the signatures with cosign first (docs/BETRIEB.md). Up to 0.1.48 this was `COBE_NEWS_IMAGE` (the app only) | not set (local build) |
 
 ### Certificate {#env-zertifikat}
 
@@ -559,7 +559,9 @@ curl -s http://127.0.0.1:8096/api/health
 ```
 
 Normal answer: `{"ok":true,"version":"{{version}}"}`. Docker uses the same query for the status `healthy` in
-`docker compose ps`; only then does the proxy start. This query does not appear in the access log.
+`docker compose ps`; only then does the proxy start. This query does not appear in the access log. Without the database
+(stopped, unreachable, no answer within 3 seconds) it answers `503` with `{"ok":false}`. Uptime monitors may ask with
+`HEAD` too – as for the page itself and the calendar subscription.
 
 More than "it runs" – the state of the sources, pending deliveries, the age of the last backup, the result of the
 restore test – comes from `/metrics` for Prometheus, with a token of its own: [Metrics](/docs/api#metriken).
@@ -627,6 +629,14 @@ to the outside, no connection to the internet. The data lives in the volume `cob
 The schema comes from migrations and is brought to the app's version at every start. The container's memory limit is
 set by `DB_MEM` (`512m` out of the box); with a great many stories and Vendor News data, more helps.
 
+**The app's memory (`APP_MEM`, `512m` out of the box).** The app keeps the evaluated findings of the followed products
+in memory (the Vendor News page, the numbers in the sidebar). Measured with 0.1.50: a small installation (10 products,
+about 5 000 advisories) needs around 200 MiB; 48 products with 50 000 advisories and 30 000 stories needed 430 MiB under
+load (20 users at once) – fine, but just below the limit. From about 30 followed products or more than 20 000
+advisories set `APP_MEM=768m` (from 100 products `1g`) and keep an eye on `docker stats cobe-news-app`. When the app
+reaches the limit, Docker ends it and starts it again (`docker inspect cobe-news-app --format '{{.State.OOMKilled}}'`
+shows `true`).
+
 ### A look inside {#db-zugriff}
 
 ```bash
@@ -659,9 +669,10 @@ one fails, the log says `prune … failed`, the others run all the same, and it 
 | Revoked and expired API tokens | 30 days | – |
 | Backups | the last 7, before a restore 30 days | 3–90: [Backup](/docs/sicherung#aufbewahrung) |
 | Container logs | 3 × 20 MB per container | – |
+| Vendor News advisories (NVD, vendors) of products nobody follows any more | a year after they were last stored or changed – unless one of their CVEs is watched, named by a story, the advisory changed within the year or a query of a followed product still lists it (e.g. the same Windows Server CPE); CSAF and Fortinet advisories stay | – |
 
-The Vendor News advisories themselves (NVD, vendors, CSAF) stay, also for products no longer followed – follow one
-again and they are there at once. The complete list is in `docs/BETRIEB.md` ("Aufbewahrung").
+Follow a product again and Cobe News fetches its advisories in full with the next round and evaluates only then – as
+for a newly followed product, nothing old is notified. The complete list is in `docs/BETRIEB.md` ("Aufbewahrung").
 
 ## Audit log {#protokoll}
 
@@ -750,7 +761,7 @@ Marked entries carry a warning triangle; the reasons are under **Context → Hin
 - **Settings:** news, Vendor News (including the "review versions" interval), e-mail delivery, teams, passkeys on/off,
   backup, restore test, audit log.
 - **Backup & export:** backup made, old backups removed, backup restored (command line), restore test started (in the
-  app) and run with its result (command line), export downloaded (in the app and with `python -m app.cli export`), a SQLite file
+  app) and run with its result (command line), an encrypted backup downloaded (in the app, with file and size – under "notable"), export downloaded (in the app and with `python -m app.cli export`), a SQLite file
   imported (`migrate-sqlite`), audit log exported, and a [gap or change in the chain](#protokoll-kette).
 - **Directory sync:** what AD or Entra ID change about access – accounts switched off or on again, roles from the group
   mapping (at a sign-in with its address), a team load (one summary per run).

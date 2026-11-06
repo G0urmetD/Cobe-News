@@ -289,6 +289,7 @@ def test_every_action_has_a_case_or_a_reason():
         "audit.chain_rekeyed",  # test_another_master_key_waits_for_the_operator
         "audit.pruned",  # test_late_and_future_entries_are_marked_and_the_future_does_not_hold_the_prune
         "restore_test.done",  # test_cli_actions_are_logged
+        "backup.downloaded",  # test_backup.py: test_an_encrypted_backup_downloads_whole_and_is_logged
     }
     covered = {a for a, _, act in CASES if act is not None} | elsewhere | {"team.member_added"}
     assert set(audit.ACTIONS) == covered, set(audit.ACTIONS) ^ covered

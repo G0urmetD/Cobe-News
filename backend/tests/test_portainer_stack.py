@@ -5,7 +5,10 @@ web editor, no checkout) run the released ones of this version; the release pipe
 The Portainer file stays in step with docker-compose.yml: the same settings, hardening and networks; nothing that needs
 a checkout (no build, no relative path, no env_file)."""
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -218,28 +221,79 @@ def test_dockerfiles_pin_their_base_images_and_carry_the_files(local):
             assert (ROOT / "deploy" / folder / f).is_file(), f
 
 
-def test_the_release_builds_and_signs_all_three():
+def test_the_release_builds_signs_and_only_then_tags():
+    """Build and push by digest only (no tag), sign the three digests, and only then – job "publish", after all of it –
+    check signatures and attestations, put the version tag on the signed digests (no rebuild) and `latest` only for the
+    highest release."""
     wf = _load(RELEASE)
     text = RELEASE.read_text(encoding="utf-8")
     env = wf["env"]
     assert (env["IMAGE"], env["DB_IMAGE"], env["PROXY_IMAGE"]) == tuple(i[0] for i in IMAGES.values())
     assert all(v == v.lower() for v in env.values())  # cosign: lower-case names only
-    steps = {s.get("id"): s for s in wf["jobs"]["image"]["steps"] if s.get("id")}
+    jobs = wf["jobs"]
+    assert list(jobs) == ["checks", "image", "publish", "release"]
+    assert jobs["image"]["needs"] == "checks" and jobs["publish"]["needs"] == "image" and jobs["release"]["needs"] == ["image", "publish"]
+    steps = {s.get("id"): s for s in jobs["image"]["steps"] if s.get("id")}
     for build, meta, context, var in (("build", "meta", ".", "IMAGE"), ("build-db", "meta-db", "deploy/postgres", "DB_IMAGE"), ("build-proxy", "meta-proxy", "deploy/nginx", "PROXY_IMAGE")):
         w = steps[build]["with"]
-        assert w["context"] == context and w["platforms"] == "linux/amd64,linux/arm64" and w["push"] is True
-        assert w["provenance"] == "mode=max" and w["sbom"] is True and w["tags"] == f"${{{{ steps.{meta}.outputs.tags }}}}"
-        assert steps[meta]["with"]["images"] == f"${{{{ env.{var} }}}}"
-        assert "type=semver,pattern={{version}}" in steps[meta]["with"]["tags"]
-    sign = next(s for s in wf["jobs"]["image"]["steps"] if s.get("name", "").startswith("Sign"))
+        assert w["context"] == context and w["platforms"] == "linux/amd64,linux/arm64"
+        assert w["provenance"] == "mode=max" and w["sbom"] is True and w["labels"] == f"${{{{ steps.{meta}.outputs.labels }}}}"
+        # by digest only: no tags, no push shorthand – nothing in this job moves a tag
+        assert "tags" not in w and "push" not in w
+        assert w["outputs"] == f"type=image,name=${{{{ env.{var} }}}},push-by-digest=true,name-canonical=true,push=true"
+        assert steps[meta]["with"]["images"] == f"${{{{ env.{var} }}}}" and "tags" not in steps[meta]["with"]
+    image_steps = jobs["image"]["steps"]
+    sign = next(s for s in image_steps if s.get("name", "").startswith("Sign"))
+    assert image_steps.index(sign) > max(image_steps.index(steps[b]) for b in ("build", "build-db", "build-proxy"))
     for line in ('cosign sign --yes "${IMAGE}@${DIGEST}"', 'cosign sign --yes "${DB_IMAGE}@${DB_DIGEST}"', 'cosign sign --yes "${PROXY_IMAGE}@${PROXY_DIGEST}"'):
         assert line in sign["run"]
-    assert set(wf["jobs"]["image"]["outputs"]) == {"digest", "db-digest", "proxy-digest"}
+    assert set(jobs["image"]["outputs"]) == {"digest", "db-digest", "proxy-digest"}
+    assert jobs["image"]["permissions"] == {"contents": "read", "packages": "write", "id-token": "write"}
+    # publish: no signing rights; one at a time across tags (latest)
+    pub = jobs["publish"]
+    assert pub["permissions"] == {"contents": "read", "packages": "write"}
+    assert pub["concurrency"] == {"group": "release-tags", "cancel-in-progress": False}
+    checkout = next(s for s in pub["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))
+    assert checkout["with"]["fetch-depth"] == 0 and checkout["with"]["persist-credentials"] is False
+    names = [s.get("name") or s.get("id") or s.get("uses") for s in pub["steps"]]
+    verify, latest, tag = (next(s for s in pub["steps"] if s.get("name", "").startswith(p)) for p in ("Check signatures", "Is this the highest", "Version tag"))
+    assert names.index(verify["name"]) < names.index(latest["name"]) < names.index(tag["name"])
+    assert 'cosign verify "$ref"' in verify["run"] and "release.yml@${GITHUB_REF}" in verify["run"] and "attestation-manifest" in verify["run"]
+    run = tag["run"]
+    assert 'docker buildx imagetools create --tag "$1:$3" "$1@$2"' in run and '[ "$got" != "$2" ]' in run  # same digest, else stop
+    for img, dig in (("IMAGE", "DIGEST"), ("DB_IMAGE", "DB_DIGEST"), ("PROXY_IMAGE", "PROXY_DIGEST")):
+        assert f'put "${img}" "${dig}" "$v"' in run and f'put "${img}" "${dig}" latest' in run
+    assert run.index("latest\n") > run.index('if [ "$MOVE_LATEST" = true ]; then')
+    assert tag["env"]["MOVE_LATEST"] == "${{ steps.latest.outputs.move }}" and pub["outputs"]["latest"] == "${{ steps.latest.outputs.move }}"
     # every action pinned by its commit, still one tag-triggered pipeline
     uses = re.findall(r"uses: (\S+)", text)
     assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), uses
     assert wf[True] == {"push": {"tags": ["v[0-9]+.[0-9]+.[0-9]+"]}}  # PyYAML reads the key "on" as True
     assert sorted(p.name for p in RELEASE.parent.iterdir()) == ["release.yml"]
+
+
+@pytest.mark.skipif(not (shutil.which("git") and shutil.which("bash")), reason="needs git and bash")
+@pytest.mark.parametrize(
+    ("tag", "move"),
+    [("v0.1.51", True), ("v0.1.50", False), ("v0.1.9", False), ("v0.1.100", True)],
+)
+def test_latest_moves_only_for_the_highest_release(tmp_path, tag, move):
+    """The step of the release workflow as it is: a backport (a lower tag) never moves latest; versions compare as
+    numbers (0.1.100 above 0.1.51); other tags (rc, test names) do not count."""
+    step = next(s for s in _load(RELEASE)["jobs"]["publish"]["steps"] if s.get("id") == "latest")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = ["git", "-C", str(repo), "-c", "user.email=t@example.org", "-c", "user.name=t", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "x"], check=True)
+    tags = ["v0.1.9", "v0.1.10", "v0.1.49", "v0.1.50", "v0.1.51", "v0.2.0-rc1", "v0.1.52x", "test-dates"] + (["v0.1.100"] if tag == "v0.1.100" else [])
+    for t in tags:
+        subprocess.run([*git, "tag", t], check=True)
+    out = tmp_path / "out"
+    out.write_text("")
+    r = subprocess.run(["bash", "-c", step["run"]], cwd=repo, env={**os.environ, "TAG": tag, "GITHUB_OUTPUT": str(out)}, capture_output=True, text=True, timeout=30)  # noqa: S603, S607
+    assert r.returncode == 0, r.stderr
+    assert out.read_text().strip() == f"move={'true' if move else 'false'}"
 
 
 def _tags(text: str) -> list[str]:

@@ -260,6 +260,89 @@ async def test_rate_limit_pauses_the_host_and_keeps_cpes_due(nvd):
     assert nvd.calls == [] and out["stopped"] == "paused"  # nothing asked into the pause
 
 
+@pytest.mark.parametrize("status", [500, 503, 403])
+async def test_an_nvd_failing_on_its_side_ends_the_step_at_the_first_answer(nvd, status):
+    """0.1.50: a failed request returned 0 "asked" – the budget never filled, and an NVD answering 5xx (or refusing, 403)
+    was asked about every due CPE in one step (37 requests in a row in the bug hunt, budget 4). Now the step ends at
+    the first failure and the request counts."""
+    nvd.status = status
+    await _follow("fortios")
+    out = await cc.run()
+    # 403 and 503 are the NVD's "slow down": the host pauses ("paused") – either way one request, then the end
+    assert len(nvd.calls) == 1 and out["requests"] == 1 and out["stopped"] == ("unreachable" if status == 500 else "paused")
+    async with db.session() as s:
+        row = await s.get(CatalogCpeCheck, "o:fortinet:fortios")
+        assert row.checked_at is None and row.error  # due again after RETRY_AFTER_ERROR
+        assert len((await settings_store.get(s, cc.SETTING))["sent"]) == 1  # the failed request counts for the hour
+
+
+async def test_an_unreachable_nvd_ends_the_step_and_never_exceeds_the_budget(monkeypatch):
+    calls: list[httpx.Request] = []
+
+    def down(req: httpx.Request) -> httpx.Response:
+        calls.append(req)
+        raise httpx.ConnectError("All connection attempts failed", request=req)
+
+    monkeypatch.setattr(vendor, "transport", httpx.MockTransport(down))
+    await _follow("fortios", "typo3", "gitlab")
+    for _ in range(10):  # ten steps within the hour: never more than the hour's budget, each step stops at once
+        before = len(calls)
+        out = await cc.run(manual=True)
+        assert len(calls) - before <= 1 and out["stopped"] in ("unreachable", "budget")
+    assert len(calls) == 10 <= cc.BUDGET_PER_HOUR
+    for _ in range(5):  # the scheduled steps: their share of what is left of the hour – the failed requests count
+        await cc.run()
+    assert 10 < len(calls) <= cc.BUDGET_PER_HOUR
+
+
+async def test_a_cpe_unknown_to_the_nvd_does_not_end_the_step(nvd, monkeypatch):
+    """A 4xx about one CPE (not a refusal) is that CPE's error – the step goes on with the next."""
+    real = nvd.handler
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if "fortios" in str(req.url):
+            nvd.calls.append(req)
+            return httpx.Response(404)
+        return real(req)
+
+    monkeypatch.setattr(vendor, "transport", httpx.MockTransport(handler))
+    await _follow("fortios", "typo3")
+    out = await cc.run(manual=True)
+    assert out["stopped"] is None and out["cpes"] >= 2 and out["requests"] == len(nvd.calls)
+
+
+async def test_the_stored_requests_count_once(nvd):
+    """0.1.50: memory (exact times) and the stored copy (rounded to 0.1 s) were merged as a set of different values –
+    every request counted twice from the next step on, the hourly budget was effectively half."""
+    await _follow("fortios")
+    await cc.run()
+    first = len(nvd.calls)
+    for _ in range(3):  # further steps (nothing new to ask once the budget of the step is used): no growth
+        await cc.run()
+    async with db.session() as s:
+        state = await settings_store.get(s, cc.SETTING)
+    assert len(state["sent"]) == len(nvd.calls) and state["sent_v"] == cc.SENT_V and len(cc._sent) == len(nvd.calls) >= first
+
+
+async def test_a_doubled_list_of_older_versions_is_cleaned_up(nvd):
+    now = __import__("time").time()
+    legacy = [round(now - 100, 1), round(now - 100, 1), round(now - 50, 1), round(now - 50, 1)]
+    async with db.session() as s:
+        await settings_store.put(s, cc.SETTING, {"sent": legacy})  # 0.1.50: each request twice, no "sent_v"
+        await s.commit()
+    cc.merge_sent(await _state())
+    assert list(cc._sent) == sorted(set(legacy))
+    # the new form keeps two requests of the same millisecond
+    cc._sent.clear()
+    cc.merge_sent({"sent": [now, now], "sent_v": cc.SENT_V})
+    assert len(cc._sent) == 2
+
+
+async def _state() -> dict:
+    async with db.session() as s:
+        return await settings_store.get(s, cc.SETTING)
+
+
 async def test_vendor_round_running_means_no_request(nvd):
     await _follow("fortios")
     out = await cc.run(vendor_busy=True)

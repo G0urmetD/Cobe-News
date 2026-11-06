@@ -163,3 +163,13 @@ def test_rendered_configuration_passes_nginx_t(tmp_path):
     # an unknown name on https: the 421 with its text; on plain http the connection closed without an answer (curl 52)
     assert "status=421" in out.stdout and "Unbekannter Hostname – in .env BASE_URL oder TLS_NAMES eintragen." in out.stdout
     assert "http closed: 52" in out.stdout
+
+
+def test_the_backup_download_is_passed_through_unbuffered():
+    """0.1.51: an encrypted backup as a download – nginx must not spool it into its temp folder (a tmpfs: the proxy's
+    memory); the location matches only the download route."""
+    text = TEMPLATE.read_text()
+    block = re.search(r"location \^~ /api/admin/backup/files/ \{(.*?)\n    \}", text, re.S)
+    assert block is not None
+    assert "proxy_buffering off;" in block.group(1) and "proxy_pass http://app:8000;" in block.group(1)
+    assert text.count("proxy_buffering off;") == 1  # nowhere else

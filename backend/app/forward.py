@@ -369,7 +369,7 @@ def render_mail(f: Forward, lang: str) -> tuple[str, str, str]:
         facts=[x for x in facts if x != notify.tlp_line(lang)],
         tlp=notify.tlp_line(lang) if f.tlp == "GREEN" else "",
         labels={"article": lb["article"], "open": lb["open"], "button": nl["button"]},
-        app_url=get_config().base_url + "/",
+        app_url=f.link or get_config().base_url + "/",  # the button opens the forwarded story (finding) itself
         footer=footer,
     )
     lines = [head, "=" * min(len(head), 60), ""]

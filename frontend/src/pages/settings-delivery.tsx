@@ -30,6 +30,7 @@ import {
 import { errorText } from "@/lib/errors"
 import { PERSONAL_KEY, PERSONAL_WAYS, type PersonalNotify, type PersonalWay, type Team, type TeamsSettings } from "@/lib/teams-api"
 import { SaveBar, SheetActions, SheetBody } from "@/pages/settings-shared"
+import { isoList } from "@/lib/bidi"
 
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ queryKey: PERSONAL_KEY })
 
@@ -223,7 +224,7 @@ export function DeputyPicker({ url, value, onChange }: { url: string; value: Per
                     <span className="block truncate text-sm">{d.display_name}</span>
                     <span className="block truncate text-[11px] text-muted-foreground">
                       <span className="font-mono">{d.username}</span>
-                      {d.teams.length > 0 && ` · ${d.teams.join(", ")}`}
+                      {d.teams.length > 0 && ` · ${isoList(d.teams)}`}
                     </span>
                   </button>
                 </li>

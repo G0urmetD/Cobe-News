@@ -26,6 +26,7 @@ its reason ("bitte prüfen") – never dropped.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from functools import lru_cache
 
@@ -53,7 +54,11 @@ class Checked:
 
 
 def _clean(text: str) -> str:
-    return re.sub(r"\s+", " ", (text or "").strip())
+    """The typed text as a version: compatibility forms folded (NFKC – full-width "３.９.０" is 3.9.0), invisible format
+    and direction characters (Unicode Cf: U+202E, zero-width spaces …) and other control characters dropped, blanks
+    collapsed. 0.1.50 kept them: "3.9.0" + U+202E was stored as a version of its own that looked like 3.9.0."""
+    t = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", text or ""))
+    return "".join(c for c in t if unicodedata.category(c) not in ("Cf", "Cc")).strip()
 
 
 # ---------------------------------------------------------------- 2. the product's own name

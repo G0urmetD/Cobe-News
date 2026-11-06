@@ -242,9 +242,12 @@ def vendor_payload(event_id: str, title: str, product: str, severity: str, path:
     }
 
 
-def summary_payload(count: int, lang: str) -> dict:
+def summary_payload(count: int, lang: str, ids: list[str] | None = None) -> dict:
+    """The rest of a round in one notification: a click opens the news list filtered to exactly these stories
+    (notify.overview_path – at most notify.NEWS_IDS_MAX, else the news list); `ids` unknown or incomplete: the news list."""
     t = TEXTS[_lang(lang)]
-    return {"v": 1, "kind": "summary", "id": f"summary-{int(time.time())}", "title": t["summary"].format(n=count), "body": t["summary_text"], "severity": "info", "url": "/"}
+    url = notify.overview_path([], count, [("news", i) for i in ids]) if ids and len(ids) == count else notify.NEWS_PATH
+    return {"v": 1, "kind": "summary", "id": f"summary-{int(time.time())}", "title": t["summary"].format(n=count), "body": t["summary_text"], "severity": "info", "url": url}
 
 
 def test_payload(lang: str) -> dict:
@@ -362,7 +365,9 @@ async def dispatch(db: AsyncSession) -> dict[str, int]:
         single = [api._item_out(i, s, None) for i, s in rows[:SINGLE]][::-1]  # the oldest of the newest first, as the tab
         payloads = [story_payload({"id": x["id"], "title": x["title"], "severity": x["severity"], "source": x["source"]["name"]}, sub.lang) for x in single]
         if total > len(single):
-            payloads.append(summary_payload(total - len(single), sub.lang))
+            # the rest by id when the round knows them all (rows holds the newest RECENT_MAX)
+            rest = [str(i.id) for i, _s in rows[SINGLE:]] if total == len(rows) else None
+            payloads.append(summary_payload(total - len(single), sub.lang, rest))
         jobs.append((sub, payloads))
     gate = asyncio.Semaphore(CONCURRENCY)
 

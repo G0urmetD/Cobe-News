@@ -117,6 +117,7 @@ const auditDe: Record<string, string> = {
   "audit.action.backup.deleted": "Sicherungen entfernt",
   "audit.action.restore_test.run": "Rücksicherungs-Test gestartet",
   "audit.action.export.downloaded": "Export heruntergeladen",
+  "audit.action.backup.downloaded": "Verschlüsselte Sicherung heruntergeladen",
   "audit.action.audit.exported": "Protokoll exportiert",
   "audit.action.source.created": "Quelle hinzugefügt",
   "audit.action.source.changed": "Quelle geändert",

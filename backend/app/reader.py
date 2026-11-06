@@ -55,8 +55,8 @@ VIEW_PAGES = ("news", "vendor")
 VIEW_MAX = 30
 NAME_MAX = 60
 QUERY_MAX = 2000
-# the drawer of a story or product is no filter: never stored in a view
-VIEW_DROP = frozenset({"story", "product", "finding", "view"})
+# the drawer of a story or product is no filter: never stored in a view – nor a notification's stories (`ids`)
+VIEW_DROP = frozenset({"story", "product", "finding", "view", "ids"})
 CHUNK = 5000
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 

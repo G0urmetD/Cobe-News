@@ -19,7 +19,8 @@ the host-wide pause after a 429 is respected – nothing is asked while it lasts
   (the count, then the newest – NVD lists oldest first);
 - at most BUDGET_PER_HOUR requests per hour, only while the Vendor News round is not running – kept in the settings
   (a restart does not give a fresh hour), and spread over the hour: one step (every LOOP_EVERY_S) asks at most its share
-  (step_share), not the whole hour's budget at once.
+  (step_share), not the whole hour's budget at once. Every request sent counts – a failed one too – and an outage (the
+  NVD unreachable, refusing or answering 5xx) ends the step at the first failure: it never runs through the due CPEs.
 Budget: about 770 distinct CPEs in the catalogue → at most ~2 300 requests per month (≈ 3 per hour on average); the cap of
 20 per hour (≈ 3 % of the NVD's public limit of 5 per 30 s) spreads them out – the first full pass takes about five days,
 after that each CPE comes up again 30 days after its last check. "Jetzt prüfen" (admins) checks the followed products at
@@ -33,7 +34,7 @@ import json
 import logging
 import math
 import time
-from collections import deque
+from collections import Counter, deque
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
@@ -63,6 +64,10 @@ NVD_HOST = "services.nvd.nist.gov"
 SETTING = "catalog_check"
 
 _sent: deque[float] = deque()  # when the self-test's requests went out (epoch seconds; the hourly budget, see run())
+_asked = [0]  # every request sent since the process started – failed ones too (a step's budget counts attempts)
+# the stored "sent" list's form: 2 (0.1.51) – milliseconds, each request once. Up to 0.1.50 a list in tenths of a second
+# where every request stood twice (memory and the stored copy were merged as a set of different roundings)
+SENT_V = 2
 
 
 def _months_ago(now: datetime, months: int) -> datetime:
@@ -128,8 +133,18 @@ def parse_cve_page(data: bytes) -> tuple[int, str | None, datetime | None]:
     return total, None, None
 
 
+def outage(exc: NewsError) -> bool:
+    """The NVD is not answering as it should – refused (rate limit, 403), unreachable (connection, timeout, DNS, TLS) or
+    failing on its side (5xx): the step ends, every further CPE would meet the same. A 4xx about one CPE does not."""
+    if exc.category in ("rate_limited", "blocked", "connection", "timeout", "dns", "tls"):
+        return True
+    return exc.category == "http" and str(exc.detail or "").startswith("HTTP 5")
+
+
 async def _ask(db: AsyncSession, url: str, key: str) -> bytes:
-    _sent.append(time.time())
+    # counted before it goes out: a request that fails was sent all the same (the budget counts attempts, not answers)
+    _sent.append(round(time.time(), 3))
+    _asked[0] += 1
     # db: what the session holds is committed first – no transaction stays open while the gate and the download wait
     body = await svc.get(url, db=db, headers={"apiKey": key} if key else {}, has_key=bool(key), conditional=False, limit=4 * 1024 * 1024)
     return body or b"{}"
@@ -137,7 +152,8 @@ async def _ask(db: AsyncSession, url: str, key: str) -> bytes:
 
 async def check_cpe(db: AsyncSession, cpe: str, key: str, local: dict | None) -> int:
     """Ask the NVD about one CPE (local: the CVE facts of a followed product's own NVD data – only the dictionary is
-    asked). Returns the number of requests; NewsError (429 → the host pauses, the CPE stays due) propagates."""
+    asked). Returns the number of answered requests; the NewsError of an outage (outage(): 429, 403, unreachable, 5xx –
+    the step ends, the CPE is due again after RETRY_AFTER_ERROR) propagates."""
     row = await db.get(CatalogCpeCheck, cpe)
     if row is None:
         row = CatalogCpeCheck(cpe=cpe, source="nvd")
@@ -159,7 +175,7 @@ async def check_cpe(db: AsyncSession, cpe: str, key: str, local: dict | None) ->
     except NewsError as exc:
         row.error = (f"{exc.category}: {exc.detail}" if exc.detail else exc.category)[:200]
         await db.commit()  # the last good answer (checked_at, …) stays; due again after RETRY_AFTER_ERROR
-        if exc.category == "rate_limited":
+        if outage(exc):
             raise
         log.info("catalogue check %s: %s", cpe, row.error)
         return asked
@@ -382,14 +398,16 @@ def due(cpes: dict[str, CatalogCpeCheck], followed_cpes: set[str], all_cpes: lis
 
 async def run(*, manual: bool = False, vendor_busy: bool = False) -> dict:
     """One step: ask the NVD about due CPEs within the budget (manual: the followed ones now), then the verdicts."""
-    asked = checked = 0
+    checked = 0
     stopped = None
+    start = _asked[0]
+
+    def asked() -> int:  # the requests of this step – failed ones included
+        return _asked[0] - start
+
     async with dbm.session() as db:
         # the hour's requests as stored (a restart must not start a fresh hour); memory may know some more
-        stored = (await settings_store.get(db, SETTING)).get("sent") or []
-        known = sorted({*_sent, *(float(x) for x in stored if isinstance(x, int | float))})
-        _sent.clear()
-        _sent.extend(known)
+        merge_sent((await settings_store.get(db, SETTING)))
         cfg = await svc.config(db)
         cat = catalog.load()
         fol = await followed_keys(db)
@@ -414,14 +432,16 @@ async def run(*, manual: bool = False, vendor_busy: bool = False) -> dict:
                     stopped = "paused"
                     break
                 need = 1 if c in local else 3
-                if asked + need > allowance:
+                if asked() + need > allowance:
                     stopped = "budget"
                     break
                 try:
-                    asked += await check_cpe(db, c, key, local.get(c))
+                    await check_cpe(db, c, key, local.get(c))
                     checked += 1
-                except NewsError:
-                    stopped = "paused"
+                except NewsError as exc:
+                    # rate limited: the host pauses (svc.blocked_for); unreachable or failing: this step ends – an
+                    # outage never runs through the list of due CPEs
+                    stopped = "paused" if exc.category == "rate_limited" else "unreachable"
                     break
                 if not (await svc.config(db)).get("enabled", True):
                     break
@@ -430,7 +450,7 @@ async def run(*, manual: bool = False, vendor_busy: bool = False) -> dict:
         changed = await evaluate(db)
         state = await settings_store.get(db, SETTING)
         budget_left()  # drops what is older than an hour
-        state = {**state, "last_run_at": datetime.now(UTC).isoformat(), "last_stop": stopped, "sent": [round(x, 1) for x in _sent]}
+        state = {**state, "last_run_at": datetime.now(UTC).isoformat(), "last_stop": stopped, "sent": list(_sent), "sent_v": SENT_V}
         if manual:
             state["last_manual_at"] = state["last_run_at"]
         if checked:
@@ -438,8 +458,21 @@ async def run(*, manual: bool = False, vendor_busy: bool = False) -> dict:
         await settings_store.put(db, SETTING, state)
         await db.commit()
     if checked or changed:
-        log.info("catalogue check: %s CPEs (%s requests), %s verdicts changed%s", checked, asked, changed, f", stopped: {stopped}" if stopped else "")
-    return {"cpes": checked, "requests": asked, "changed": changed, "stopped": stopped}
+        log.info("catalogue check: %s CPEs (%s requests), %s verdicts changed%s", checked, asked(), changed, f", stopped: {stopped}" if stopped else "")
+    return {"cpes": checked, "requests": asked(), "changed": changed, "stopped": stopped}
+
+
+def merge_sent(state: dict) -> None:
+    """The hour's requests: what memory knows and what was stored (a restart). Both hold the same request with the same
+    value (milliseconds) – merged as a multiset (the larger count of each value), so a request stored by the last step
+    counts once, and two requests in the same millisecond still count twice. A list of 0.1.50 or older (tenths of a
+    second, every request twice): each value once."""
+    stored = [round(float(x), 3) for x in state.get("sent") or [] if isinstance(x, int | float) and not isinstance(x, bool)]
+    if state.get("sent_v") != SENT_V:
+        stored = sorted(set(stored))
+    merged = Counter(round(x, 3) for x in _sent) | Counter(stored)
+    _sent.clear()
+    _sent.extend(sorted(merged.elements()))
 
 
 class CheckLoop:

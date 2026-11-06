@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import ConfigDict, Field, ValidationError, field_validator
 from sqlalchemy import Text, and_, cast, delete, exists, false, func, literal, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import __version__, advisory_changes, audit, epss, exploits, netaddr, reader, story_details
+from app import db as dbm
 from app import settings as settings_store
 from app import news as news_svc
 from app.config import get_config, tls_verify
@@ -28,6 +30,8 @@ from app.models import NewsItem, NewsItemSource, NewsSource, NotifyRule, StoryDe
 router = APIRouter(prefix="/api", tags=["news"])
 Severity = Literal["critical", "high", "medium", "low", "info"]
 Topic = Literal["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]  # news.TOPICS
+TimeField = Literal["published", "fetched"]  # what a time range is about: published_at (default) or fetched_at (arrival)
+IDS_MAX = 50  # `ids` (a notification's stories): at most this many
 
 
 # in-process, no Redis: one process, one background loop
@@ -46,10 +50,19 @@ class _M(NoNul):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-@router.get("/health")
-async def health(db: Db) -> dict:
-    await db.execute(select(1))
-    return {"ok": True, "version": __version__}
+HEALTH_DB_TIMEOUT = 3.0  # s – below the container's health check (4 s): a hanging database answers 503, not nothing
+
+
+@router.api_route("/health", methods=["GET", "HEAD"])
+async def health() -> JSONResponse:
+    """Up and with its database. Without the database (stopped, unreachable, not answering in time): 503 with a minimal
+    body – not a 500 with a stack trace in the log (0.1.51). HEAD as GET (uptime monitors)."""
+    try:
+        async with asyncio.timeout(HEALTH_DB_TIMEOUT), dbm.session() as s:
+            await s.execute(select(1))
+    except Exception:  # noqa: BLE001 - whatever keeps the database from answering: not ready
+        return JSONResponse({"ok": False}, status_code=503, headers={"Retry-After": "10"})
+    return JSONResponse({"ok": True, "version": __version__})
 
 
 def _source_ref(s: NewsSource) -> dict:
@@ -106,6 +119,50 @@ def _with_source(stmt):  # noqa: ANN001, ANN202
     return stmt.join(NewsSource, NewsSource.id == NewsItem.source_id)
 
 
+def _when(d: datetime | None, name: str) -> datetime | None:
+    """A bound of the time range as aware UTC – 422 for a time without a zone (whose local time?) or outside
+    1970–2100 (year 9999 at -14:00 overflows on the way: never a 500)."""
+    if d is None:
+        return None
+    if d.tzinfo is None:
+        raise api_error(422, "invalid", errors=f"{name} needs a time zone")
+    if (s := _sane_time(d)) is None:
+        raise api_error(422, "invalid", errors=f"{name} out of range")
+    return s
+
+
+def time_range(since: datetime | None, until: datetime | None, field: str = "published", mark: reader.Marks | None = None) -> list:
+    """The list's "Zeitraum" as conditions: `since` (inclusive) to `until` (exclusive) on the published or the arrival
+    time (both indexed: ix_news_items_published, ix_news_items_fetched); `mark` ("Seit meinem letzten Besuch"): what
+    arrived after the person's read watermark – by its arrival number, as the read state decides it (app/reader.py)."""
+    s, u = _when(since, "since"), _when(until, "until")
+    if s is not None and u is not None and s > u:
+        raise api_error(422, "invalid", errors="since is after until")
+    col = NewsItem.fetched_at if field == "fetched" else NewsItem.published_at
+    out: list = []
+    if s is not None:
+        out.append(col >= s)
+    if u is not None:
+        out.append(col < u)
+    if mark is not None:
+        out.append(or_(and_(NewsItem.seq.is_not(None), NewsItem.seq > mark.news_seq), and_(NewsItem.seq.is_(None), NewsItem.fetched_at > mark.news_at)))
+    return out
+
+
+def story_ids(raw: str | list[str] | None) -> list[uuid.UUID] | None:
+    """`ids` – the stories of a notification ("a,b,c", also as several parameters): at most IDS_MAX, each a UUID,
+    else 422 (never a 500). None: no such filter."""
+    if raw is None:
+        return None
+    parts = [p.strip() for x in ([raw] if isinstance(raw, str) else raw) for p in x.split(",") if p.strip()]
+    if not parts or len(parts) > IDS_MAX:
+        raise api_error(422, "invalid", errors=f"ids: 1 to {IDS_MAX} story ids")
+    try:
+        return list(dict.fromkeys(uuid.UUID(p) for p in parts))
+    except ValueError as exc:
+        raise api_error(422, "invalid", errors="ids: not a story id") from exc
+
+
 async def ours_keys(db: AsyncSession, user: User, scope: str, labels: dict[str, str] | None = None) -> set[str]:
     """"Betrifft unsere Produkte": the products that count – every followed one, or under "Mein Team" (`scope=team`, as
     Vendor News) those of the person's teams (while Teams is off: every followed one)."""
@@ -129,6 +186,18 @@ def _with_ours(items: list[dict], stored: list[list], labels: dict[str, str]) ->
         x["products"] = [{"key": k, "label": labels[k]} for k in keys or [] if k in labels]
 
 
+SEARCH_MIN = 3  # the trigram index (ix_news_items_search_trgm) needs 3 characters – as the audit log's search
+
+
+def short_search(q: str) -> bool:
+    """A term of 1–2 characters: no index serves it – the list itself reads on until it has its page, but the counts
+    (total, unread, the topics' facets, "Betrifft unsere Produkte") would each read every story: four full scans,
+    217 ms alone and 550 ms under load at 30 000 stories (bug hunt 0.1.50). For such a term the list comes without
+    counts (the page says so: at least 3 characters, as the audit log's search)."""
+    term = fold(q.strip()[:100]).replace("%", "").replace("_", "").strip()  # as the filter uses it (db.contains)
+    return 0 < len(term) < SEARCH_MIN
+
+
 @router.get("/news")
 async def list_news(
     user: Reader,
@@ -144,6 +213,11 @@ async def list_news(
     muted: bool = False,
     ours: bool = False,
     scope: Literal["all", "team"] = "all",
+    since: datetime | None = None,
+    until: datetime | None = None,
+    time_field: TimeField = "published",
+    since_mark: bool = False,
+    ids: Annotated[str | None, Query(max_length=IDS_MAX * 40)] = None,
 ) -> dict:
     """Stories newest first – "all", "new" (unread by me) or "read" (read by me); app/reader.py decides what is read
     (the watermark, the marks, the age). `muted`: also the stories whose CVEs I all muted (flagged, dimmed by the page) –
@@ -154,8 +228,14 @@ async def list_news(
 
     `ours` ("Betrifft unsere Produkte"): only stories whose details concern a followed product – under `scope=team`
     one of the person's teams. `counts.ours` counts them with every other filter; `ours_on`: anything is followed (in
-    that scope) at all."""
+    that scope) at all.
+
+    "Zeitraum": `since` (inclusive) / `until` (exclusive) – times with a zone – on `time_field` (published: the story's
+    date, fetched: its arrival); `since_mark`: what arrived after my read watermark ("Seit meinem letzten Besuch" – its
+    time is `mark_at`). `ids`: only these stories (a notification's, "a,b,c", at most 50). Each is one more filter: the
+    list, every count and the cursor alike (the order stays by date)."""
     me = user.id
+    wanted = story_ids(ids)
     now = datetime.now(UTC)
     # the arrival number of the newest story stored before this list was read ("Alle gelesen" marks up to it, not
     # what arrived after the page was loaded) – read first: a story stored meanwhile has a higher number
@@ -164,6 +244,9 @@ async def list_news(
     mutes = await reader.mutes_of(db, me, now)
     r, on = reader.news_read_mark(me)
     where = _filters(list(source), list(severity), q)  # without the topics: the facets count every topic
+    where += time_range(since, until, time_field, m if since_mark else None)
+    if wanted is not None:
+        where.append(NewsItem.id.in_(wanted))
     hush = reader.news_muted(mutes)
     if hush is not None and not muted:
         where.append(~hush)
@@ -191,12 +274,12 @@ async def list_news(
     rows = (await db.execute(stmt.order_by(key.desc(), NewsItem.id.desc()).limit(limit + 1))).all()
     items = [_item_out(i, s, None if un else ra, unread=bool(un), muted=bool(mu)) for i, s, ra, un, mu in rows[:limit]]
     _with_ours(items, [r[0].products for r in rows[:limit]], {k: v for k, v in labels.items() if k in keys})
-    out: dict = {"items": items, "more": len(rows) > limit, "next": None, "upto": upto, "ours_on": bool(keys)}
+    out: dict = {"items": items, "more": len(rows) > limit, "next": None, "upto": upto, "ours_on": bool(keys), "mark_at": m.news_at.isoformat()}
     await _with_hints(db, out["items"])
     if len(rows) > limit:
         i = rows[limit - 1][0]
         out["next"] = f"{i.published_at.isoformat()}|{i.id}"
-    if counts:  # the next pages do not need them
+    if counts and not short_search(q):  # the next pages do not need them; a term of 1–2 characters: none (below)
         total = int(await db.scalar(_with_source(select(func.count()).select_from(NewsItem)).where(*where)) or 0)
         new = await reader.news_unread_count(db, me, m, where, now, _with_source)
         out["counts"] = {
@@ -431,21 +514,32 @@ class ReadAllIn(_M):
     muted: bool = False  # the list showed the muted stories too ("Stummgeschaltete zeigen")
     ours: bool = False  # "Betrifft unsere Produkte"
     scope: Literal["all", "team"] = "all"
+    # the list's "Zeitraum" (as GET /news resolved it – a preset's times as the page asked them) and `ids`
+    since: datetime | None = None
+    until: datetime | None = None
+    time_field: TimeField = "published"
+    since_mark: bool = False
+    ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=IDS_MAX)
 
 
 @router.post("/news/read-all")
 async def read_all(body: ReadAllIn, user: Reader, db: Db) -> dict:
     """Everything unread of the current filter (up to `upto` when given) read at once – by the filter, never by ids:
-    without a filter the person's watermark moves (app/reader.py), with one a mark per unread story. Idempotent."""
+    without a filter the person's watermark moves (app/reader.py), with one a mark per unread story. Idempotent.
+    A time range or `ids` is a filter like any: only what the list shows is marked."""
     mutes = await reader.mutes_of(db, user.id)
     where = _filters(list(body.source), list(body.severity), body.q, list(body.topic))
+    where += time_range(body.since, body.until, body.time_field, await reader.marks(db, user) if body.since_mark else None)
+    if body.ids is not None:
+        where.append(NewsItem.id.in_(list(dict.fromkeys(body.ids))))
     hush = reader.news_muted(mutes)
     if hush is not None and not body.muted:
         where.append(~hush)
     if body.ours:
         where.append(_ours_filter(await ours_keys(db, user, body.scope)))
     # a topic (or our products) is a filter: marks for its unread stories, the watermark stays
-    everything = not body.source and not body.severity and not body.topic and not body.ours and not body.q.strip() and (hush is None or body.muted)
+    ranged = body.since is not None or body.until is not None or body.since_mark or body.ids is not None
+    everything = not body.source and not body.severity and not body.topic and not body.ours and not body.q.strip() and not ranged and (hush is None or body.muted)
     top = await news_svc.last_seq(db)
     upto = min(body.upto, top) if body.upto is not None else top
     marked = await reader.news_read_all(db, user, where, _with_source, upto=upto, everything=everything)
@@ -532,9 +626,20 @@ async def admin_news(admin: Admin, db: Db) -> dict:
 
 
 def _feed_url(v: str) -> str:
+    v = netaddr.normal_url(v)  # one spelling of the address: host in lower case (IDNA), no default port (0.1.51)
     if not netaddr.valid_url(v, https_only=True) or netaddr.forbidden_literal(v):
         raise ValueError("invalid url")
     return v
+
+
+async def _same_feed(db: AsyncSession, url: str, other_than: uuid.UUID | None = None) -> bool:
+    """Is this address a source already – compared in one spelling (netaddr.normal_url): sources stored before 0.1.51
+    may still be written with an upper-case host or the default port."""
+    want = netaddr.normal_url(url)
+    q = select(NewsSource.url)
+    if other_than is not None:
+        q = q.where(NewsSource.id != other_than)
+    return any(netaddr.normal_url(u) == want for u in await db.scalars(q))
 
 
 class SourceIn(_M):
@@ -563,6 +668,8 @@ async def add_source(body: SourceIn, admin: Admin, db: Db) -> dict:
     """A feed of one's own. Two admins (or a double click) adding the same address at once get one source and a 409,
     not two sources or a 500: the unique index on the address of added sources decides (migration 0005; the check in the
     statement covers the built-in addresses, which the index leaves out)."""
+    if await _same_feed(db, body.url):
+        raise api_error(409, "news_source_exists")
     sid, key = uuid.uuid4(), f"custom-{uuid.uuid4().hex[:12]}"
     values = select(
         literal(sid, NewsSource.id.type), literal(key), literal(body.name), literal(body.url), literal(""), literal(False), literal(True), literal(0), literal(datetime.now(UTC), NewsSource.created_at.type)
@@ -591,7 +698,7 @@ async def patch_source(sid: uuid.UUID, body: SourcePatch, admin: Admin, db: Db) 
     changes = body.model_dump(exclude_unset=True)
     if s.builtin and ({"name", "url"} & set(changes)):
         raise api_error(409, "news_source_builtin")  # built-in sources keep the address the code knows
-    if changes.get("url") and changes["url"] != s.url and await db.scalar(select(NewsSource.id).where(NewsSource.url == changes["url"], NewsSource.id != s.id)):
+    if changes.get("url") and changes["url"] != s.url and await _same_feed(db, changes["url"], other_than=s.id):
         raise api_error(409, "news_source_exists")
     moved, switched_on = bool(changes.get("url")) and changes["url"] != s.url, bool(changes.get("enabled")) and not s.enabled
     before = {"name": s.name, "url": s.url, "enabled": s.enabled}

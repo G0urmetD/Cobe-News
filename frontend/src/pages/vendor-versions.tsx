@@ -40,6 +40,7 @@ import { fmtDay } from "@/lib/format"
 import { useCatalogTexts } from "@/lib/catalog-texts"
 import { cn } from "@/lib/utils"
 import { confirmAll, confirmVersion, dueVersions, refreshReview } from "@/lib/version-review"
+import { iso } from "@/lib/bidi"
 import {
   STATUS_COLOR,
   SUPPORT_COLOR,
@@ -53,6 +54,7 @@ import {
   type ReleaseLine,
   type Support,
   type VendorProduct,
+  type VersionTarget,
   productKeyOf,
   refreshVendor,
 } from "@/lib/vendor-api"
@@ -199,7 +201,7 @@ function InstalledVersion({
       setConfirming(false)
     }
   }
-  const name = v.label ? `${v.version} (${v.label})` : v.version
+  const name = v.label ? `${v.version} (${iso(v.label)})` : v.version
   const remove = async () => {
     if (!(await confirmAction({ title: t("vendor.v.removeTitle"), text: t("vendor.v.removeText", { version: name }), confirm: t("common.remove") }))) return
     try {
@@ -222,7 +224,7 @@ function InstalledVersion({
       <div className="flex items-start gap-2">
         <p className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className="font-mono text-base font-semibold break-all">{v.version}</span>
-          {v.label && <span className="text-sm text-muted-foreground">{v.label}</span>}
+          {v.label && <bdi className="text-sm text-muted-foreground">{v.label}</bdi>}
           {v.count && <span className="text-xs text-muted-foreground">· {t("vendor.devices", { count: v.count })}</span>}
           {v.short && (
             <Hint text={t("vendor.v.shortHint", { version: v.version })}>
@@ -282,7 +284,7 @@ function InstalledVersion({
               <CheckCircle2 /> {t("vendor.v.clean")}
             </Pill>
           ))}
-        <ReleaseChips v={v} lines={lines} veeam={d.product.scheme === "veeam"} affected={s?.affected ?? 0} />
+        <ReleaseChips v={v} lines={lines} veeam={d.product.scheme === "veeam"} affected={s?.affected ?? 0} target={s?.target} />
       </div>
     </li>
   )
@@ -310,7 +312,7 @@ function ReviewLine({ v, canConfirm, busy, onConfirm }: { v: FollowedVersion; ca
             <Ts at={r.confirmed_at} rel />
           </>
         )}
-        {r.confirmed_by && ` · ${t("review.by", { name: r.confirmed_by })}`}
+        {r.confirmed_by && ` · ${t("review.by", { name: iso(r.confirmed_by) })}`}
       </span>
       {canConfirm && (
         <Button variant={r.due ? "outline" : "ghost"} size="xs" className="ml-auto" disabled={busy} onClick={onConfirm} title={t("review.confirmHint")}>
@@ -344,7 +346,7 @@ function Hint({ text, children }: { text: string; children: React.ReactNode }) {
   )
 }
 
-function ReleaseChips({ v, lines, veeam, affected }: { v: FollowedVersion; lines: ReleaseLine[]; veeam: boolean; affected: number }) {
+function ReleaseChips({ v, lines, veeam, affected, target }: { v: FollowedVersion; lines: ReleaseLine[]; veeam: boolean; affected: number; target?: VersionTarget }) {
   const { t } = useTranslation()
   const r = v.release
   if (!r) return <span className="text-xs text-muted-foreground">{t("vendor.lines.noData")}</span>
@@ -366,6 +368,14 @@ function ReleaseChips({ v, lines, veeam, affected }: { v: FollowedVersion; lines
         <Hint text={t("vendor.v.updateHint", { line: lineName, latest: r.line.latest })}>
           <Pill color="--primary">
             <TrendingUp /> {t("vendor.v.update", { latest: r.line.latest })}
+          </Pill>
+        </Hint>
+      ) : r.line.latest && affected > 0 && target?.kind === "update" && target.to && target.to !== r.line.latest ? (
+        // the advisories name a fix in the line that endoflife.date does not list yet (its newest is older): the newer
+        // known fix counts – as the card's "Update auf … behebt …"
+        <Hint text={t("vendor.v.updateFixHint", { line: lineName, to: target.to, latest: r.line.latest })}>
+          <Pill color="--primary">
+            <TrendingUp /> {t("vendor.v.update", { latest: target.to })}
           </Pill>
         </Hint>
       ) : r.line.latest && affected > 0 ? (

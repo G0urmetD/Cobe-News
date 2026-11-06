@@ -356,6 +356,19 @@ Nennen mehrere Quellen dieselbe Schwachstelle, entscheidet je Version diese Reih
 5. OSV zuletzt: es entscheidet nur ein „möglicherweise betroffen“ und ergänzt eine fehlende Fix-Version, ändert aber
    kein eindeutiges Urteil.
 
+Dabei gilt:
+
+- Ein CSAF-Dokument des BSI (WID) ist kein Herstellerhinweis: es fasst mehrere CVEs und die Angaben der Hersteller
+  zusammen. Neben den CVE-Einträgen seiner CVEs entscheidet es nur, wo diese nichts entscheiden. Nennt es ein Produkt
+  ohne Version („alle Versionen“) und sagen die CVE-Einträge „nicht betroffen“, steht „möglicherweise betroffen“; sein
+  „nicht betroffen“ (etwa aus Grenzen je Linie, die zwei CVEs zusammenlegen) zählt nie gegen ein „betroffen“ der
+  CVE-Einträge.
+- Nennt der Hersteller im CVE-Eintrag seine betroffenen Bereiche und eure Version ausdrücklich nicht (alle anderen
+  „nicht betroffen“, oder der Fix eurer Linie), die NVD-Analyse aber einen Bereich, der sie einschließt, steht
+  „möglicherweise betroffen“ – nicht „betroffen“.
+- Ein Release über dem Ende eines betroffenen Bereichs derselben Linie gilt als behoben (GitLab `>=12.8, <12.9.8`:
+  12.9.8 enthält den Fix).
+
 ### Eine Quelle abschalten {#weitere-quellen-aus}
 
 Schalter aus und „Speichern“:

@@ -24,7 +24,7 @@ import threading
 import time
 from dataclasses import dataclass
 from functools import lru_cache
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import httpcore
 import httpx
@@ -67,6 +67,35 @@ def valid_url(url: str, *, https_only: bool = False) -> bool:
         except ValueError:
             return False
     return bool(_HOSTNAME.match(host))
+
+
+DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def normal_url(url: str) -> str:
+    """One spelling of an address (0.1.51 – "https://FEEDS.example.test:443/rss" and "https://feeds.example.test/rss"
+    were two feeds, fetched twice): scheme and host in lower case, an international host name in its ASCII form (IDNA),
+    the scheme's default port left out. Path, query and fragment stay as typed (a path may be case-sensitive). Not
+    parseable: unchanged (the validation refuses it)."""
+    try:
+        parts = urlsplit(url.strip())
+        port = parts.port
+        host = parts.hostname or ""
+    except (ValueError, AttributeError):
+        return url
+    if not host or parts.username is not None or parts.password is not None:
+        return url
+    scheme = parts.scheme.lower()
+    if ":" in host:  # IPv6
+        name = f"[{host.lower()}]"
+    else:
+        try:
+            name = host.encode("idna").decode("ascii").lower() if not host.isascii() else host.lower()
+        except UnicodeError:
+            return url
+    if port is not None and port != DEFAULT_PORTS.get(scheme):
+        name = f"{name}:{port}"
+    return urlunsplit((scheme, name, parts.path, parts.query, parts.fragment))
 
 
 def host_name(host: str) -> bool:

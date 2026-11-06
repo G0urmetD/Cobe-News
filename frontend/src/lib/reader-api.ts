@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 import { polled } from "@/lib/poll"
 import { NEWS_SEVERITIES, type NewsSeverity, type NewsTopic, isTopic } from "@/lib/news-api"
+import { type NewsRange, readIds, readRange, writeRange } from "@/lib/news-range"
 import { STATUS_FILTERS, type OverviewFilter, type StatusFilter } from "@/lib/vendor-api"
 import type { VendorScope } from "@/lib/teams-api"
 
@@ -11,6 +12,8 @@ export interface ReaderCounts {
   news: number
   vendor: number
   news_enabled: boolean
+  /** false: Vendor News is switched off (no number, no dot) */
+  vendor_enabled?: boolean
 }
 
 export const COUNTS_KEY = ["reader", "counts"] as const
@@ -46,6 +49,10 @@ export interface NewsUrlFilter {
   muted: boolean
   /** "Betrifft unsere Produkte" */
   ours: boolean
+  /** "Zeitraum" (lib/news-range.ts) */
+  range: NewsRange
+  /** a notification's stories ("Aus der Benachrichtigung"): only these – the other filters are set aside meanwhile */
+  ids: string[]
 }
 
 const on = (v: string | null) => v === "1" || v === "true"
@@ -55,7 +62,17 @@ export function readNewsFilter(p: URLSearchParams): NewsUrlFilter {
   const sources = [...new Set(p.getAll("source").filter((x) => UUID.test(x)))].slice(0, 50)
   const severities = [...new Set(p.getAll("severity"))].filter((x): x is NewsSeverity => NEWS_SEVERITIES.includes(x as NewsSeverity))
   const topics = [...new Set(p.getAll("topic"))].filter(isTopic)
-  return { sources, severities, topics, q: (p.get("q") ?? "").slice(0, 100), unread: on(p.get("unread")), muted: on(p.get("muted")), ours: on(p.get("ours")) }
+  return {
+    sources,
+    severities,
+    topics,
+    q: (p.get("q") ?? "").slice(0, 100),
+    unread: on(p.get("unread")),
+    muted: on(p.get("muted")),
+    ours: on(p.get("ours")),
+    range: readRange(p),
+    ids: readIds(p),
+  }
 }
 
 /** The filter written into an address – the other parameters (the drawer's, unknown ones) stay as they are. */
@@ -82,8 +99,12 @@ export function writeNewsFilter(p: URLSearchParams, f: Partial<NewsUrlFilter>): 
       if (f[k]) next.set(k, "1")
       else next.delete(k)
     }
+  if (f.ids !== undefined) {
+    next.delete("ids")
+    if (f.ids.length) next.set("ids", f.ids.join(","))
+  }
   next.delete("tab") // the old "Neu | Gelesen" tabs
-  return next
+  return f.range !== undefined ? writeRange(next, f.range) : next
 }
 
 export interface VendorUrlFilter {
@@ -126,7 +147,9 @@ export function writeVendorFilter(p: URLSearchParams, f: Partial<VendorUrlFilter
 
 /** Filters of the News page only: on Vendor News they are no filter (a `topic` or `ours` there is neither a view nor a
  *  reason to skip the default view – readVendorFilter ignores them as well). */
-export const NEWS_ONLY_PARAMS = ["topic", "ours"] as const
+export const NEWS_ONLY_PARAMS = ["topic", "ours", "range", "since", "until", "time", "ids"] as const
+/** A filter, but never stored in a view: a notification's stories (`ids` – the link of one mail, not a way of looking). */
+export const NOT_IN_VIEW = ["ids"] as const
 
 const notAFilter = (k: string, page?: ViewPage) => (DRAWER_PARAMS as readonly string[]).includes(k) || (page === "vendor" && (NEWS_ONLY_PARAMS as readonly string[]).includes(k))
 
@@ -140,7 +163,7 @@ export function hasFilter(p: URLSearchParams, page?: ViewPage): boolean {
  *  the News page's own filters. */
 export function viewQuery(p: URLSearchParams, page?: ViewPage): string {
   const next = new URLSearchParams()
-  for (const [k, v] of p) if (!notAFilter(k, page)) next.append(k, v)
+  for (const [k, v] of p) if (!notAFilter(k, page) && !(NOT_IN_VIEW as readonly string[]).includes(k)) next.append(k, v)
   return next.toString()
 }
 
