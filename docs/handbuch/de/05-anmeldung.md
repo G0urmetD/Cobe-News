@@ -14,8 +14,8 @@ und vollständig eingerichtet ist.
 | Art | Wer legt das Konto an | Zweiter Faktor | Rolle kommt aus |
 |---|---|---|---|
 | **Lokal** | ein Admin unter *Einstellungen → Benutzer & Rollen* | [TOTP](term:totp) oder ein [Passkey](#passkeys) in Cobe News – Pflicht für Admins (TOTP), für Leser freiwillig oder [Pflicht für alle](#zweiter-faktor-alle) | der Einstellung am Konto |
-| **Active Directory / LDAP** | entsteht automatisch bei der ersten Anmeldung | TOTP in Cobe News – Pflicht für Admins, für Leser freiwillig oder [Pflicht für alle](#zweiter-faktor-alle) | der [Rollen-Zuordnung](#gruppen-rollen) |
-| **Microsoft Entra ID** | entsteht automatisch bei der ersten Anmeldung | verlangt Microsoft ([Conditional Access](term:conditionalaccess)); wo ein zweiter Faktor Pflicht ist und das Token ihn nicht nachweist, zusätzlich TOTP in Cobe News ([MFA-Nachweis](#entra-mfa-nachweis)) | der [Rollen-Zuordnung](#gruppen-rollen) |
+| **Active Directory / LDAP** | entsteht automatisch, sobald es in einer zugeordneten Gruppe ist ([vorab geladen](#vorab-laden)) – ohne Passwort; je nach [Automatischer Anmeldung](#freigabe) sofort aktiv oder nach Freigabe | TOTP in Cobe News – Pflicht für Admins, für Leser freiwillig oder [Pflicht für alle](#zweiter-faktor-alle) | der [Rollen-Zuordnung](#gruppen-rollen) |
+| **Microsoft Entra ID** | wie AD: [vorab geladen](#vorab-laden), sofort aktiv oder nach [Freigabe](#freigabe) | verlangt Microsoft ([Conditional Access](term:conditionalaccess)); wo ein zweiter Faktor Pflicht ist und das Token ihn nicht nachweist, zusätzlich TOTP in Cobe News ([MFA-Nachweis](#entra-mfa-nachweis)) | der [Rollen-Zuordnung](#gruppen-rollen) |
 
 Die Anmeldeseite zeigt dann „Mit Microsoft anmelden“ (Entra ID) und darunter die Reiter „Active Directory“ und
 „Lokales Konto“.
@@ -117,6 +117,8 @@ In jeder Zeile der Benutzerliste:
 | Was | Wo | Hinweise |
 |---|---|---|
 | Rolle ändern | Auswahl *Rolle* | Nur lokale Konten – bei AD/Entra folgt die Rolle der Gruppe. Verlangt erneute Bestätigung. Alle Sitzungen des Kontos enden. |
+| Freigeben / Ablehnen | Schaltflächen in der Zeile (*Wartet auf Freigabe*) | Nur solange die [automatische Anmeldung](#freigabe) aus ist. „Freigeben“ schaltet das Konto ein – als Admin mit erneuter Bestätigung; den Schalter *Aktiv* einschalten ist dasselbe. „Ablehnen“ lässt es aus wie *Dauerhaft sperren*. |
+| Aufstieg freigeben / Bleibt Leser | Schaltflächen in der Zeile (*Aufstieg zum Admin wartet auf Freigabe*) | „Aufstieg freigeben“ macht den Leser zum Admin (erneute Bestätigung, alle Sitzungen enden). „Bleibt Leser“: Solange das Konto in der Admin-Gruppe ist, wird nicht wieder gefragt. |
 | Deaktivieren / aktivieren | Schalter *Aktiv* | Sitzungen enden sofort. Bei einem Admin-Konto mit erneuter Bestätigung. Ein von dir deaktiviertes Verzeichniskonto schaltet der Verzeichnisabgleich nie wieder ein. |
 | Dauerhaft sperren | „Weitere Aktionen“ → „Dauerhaft sperren“ | Auch für ein Konto, das der Abgleich oder Teams schon ausgeschaltet hat (sein Schalter steht schon auf aus). Danach steht *Vom Admin gesperrt*: Weder der Abgleich noch Teams noch eine Anmeldung schalten das Konto wieder ein. Verlangt erneute Bestätigung, alle Sitzungen enden. |
 | Dauerhafte Sperre aufheben | „Weitere Aktionen“ → „Dauerhafte Sperre aufheben“ | Verzeichniskonto: Danach entscheidet wieder der Abgleich (*Wartet auf Abgleich*) – aktiv, sobald eine Anmeldung oder der nächste Abgleich eine zugeordnete Gruppe oder ein Team findet. Lokales Konto: sofort wieder aktiv. Verlangt erneute Bestätigung. |
@@ -127,7 +129,7 @@ In jeder Zeile der Benutzerliste:
 | Löschen | „Weitere Aktionen“ → „Löschen“ | Löscht das Konto und seine Gelesen-Markierungen. Ein Verzeichniskonto entsteht bei der nächsten Anmeldung neu, solange die Gruppe passt – zum Aussperren lieber deaktivieren. |
 
 Warum ein Konto aus ist, zeigt seine Markierung (mit Erklärung beim Darüberfahren): *Vom Admin gesperrt* ist die
-dauerhafte Sperre. *Kein Team mehr*, *Teams ausgeschaltet*, *Keine Rollen-Gruppe mehr*, *Im Verzeichnis deaktiviert* und
+dauerhafte Sperre (auch nach „Ablehnen“). *Wartet auf Freigabe* schaltet nur ein Admin ein ([Freigabe](#freigabe)). *Kein Team mehr*, *Teams ausgeschaltet*, *Keine Rollen-Gruppe mehr*, *Im Verzeichnis deaktiviert* und
 *Nicht mehr im Verzeichnis* hat der Abgleich gesetzt – solche Konten schaltet er von selbst wieder ein, sobald es wieder
 passt. Wer nicht zurückkommen soll, bekommt „Dauerhaft sperren“.
 
@@ -443,7 +445,7 @@ dafür braucht es die Berechtigungen aus Schritt 5.
 
 | Berechtigung | Typ | Wofür Cobe News sie braucht | Was ohne sie nicht geht |
 |---|---|---|---|
-| `GroupMember.Read.All` | Anwendung | Gruppensuche unter *Rollen-Zuordnung* und bei Teams; Gruppen von Benutzern mit mehr als 200 Gruppen (oder ohne Gruppenanspruch im Token); Gruppen im stündlichen Abgleich; [Teams](#teams): die Mitglieder einer gebundenen Gruppe (`transitiveMembers`) | Die Gruppensuche meldet „Der App-Registrierung fehlt eine Berechtigung“ – Entra-Gruppen lassen sich in der Oberfläche **nicht zuordnen**. Benutzer mit mehr als 200 Gruppen können sich nicht anmelden („Die Anmeldung mit Microsoft ist fehlgeschlagen.“). Teams: die Gruppe zeigt „Microsoft Graph verweigert den Zugriff (403) …“, niemand wird geladen. |
+| `GroupMember.Read.All` | Anwendung | Gruppensuche unter *Rollen-Zuordnung* und bei Teams; Gruppen von Benutzern mit mehr als 200 Gruppen (oder ohne Gruppenanspruch im Token); Gruppen im stündlichen Abgleich; [Teams](#teams) und [Vorab laden](#vorab-laden): die Mitglieder einer gebundenen bzw. zugeordneten Gruppe (`transitiveMembers`) | Die Gruppensuche meldet „Der App-Registrierung fehlt eine Berechtigung“ – Entra-Gruppen lassen sich in der Oberfläche **nicht zuordnen**. Benutzer mit mehr als 200 Gruppen können sich nicht anmelden („Die Anmeldung mit Microsoft ist fehlgeschlagen.“). Teams: die Gruppe zeigt „Microsoft Graph verweigert den Zugriff (403) …“, niemand wird geladen. |
 | `User.Read.All` | Anwendung | Stündlicher Abgleich: gibt es das Konto noch, ist es aktiviert, in welchen Gruppen ist es; [Teams](#teams): Name, UPN, E-Mail und Status der geladenen Mitglieder | Der Abgleich für Entra wird übersprungen (Log: `directory sync (entra) skipped: forbidden`). Wer in Entra deaktiviert, gelöscht oder aus der Gruppe genommen wird, behält eine laufende Sitzung bis zu deren Ablauf (Standard: 60 Minuten ohne Aktion, spätestens 12 Stunden); erst die nächste Anmeldung prüft neu. Teams: Graph liefert nur IDs, die Gruppe zeigt „Graph liefert nur IDs ohne Namen …“, niemand wird geladen. |
 
 Für [Teams](#teams) mit Entra-Gruppen sind **beide Pflicht** – neue Berechtigungen braucht Teams nicht.
@@ -636,6 +638,73 @@ Lokale Konten und der Notfall-Admin sind nie betroffen. **Hängt dein eigener Ad
 Zuordnung nicht entfernen – du würdest dich aussperren. Entferne sie dann mit einem anderen Admin-Konto, z. B. dem
 Notfallkonto.
 
+## Automatische Anmeldung und Freigabe {#freigabe}
+
+Ganz oben unter [Einstellungen → Anmeldung](/settings/auth) steht der Schalter **„Automatische Anmeldung über AD/Entra
+ID zulassen“**. Er gilt für AD/LDAP und Entra ID zusammen; lokale Konten und der Notfall-Admin sind nie betroffen.
+Ändern verlangt eine [erneute Bestätigung](#erneut-bestaetigen) und steht im Protokoll.
+
+- **An** (Standard, wie bis 0.1.51): Wer in einer zugeordneten Gruppe – oder einer [Team](#teams)-Gruppe – ist, meldet
+  sich sofort an. Nach dem Update ändert sich nichts.
+- **Aus**: Ein Admin entscheidet, wer hineinkommt.
+  - **Neue Konten warten.** Vorab geladene, bei der Anmeldung entstandene und von einem Team geladene Konten stehen
+    unter [Benutzer](/settings/users) als *Wartet auf Freigabe*, der Schalter *Aktiv* ist aus. „Freigeben“ (oder den
+    Schalter einschalten) schaltet das Konto mit der Rolle ein, die seine Gruppen gerade geben – als Admin nur mit
+    erneuter Bestätigung. „Ablehnen“ lässt es dauerhaft aus (*Vom Admin gesperrt*). Kein Abgleich, kein Team und keine
+    Anmeldung schaltet ein wartendes Konto ein.
+  - **Aufstieg zum Admin wartet.** Kommt ein freigegebener Leser in eine Admin-Gruppe, bleibt er Leser und die Zeile
+    zeigt *Aufstieg zum Admin wartet auf Freigabe*. „Aufstieg freigeben“ (erneute Bestätigung) macht ihn zum Admin, seine
+    Sitzungen enden; „Bleibt Leser“ fragt nicht wieder, solange er in der Admin-Gruppe ist.
+  - **Absenken und Ausschalten bleiben automatisch.** Raus aus der Admin-Gruppe, gelöscht, deaktiviert oder in keiner
+    Gruppe mehr – das geschieht sofort wie bisher ([Abgleich](#abgleich)).
+  - **Anmeldung eines wartenden Kontos**: Erst nach dem richtigen AD-Passwort bzw. der erfolgreichen Anmeldung bei
+    Microsoft erscheint „Konto wartet auf Freigabe durch einen Admin.“ – mit falschem Passwort sieht es aus wie immer.
+    Wer noch kein Konto hat, bekommt dabei eines (*Wartet auf Freigabe*), damit Admins es sehen.
+  - **Freigabe gehört zur Verzeichnis-ID** (AD: `objectGUID`, Entra: Objekt-ID), nie zum Namen. Wird ein Konto im
+    Verzeichnis gelöscht und mit gleichem Namen neu angelegt, wartet das neue wieder. Ein Konto, das nie angemeldet war,
+    vom Abgleich ausgeschaltet wurde und jetzt zurückkommt, wartet ebenfalls; eines, das schon in Gebrauch war, kommt wie
+    bisher von selbst wieder.
+
+Was beim **Umschalten** geschieht, sagt „Speichern“ vorher:
+
+- **An → Aus**: Alle Verzeichniskonten, die schon aktiv sind, bleiben aktiv (die Zahl steht im Dialog). Nur neue
+  warten.
+- **Aus → An**: Wartende Konten und Aufstiege werden **nicht** still eingeschaltet. Der Dialog nennt, wie viele warten,
+  und bietet **„Auch alle wartenden freigeben“** an (Standard: aus). Eingeschaltet wird jedes Konto mit der Rolle seiner
+  Gruppen, jede Freigabe einzeln im Protokoll; der Dialog warnt, wenn dabei jemand Admin wird.
+
+Wartet etwas, zeigt *Benutzer & Rollen* in der Einstellungs-Navigation eine Zahl, und die Benutzerliste hat den Filter
+„Wartet auf Freigabe“.
+
+Im [Protokoll](/settings/audit): *Konto wartet auf Freigabe*, *Konto freigegeben*, *Freigabe abgelehnt*, *Aufstieg zum
+Admin wartet auf Freigabe*, *… freigegeben*, *… abgelehnt*, *Anmeldung abgewiesen – Konto wartet auf Freigabe*; das
+Umschalten als *Anmeldung konfiguriert*. Wartende Konten und Freigaben sind unter „Nur Auffälliges“ markiert.
+
+### Mitglieder vorab laden {#vorab-laden}
+
+Die Mitglieder **jeder zugeordneten Gruppe** (Leser und Admin, AD/LDAP und Entra ID; verschachtelte Gruppen
+wie bei der Anmeldung – bei AD nur mit *Verschachtelte Gruppen*) lädt Cobe News selbst – sobald eine Zuordnung hinzukommt oder entfernt wird und dann stündlich mit dem
+[Abgleich](#abgleich). So stehen sie unter [Benutzer](/settings/users) schon vor der ersten Anmeldung, als *Noch nie
+angemeldet*: ohne Passwort und ohne Sitzung. Das geschieht unabhängig vom Schalter oben – an sind sie sofort aktiv, aus
+warten sie auf die Freigabe.
+
+- Wer sich noch nie angemeldet hat, wird hier auf Stand gehalten: Name, Anzeigename, E-Mail, Rolle (Admin, wenn eine
+  seiner Gruppen Admin gibt) und an/aus wie im Verzeichnis. Wer sich einmal angemeldet hat, folgt der Anmeldung und dem
+  stündlichen Abgleich.
+- **Datensparsam**: Ein Konto, das **nie angemeldet** war und in **keiner zugeordneten Gruppe und keinem Team** mehr ist,
+  wird **gelöscht** – nicht nur ausgeschaltet. Nur wenn alle zugeordneten Gruppen seines Verzeichnisses gelesen werden
+  konnten (eine Gruppe, die nicht lesbar ist, ändert nichts), nie ein Konto, das ein Admin gesperrt oder abgelehnt hat,
+  und nie eines mit laufender Anmeldung. Konten, die sich je angemeldet haben, werden wie bisher nur ausgeschaltet.
+  Das Protokoll behält, wer gelöscht wurde (*Konto gelöscht*, Grund „nie angemeldet, in keiner zugeordneten Gruppe
+  mehr“).
+- Große Gruppen werden wie bei Teams in Paketen zu 500 Konten geschrieben; eine Gruppe darf höchstens 50 000 Mitglieder
+  haben. Im Protokoll steht pro Lauf ein Eintrag *Mitglieder der zugeordneten Gruppen geladen*; einzelne Einträge
+  (wartende, gelöschte Konten) höchstens 200 pro Lauf, der Rest gezählt.
+- Ein lokales Konto gleichen Namens wird nie übernommen (*Name schon vergeben*).
+- **Entra ID** braucht dafür `GroupMember.Read.All` und `User.Read.All` – dieselben
+  [API-Berechtigungen](#entra-api-berechtigungen) wie Teams. Ohne sie bleibt die Gruppe ungelesen und es ändert sich
+  nichts.
+
 ## Stündlicher Abgleich {#abgleich}
 
 Einmal pro Stunde fragt Cobe News für jedes AD- und Entra-Konto das Verzeichnis:
@@ -644,7 +713,10 @@ Einmal pro Stunde fragt Cobe News für jedes AD- und Entra-Konto das Verzeichnis
   sofort. In der Benutzerliste steht der Grund: *Nicht mehr im Verzeichnis*, *Im Verzeichnis deaktiviert* oder *Keine
   Rollen-Gruppe mehr*.
 - **Wieder aktiv und in einer Gruppe** → ein vom Abgleich deaktiviertes Konto wird wieder eingeschaltet. Ein Konto, das
-  ein Admin deaktiviert oder [dauerhaft gesperrt](#benutzer-verwalten) hat, bleibt aus.
+  ein Admin deaktiviert oder [dauerhaft gesperrt](#benutzer-verwalten) hat, bleibt aus, ein *wartendes* Konto ebenso
+  ([Freigabe](#freigabe)).
+- **Andere Gruppe, höhere Rolle bei ausgeschalteter automatischer Anmeldung** → der Aufstieg zum Admin wartet auf die
+  [Freigabe](#freigabe); absenken geschieht sofort.
 - **Andere Gruppe, andere Rolle** → die Rolle folgt; alle Sitzungen enden, die neue Rolle gilt ab der nächsten
   Anmeldung.
 - **Umbenannt** → Konten werden an ihrer ID erkannt, nicht am Namen. Der neue Name (AD: `sAMAccountName`, Entra: UPN)
@@ -668,7 +740,8 @@ Bist du **selbst** mit einem Konto dieser Anmeldeart angemeldet, lässt sie sich
 danach nicht mehr anmelden. Melde dich mit einem lokalen Admin-Konto an (z. B. dem Notfallkonto) und schalte sie von dort
 aus aus.
 
-Mit [Teams](#teams) lädt der Abgleich zuerst die Mitglieder aller gebundenen Gruppen, dann prüft er die Konten wie oben.
+Mit [Teams](#teams) lädt der Abgleich zuerst die Mitglieder aller gebundenen Gruppen, dann die der zugeordneten Gruppen
+([vorab laden](#vorab-laden)), dann prüft er die Konten wie oben.
 Konten, die ein Team geladen hat und die sich noch nie angemeldet haben, fragt er nicht einzeln ab – sie haben keine
 Sitzung, und die erste Anmeldung prüft ohnehin alles.
 
@@ -717,7 +790,9 @@ Entra liest `transitiveMembers` (nur Benutzer) seitenweise. Eine Gruppe hat höc
 ### Mitglieder und Rollen {#teams-mitglieder}
 
 - Geladene Personen erscheinen sofort unter [Benutzer](/settings/users) als AD- bzw. Entra-Konto mit *Noch nie
-  angemeldet*, bis sie sich zum ersten Mal anmelden. Ein lokales Konto gleichen Namens wird nie übernommen.
+  angemeldet*, bis sie sich zum ersten Mal anmelden. Ein lokales Konto gleichen Namens wird nie übernommen. Ist die
+  [automatische Anmeldung](#freigabe) aus, warten neue Team-Konten auf die Freigabe (die Willkommens-Mail geht erst
+  danach).
 - Eine Team-Gruppe gibt die Rolle **Leser**. Ist jemand auch in einer Admin-Gruppe der
   [Rollen-Zuordnung](#gruppen-rollen), wird er Admin – Admin gewinnt. Teams ist ein zusätzlicher Weg zum Lesen, nur
   solange Teams eingeschaltet ist; es gibt weiterhin keine Standardrolle.

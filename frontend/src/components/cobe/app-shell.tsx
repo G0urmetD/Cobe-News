@@ -51,6 +51,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ActivityBox } from "@/components/cobe/activity-box"
 import { Logo, PersonAvatar } from "@/components/cobe/common"
 import { PageErrorBoundary } from "@/components/cobe/query-state"
 import { api } from "@/lib/api"
@@ -276,6 +277,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {isAdmin && (
             <SidebarGroup className="mt-auto">
               <SidebarGroupContent>
+                {/* the app's newest notices (admins): sign-ins, follows, approvals – right above "Einstellungen" */}
+                <ActivityBox />
                 <SidebarMenu>
                   <NavItem to="/settings" icon={Settings} label={t("nav.settings")} />
                 </SidebarMenu>

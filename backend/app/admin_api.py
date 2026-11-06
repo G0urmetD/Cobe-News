@@ -18,7 +18,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import set_committed_value
 
-from app import audit, crypto, passkeys_api, tls
+from app import audit, crypto, passkeys_api, preload, tls
 from app import settings as settings_store
 from app.auth import bruteforce, directory, entra, ldap_dir, lock_store, passwords, sessions
 from app.auth_api import admins_count, user_out
@@ -48,6 +48,9 @@ def _user_row(u: User, temp_days: int = passwords.TEMP_DAYS) -> dict:
         "temp_password_expires_at": end.isoformat() if end else None,
         "temp_password_expired": bool(end and end <= datetime.now(UTC)),
         "locked_for": bruteforce.locked_for(bruteforce.lock_key(u)),
+        # approval (app/auth/directory.py): a raise to admin waits ("admin") or was declined ("declined"); a waiting
+        # account itself is deactivated_reason "pending"
+        "pending_role": u.pending_role,
         "version": u.version or 1,
         "created_at": u.created_at.isoformat(),
         "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
@@ -72,6 +75,12 @@ async def users(admin: Admin, db: Db) -> list[dict]:
     keys = dict((await db.execute(select(UserPasskey.user_id, func.count()).group_by(UserPasskey.user_id))).all())
     days = await _temp_days(db)
     return [{**_user_row(u, days), "teams": names.get(u.id, []), "welcome": welcome.get(u.id), "passkeys": int(keys.get(u.id, 0))} for u in rows]
+
+
+@router.get("/users/pending")
+async def users_pending(admin: Admin, db: Db) -> dict:
+    """What waits for an admin's approval (the number on "Benutzer"): accounts – of them as admin – and raises to admin."""
+    return await directory.pending_counts(db)
 
 
 class UserIn(_M):
@@ -154,6 +163,11 @@ async def patch_user(uid: uuid.UUID, body: UserPatch, admin: Admin, sess: Active
         raise api_error(409, "user_protected")  # the emergency admin and oneself stay admin and active
     if "role" in ch and u.auth_source != "local":
         raise api_error(409, "directory_managed")  # the directory group decides
+    if ch.get("is_active") and directory.is_pending(u):
+        # switching a waiting account on is its approval – the same checks and the same entry as "Freigeben"
+        if set(ch) - {"is_active"}:
+            raise api_error(409, "approval_pending")
+        return await _approve(u, version, admin, sess, db)
     # checked before anything is written: the last active admin is never demoted or switched off
     if u.role == "admin" and u.is_active and (ch.get("role") == "reader" or ch.get("is_active") is False) and await admins_count(db) <= 1:
         raise api_error(409, "last_admin")
@@ -212,6 +226,81 @@ async def block_user(uid: uuid.UUID, body: BlockIn, admin: Admin, sess: ActiveSe
     else:
         u.deactivated_reason = "sync:unblocked"
     audit.record(db, admin, "user.blocked" if body.blocked else "user.unblocked", audit.user_target(u), {"is_active": u.is_active, "reason": u.deactivated_reason})
+    await db.commit()
+    return _user_row(u, await _temp_days(db))
+
+
+class ApprovalIn(_M):
+    version: int | None = None  # the state the decision was made on (409 stale otherwise)
+
+
+async def _approve(u: User, version: int | None, admin: User, sess, db) -> dict:  # noqa: ANN001
+    """A waiting account switched on – with the role its groups give now (directory.approvable_role); one as admin
+    re-confirmed. A role other than the one shown (a mapping changed meanwhile): the new one is stored and 409 stale – the
+    admin decides on what is true now."""
+    if not directory.is_pending(u) or u.auth_source == "local" or u.is_emergency:
+        raise api_error(409, "not_pending")
+    role = await directory.approvable_role(db, u)
+    if role is None:
+        raise api_error(409, "no_role")  # in no mapped group (nor a team) any more – nothing to give
+    if role == "admin" or u.role == "admin":
+        require_reauth(sess, admin)
+    await _bump(db, u, version)
+    if role != u.role:
+        u.role = role
+        await db.commit()
+        raise api_error(409, "stale")
+    await directory.approve(db, u, role, admin)
+    await db.commit()
+    return _user_row(u, await _temp_days(db))
+
+
+@router.post("/users/{uid}/approve")
+async def approve_user(uid: uuid.UUID, body: ApprovalIn, admin: Admin, sess: ActiveSession, db: Db) -> dict:
+    """"Freigeben": a directory account waiting for approval is switched on (as admin: re-confirmed). Logged."""
+    return await _approve(await _target(db, uid), body.version, admin, sess, db)
+
+
+@router.post("/users/{uid}/decline")
+async def decline_user(uid: uuid.UUID, body: ApprovalIn, admin: Admin, db: Db) -> dict:
+    """"Ablehnen": a waiting account stays off – an admin's "off" (like a block: the directory never switches it on; the
+    block can be lifted later). Logged."""
+    u = await _target(db, uid)
+    if not directory.is_pending(u) or u.auth_source == "local" or u.is_emergency:
+        raise api_error(409, "not_pending")
+    await _bump(db, u, body.version)
+    directory.decline(db, u, admin)
+    await db.commit()
+    return _user_row(u, await _temp_days(db))
+
+
+@router.post("/users/{uid}/approve-role")
+async def approve_raise(uid: uuid.UUID, body: ApprovalIn, admin: Admin, sess: ActiveSession, db: Db) -> dict:
+    """"Aufstieg freigeben": a reader whose groups give admin becomes admin – re-confirmed, its sessions end (the next
+    sign-in asks for the admin's second factor). Also after a declined raise, while the groups still give admin."""
+    require_reauth(sess, admin)
+    u = await _target(db, uid)
+    if not u.is_active or u.pending_role not in ("admin", directory.RAISE_DECLINED) or u.role != "reader" or u.auth_source == "local":
+        raise api_error(409, "not_pending")
+    if await directory.approvable_role(db, u) != "admin":
+        await _bump(db, u, body.version)
+        u.pending_role = None  # the groups give admin no more – nothing waits
+        await db.commit()
+        raise api_error(409, "no_role")
+    await _bump(db, u, body.version)
+    await directory.approve_raise(db, u, admin)
+    await db.commit()
+    return _user_row(u, await _temp_days(db))
+
+
+@router.post("/users/{uid}/decline-role")
+async def decline_raise(uid: uuid.UUID, body: ApprovalIn, admin: Admin, db: Db) -> dict:
+    """"Bleibt Leser": the waiting raise declined – not asked again while the account stays in the admin groups."""
+    u = await _target(db, uid)
+    if not u.is_active or u.pending_role != "admin" or u.auth_source == "local":
+        raise api_error(409, "not_pending")
+    await _bump(db, u, body.version)
+    directory.decline_raise(db, u, admin)
     await db.commit()
     return _user_row(u, await _temp_days(db))
 
@@ -363,6 +452,79 @@ async def put_mfa(body: MfaIn, admin: Admin, sess: ActiveSession, db: Db) -> dic
         audit.record(db, admin, "signin.config_changed", audit.target("signin", "mfa", "mfa"), {"changes": changes})
     out = await _put_section(db, "mfa", value, body.rev)
     return {"required_all": bool(out["required_all"]), "rev": int(out.get("rev") or 0)}
+
+
+class PendingIn(_M):
+    accounts: int = Field(ge=0)
+    accounts_admin: int = Field(ge=0)
+    raises: int = Field(ge=0)
+
+
+class ApprovalSettingsIn(_M):
+    auto_signin: bool
+    # switching it on: also approve everything that waits (accounts and raises to admin) – an explicit choice, off by
+    # default (nothing waiting is switched on silently)
+    approve_pending: bool = False
+    # with approve_pending: what the dialog showed (GET …/approval) – something else waiting now is 409 "stale"
+    expect: PendingIn | None = None
+    rev: int | None = None
+
+
+async def _approval_state(db) -> dict:  # noqa: ANN001
+    cfg = await settings_store.get(db, directory.SECTION)
+    active = await db.scalar(select(func.count()).select_from(User).where(User.auth_source.in_(("ldap", "entra")), User.is_active.is_(True), User.is_emergency.is_(False)))
+    return {"auto_signin": bool(cfg.get("auto_signin", True)), "rev": int(cfg.get("rev") or 0), "active_directory": int(active or 0), **await directory.pending_counts(db)}
+
+
+@router.get("/auth/approval")
+async def get_approval(admin: Admin, db: Db) -> dict:
+    """"Automatische Anmeldung über AD/Entra ID zulassen" and what switching it concerns: the directory accounts that
+    are on (they stay on when it is switched off), what waits (it keeps waiting when it is switched on – unless
+    approve_pending)."""
+    return await _approval_state(db)
+
+
+@router.put("/auth/approval")
+async def put_approval(body: ApprovalSettingsIn, admin: Admin, sess: ActiveSession, db: Db) -> dict:
+    """Switched off: new directory accounts and raises to admin wait for an admin's approval; the accounts on now stay
+    on. Switched on: new ones sign in at once again; what waits keeps waiting – or, with approve_pending, is approved
+    now (each account logged). Re-confirmed."""
+    require_reauth(sess, admin)
+    if body.approve_pending and not body.auto_signin:
+        raise api_error(422, "approve_needs_auto")
+    current = await settings_store.get(db, directory.SECTION)
+    value = {"auto_signin": body.auto_signin}
+    approved = {"accounts": 0, "raises": 0}
+    if body.approve_pending:
+        if body.expect is None:
+            raise api_error(422, "approve_needs_counts")
+        # locked: a decline or a sign-in at the same moment waits – never written over
+        pending = select(User).where(User.is_active.is_(False), User.deactivated_reason == directory.PENDING, User.is_emergency.is_(False), User.auth_source != "local")
+        accounts = list(await db.scalars(pending.order_by(User.id).with_for_update()))
+        raises = list(await db.scalars(select(User).where(User.is_active.is_(True), User.pending_role == "admin", User.role == "reader").order_by(User.id).with_for_update()))
+        # never more than the dialog showed: the rows are locked now – what waits is counted as GET …/approval counts
+        # it; an account that came (or was decided) since the dialog opened refuses the whole save
+        now = await directory.pending_counts(db)
+        if {k: now[k] for k in ("accounts", "accounts_admin", "raises")} != body.expect.model_dump():
+            await db.rollback()
+            raise api_error(409, "stale")
+        for u in accounts:
+            role = await directory.approvable_role(db, u)
+            if role is None:
+                continue  # in no mapped group any more: stays waiting (the preload deletes it once unused)
+            await directory.approve(db, u, role, admin, why="bulk")
+            u.version = (u.version or 1) + 1
+            approved["accounts"] += 1
+        for u in raises:
+            if await directory.approvable_role(db, u) != "admin":
+                continue
+            await directory.approve_raise(db, u, admin, why="bulk")
+            u.version = (u.version or 1) + 1
+            approved["raises"] += 1
+    if changes := audit.diff({"auto_signin": bool(current.get("auto_signin", True))}, value, value.keys()):
+        audit.record(db, admin, "signin.config_changed", audit.target("signin", directory.SECTION, directory.SECTION), {"changes": changes, **({"approved": approved} if body.approve_pending else {})})
+    await _put_section(db, directory.SECTION, value, body.rev)  # commits – the approvals with it, or nothing (stale)
+    return {**await _approval_state(db), "approved": approved}
 
 
 @router.get("/auth/{source}/impact")
@@ -573,6 +735,7 @@ async def add_mapping(body: MappingIn, admin: Admin, sess: ActiveSession, db: Db
     except IntegrityError as exc:  # the same mapping added in parallel
         await db.rollback()
         raise api_error(409, "mapping_exists") from exc
+    preload.start()  # its members get their accounts now (app/preload.py) – in the background
     return _mapping(m)
 
 
@@ -605,6 +768,7 @@ async def delete_mapping(mid: uuid.UUID, admin: Admin, sess: ActiveSession, db: 
         out = await directory.reassess_mapping(db, source, group_id, role, me=admin.id, apply=True, actor=admin)
     audit.record(db, admin, "role_mapping.deleted", who, {"source": source, "group_id": group_id, "role": role, "recheck": end_sessions, **{k: out.get(k, 0) for k in ("lost", "demoted", "unknown", "affected")}})
     await db.commit()
+    preload.start()  # accounts that never signed in and are in no mapped group any more go (app/preload.py)
     return {"ok": True, **out}
 
 
@@ -665,17 +829,38 @@ async def backup_now(admin: Admin, db: Db) -> dict:
     return {"started": True, "status": await backup.status(db)}
 
 
-@router.get("/backup/files/{name}")
-async def backup_download(name: str, admin: Admin, sess: ActiveSession, db: Db, _guard: DownloadGuard) -> StreamingResponse:
-    """An encrypted backup (.tar.enc) as a download – a fresh proof of identity first (it is the whole database, readable
-    with the passphrase), only from this site's page (CSRF token), logged (backup.downloaded, notable), a few per hour and
-    one at a time per admin. Streamed: never whole in memory. An unencrypted one stays on the server (403)."""
+BACKUP_DOWNLOAD_PATH = "/api/admin/backup/download/"  # + the ticket: never in a log (main.shown_path, nginx access_log off)
+
+
+@router.post("/backup/files/{name}/ticket")
+async def backup_download_ticket(name: str, admin: Admin, sess: ActiveSession) -> dict:
+    """Step 1 of an encrypted backup's (.tar.enc) download – a fresh proof of identity first (it is the whole database,
+    readable with the passphrase), only from this site's page (a write: the CSRF token), a few per hour and one at a
+    time per admin; refused here with the reason (the page shows it). The answer: the address the browser downloads it
+    from (step 2) – with a ticket for this admin, this session and this file, used once, valid for a minute. An
+    unencrypted one stays on the server (403)."""
     from app import backup
 
     require_reauth(sess, admin)
+    try:
+        ticket = backup.issue_ticket(name, str(admin.id), str(sess.id))
+    except backup.DownloadRefused as exc:
+        raise api_error(exc.status, exc.code, **({"retry_after": exc.retry} if exc.retry else {})) from None
+    return {"url": f"{BACKUP_DOWNLOAD_PATH}{ticket}", "expires_in": int(backup.TICKET_TTL)}
+
+
+@router.get("/backup/download/{ticket}")
+async def backup_download(ticket: str, admin: Admin, sess: ActiveSession, db: Db) -> StreamingResponse:
+    """Step 2: the browser's own download (an <a download> of the page – saved straight to disk, never whole in the
+    page's memory). The ticket stands in for the CSRF token: only the page that asked for it knows it, and it counts
+    only with the same admin's same session (the session cookie). Logged when it starts (backup.downloaded, notable),
+    streamed: never whole in memory either."""
+    from app import backup
+
     uid = str(admin.id)
     try:
-        dl = backup.prepare_download(name, uid)
+        name = backup.redeem_ticket(ticket, uid, str(sess.id))
+        dl = backup.prepare_download(name, uid)  # checked again: removed meanwhile, another download running, the limit
     except backup.DownloadRefused as exc:
         raise api_error(exc.status, exc.code, **({"retry_after": exc.retry} if exc.retry else {})) from None
     try:
@@ -689,6 +874,7 @@ async def backup_download(name: str, admin: Admin, sess: ActiveSession, db: Db, 
         "Content-Length": str(dl.size),
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
     }
     return _BackupStream(dl, uid, backup.stream_download(dl, uid), media_type="application/octet-stream", headers=headers)
 

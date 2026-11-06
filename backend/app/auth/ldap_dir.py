@@ -397,10 +397,11 @@ def group_dn(cfg: dict, dn: str) -> str:
     return dn
 
 
-def member_filter(dn: str) -> str:
-    """People in the group, nested groups too (LDAP_MATCHING_RULE_IN_CHAIN) – the DN escaped for the filter (RFC 4515):
-    a group named "a)(objectClass=*" stays one value."""
-    return f"(&(objectCategory=person)(objectClass=user)(memberOf:{IN_CHAIN}:={escape_filter_chars(dn)}))"
+def member_filter(dn: str, nested: bool = True) -> str:
+    """People in the group, nested groups too (LDAP_MATCHING_RULE_IN_CHAIN) – or, `nested` off, its direct members – the
+    DN escaped for the filter (RFC 4515): a group named "a)(objectClass=*" stays one value."""
+    rule = f"memberOf:{IN_CHAIN}:" if nested else "memberOf"
+    return f"(&(objectCategory=person)(objectClass=user)({rule}={escape_filter_chars(dn)}))"
 
 
 def _cookie(conn: Connection) -> bytes | None:
@@ -417,7 +418,9 @@ def group_members(cfg: dict, dn: str) -> list[DirectoryUser]:
     svc = _service(cfg)
     out: list[DirectoryUser] = []
     try:
-        flt = member_filter(dn)
+        # the preload of the mapped groups reads them as the sign-in counts them (members_nested: nested_groups);
+        # a team always takes nested members
+        flt = member_filter(dn, bool(cfg.get("members_nested", True)))
         cookie: bytes | None = None
         name_attr = cfg.get("attr_username") or "sAMAccountName"
         while True:

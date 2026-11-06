@@ -28,6 +28,7 @@ OVERLAY: list[dict] = DATA.overlay
 # keys merged into another product (`replaces`: db2 → ibm-db2 …) – an old link (/vendor?product=db2) opens the new one
 REPLACED: dict[str, str] = {r: o["key"] for o in OVERLAY for r in o.get("replaces") or []}
 CSAF_PROVIDERS: list[dict] = DATA.csaf  # catalog/csaf.yaml – the CSAF providers mapped to catalogue vendors
+CNAS: list[dict] = DATA.cnas  # catalog/cnas.yaml – the CNAs mapped to catalogue vendors (vendor_match.cna_by)
 
 log = logging.getLogger("cobe_news.vendor")
 BUNDLED = Path(__file__).resolve().parent / "data" / "vendor_catalog.json"

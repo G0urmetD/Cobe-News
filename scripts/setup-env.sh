@@ -32,3 +32,18 @@ if ! grep -Eq '^POSTGRES_RESTORE_PASSWORD=' .env; then
 else
   echo "POSTGRES_RESTORE_PASSWORD already in .env – unchanged"
 fi
+# Linux: ./data is mounted into the app, which runs as UID 10001 – a freshly cloned folder belongs to whoever cloned the
+# repository, and the app could not write its key, certificate or backups there. (Docker Desktop on macOS/Windows maps
+# the owner itself: nothing to do.)
+mkdir -p data
+if [ "$(uname -s)" = Linux ] && [ "$(stat -c %u data)" != 10001 ]; then
+  if [ "$(id -u)" = 0 ]; then
+    chown -R 10001:10001 data
+    echo "data/ now belongs to UID 10001 (the app's user)"
+  elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    sudo chown -R 10001:10001 data
+    echo "data/ now belongs to UID 10001 (the app's user)"
+  else
+    echo "data/ must belong to UID 10001 (the app's user) – run: sudo chown -R 10001:10001 data" >&2
+  fi
+fi

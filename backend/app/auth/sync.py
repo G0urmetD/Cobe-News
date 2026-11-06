@@ -59,14 +59,15 @@ async def run(db: AsyncSession) -> dict[str, int]:
                 log.warning("directory sync (entra) skipped: %s", getattr(exc, "category", exc))
                 sources.remove("entra")
                 break
-    # 2. write the outcome in one short transaction
+    # 2. write the outcome in one short transaction – the switch as it is now (the lookups may have taken minutes)
+    approval = await directory.approval_required(db)
     for uid, src, x in todo:
         if src not in sources or x not in found:
             continue
         u = await db.get(User, uid)
         if u is None or u.auth_source != src or u.is_emergency:
             continue
-        what = await directory.apply_sync(db, u, found[x])
+        what = await directory.apply_sync(db, u, found[x], approval)
         if what not in ("unchanged", "skipped"):
             out[what] = out.get(what, 0) + 1
             log.info("directory sync: %s %s", u.username, what)

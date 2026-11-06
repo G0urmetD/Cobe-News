@@ -35,9 +35,9 @@ import { api, ApiError, saveBlob } from "@/lib/api"
 import {
   BACKUP_KEY,
   backupErrorKey,
-  backupFileUrl,
   backupState,
   canDownload,
+  downloadBackup,
   fmtBytes,
   nowNote,
   removedBy,
@@ -467,7 +467,8 @@ function FileRow({ f }: { f: BackupStatus["backups"][number] }) {
 }
 
 /** An encrypted backup to this computer: asked first (what the file is, that it needs the passphrase, keep it safe),
- *  then a fresh proof of identity (withReauth) – the server streams it, logs it and allows a few per hour. */
+ *  then a fresh proof of identity (withReauth) – then the browser downloads it itself (straight to disk, its own
+ *  progress); the server streams it, logs it and allows a few per hour. */
 function DownloadButton({ name }: { name: string }) {
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
@@ -475,9 +476,8 @@ function DownloadButton({ name }: { name: string }) {
     if (!(await confirmAction({ title: t("backup.dl.title"), text: t("backup.dl.text", { name }), confirm: t("backup.dl.confirm"), destructive: false }))) return
     setBusy(true)
     try {
-      const { blob, filename } = await withReauth(() => api.getFile(backupFileUrl(name)))
-      saveBlob(blob, filename)
-      toast.success(t("backup.dl.done", { name: filename }))
+      await withReauth(() => downloadBackup(name))
+      toast.success(t("backup.dl.done", { name }))
     } catch (e) {
       toast.error(errorText(t, e))
     } finally {

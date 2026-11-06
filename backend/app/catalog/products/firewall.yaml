@@ -362,6 +362,7 @@
   vendor: IPFire Project
   cpes: [a:ipfire:ipfire]
   kw: [IPFire]
+  normalize: [ipfire_core]  # "2.27 - Core Update 174" (web UI) → 2.27 Core 174
   example: 2.29 Core 195
 - key: untangle
   label: Arista NG Firewall (Untangle)

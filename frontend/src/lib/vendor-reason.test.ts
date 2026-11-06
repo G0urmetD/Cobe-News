@@ -21,6 +21,16 @@ describe("the reason of a verdict names its source", () => {
     expect(reasonText(t, { reason: "line_none", detail: { by: "osv" } })).toBe("Linie laut OSV nicht betroffen")
   })
 
+  it("names a CNA that is not the vendor – never as the vendor", () => {
+    expect(reasonText(t, { reason: "default_affected", detail: { by: "cna", cna: "GitHub" } })).toBe("laut GitHub (nicht der Hersteller) alle anderen Versionen betroffen")
+    expect(reasonText(t, { reason: "in_list", detail: { by: "cna", cna: "VulDB" } })).toBe("Version laut VulDB (nicht der Hersteller) als betroffen gelistet")
+    expect(reasonText(t, { reason: "in_range", detail: { by: "cna", cna: "GitHub" } })).toBe("im betroffenen Versionsbereich · Quelle: GitHub (nicht der Hersteller)")
+    // known only by its UUID (the NVD's sourceIdentifier)
+    expect(reasonText(t, { reason: "out_of_range", detail: { by: "cna" } })).toBe("außerhalb des betroffenen Bereichs · Quelle: CNA (nicht der Hersteller)")
+    const en = tr(vendorEn as Record<string, string>)
+    expect(reasonText(en, { reason: "default_affected", detail: { by: "cna", cna: "GitHub" } })).toBe("every other version affected according to GitHub (not the vendor)")
+  })
+
   it("adds the source to the other reasons, and to none that names it already", () => {
     expect(reasonText(t, { reason: "in_range", detail: { by: "nvd", after: "1.2" } })).toBe("im betroffenen Versionsbereich · betroffen bis einschließlich 1.2 · Quelle: NVD")
     expect(reasonText(t, { reason: "fixed", detail: { by: "vendor" } })).toBe("Version enthält den Fix · Quelle: Hersteller")
@@ -33,7 +43,7 @@ describe("the reason of a verdict names its source", () => {
 
   it("has every source and every sourced wording in German and English", () => {
     const sources = new Set([...vendorMatchPy.matchAll(/^#\s+(\w+)\s{2,}/gm)].map((m) => m[1]))
-    expect([...sources].sort()).toEqual(["adp", "bsi", "csaf", "nvd", "osv", "vendor"])
+    expect([...sources].sort()).toEqual(["adp", "bsi", "cna", "csaf", "nvd", "osv", "vendor"])
     for (const s of sources) {
       expect(vendorDe[`vendor.by.${s}` as keyof typeof vendorDe], s).toBeTruthy()
       expect(vendorEn[`vendor.by.${s}` as keyof typeof vendorEn], s).toBeTruthy()

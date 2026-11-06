@@ -208,7 +208,7 @@ async def test_big_group_in_batches(directory_fake, monkeypatch):
     commits = 0
     real = teams._accounts
 
-    async def counting(s, people, welcome):  # noqa: ANN001, ANN202
+    async def counting(s, people, welcome, *rest):  # noqa: ANN001, ANN002, ANN202
         nonlocal commits
         orig = s.commit
 
@@ -219,7 +219,7 @@ async def test_big_group_in_batches(directory_fake, monkeypatch):
 
         s.commit = commit
         try:
-            return await real(s, people, welcome)
+            return await real(s, people, welcome, *rest)
         finally:
             s.commit = orig
 

@@ -8,6 +8,8 @@ Layout (docs/BETRIEB.md „Katalog pflegen“):
     catalog/products/<cat>.yaml    the products of one category (file name = category), in the order they are kept
     catalog/csaf.yaml              the CSAF 2.0 providers Vendor News reads, each mapped to catalogue vendors
                                    (app/csaf_providers.py)
+    catalog/cnas.yaml              CNAs (who wrote a CVE record) and the catalogue vendors they are – the CNA's
+                                   affected data is the vendor's own word only then (app/vendor_match.cna_by)
     catalog/build_maps/<name>.yaml build tables: what admins see → the version advisories compare (app/build_maps.py):
                                    vmware.yaml (vCenter/ESXi, Broadcom KB 326316 / 316595 – app/vmware_builds.py),
                                    exchange.yaml, sqlserver.yaml, vmware_tools.yaml, globalprotect.yaml (tables of names)
@@ -73,7 +75,7 @@ class _Strict(BaseModel):
 
 
 # app/version_input.py: product rules for typed versions (a display form → the form advisories use)
-NORMALIZERS = ("two_digit_year", "netscaler", "ise_patch", "office_build", "nginx_plus", "checkpoint", "horizon_yymm", "leading_zeros")
+NORMALIZERS = ("two_digit_year", "netscaler", "ise_patch", "office_build", "nginx_plus", "checkpoint", "horizon_yymm", "leading_zeros", "ipfire_core")
 Regex = Annotated[str, StringConstraints(min_length=1, max_length=300)]
 
 
@@ -201,6 +203,32 @@ class CsafFile(_Strict):
     providers: list[CsafProvider] = Field(max_length=100)
 
 
+# a CNA as a CVE record names it: cvelistV5's short name (palo_alto, GitHub_M, @huntr_ai), the NVD's sourceIdentifier
+# (an address or the CNA's UUID), or "*@<domain>" – every address at that domain
+CnaId = Annotated[str, StringConstraints(pattern=r"^(?:@?[A-Za-z0-9][A-Za-z0-9_.-]{0,59}|(?:\*|[A-Za-z0-9._%+-]{1,64})@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)$", max_length=260)]
+
+
+class Cna(_Strict):
+    """A CNA (CVE Numbering Authority) and the catalogue vendors it is – its CVE records count as their own word."""
+
+    key: TextKey = Field(description="Unique, short (github, vuldb …).")
+    name: Text = Field(description="Shown name, e.g. 'GitHub' – „laut GitHub (nicht der Hersteller)“.")
+    ids: list[CnaId] = Field(
+        min_length=1,
+        max_length=20,
+        description="How CVE records name it: cvelistV5 short name (assignerShortName, e.g. GitHub_M), NVD sourceIdentifier (address or UUID), or *@<domain> for every address there. Compared without case.",
+    )
+    vendors: list[Text] = Field(
+        [],
+        max_length=10,
+        description="Catalogue vendors (as in the products' vendor field) the CNA is – for their products its affected data is the vendor's own word. Empty: a third party for every product (VulDB, MITRE …).",
+    )
+
+
+class CnaFile(_Strict):
+    cnas: list[Cna] = Field(max_length=500)
+
+
 Day = Annotated[str, StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}$")]
 Source = Annotated[str, StringConstraints(min_length=8, max_length=300)]
 Release = Annotated[str, StringConstraints(pattern=r"^\d{1,2}\.\d{1,2}(?:\.0)?[a-z]?(?: U\d{1,2}[a-z]?)?$", max_length=20)]
@@ -256,6 +284,7 @@ SCHEMA_FILES = {
     "categories": CategoriesFile,
     "texts": TextsFile,
     "csaf": CsafFile,
+    "cnas": CnaFile,
     "build_map_vmware": VmwareBuildsFile,
     "build_map_names": NamesMapFile,
 }
@@ -272,6 +301,7 @@ class Catalog:
     texts: dict[str, dict[str, dict[str, str]]]  # {"hints": {key: {de, en}}, "where": {...}}
     overlay: list[dict] = field(default_factory=list)  # one dict per product entry (see the module docstring)
     csaf: list[dict] = field(default_factory=list)  # the CSAF providers (csaf.yaml), in file order
+    cnas: list[dict] = field(default_factory=list)  # the CNAs mapped to catalogue vendors (cnas.yaml), in file order
     build_maps: dict = field(default_factory=dict)  # build_maps/<name>.yaml by name: {"kind", "fetched", "sources", …}
 
     @property
@@ -392,6 +422,7 @@ def load(directory: Path | None = None) -> Catalog:
         texts={"hints": {k: v.model_dump() for k, v in texts.hints.items()}, "where": {k: v.model_dump() for k, v in texts.where.items()}},
         overlay=overlay,
         csaf=csaf,
+        cnas=_cnas(d),
         build_maps=_build_maps(d, {o["key"]: o for o in overlay}, texts),
     )
 
@@ -439,6 +470,29 @@ def _csaf(d: Path, vendors: set[str]) -> list[dict]:
         if bad := [v for v in p.vendors if v.lower() not in vendors]:
             raise CatalogError(f"{where}: vendor {bad[0]!r} is no vendor of a catalogue product")
         out.append(p.model_dump(exclude_none=True))
+    return out
+
+
+def _cnas(d: Path) -> list[dict]:
+    """cnas.yaml: unique keys, and no identifier of two CNAs. Its vendors are not checked here – most of them are
+    endoflife.date products' vendors, not this directory's (tests/test_cve_origin.py checks them against the catalogue)."""
+    path = d / "cnas.yaml"
+    if not path.is_file():
+        return []
+    raw = _yaml(path, d) or {"cnas": []}
+    out: list[dict] = []
+    keys: set[str] = set()
+    ids: dict[str, str] = {}
+    for i, c in enumerate(_check(CnaFile, raw, "cnas.yaml").cnas):
+        where = f"cnas.yaml: CNA {c.key!r} (entry {i + 1})"
+        if c.key in keys:
+            raise CatalogError(f"{where}: key listed twice")
+        keys.add(c.key)
+        for x in c.ids:
+            if (other := ids.get(x.lower())) is not None:
+                raise CatalogError(f"{where}: {x!r} is already an identifier of {other!r}")
+            ids[x.lower()] = c.key
+        out.append(c.model_dump())
     return out
 
 

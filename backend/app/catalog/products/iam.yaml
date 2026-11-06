@@ -21,8 +21,10 @@
   label: ManageEngine ADSelfService Plus
   vendor: Zoho ManageEngine
   cpes: [a:zohocorp:manageengine_adselfservice_plus]
+  cna: [[ManageEngine, ADSelfService Plus], [Zohocorp, ManageEngine ADSelfService Plus]]
   kw: [ADSelfService Plus]
-  example: 6.4 build 6402
+  scheme: build
+  example: 6.5 Build 6519
 
 # ---------------------------------------------------------------- identity & access (IAM/SSO)
 - key: adfs

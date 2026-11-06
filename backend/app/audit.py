@@ -6,7 +6,9 @@ field that looks secret would be logged in clear).
 `record()` adds the entry to the session of the change itself: it is committed with the change, and a change that is
 rolled back (refused, stale, failed) leaves no entry. Append-only – there is no API to edit or delete an entry, and the
 chain (below) shows one changed behind the app's back; the hourly prune removes what is older than the retention
-(settings section "audit", default 365 days, 90–3650).
+(settings section "audit", default 365 days, 90–3650). With the database image (0.1.52) PostgreSQL itself holds the app
+to that: the table belongs to another role, the app may only add, read and seal, and the prune deletes through that
+role's function (audit_lock.py).
 
 Where it came from (0.1.50): the request's context – client address, how it arrived, method and path, request id, the
 browser and system coarse (never the full user agent) – comes from the middleware (main._guard → set_request), the
@@ -61,6 +63,7 @@ from sqlalchemy import Select, delete, exists, func, literal_column, select, tex
 from sqlalchemy import Text as SAText
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import audit_lock
 from app.models import AuditEntry
 
 SECTION = "audit"  # settings: {"keep_days": 365, "rev": n}
@@ -88,6 +91,14 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "user.reset",
         "user.unlocked",
         "role.changed",
+        # approval of directory accounts ("Automatische Anmeldung über AD/Entra ID zulassen" off – app/auth/directory.py)
+        "user.approval_pending",
+        "user.approved",
+        "user.declined",
+        "role.approval_pending",
+        "role.approved",
+        "role.declined",
+        "directory.preloaded",
         "account.password_changed",
         "account.totp_enabled",
         "account.totp_removed",
@@ -106,6 +117,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "login.locked_unknown",
         "login.ip_blocked",
         "login.emergency_slowed",
+        "login.pending_refused",
         "setup.completed",
         "setup.token_issued",
     ),
@@ -172,6 +184,11 @@ NOTABLE_ACTIONS = frozenset(
         "login.ip_blocked",
         "login.emergency_slowed",
         "role.changed",
+        # approval: something waits for an admin, or an admin gave access
+        "user.approval_pending",
+        "role.approval_pending",
+        "user.approved",
+        "role.approved",
         "token.created",
         "token.revoked",
         "sessions.revoked",
@@ -534,7 +551,7 @@ def _auto_anomalies(action: str, target: Target | None, details: dict) -> list[s
     out = []
     changes = details.get("changes") if isinstance(details.get("changes"), dict) else {}
     role = changes.get("role") if isinstance(changes.get("role"), dict) else {}
-    if (action == "role.changed" and role.get("to") == "admin") or (action == "user.created" and details.get("role") == "admin"):
+    if (action in ("role.changed", "role.approved") and role.get("to") == "admin") or (action in ("user.created", "user.approved") and details.get("role") == "admin" and not details.get("pending")):
         out.append("role_admin")
     if action == "settings.changed" and target is not None and target.type == "settings" and target.id == SECTION:
         keep = changes.get("keep_days") if isinstance(changes.get("keep_days"), dict) else {}
@@ -1090,7 +1107,8 @@ async def rekey(reason: str, actor=None) -> dict:  # noqa: ANN001 - an Actor (de
 
 async def status(db: AsyncSession) -> dict:
     """The chain for the page: ok / problem / other_key / empty, how far it is sealed and checked, the problems – a
-    problem stays until an operator acknowledges it (the audit.chain_problem entries after the last acceptance count)."""
+    problem stays until an operator acknowledges it (the audit.chain_problem entries after the last acceptance count) –
+    and the database lock's state (`lock`, audit_lock.state)."""
     st = await chain_state(db)
     unsealed = int(await db.scalar(select(func.count()).select_from(select(AuditEntry.id).where(AuditEntry.seq.is_(None)).limit(COUNT_CAP).subquery())) or 0)
     why = await _state_problem(db, st)
@@ -1121,6 +1139,8 @@ async def status(db: AsyncSession) -> dict:
         "logged_problems": logged,
         "rekeyed_at": st.get("rekeyed_at"),
         "busy": False,
+        # the database lock (audit_lock.py): whether PostgreSQL itself refuses changing or deleting an entry
+        "lock": await audit_lock.state(db),
     }
 
 
@@ -1172,7 +1192,9 @@ async def prune(_db: AsyncSession | None = None, now: datetime | None = None) ->
     async with _session() as s:
         if await flush_floods(s):
             await s.commit()
-        cut = now - timedelta(days=await keep_days(s))
+        keep = await keep_days(s)
+        cut = now - timedelta(days=keep)
+        locked = await audit_lock.installed(s)
     await seal_all()
     gone = 0
     async with _session() as s:
@@ -1193,7 +1215,10 @@ async def prune(_db: AsyncSession | None = None, now: datetime | None = None) ->
                 # the batch's last entry and its hash, read before it goes
                 r = (await s.execute(select(AuditEntry.seq, AuditEntry.hash).where(AuditEntry.seq <= tgt[0]).order_by(AuditEntry.seq).offset(PRUNE_BATCH - 1).limit(1))).first()
                 upto, h = (int(r[0]), r[1] or "") if r is not None else tgt
-                res = await s.execute(delete(AuditEntry).where(AuditEntry.seq <= upto).execution_options(synchronize_session=False))
+                if locked:  # the database lock (audit_lock.py): only its function deletes – and never what is within the retention
+                    n = int(await s.scalar(text(f"SELECT {audit_lock.ROLE}.prune(:upto, :keep)"), {"upto": upto, "keep": keep}) or 0)
+                else:
+                    n = (await s.execute(delete(AuditEntry).where(AuditEntry.seq <= upto).execution_options(synchronize_session=False))).rowcount or 0
                 if upto > int(st.get("anchor_seq") or 0):
                     st.update(anchor_seq=int(upto), anchor_hash=h)
                 for k in ("verified", "sweep"):
@@ -1202,7 +1227,7 @@ async def prune(_db: AsyncSession | None = None, now: datetime | None = None) ->
                 st["problems"] = [p for p in st.get("problems") or [] if int(p.get("seq") or 0) > upto]
                 await _put_state(s, st)
                 await s.commit()
-                gone += res.rowcount or 0
+                gone += n
                 if upto >= tgt[0]:
                     break
     await verify(budget=SWEEP_BUDGET)  # the new entries – also when nobody opens the page

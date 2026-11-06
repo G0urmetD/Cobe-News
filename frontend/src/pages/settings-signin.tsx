@@ -16,6 +16,8 @@ import { copyWithToast } from "@/lib/clipboard"
 import { api, ApiError, type Role } from "@/lib/api"
 import {
   AUTH_CONTEXT,
+  approvalBody,
+  type ApprovalSettings,
   type DirectoryGroup,
   type EntraMfaMode,
   type EntraSettings,
@@ -24,6 +26,7 @@ import {
   type MfaSettings,
   type SessionSettings,
   type SourceImpact,
+  useApprovalSettings,
   useEntra,
   useLdap,
   useMappings,
@@ -177,6 +180,122 @@ function SwitchOffDialog({ kind, onConfirm, onClose }: { kind: DirectoryKind; on
       onConfirm={onConfirm}
       onClose={onClose}
     />
+  )
+}
+
+// ---------------------------------------------------------------- automatic sign-in via AD/Entra ID (approval)
+
+/** "Automatische Anmeldung über AD/Entra ID zulassen": on – members of a mapped group sign in at once (as before); off –
+ *  new directory accounts and raises to admin wait for an admin's approval (Benutzer). Saving asks first: what stays
+ *  on (switching off), what keeps waiting – or, chosen, is approved now (switching on). */
+export function ApprovalPane() {
+  const q = useApprovalSettings()
+  if (!q.data) return <SheetLoading error={q.error} onRetry={q.refetch} />
+  return <ApprovalForm key={`${q.data.rev}-${q.data.auto_signin}`} initial={q.data} />
+}
+
+function ApprovalForm({ initial }: { initial: ApprovalSettings }) {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const [on, setOn] = useState(initial.auto_signin)
+  const [busy, setBusy] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const save = async (approvePending: boolean) => {
+    setBusy(true)
+    try {
+      const r = await withReauth(() =>
+        api.put<ApprovalSettings & { approved: { accounts: number; raises: number } }>("/api/admin/auth/approval", approvalBody(initial, on, approvePending)),
+      )
+      const n = r.approved.accounts + r.approved.raises
+      toast.success(n ? t("signin.approval.approvedAll", { count: n }) : t("common.saved"))
+      void qc.invalidateQueries({ queryKey: ["admin", "approval"] })
+      void qc.invalidateQueries({ queryKey: ["admin", "users"] })
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "stale") {
+        // the new numbers first – then the question again (with the same settings form the question shows them)
+        await qc.refetchQueries({ queryKey: ["admin", "approval"] })
+        const now = qc.getQueryData<ApprovalSettings>(["admin", "approval"])
+        if (approvePending && now?.rev === initial.rev && now.auto_signin === initial.auto_signin) {
+          toast.warning(t("signin.approval.staleCounts"))
+          setAsking(true)
+        } else toast.error(errorText(t, e))
+      } else toast.error(errorText(t, e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <SheetBody>
+        <ToggleRow
+          label={t("signin.approval.auto")}
+          description={<Explained label={t("signin.approval.autoHint")} text={t("signin.approval.tip")} />}
+          checked={on}
+          onCheckedChange={setOn}
+          className="py-0"
+        />
+        {!initial.auto_signin && <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("signin.approval.offAbout")}</p>}
+      </SheetBody>
+      <SheetActions>
+        <span />
+        <SaveBar busy={busy} dirty={on !== initial.auto_signin} onSave={() => setAsking(true)} />
+      </SheetActions>
+      {asking && (
+        <ApprovalSwitchDialog
+          initial={initial}
+          on={on}
+          onClose={() => setAsking(false)}
+          onConfirm={(all) => {
+            setAsking(false)
+            void save(all)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+function ApprovalSwitchDialog({ initial, on, onConfirm, onClose }: { initial: ApprovalSettings; on: boolean; onConfirm: (approveAll: boolean) => void; onClose: () => void }) {
+  const { t } = useTranslation()
+  const [all, setAll] = useState(false) // "auch alle wartenden freigeben": an explicit choice, off by default
+  const waiting = initial.accounts + initial.raises
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t(on ? "signin.approval.onTitle" : "signin.approval.offTitle")}</DialogTitle>
+          <DialogDescription>
+            {on
+              ? waiting
+                ? t("signin.approval.onWaiting", { count: initial.accounts, raises: initial.raises })
+                : t("signin.approval.onNone")
+              : t("signin.approval.offText", { count: initial.active_directory })}
+          </DialogDescription>
+        </DialogHeader>
+        {on && waiting > 0 && (
+          <>
+            <ToggleRow
+              label={t("signin.approval.approveAll")}
+              description={t("signin.approval.approveAllHint", { admins: initial.accounts_admin + initial.raises })}
+              checked={all}
+              onCheckedChange={setAll}
+              className="rounded-lg border px-3"
+            />
+            {all && initial.accounts_admin + initial.raises > 0 && (
+              <p className="flex gap-1.5 rounded-lg border border-warning/40 bg-warning/10 p-2.5 text-xs">
+                <TriangleAlert className="size-4 shrink-0 text-warning" /> {t("signin.approval.approveAllAdmins", { count: initial.accounts_admin + initial.raises })}
+              </p>
+            )}
+          </>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={() => onConfirm(on && all)}>{t("common.save")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

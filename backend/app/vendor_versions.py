@@ -24,6 +24,19 @@ markers so they sort before the release ("1.2.0-rc1" < "1.2.0"). Schemes:
 - ``sap``      SAP component releases as SAP's records write them: ``S4CORE 108``, ``SAP_BASIS 758``, ``758``, and the
                NetWeaver release ``7.58`` (= SAP_BASIS 758) → (758,); a support package ``SP02`` is one more part. The
                product release (S/4HANA ``2023``) is no component release – refused.
+- ``build``    products versioned by a build number that carries the release line (Zoho ManageEngine: ServiceDesk
+               Plus ``14.6 Build 14600``, ADSelfService Plus ``6.4 build 6402``, OpManager ``12.8 Build 128329`` /
+               ``12.8.329``). The build decides: ``14.6 Build 14600``, ``Build 14600`` and ``14600`` are all
+               (14, 6, 14600) – the line comes from the build (14600 → 14.6, 128329 → 12.8), a version written next
+               to it is not trusted over it. A bound written as a version without build (NVD's ``< 14.9``, ``≤ 14.7``)
+               is the line (14, 9): every build of 14.9 is at or above it. A bare number below 1000 is a major
+               version (NVD's start ``10``), not a build. ``14.6`` alone is a line – the matching decides only where
+               every build of it gets the same verdict.
+- ``fw_index`` firmware counted by its index in brackets (WAGO PFC: ``04.06.03(28)`` is FW28): advisories write the
+               index alone (NVD ``< 22``, ``16 – 23``; the CNA ``FW16 < FW22``) or the whole version
+               (``03.02.02(14)``) – both are the index: (28,), (14,); "FW23 affected" is 04.02.13(23). ``FW22 Patch 1``
+               is not read (which version a patch is, the release notes say). Typed without its index ("04.06.03") it is
+               accepted but not comparable: "möglicherweise betroffen" wherever the index decides.
 - ``distro``   a Linux distribution release (``12``, ``9.4``, ``22.04``): its packages decide, not this number.
 - ``cloud``    a service the vendor runs: no version on the customer side.
 - ``generic``  anything else with digits: numbers and letters (``1.0.2u``, ``9.8p1``, ``2.4.62``, ``14.1-29.72``).
@@ -40,7 +53,7 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache, total_ordering
 
-SCHEMES = ("panos", "fortios", "cisco", "windows", "vmware", "ivanti", "veeam", "sfos", "java", "sap", "distro", "cloud", "generic")
+SCHEMES = ("panos", "fortios", "cisco", "windows", "vmware", "ivanti", "veeam", "sfos", "java", "sap", "build", "fw_index", "distro", "cloud", "generic")
 PRE = {"dev": -4, "alpha": -3, "a": -3, "beta": -2, "b": -2, "pre": -1, "preview": -1, "rc": -1, "cr": -1, "ea": -1}
 # words that only separate parts ("8.0 Update 3", "21.0 MR1", "11.2.4-h23", "22.7R2", "SP3", "CU14", "build 2573")
 MILESTONE = {"m", "milestone"}  # only after "-" or "." and before a number: Maven's 7.0.0-M1
@@ -190,6 +203,60 @@ _JAVA_OLD = (
 _SAP = re.compile(
     r"^(?:sap[_ ]?)?(?:[a-z][a-z0-9_]{1,15}\s*[_ ]\s*)?(?:(\d)\.(\d{1,2})|(\d{3}))(?:\s*[,;]?\s*(?:sp|support\s+package)\s*(\d{1,4}))?$", re.I
 )
+# build scheme: "14.6 Build 14600", "14.6 (Build 14600)", "Version 14.6, Build 14600", NVD's "11.1 build_11101" /
+# "12.3 build123001" / "14.9 14910", "Build 14600", "14600"; OpManager's three-part "12.8.329" (= build 128329)
+_BUILD_FULL = re.compile(r"^(?:version\s*:?\s*|v(?=\d))?(?:(\d{1,2})\.(\d{1,2})(?:\.0)?\s*[,;(]?\s*)?(?:build\s*(?:no\.?|number)?\s*[_:#-]?\s*)?(\d{4,6})\s*\)?$", re.I)
+_BUILD_THREE = re.compile(r"^v?(\d{1,2})\.(\d)\.(\d{3})$")
+_BUILD_PATCH = re.compile(r"^v?(\d{1,2})\.(\d)\.(\d{1,2})$")
+_BUILD_LINE = re.compile(r"^(?:version\s*:?\s*|v(?=\d))?(\d{1,2})(?:\.(\d{1,2}))?(?:\.0)?$", re.I)
+BUILD_DEPTH = 3  # (major, minor, build): a complete version of the build scheme
+BUILD_MIN = 1000  # below: a major version ("10"), not a build
+
+
+def build_line(n: int) -> tuple[int, int]:
+    """The release line a build number belongs to: 14600 → 14.6, 6402 → 6.4, 128329 → 12.8 (six digits: OpManager)."""
+    if n >= 100000:
+        return n // 10000, n // 1000 % 10
+    return n // 1000, n // 100 % 10
+
+
+def build_v(n: int) -> V:
+    major, minor = build_line(n)
+    return V((major, minor, n), f"{major}.{minor} Build {n}")
+
+
+def _build(t: str) -> V | None:
+    if m := _BUILD_THREE.match(t):
+        return build_v(int(m.group(1) + m.group(2) + m.group(3)))  # OpManager 12.8.329 = build 128329
+    if (m := _BUILD_PATCH.match(t)) and int(m.group(3)):
+        a, b, c = (int(x) for x in m.groups())
+        return build_v(a * 1000 + b * 100 + c)  # ADSelfService Plus "before 5.0.6" = build 5006 (4.3.3 = 4303)
+    if (m := _BUILD_FULL.match(t)) and int(m.group(3)) >= BUILD_MIN:
+        return build_v(int(m.group(3)))
+    if m := _BUILD_LINE.match(t):
+        key = (int(m.group(1)),) + ((int(m.group(2)),) if m.group(2) is not None else ())
+        return V(key, ".".join(str(x) for x in key))
+    return None
+
+
+# fw_index: "04.06.03(28)", "Firmware version 03.01.07(13)", "FW28", "28"
+_FWI_FULL = re.compile(r"^(?:firmware\s+)?(?:version\s+)?v?(\d{1,2})\.(\d{1,2})\.(\d{1,2})\s*\((\d{1,3})\)$", re.I)
+_FWI_ONLY = re.compile(r"^(?:fw\s*)?(\d{1,3})$", re.I)
+# the version without its index ("04.06.03" – the index stands only in brackets after it): accepted as typed, but not
+# comparable (parse: None) – "möglicherweise betroffen" wherever a bound decides; with "(28)" it compares
+_FWI_BARE = re.compile(r"^(?:firmware\s+)?(?:version\s+)?v?(\d{1,2})\.(\d{1,2})\.(\d{1,2})$", re.I)
+
+
+def _fw_index(t: str) -> V | None:
+    t = t.replace("\\", "")
+    if m := _FWI_FULL.match(t):
+        a, b, c, idx = (int(x) for x in m.groups())
+        return V((idx,), f"{a:02d}.{b:02d}.{c:02d}({idx})")  # the index is the release (FW23 is 04.02.13(23))
+    if m := _FWI_ONLY.match(t):
+        return V((int(m.group(1)),), f"FW{int(m.group(1))}")
+    return None
+
+
 _JAVA_NEW = re.compile(r"^(\d{1,2}(?:\.\d{1,4}){0,4})(?:[+]\d{1,4})?(?:-perf)?$", re.I)  # 21.0.5, 21.0.5+11, 24
 
 
@@ -219,6 +286,10 @@ def parse(scheme: str, text: str) -> V | None:
         return V((10, 0, int(m.group(1)), int(m.group(2))), f"10.0.{int(m.group(1))}.{int(m.group(2))}")
     if scheme == "sfos":
         return _sfos(t)
+    if scheme == "build":
+        return _build(t)
+    if scheme == "fw_index":
+        return _fw_index(t)
     if scheme == "java":
         return _java(t)
     if scheme == "sap":
@@ -354,7 +425,8 @@ def from_cpe(scheme: str, version: str, update: str = "*") -> tuple[V | None, bo
     elif scheme == "ivanti":
         text = f"{version}{update.upper()}"
     else:
-        text = f"{version} {update.replace('_', ' ')}"
+        # IPFire's "2.27:core_update174" is the Core Update an admin sees as "2.27 Core 174"
+        text = f"{version} {re.sub(r'^core_?update_?(?=\d)', 'core ', update).replace('_', ' ')}"
     return parse(scheme, text), any_update
 
 
@@ -371,13 +443,15 @@ def validate(scheme: str, text: str) -> tuple[bool, str, str]:
     if scheme == "windows" and _KB.match(t):
         return False, t, "kb"
     v = parse(scheme, t)
+    if v is None and scheme == "fw_index" and (m := _FWI_BARE.match(t)):
+        return True, ".".join(f"{int(x):02d}" for x in m.groups()), ""  # no index known: stored, compared as unknown
     if v is None:
         return False, t, "format"
     if scheme == "generic" and strict_problem(t):
         return False, t, "format"  # "iLO 6 v1.62": a word of its own before a number (strict_problem)
     if scheme == "generic" and (p := strip_platform(t)) != t:
         t = p  # 131.0.2903.86 x64 → 131.0.2903.86
-    return True, v.text if scheme in ("panos", "windows", "veeam", "sfos", "java", "fortios") else t, ""
+    return True, v.text if scheme in ("panos", "windows", "veeam", "sfos", "java", "fortios", "build", "fw_index") else t, ""
 
 
 EXAMPLES = {
@@ -391,6 +465,8 @@ EXAMPLES = {
     "sfos": "21.0.1.272",
     "java": "21.0.5 · 8u411",
     "sap": "S4CORE 108 · SAP_BASIS 758",
+    "build": "14.6 Build 14600",
+    "fw_index": "04.06.03(28)",
     "distro": "12 · 9.4 · 24.04",
     "cloud": "",
     "generic": "8.3.14",

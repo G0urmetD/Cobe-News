@@ -143,6 +143,7 @@ const OFF_KEYS: Record<string, string> = {
   "sync:disabled": "users.offDisabled",
   "sync:gone": "users.offGone",
   "sync:unblocked": "users.offUnblocked",
+  pending: "users.offPending",
 }
 
 /**
@@ -154,6 +155,10 @@ export function offKeys(reason: string | null): [string, string | undefined] {
   if (key) return [key, `${key}Hint`]
   return reason?.startsWith("sync:") ? ["users.offSync", "users.offSyncHint"] : ["users.off", undefined]
 }
+
+/** A directory account waiting for an admin's approval ("Automatische Anmeldung über AD/Entra ID zulassen" off) –
+ *  switched on only by an admin ("Freigeben"), never by the directory. */
+export const isPending = (u: { is_active: boolean; deactivated_reason: string | null }) => !u.is_active && u.deactivated_reason === "pending"
 
 /** The lasting block of an admin – lifted only by an admin (the switch is off already for a "sync:…" account). */
 export const isBlocked = (u: { is_active: boolean; deactivated_reason: string | null }) => !u.is_active && u.deactivated_reason === "admin"
@@ -198,6 +203,26 @@ export interface UserRow extends ApiUser {
   welcome?: "pending" | "sending" | "sent" | "no_address" | "failed" | null
   /** registered passkeys (local accounts) */
   passkeys?: number
+  /** a directory account's raise to admin: waits for approval ("admin") or was declined ("declined") */
+  pending_role?: "admin" | "declined" | null
+}
+
+/** What waits for an admin's approval (GET /api/admin/users/pending – the number on "Benutzer"). */
+export interface PendingCounts {
+  accounts: number
+  /** … of them as admin */
+  accounts_admin: number
+  /** readers whose raise to admin waits */
+  raises: number
+}
+
+/** "Automatische Anmeldung über AD/Entra ID zulassen" (GET/PUT /api/admin/auth/approval) and what switching it
+ *  concerns. */
+export interface ApprovalSettings extends PendingCounts {
+  auto_signin: boolean
+  rev: number
+  /** directory accounts that are on – they stay on when it is switched off */
+  active_directory: number
 }
 
 export interface LdapSettings {
@@ -273,6 +298,28 @@ export const useEntra = () => useQuery({ queryKey: ["admin", "entra"], queryFn: 
 export const useMappings = () => useQuery({ queryKey: ["admin", "mappings"], queryFn: () => api.get<GroupMapping[]>("/api/admin/auth/mappings") })
 export const useSessionSettings = () => useQuery({ queryKey: ["admin", "sessions"], queryFn: () => api.get<SessionSettings>("/api/admin/auth/sessions") })
 export const useMfaSettings = () => useQuery({ queryKey: ["admin", "mfa"], queryFn: () => api.get<MfaSettings>("/api/admin/auth/mfa") })
+export const useApprovalSettings = () => useQuery({ queryKey: ["admin", "approval"], queryFn: () => api.get<ApprovalSettings>("/api/admin/auth/approval") })
+/** The number on "Benutzer" for admins – asked every few minutes (a preload or a sign-in may add to it any time). */
+export const usePendingCounts = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["admin", "users", "pending"],
+    queryFn: () => api.get<PendingCounts>("/api/admin/users/pending"),
+    enabled,
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  })
+export const pendingTotal = (c: PendingCounts | undefined) => (c ? c.accounts + c.raises : 0)
+
+/** PUT /api/admin/auth/approval: with "auch alle wartenden freigeben" the numbers the dialog showed go along – the
+ *  server refuses (409 "stale") when something else waits by now, so never more is approved than was shown. */
+export function approvalBody(shown: ApprovalSettings, autoSignin: boolean, approvePending: boolean) {
+  return {
+    auto_signin: autoSignin,
+    approve_pending: approvePending,
+    ...(approvePending ? { expect: { accounts: shown.accounts, accounts_admin: shown.accounts_admin, raises: shown.raises } } : {}),
+    rev: shown.rev,
+  }
+}
 
 // ---------------------------------------------------------------- HTTPS
 

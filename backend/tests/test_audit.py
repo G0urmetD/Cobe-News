@@ -167,8 +167,33 @@ async def _suggestion(c):  # noqa: ANN001, ANN202
     return r.json()
 
 
+async def _waiting(c, *, role: str = "reader", raise_: bool = False):  # noqa: ANN001, ANN202
+    """A directory account waiting for approval (or, `raise_`, a reader whose raise to admin waits) – its group mapped."""
+    from app.models import GroupMapping
+
+    gid = f"CN=News-{role},DC=corp,DC=example".lower()
+    async with db.session() as s:
+        s.add(GroupMapping(source="ldap", group_id=gid, group_name=role, role=role))
+        await s.commit()
+    extra = {"pending_role": "admin"} if raise_ else {"is_active": False, "deactivated_reason": "pending"}
+    async with db.session() as s:
+        u = User(username="dora", display_name="Dora", role="reader" if raise_ else role, auth_source="ldap", external_id=str(uuid.uuid4()), role_groups=[gid], **extra)
+        s.add(u)
+        await s.commit()
+    return {"id": str(u.id)}
+
+
+async def _raise(c):  # noqa: ANN001, ANN202
+    return await _waiting(c, role="admin", raise_=True)
+
+
 CASES = [
     # accounts
+    ("user.approved", _waiting, lambda c, u: c.post(f"/api/admin/users/{u['id']}/approve", json={})),
+    ("user.declined", _waiting, lambda c, u: c.post(f"/api/admin/users/{u['id']}/decline", json={})),
+    ("role.approved", _raise, lambda c, u: c.post(f"/api/admin/users/{u['id']}/approve-role", json={})),
+    ("role.declined", _raise, lambda c, u: c.post(f"/api/admin/users/{u['id']}/decline-role", json={})),
+    ("signin.config_changed", _nothing, lambda c, x: c.put("/api/admin/auth/approval", json={"auto_signin": False})),
     ("user.created", _nothing, lambda c, x: c.post("/api/admin/users", json={"username": "bob", "role": "reader"})),
     ("user.changed", _user, lambda c, u: c.patch(f"/api/admin/users/{u['id']}", json={"display_name": "Robert"})),
     ("role.changed", _user, lambda c, u: c.patch(f"/api/admin/users/{u['id']}", json={"role": "admin"})),
@@ -290,6 +315,10 @@ def test_every_action_has_a_case_or_a_reason():
         "audit.pruned",  # test_late_and_future_entries_are_marked_and_the_future_does_not_hold_the_prune
         "restore_test.done",  # test_cli_actions_are_logged
         "backup.downloaded",  # test_backup.py: test_an_encrypted_backup_downloads_whole_and_is_logged
+        "user.approval_pending",  # test_approval.py: test_signin_creates_a_waiting_account_and_says_so
+        "role.approval_pending",  # test_approval.py: test_raise_to_admin_waits_lowering_does_not
+        "login.pending_refused",  # test_approval.py: test_signin_creates_a_waiting_account_and_says_so
+        "directory.preloaded",  # test_approval.py: test_preload_creates_accounts_on_and_waiting
     }
     covered = {a for a, _, act in CASES if act is not None} | elsewhere | {"team.member_added"}
     assert set(audit.ACTIONS) == covered, set(audit.ACTIONS) ^ covered
@@ -378,6 +407,8 @@ REVIEWED_NOT_SECRET = {
     "encryption": "ldaps | starttls | none – a mode",
     "header_name": "the name of a webhook header, not its value",
     "nested_groups": "",
+    "auto_signin": "a switch (Automatische Anmeldung über AD/Entra ID)",
+    "approve_pending": "a switch",
     "clear_hmac": "a switch",
     "clear_header": "a switch",
     "clear_password": "a switch",

@@ -130,6 +130,7 @@ const vendorEn: Record<string, string> = {
   "vendor.reason.line_all": "every version of this line affected – no fix in the line, move to a newer line",
   "vendor.reason.fixed": "version contains the fix",
   "vendor.reason.line_none": "line not affected according to the vendor",
+  "vendor.reason.other_scale": "version not comparable – the advisory names a date or a build instead of a version",
   "vendor.reason.newer_line": "line newer than any the advisory names",
   "vendor.reason.line_not_listed": "version not decidable – the advisory does not name the line",
   "vendor.reason.panorama_derived": "version not decidable – PAN-OS advisory that says nothing about Panorama",
@@ -150,11 +151,12 @@ const vendorEn: Record<string, string> = {
   "vendor.reason.platform": "only on: {{value}}",
   "vendor.reason.after": "affected up to and including {{value}}",
   "vendor.reason.build_needed": "version not decidable – needs the build number (e.g. 12.3.2.4934)",
+  "vendor.reason.build_number_needed": "version not decidable – needs the build number; enter the version with its build (e.g. 14.6 Build 14600)",
   "vendor.reason.older_untested": "older than the versions tested – the vendor says to consider them affected",
   "vendor.reason.edition_not_named": "edition not named in the advisory – only other editions affected",
   "vendor.reason.ios_train": "version not decisive – classic IOS: comparable within its train only, your version is not listed",
   "vendor.reason.fix_only": "data not decisive – the advisory names only the fix, no affected versions",
-  // the same reasons when the verdict is not the vendor's own word (Verdict.detail.by: NVD, CISA, BSI, OSV …)
+  // the same reasons when the verdict is not the vendor's own word (Verdict.detail.by: NVD, CISA, BSI, OSV, a CNA that is not the vendor …)
   "vendor.reason.in_list_by": "version listed as affected according to {{src}}",
   "vendor.reason.line_none_by": "line not affected according to {{src}}",
   "vendor.reason.default_affected_by": "every other version affected according to {{src}}",
@@ -163,6 +165,9 @@ const vendorEn: Record<string, string> = {
   "vendor.reason.vendor_unaffected": "version not decisive – not affected according to the vendor, in the affected range according to the NVD",
   "vendor.reason.source": "source: {{src}}",
   "vendor.by.vendor": "vendor",
+  // the CNA of a CVE record that is not the product's vendor (GitHub's advisory database, VulDB, MITRE …)
+  "vendor.by.cna": "{{name}} (not the vendor)",
+  "vendor.by.cna_unnamed": "CNA",
   "vendor.by.nvd": "NVD",
   "vendor.by.adp": "CISA (ADP)",
   "vendor.by.bsi": "BSI",

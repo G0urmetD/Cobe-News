@@ -119,6 +119,29 @@ export function restoreCommand(name: string, dir = "/data/backups"): string {
  *  database, readable). The name goes into the path as one segment. */
 export const canDownload = (f: Pick<BackupFile, "encrypted">) => f.encrypted
 export const backupFileUrl = (name: string) => `/api/admin/backup/files/${encodeURIComponent(name)}`
+/** Where the server's download addresses begin (step 2, with the ticket in the last segment). */
+export const BACKUP_DOWNLOAD_PREFIX = "/api/admin/backup/download/"
+
+/** The browser's own download of an address of this site: saved straight to disk with the browser's progress, however
+ *  big – no Blob in the page's memory, no new tab, the page stays (the answer is an attachment). */
+export function startDownload(url: string, doc: Document = document) {
+  const a = doc.createElement("a")
+  a.href = url
+  a.download = "" // the server's file name (Content-Disposition)
+  a.rel = "noreferrer"
+  a.hidden = true
+  doc.body.append(a) // Firefox clicks only a link in the page
+  a.click()
+  a.remove()
+}
+
+/** An encrypted backup to this computer: step 1 asks the server for a ticket (the CSRF token, a fresh proof of identity
+ *  – withReauth around it –, the limits: refused here with the reason), step 2 lets the browser download it. */
+export async function downloadBackup(name: string, start: (url: string) => void = startDownload): Promise<void> {
+  const { url } = await api.post<{ url: string; expires_in: number }>(`${backupFileUrl(name)}/ticket`)
+  if (typeof url !== "string" || !url.startsWith(BACKUP_DOWNLOAD_PREFIX) || url.includes("?")) throw new Error("unexpected download address")
+  start(url)
+}
 
 /** The last outcome's error in the reader's language (the backend's own text stays available as detail). */
 export const backupErrorKey = (last: BackupLast) => `backup.err.${last.code ?? "failed"}`

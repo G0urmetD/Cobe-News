@@ -164,6 +164,13 @@ def _leading_zeros(t: str) -> str:
     return t
 
 
+def _ipfire_core(t: str) -> str:
+    """IPFire: the web UI and the release notes write "IPFire 2.27 (x86_64) - Core Update 174" – stored in the form the
+    NVD's CPEs are read as (vendor_versions.from_cpe): "2.27 Core 174"."""
+    m = re.fullmatch(r"(?i)(?:ipfire\s*)?v?(\d+\.\d+)\s*(?:\((?:x86_64|aarch64|arm\w*|i586)\))?\s*[-–,]?\s*core(?:\s*-?\s*update)?\s*(\d{1,4})", t)
+    return f"{m.group(1)} Core {m.group(2)}" if m else t
+
+
 NORMALIZE = {
     "two_digit_year": _two_digit_year,
     "netscaler": _netscaler,
@@ -173,6 +180,7 @@ NORMALIZE = {
     "checkpoint": _checkpoint,
     "horizon_yymm": _horizon_yymm,
     "leading_zeros": _leading_zeros,
+    "ipfire_core": _ipfire_core,
 }
 
 

@@ -15,6 +15,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
+from app.audit_lock import ddl_skipped
+
 revision: str = "0033"
 down_revision: str | None = "0032"
 branch_labels: str | Sequence[str] | None = None
@@ -29,8 +31,12 @@ EXPR = (
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")  # there since 0002 – harmless when it is
+    if ddl_skipped(op.get_bind(), revision):  # locked (0.1.52): the table has the index already
+        return
     op.execute(f"CREATE INDEX ix_audit_log_search ON audit_log USING gin ({EXPR} gin_trgm_ops)")
 
 
 def downgrade() -> None:
+    if ddl_skipped(op.get_bind(), revision):
+        return
     op.execute("DROP INDEX IF EXISTS ix_audit_log_search")

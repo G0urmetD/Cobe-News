@@ -16,6 +16,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from app.audit_lock import ddl_skipped
+
 TS = postgresql.TIMESTAMP(timezone=True)
 
 # the one place with this migration's numbers (renumbered when another migration lands first)
@@ -26,6 +28,9 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # the locked table (0.1.52) is there already – a restore's reference schema migrates from scratch beside it
+    if ddl_skipped(op.get_bind(), revision):
+        return
     op.create_table(
         "audit_log",
         sa.Column("id", sa.BigInteger(), sa.Identity(always=False), nullable=False),
@@ -49,6 +54,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if ddl_skipped(op.get_bind(), revision):
+        return
     op.drop_index("ix_audit_log_target", table_name="audit_log")
     op.drop_index("ix_audit_log_action", table_name="audit_log")
     op.drop_index("ix_audit_log_actor", table_name="audit_log")

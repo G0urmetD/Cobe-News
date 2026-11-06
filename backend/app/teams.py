@@ -24,7 +24,8 @@ import time
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import and_, delete, exists, func, or_, select, update
+from sqlalchemy import Boolean, and_, delete, exists, false, func, or_, select, update
+from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +34,7 @@ from app import settings as settings_store
 from app.auth import entra, ldap_dir
 from app.auth.directory import DirectoryUser
 from app.config import get_config
-from app.models import PersonRoute, Team, TeamGroup, TeamMember, TeamProduct, TeamProductMember, TeamWelcome, User, VendorFollow
+from app.models import GroupMapping, PersonRoute, Team, TeamGroup, TeamMember, TeamProduct, TeamProductMember, TeamWelcome, User, VendorFollow
 
 log = logging.getLogger("cobe_news.teams")
 
@@ -135,15 +136,17 @@ def _chunks(items: list, n: int = BATCH):  # noqa: ANN202
         yield items[i : i + n]
 
 
-async def _accounts(db: AsyncSession, people: list[DirectoryUser], welcome: bool) -> tuple[dict[tuple[str, str], uuid.UUID], dict[str, int]]:
+async def _accounts(db: AsyncSession, people: list[DirectoryUser], welcome: bool, approval: bool = False, budget=None) -> tuple[dict[tuple[str, str], uuid.UUID], dict[str, int]]:  # noqa: ANN001
     """The accounts of the loaded people, batch by batch: found by their directory id, created when new (and enabled),
     name, display name and e-mail kept in step for those who never signed in (afterwards the sign-in does that). Who
     never signed in follows the directory's on/off; an admin's "off" is never undone. A new account whose name a local
-    account has is not created (a local account is never taken over)."""
+    account has is not created (a local account is never taken over). `approval` (directory.approval_required): a new
+    account – and one that never signed in and comes back – waits for an admin's approval; a waiting one stays so."""
     from app.auth import directory
 
+    budget = budget or directory.AuditBudget()
     ids: dict[tuple[str, str], uuid.UUID] = {}
-    counts = {"created": 0, "conflicts": 0, "deactivated": 0, "reactivated": 0}
+    counts = {"created": 0, "conflicts": 0, "deactivated": 0, "reactivated": 0, "pending": 0}
     for chunk in _chunks(people):
         source = chunk[0].source
         have = {u.external_id: u for u in await db.scalars(select(User).where(User.auth_source == source, User.external_id.in_([p.external_id for p in chunk])))}
@@ -167,10 +170,15 @@ async def _accounts(db: AsyncSession, people: list[DirectoryUser], welcome: bool
                     role="reader",
                     auth_source=source,
                     external_id=p.external_id,
-                    is_active=True,
+                    is_active=not approval,
+                    deactivated_reason=directory.PENDING if approval else None,
                 )
                 db.add(u)
                 counts["created"] += 1
+                if approval:
+                    counts["pending"] += 1
+                    if budget.take():
+                        directory._audit(db, u, "user.approval_pending", {"source": source, "why": "team", "role": u.role})
                 if welcome and (source, p.external_id) not in seen:
                     db.add(TeamWelcome(source=source, external_id=p.external_id, status="pending" if p.email else "no_address"))
             elif u.last_login_at is None and not u.is_emergency:
@@ -183,6 +191,9 @@ async def _accounts(db: AsyncSession, people: list[DirectoryUser], welcome: bool
                     u.is_active, u.deactivated_reason = False, "sync:disabled"
                     u.version = (u.version or 1) + 1
                     counts["deactivated"] += 1
+                elif p.enabled and not u.is_active and reason.startswith("sync:") and approval:
+                    directory.wait_for_approval(db, u, "team", audit=budget.take())  # never used: waits like a new one
+                    counts["pending"] += 1
                 elif p.enabled and not u.is_active and reason.startswith("sync:"):
                     u.is_active, u.deactivated_reason = True, None  # back in the group / enabled again – never after an admin's "off"
                     u.version = (u.version or 1) + 1
@@ -193,16 +204,29 @@ async def _accounts(db: AsyncSession, people: list[DirectoryUser], welcome: bool
     return ids, counts
 
 
+def held_by_mapping(mapped: list[tuple[str, str]]):  # noqa: ANN201
+    """SQL: the account's groups as last read (User.role_groups) hold one of these mapped groups (source, group id) – an
+    account the preload of the mapped groups keeps (app/preload.py), whatever Teams says."""
+    by: dict[str, list[str]] = {}
+    for source, gid in mapped:
+        by.setdefault(source, []).append(gid.lower())
+    conds = [and_(User.auth_source == src, User.role_groups.op("?|", is_comparison=True)(pg_array(sorted(set(gids))))) for src, gids in by.items()]
+    return func.coalesce(or_(*conds), false(), type_=Boolean) if conds else false()
+
+
 async def deactivate_left(db: AsyncSession, reason: str = "sync:no_team") -> int:
     """Accounts a team load brought that never signed in: switched off once they are in no team group any more
     ("sync:no_team") – or all of them when Teams is switched off ("sync:teams_off"). Back in a team group, the next load
     switches them on again (_accounts); a sign-in with a mapped group does, too. An admin's "off" is never touched, and
-    accounts that ever signed in are left to the hourly account sync (their role follows their groups there)."""
+    accounts that ever signed in are left to the hourly account sync (their role follows their groups there); nor is an
+    account a mapped group holds (the preload of the mapped groups keeps it in step – app/preload.py)."""
+    mapped = [(s, g) for s, g in await db.execute(select(GroupMapping.source, GroupMapping.group_id))]
     q = update(User).where(
         User.auth_source.in_(("ldap", "entra")),
         User.is_active.is_(True),
         User.is_emergency.is_(False),
         User.last_login_at.is_(None),
+        ~held_by_mapping(mapped),
     )
     if reason != "sync:teams_off":
         q = q.where(~exists().where(TeamMember.user_id == User.id, TeamMember.origin == "group"))
@@ -267,15 +291,20 @@ async def _sync(db: AsyncSession, team_ids: set[uuid.UUID] | None) -> dict[str, 
     by_source = sorted(people.values(), key=lambda p: p.source)
     ids: dict[tuple[str, str], uuid.UUID] = {}
     out = {"created": 0, "conflicts": 0, "added": 0, "removed": 0, "failed_groups": sum(1 for x in loads.values() if isinstance(x, str))}
-    switched = {"deactivated": 0, "reactivated": 0}
+    switched = {"deactivated": 0, "reactivated": 0, "pending": 0}
+    from app.auth import directory
+
+    approval = await directory.approval_required(db)
+    await dbm.release(db)
+    budget = directory.AuditBudget()
     for source in ("ldap", "entra"):
         part = [p for p in by_source if p.source == source]
         if part:
-            got_ids, counts = await _accounts(db, part, bool(conf.get("welcome_mail")))
+            got_ids, counts = await _accounts(db, part, bool(conf.get("welcome_mail")), approval, budget)
             ids.update(got_ids)
             out["created"] += counts["created"]
             out["conflicts"] += counts["conflicts"]
-            for k in ("deactivated", "reactivated"):  # the audit log's (switched by the directory, never signed in)
+            for k in ("deactivated", "reactivated", "pending"):  # the audit log's (switched by the directory, never signed in)
                 switched[k] += counts[k]
     # 3. the memberships per team: added as found; taken away only when every group of the team could be read
     groups_of: dict[uuid.UUID, list[tuple[str, str]]] = {t: [] for t in teams}
@@ -299,7 +328,9 @@ async def _sync(db: AsyncSession, team_ids: set[uuid.UUID] | None) -> dict[str, 
     left = await deactivate_left(db)  # 4. who left their last team group and never signed in (logged by itself)
     # the load in the audit log: one entry for what it changed (it committed batch by batch – accounts that never signed
     # in, memberships; the role a membership gives is decided at the sign-in and by the account sync, logged there)
-    loaded = {k: n for k, n in {**out, **switched}.items() if n and k in ("created", "reactivated", "deactivated", "added", "removed")}
+    loaded = {k: n for k, n in {**out, **switched}.items() if n and k in ("created", "reactivated", "deactivated", "added", "removed", "pending")}
+    if budget.over:
+        loaded["pending_not_listed"] = budget.over  # waiting accounts beyond the ones logged one by one
     if loaded:
         from app import audit
 
@@ -394,7 +425,9 @@ async def send_welcome(db: AsyncSession) -> int:
     sent = 0
     deadline = time.monotonic() + WELCOME_ROUND_S
     while sent < WELCOME_PER_ROUND and time.monotonic() < deadline:
-        row = (await db.execute(select(TeamWelcome.source, TeamWelcome.external_id).where(TeamWelcome.status == "pending").order_by(TeamWelcome.created_at).limit(1))).first()
+        # an account waiting for an admin's approval gets its mail once approved (not before: it could not sign in)
+        waiting = exists().where(User.auth_source == TeamWelcome.source, User.external_id == TeamWelcome.external_id, User.deactivated_reason == "pending")
+        row = (await db.execute(select(TeamWelcome.source, TeamWelcome.external_id).where(TeamWelcome.status == "pending", ~waiting).order_by(TeamWelcome.created_at).limit(1))).first()
         if row is None:
             break
         source, ext = row
@@ -417,6 +450,8 @@ async def send_welcome(db: AsyncSession) -> int:
             done = {"status": "failed", "error": "gone"}
         elif not to or not MAIL.fullmatch(to):
             done = {"status": "no_address", "error": None}  # none – or not one plain address (never a list of them)
+        elif not u.is_active and u.deactivated_reason == "pending":
+            done = {"status": "pending", "error": None}  # began waiting for approval just now: sent once approved
         elif not u.is_active:
             # switched off before the mail went out: by an admin, or out of every team group again
             done = {"status": "failed", "error": "blocked" if u.deactivated_reason == "admin" else "inactive"}

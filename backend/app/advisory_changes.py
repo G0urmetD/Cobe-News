@@ -40,8 +40,10 @@ log = logging.getLogger("cobe_news.vendor")
 # the extractor below: raised when facts_of changes what it takes (the old facts are then recomputed, never a change)
 EXTRACT_V = 1
 # per source the parser its records come from (vendor_sources, csaf_providers/story_details, cvelist, osv): raised with
-# a change of a parser that alters what it reads – the next record of that source sets its facts anew, silently
-PARSER_V = {"nvd": 1, "paloalto": 1, "fortinet": 1, "veeam": 1, "csaf": 1, "cvelist": 1, "osv": 1}
+# a change of a parser that alters what it reads – the next record of that source sets its facts anew, silently.
+# nvd 2 (0.1.52): the records keep their CNA (data["assigner"], vendor_match.cna_by) – the one refetch of migration 0036
+# turns "laut Hersteller" into a third party's word for many of them, a verdict that moves without anything new said
+PARSER_V = {"nvd": 2, "paloalto": 1, "fortinet": 1, "veeam": 1, "csaf": 1, "cvelist": 1, "osv": 1}
 KEEP = timedelta(days=365)
 PER_ADVISORY = 20
 RECENT = timedelta(days=30)  # "Geändert" in the lists: a change within this time
@@ -215,6 +217,15 @@ def facts_of(source: str, severity: str | None, cvss: float | None, cves: list |
         _csaf(data, out)
     score = round(float(cvss), 1) if isinstance(cvss, int | float) else None
     return {"sev": str(severity or "info"), "cvss": score, **{k: _uniq(out[k]) for k in LISTS}, "rev": _n(data.get("rev"))[:40]}
+
+
+def reparsed(source: str, stored: dict | None, old: dict | None, new: dict | None) -> bool:
+    """The record comes from another parser of its source than the stored facts (PARSER_V): its facts are set anew,
+    silently. Without stored facts (a record stored once only has no state row) only the record can tell: an NVD record
+    that gains its CNA (data["assigner"], parser 2) was stored by parser 1 – its first refetch is no change either."""
+    if stored:
+        return stored.get("p", 1) != PARSER_V.get(source, 1)
+    return source == "nvd" and isinstance(new, dict) and "assigner" in new and not (isinstance(old, dict) and "assigner" in old)
 
 
 def _unknown_sev(f: dict) -> bool:

@@ -120,6 +120,8 @@ The format is checked per vendor so that versions are compared correctly:
 | VMware ESXi, vCenter | version with update, also the VAMI version and the build ([more](#vmware-vsphere)) | `8.0 U3c`, `8.0 Update 3c`, `8.0c`, `8.0.3.00400`, `24322831` |
 | Ivanti | R releases | `22.7R2.3` |
 | Veeam | the whole build | `12.3.2.4934`, `13.1.2 (build 13.1.2.57)` |
+| WAGO PFC100/PFC200 | firmware with its index in brackets – the index counts | `04.06.03(28)`, `FW28` |
+| Zoho ManageEngine (ServiceDesk Plus, ADSelfService Plus, Password Manager Pro, PAM360, OpManager) | version with build number – the build counts | `14.6 Build 14600`, `14600`, `12.8.329` (OpManager) |
 | Linux distributions | release | `12`, `9.4`, `24.04` |
 | everything else | numbers and letters | `8.3.14`, `1.0.2u`, `9.8p1` |
 
@@ -130,6 +132,10 @@ Special cases:
 - **Veeam:** best enter the whole build. A short `12.3.2` stands for every build of 12.3.2 – only what holds for all of
   them is decided, otherwise it says "possibly affected". `12.3.2 P4` cannot be compared; the KB article says which
   build a patch is. The Veeam Agent has a catalogue entry per operating system.
+- **Zoho ManageEngine:** the products count by build number (Help → About: "14.6 Build 14600"). The build is compared –
+  with the advisories' build bounds ("before 10509") and with NVD's bounds as a version line ("< 14.9" = before every
+  build of 14.9). A version without build (`14.6`) stands for every build of 14.6; only what holds for all of them is
+  decided. Fix and target version are shown as a build ("14.9 Build 14920").
 - **Linux distributions:** Vendor News shows the release line and the end of support. Whether a hole is closed depends
   on the package versions – only the distribution's advisory says that.
 - **Cloud services** have no version on your side; advisories show as "Cloud service affected".
@@ -385,7 +391,11 @@ Typical reasons for **"possibly"**:
 
 Every reason names its source: "according to the vendor" appears only where the verdict comes from the vendor itself
 (its advisory or its data in the CVE record); otherwise "according to the NVD", "CISA (ADP)", "the BSI", "OSV" or
-"source: …".
+"source: …". A CVE record counts as the vendor's word only when the vendor wrote it (it is the record's CNA). When
+someone else wrote it – GitHub's advisory database for an open-source project, VulDB, MITRE or HackerOne, for example –
+it reads "according to GitHub (not the vendor)", "according to VulDB (not the vendor)" …; a CNA the NVD names only by
+an identifier shows as "CNA (not the vendor)". Such data never outweighs the NVD's analysis: when the NVD says
+"affected", that stands.
 
 When several sources name the same vulnerability, the vendor's advisory decides before the [NVD](term:nvd), the NVD
 before the CVE list ([cvelistV5](term:cvelist)), and OSV comes last – details:

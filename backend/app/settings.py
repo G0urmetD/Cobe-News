@@ -58,6 +58,10 @@ DEFAULTS: dict[str, dict] = {
     # Teams (app/teams.py): off – while off nothing changes for anyone; the welcome e-mail to loaded members and the
     # personal notifications (e-mail, desktop, Microsoft Teams – app/personal.py) off as well
     "teams": {"enabled": False, "welcome_mail": False, "personal_email": False, "personal_desktop": False, "personal_teams": False},
+    # "Automatische Anmeldung über AD/Entra ID zulassen" (app/auth/directory.py): on – a member of a mapped group (or a
+    # team group) signs in at once, as before 0.1.52. Off: a new directory account – preloaded or created at a sign-in –
+    # and a raise to admin wait for an admin's approval
+    "directory": {"auto_signin": True},
     # the update notice for admins (app/update_check.py): on – one request to GitHub's release API every 12 hours
     "updates": {"check": True},
 }

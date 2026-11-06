@@ -160,6 +160,24 @@ def test_the_database_is_healthy_only_after_the_role_setup(local):
     assert not any("${POSTGRES_PASSWORD" in str(v) for v in app.values())
 
 
+def test_a_new_database_locks_its_audit_log_once_the_app_made_it():
+    """M3 (0.1.52): a new install – db-init finds no audit_log yet – starts one background loop (as postgres, no root):
+    every LATE_EVERY s for LATE_FOR s it looks for the table and runs audit-lock.sql once (lock_timeout: never holding
+    up the app), then ends. PID 1 keeps the signals; stop() and finish() end the loop with the server. Checked against
+    the real image by hand (docs/BETRIEB.md, Datenbank-Sperre: the lock within seconds of the app's first start)."""
+    script = (ROOT / "deploy" / "postgres" / "cobe-news-db.sh").read_text(encoding="utf-8")
+    assert "LATE_EVERY=10" in script and "LATE_FOR=1800" in script
+    assert re.search(r'if \[ "\$pending" = t \] && \[ -z "\$stopping" \]; then\n\s+late_lock &\n\s+late=\$!', script)
+    loop = script.split("late_lock() {", 1)[1].split("\n}\n", 1)[0]
+    assert "to_regclass('public.audit_log') IS NOT NULL" in loop and '-f "$here/audit-lock.sql"' in loop and "lock_timeout=5s" in loop
+    assert "alive || exit 0" in loop and "exit 0" in loop.split("audit-lock.sql", 1)[1]
+    for fn in ("stop() {", "finish() {"):
+        body = script.split(fn, 1)[1].split("\n}\n", 1)[0]
+        assert 'kill "$late"' in body, fn
+    # every superuser connection of the image pins the search_path (app-role.sql: the app owns the database)
+    assert script.count("superuser ") >= 3 and 'PGOPTIONS="-c search_path=pg_catalog,pg_temp' in script
+
+
 def test_passwords_are_required(portainer):
     services = portainer["services"]
     for value in (services["app"]["environment"]["POSTGRES_PASSWORD"], services["db"]["environment"]["POSTGRES_PASSWORD"], services["db"]["environment"]["POSTGRES_APP_PASSWORD"]):
@@ -207,14 +225,15 @@ def test_dockerfiles_pin_their_base_images_and_carry_the_files(local):
     assert re.search(r"^deploy$", (ROOT / ".dockerignore").read_text(encoding="utf-8"), re.M)  # never deploy/certs (an own key)
     # the database image: the role set-up as its entrypoint, the fast shutdown on docker stop
     assert 'ENTRYPOINT ["/usr/local/share/cobe-news/cobe-news-db.sh"]' in db and "STOPSIGNAL SIGINT" in db and 'CMD ["postgres"]' in db
-    for name in ("cobe-news-db.sh", "db-init.sh", "app-role.sql", "restore-role.sql"):
+    for name in ("cobe-news-db.sh", "db-init.sh", "app-role.sql", "audit-lock.sql", "restore-role.sql"):
         assert name in db and (ROOT / "deploy" / "postgres" / name).is_file(), name
-    assert 'here/app-role.sql"' in (ROOT / "deploy" / "postgres" / "db-init.sh").read_text(encoding="utf-8")
+    init = (ROOT / "deploy" / "postgres" / "db-init.sh").read_text(encoding="utf-8")
+    assert 'here/app-role.sql"' in init and 'here/audit-lock.sql"' in init and init.index("app-role.sql\"") < init.index("audit-lock.sql\"")
     # the proxy image: exactly what the local install mounted up to 0.1.48, where nginx's entrypoint takes it
     assert "COPY cobe-news.conf.template /etc/nginx/templates/default.conf.template" in proxy
     assert "COPY --chmod=0755 16-server-names.envsh 40-cert-watch.sh /docker-entrypoint.d/" in proxy
     # each build context lets in only its own files
-    for folder, files in (("postgres", {"Dockerfile", "cobe-news-db.sh", "db-init.sh", "app-role.sql", "restore-role.sql"}), ("nginx", {"Dockerfile", "cobe-news.conf.template", "16-server-names.envsh", "40-cert-watch.sh"})):
+    for folder, files in (("postgres", {"Dockerfile", "cobe-news-db.sh", "db-init.sh", "app-role.sql", "audit-lock.sql", "restore-role.sql"}), ("nginx", {"Dockerfile", "cobe-news.conf.template", "16-server-names.envsh", "40-cert-watch.sh"})):
         lines = [x for x in (ROOT / "deploy" / folder / ".dockerignore").read_text(encoding="utf-8").splitlines() if x and not x.startswith("#")]
         assert lines[0] == "*" and {x.removeprefix("!") for x in lines[1:]} == files, folder
         for f in files:

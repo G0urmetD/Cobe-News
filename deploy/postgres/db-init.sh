@@ -3,8 +3,8 @@
 # of the database image, at every start of the database – as the superuser (POSTGRES_USER), before the container counts
 # as healthy and so before the app starts – and harmless again: creates the role cobe_news_app if it is missing, sets
 # its password from POSTGRES_APP_PASSWORD and makes it the owner of the database and of every table – the app then
-# works without superuser rights. With POSTGRES_RESTORE_PASSWORD also the restore test's throwaway database and its own
-# role (restore-role.sql). The connection (PGHOST, PGUSER, PGDATABASE …) comes from cobe-news-db.sh.
+# works without superuser rights; then the audit log's lock (audit-lock.sql). With POSTGRES_RESTORE_PASSWORD also the
+# restore test's throwaway database and its own role (restore-role.sql). The connection (PGHOST, PGUSER, PGDATABASE …) comes from cobe-news-db.sh.
 set -eu
 here=$(dirname "$0")
 app_pw="${POSTGRES_APP_PASSWORD:-}"
@@ -13,6 +13,9 @@ if [ "${#app_pw}" -lt 16 ]; then
   exit 1
 fi
 psql --no-psqlrc --quiet -v ON_ERROR_STOP=1 -f "$here/app-role.sql"
+# the audit log's lock (docs/BETRIEB.md: Protokoll, Datenbank-Sperre): its own role owns the table, the app may only
+# read and add entries
+psql --no-psqlrc --quiet -v ON_ERROR_STOP=1 -f "$here/audit-lock.sql"
 restore_pw="${POSTGRES_RESTORE_PASSWORD:-}"
 if [ -z "$restore_pw" ]; then
   echo "db-init: POSTGRES_RESTORE_PASSWORD not set – no restore test database (docs/BETRIEB.md: Rücksicherungs-Test)"

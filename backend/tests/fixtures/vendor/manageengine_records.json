@@ -1,0 +1,1319 @@
+{
+ "_comment": "Real NVD records (services.nvd.nist.gov/rest/json/cves/2.0, fetched 2026-11-06) as Cobe News stores them (vendor_sources.parse_nvd), trimmed to the ManageEngine products' CPE matches.",
+ "records": {
+  "CVE-2018-5799": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "9403"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "n/a",
+       "product": "n/a",
+       "defaultStatus": "",
+       "versions": [
+        {
+         "version": "n/a",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "In Zoho ManageEngine ServiceDesk Plus before 9403, an XSS issue allows an attacker to run arbitrary JavaScript via a /api/request/?OPERATION_NAME= URI, aka SD-69139."
+  },
+  "CVE-2019-15046": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:*:*:*:*:*:*:*:*",
+         "versionStartIncluding": "10",
+         "versionEndExcluding": "10509"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "n/a",
+       "product": "n/a",
+       "defaultStatus": "",
+       "versions": [
+        {
+         "version": "n/a",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zoho ManageEngine ServiceDesk Plus 10 before 10509 allows unauthenticated sensitive information leakage during Fail Over Service (FOS) replication, aka SD-79989."
+  },
+  "CVE-2021-44077": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "11.1"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.1:11138:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.1:11139:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.1:11140:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.1:11141:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.1:11142:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.1:11143:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.1:11144:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.1:11145:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11200:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11201:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11202:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11203:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11204:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11205:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11206:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11207:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11208:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11209:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11210:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.2:11211:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.3:11300:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.3:11301:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.3:11302:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.3:11303:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.3:11304:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:11.3:11305:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "n/a",
+       "product": "n/a",
+       "defaultStatus": "",
+       "versions": [
+        {
+         "version": "n/a",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zoho ManageEngine ServiceDesk Plus before 11306, ServiceDesk Plus MSP before 10530, and SupportCenter Plus before 11014 are vulnerable to unauthenticated remote code execution. This is related to /RestAPI URLs in a servlet, and ImportTechnicians in the Struts configuration."
+  },
+  "CVE-2024-27314": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:*:*:*:*:*:*:*:*",
+         "versionEndIncluding": "14.6"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:14.7:14700:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:14.7:14710:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:14.7:14720:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "ManageEngine",
+       "product": "ServiceDesk Plus, ServiceDesk Plus MSP, SupportCenter Plus",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "14730",
+         "status": "affected",
+         "versionType": "14730"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zoho ManageEngine ServiceDesk Plus versions below 14730, ServiceDesk Plus MSP below 14720 and SupportCenter Plus below 14720 are vulnerable to stored XSS in the Custom Actions menu on the request details. This vulnerability can be exploited only by the SDAdmin role users.",
+   "adp": [
+    {
+     "affectedData": [
+      {
+       "vendor": "manageengine",
+       "product": "servicedesk_plus",
+       "defaultStatus": "unknown",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "14730",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:manageengine:servicedesk_plus:-:*:*:*:*:*:*:*"
+       ]
+      },
+      {
+       "vendor": "manageengine",
+       "product": "supportcenter_plus",
+       "defaultStatus": "unknown",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "14730",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:manageengine:supportcenter_plus:*:*:*:*:*:*:*:*"
+       ]
+      },
+      {
+       "vendor": "manageengine",
+       "product": "servicedeskplusmsp",
+       "defaultStatus": "unknown",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "14730",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:manageengine:servicedeskplusmsp:servicedeskplusmsp:*:*:*:*:*:*:*"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "CVE-2024-38869": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:*:*:*:*:*:*:*:*",
+         "versionEndIncluding": "14.7"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:14.8:14810:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "ManageEngine",
+       "product": "Endpoint Central",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "11.3.2416.04",
+         "status": "affected",
+         "versionType": "11.3.2416.04"
+        },
+        {
+         "version": "0",
+         "lessThan": "11.3.2400.25",
+         "status": "affected",
+         "versionType": "11.3.2400.25"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zohocorp ManageEngine Endpoint Central affected by Incorrect authorization vulnerability in remote office deploy configurations.This issue affects Endpoint Central: before 11.3.2416.04 and before 11.3.2400.25.",
+   "adp": [
+    {
+     "affectedData": [
+      {
+       "vendor": "zohocorp",
+       "product": "manageengine_endpoint_central",
+       "defaultStatus": "unknown",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "11.3.2416.04",
+         "status": "affected",
+         "versionType": "custom"
+        },
+        {
+         "version": "0",
+         "lessThan": "11.3.2400.25",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:zohocorp:manageengine_endpoint_central:*:*:*:*:*:*:*:*"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "CVE-2024-41150": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:*:*:*:*:*:*:*:*",
+         "versionEndIncluding": "14.7"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:14.8:14810:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "ManageEngine",
+       "product": "ServiceDesk Plus",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "14810",
+         "status": "affected",
+         "versionType": "14810"
+        }
+       ]
+      },
+      {
+       "vendor": "ManageEngine",
+       "product": "ServiceDesk Plus MSP",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "14800",
+         "status": "affected",
+         "versionType": "14810"
+        }
+       ]
+      },
+      {
+       "vendor": "ManageEngine",
+       "product": "SupportCenter Plus",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "14800",
+         "status": "affected",
+         "versionType": "14810"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "An Stored Cross-site Scripting vulnerability in request module affects Zohocorp ManageEngine ServiceDesk Plus, ServiceDesk Plus MSP and SupportCenter Plus.This issue affects ServiceDesk Plus versions: through 14810; ServiceDesk Plus MSP: through 14800; SupportCenter Plus: through 14800."
+  },
+  "CVE-2024-50053": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "14.9"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:14.9:*:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_servicedesk_plus:14.9:14910:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "ManageEngine",
+       "product": "ServiceDesk Plus",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "14910",
+         "status": "affected",
+         "versionType": "14910"
+        }
+       ]
+      },
+      {
+       "vendor": "ManageEngine",
+       "product": "ServiceDesk Plus MSP",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "14900",
+         "status": "affected",
+         "versionType": "14900"
+        }
+       ]
+      },
+      {
+       "vendor": "ManageEngine",
+       "product": "SupportCentre Plus",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "14900",
+         "status": "affected",
+         "versionType": "14900"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zohocorp ManageEngine ServiceDesk Plus versions below 14920 , ServiceDesk Plus MSP and SupportCentre Plus versions below 14910 are vulnerable to Stored XSS in the task feature."
+  },
+  "CVE-2019-12476": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:*:*:*:*:*:*:*:*",
+         "versionStartIncluding": "4.3.3",
+         "versionEndExcluding": "5.0.6"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "n/a",
+       "product": "n/a",
+       "defaultStatus": "",
+       "versions": [
+        {
+         "version": "n/a",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "An authentication bypass vulnerability in the password reset functionality in Zoho ManageEngine ADSelfService Plus before 5.0.6 allows an attacker with physical access to gain a shell with SYSTEM privileges via the restricted thick client browser. The attack uses a long sequence of crafted keyboard input."
+  },
+  "CVE-2021-40539": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "6.1"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:-:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:6100:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:6101:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:6102:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:6103:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:6104:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:6105:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:6106:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.1:6113:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "n/a",
+       "product": "n/a",
+       "defaultStatus": "",
+       "versions": [
+        {
+         "version": "n/a",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zoho ManageEngine ADSelfService Plus version 6113 and prior is vulnerable to REST API authentication bypass with resultant remote code execution."
+  },
+  "CVE-2024-0252": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "6.4"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.4:6400:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_adselfservice_plus:6.4:6401:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "ManageEngine",
+       "product": "ADSelfService Plus",
+       "defaultStatus": "affected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "6402",
+         "status": "affected",
+         "versionType": "6401"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "ManageEngine ADSelfService Plus versions 6401 and below are vulnerable to the remote code execution due to the improper handling in the load balancer component. Authentication is required in order to exploit this vulnerability."
+  },
+  "CVE-2025-11669": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_pam360:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "8.2"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_pam360:8.2:build8200:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_pam360:8.2:build8201:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_password_manager_pro:*:*:*:*:-:*:*:*",
+         "versionEndExcluding": "13.2"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_password_manager_pro:13.2:build13200:*:*:-:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_password_manager_pro:13.2:build13210:*:*:-:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_password_manager_pro:13.2:build13220:*:*:-:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "Zohocorp",
+       "product": "ManageEngine PAM360",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "8202",
+         "status": "affected",
+         "versionType": "8202"
+        }
+       ]
+      },
+      {
+       "vendor": "Zohocorp",
+       "product": "ManageEngine Password Manager Pro",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "13221",
+         "status": "affected",
+         "versionType": "13221"
+        }
+       ]
+      },
+      {
+       "vendor": "Zohocorp",
+       "product": "ManageEngine Access Manager Plus",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThan": "4401",
+         "status": "affected",
+         "versionType": "4401"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zohocorp ManageEngine PAM360 versions before 8202; Password Manager Pro versions before 13221; Access Manager Plus versions prior to 4401 are vulnerable to an authorization issue in the initiate remote session functionality."
+  },
+  "CVE-2024-27312": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_pam360:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "6.6"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_pam360:6.6:build6600:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "ManageEngine",
+       "product": "PAM360",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "6601",
+         "lessThan": "6602",
+         "status": "affected",
+         "versionType": "6601"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zohocorp ManageEngine PAM360 version 6601 is vulnerable to authorization vulnerability which allows a low-privileged user to perform admin actions. \nNote: This vulnerability affects only the PAM360 6600 version. No other versions are applicable to this vulnerability.",
+   "adp": [
+    {
+     "affectedData": [
+      {
+       "vendor": "manageengine",
+       "product": "pam360",
+       "defaultStatus": "affected",
+       "versions": [
+        {
+         "version": "660q",
+         "lessThan": "6601",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:manageengine:pam360:660q:*:*:*:*:*:*:*"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "CVE-2018-18980": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "12.3.214"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "n/a",
+       "product": "n/a",
+       "defaultStatus": "",
+       "versions": [
+        {
+         "version": "n/a",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "An XML External Entity injection (XXE) vulnerability exists in Zoho ManageEngine Network Configuration Manager and OpManager before 12.3.214 via the RequestXML parameter in a /devices/ProcessRequest.do GET request. For example, the attacker can trigger the transmission of local files to an arbitrary remote FTP server."
+  },
+  "CVE-2021-20078": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:*:*:*:*:*:*:*:*",
+         "versionEndExcluding": "12.5"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125000:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125002:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125100:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125101:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125102:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125108:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125110:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125111:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125112:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125113:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125114:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125116:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125117:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125118:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125120:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125121:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125123:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125124:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125125:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125136:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125137:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125139:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125140:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125143:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125144:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125145:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125156:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125157:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125158:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125159:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125161:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125163:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125174:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125175:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125176:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125177:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125178:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125180:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125181:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125192:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125193:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125194:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125195:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125196:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125197:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125198:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125201:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125204:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125212:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125213:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125214:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125215:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125216:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125228:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125229:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125230:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125231:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125232:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125233:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125312:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125323:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125324:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125326:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125328:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125329:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125340:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125341:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125342:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125343:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.5:build125344:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "n/a",
+       "product": "Manage Engine OpManager",
+       "defaultStatus": "",
+       "versions": [
+        {
+         "version": "All versions prior to version build 125346",
+         "status": "affected"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Manage Engine OpManager builds below 125346 are vulnerable to a remote denial of service vulnerability due to a path traversal issue in spark gateway component. This allows a remote attacker to remotely delete any directory or directories on the OS."
+  },
+  "CVE-2024-5466": {
+   "configs": [
+    {
+     "nodes": [
+      {
+       "cpeMatch": [
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:*:*:*:*:*:*:*:*",
+         "versionEndIncluding": "12.7"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.8:build128102:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.8:build128103:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.8:build128104:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.8:build128186:*:*:*:*:*:*"
+        },
+        {
+         "vulnerable": true,
+         "criteria": "cpe:2.3:a:zohocorp:manageengine_opmanager:12.8:build128187:*:*:*:*:*:*"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "cna": [
+    {
+     "affectedData": [
+      {
+       "vendor": "ManageEngine",
+       "product": "OpManager, Remote Monitoring and Management",
+       "defaultStatus": "unaffected",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "128329",
+         "status": "affected",
+         "versionType": "128329"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desc": "Zohocorp ManageEngine OpManager and Remote Monitoring and Management versions 128329 and below are vulnerable to the authenticated remote code execution in the deploy agent option.",
+   "adp": [
+    {
+     "affectedData": [
+      {
+       "vendor": "zohocorp",
+       "product": "manageengine_opmanager_rmm",
+       "defaultStatus": "unknown",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "128329",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:zohocorp:manageengine_opmanager_rmm:*:*:*:*:*:*:*:*"
+       ]
+      },
+      {
+       "vendor": "zohocorp",
+       "product": "manageengine_opmanager_plus",
+       "defaultStatus": "unknown",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "128329",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:zohocorp:manageengine_opmanager_plus:*:*:*:*:*:*:*:*"
+       ]
+      },
+      {
+       "vendor": "zohocorp",
+       "product": "manageengine_opmanager_msp",
+       "defaultStatus": "unknown",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "128329",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:zohocorp:manageengine_opmanager_msp:*:*:*:*:*:*:*:*"
+       ]
+      },
+      {
+       "vendor": "zohocorp",
+       "product": "manageengine_opmanager",
+       "defaultStatus": "unknown",
+       "versions": [
+        {
+         "version": "0",
+         "lessThanOrEqual": "128329",
+         "status": "affected",
+         "versionType": "custom"
+        }
+       ],
+       "cpes": [
+        "cpe:2.3:a:zohocorp:manageengine_opmanager:*:*:*:*:*:*:*:*"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

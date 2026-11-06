@@ -92,6 +92,7 @@
   vendor: WAGO
   cpes: [o:wago:pfc200_firmware, o:wago:pfc100_firmware, o:wago:750-8212_firmware]
   kw: [WAGO, PFC200]
+  scheme: fw_index  # the firmware index in brackets (FW28) orders the releases – NVD and WAGO bound by it ("< 22")
   example: 04.06.03(28)
   hint: ot
 - key: beckhoff-twincat

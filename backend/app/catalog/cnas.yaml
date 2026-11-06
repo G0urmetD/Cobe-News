@@ -1,0 +1,375 @@
+# yaml-language-server: $schema=schema/cnas.schema.json
+# CNAs – who wrote a CVE record (cvelistV5: cveMetadata.assignerShortName; NVD: sourceIdentifier, an address or the
+# CNA's UUID). The affected data of a CVE record is the vendor's own word („laut Hersteller“) only when its CNA is the
+# product's vendor; another CNA's ranges are a third party's („laut GitHub (nicht der Hersteller)“) and never outweigh
+# the NVD's analysis (app/vendor_match.cna_by). How to add one: docs/BETRIEB.md, section „Katalog pflegen“ → „CNAs“.
+#
+# A CNA listed here: the vendor of exactly the catalogue vendors under `vendors` (none: of no product). `ids`: its
+# short name, addresses and UUID, compared without case; "*@<domain>" stands for every address at that domain.
+# Any other CNA: the vendor when its short name or the domain of its address is the vendor's name (fortinet and
+# psirt@fortinet.com for Fortinet, palo_alto and psirt@paloaltonetworks.com for Palo Alto Networks) – in whole words,
+# followed only by a legal form or the like, never a generic word alone (cert.at is not cert-manager, phoenix.com –
+# Phoenix Technologies – not Phoenix Contact; app/vendor_match._token_is) – else a third party. CERT@VDE and HackerOne
+# write for vendors too, but no field of the record says for whom: third parties.
+# Listed are the third parties that write records about other vendors' products, and the vendors this rule cannot see
+# (the NVD names many CNAs only by their UUID – values from the NVD's source list, services.nvd.nist.gov/rest/json/source/2.0).
+cnas:
+  # ---------------------------------------------------------------- third parties: write about other vendors' products
+  - key: github
+    name: GitHub
+    # GitHub_M: the GitHub Advisory Database (open-source projects' advisories) – GitHub_P: GitHub's own products
+    ids: [GitHub_M, GitHub_P, security-advisories@github.com, product-cna@github.com, a0819718-46f1-4df5-94e2-005712e83aaa, 82327ea3-741d-41e4-88f8-2cf9e791e760]
+    vendors: [GitHub]
+  - key: vuldb
+    name: VulDB
+    ids: [VulDB, cna@vuldb.com, 1af790b2-7ee1-4545-860a-a788eba489b5]
+  - key: mitre
+    name: MITRE
+    ids: [mitre, cve@mitre.org, 8254265b-2729-46b6-b9e3-3dfca2d5bfca]
+  - key: hackerone
+    name: HackerOne
+    ids: [hackerone, support@hackerone.com, 36234546-b8fa-4601-9d6f-f4e334aa8ea1]
+  - key: wordfence
+    name: Wordfence
+    ids: [Wordfence, security@wordfence.com, b15e7b5b-3da4-40ae-a43c-f7aa60e62599]
+  - key: patchstack
+    name: Patchstack
+    ids: [Patchstack, audit@patchstack.com, 21595511-bba5-4825-b968-b78d1f9984a3]
+  - key: wpscan
+    name: WPScan
+    ids: [WPScan, contact@wpscan.com, 1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81]
+  - key: vulncheck
+    name: VulnCheck
+    ids: [VulnCheck, disclosure@vulncheck.com, 83251b91-4cc7-4094-a5c7-464a1b83ea10]
+  - key: snyk
+    name: Snyk
+    ids: [snyk, report@snyk.io, bae035ff-b466-4ff4-94d0-fc9efd9e1730]
+  - key: huntr
+    name: huntr
+    ids: ["@huntr_ai", security@huntr.dev, c09c270a-b464-47c1-9133-acb35b22c19a]
+  - key: fluidattacks
+    name: Fluid Attacks
+    ids: [Fluid_Attacks, help@fluidattacks.com, 84fe0718-d6bb-4716-a7e8-81a6d1daa869]
+  - key: checkmarx
+    name: Checkmarx
+    ids: [Checkmarx, 596c5446-0ce5-4ba2-aa66-48b3b757a647]
+  - key: zdi
+    name: Zero Day Initiative
+    ids: [zdi, zdi-disclosures@trendmicro.com, 99f1926a-a320-47d8-bbb5-42feb611262e]
+  - key: talos
+    name: Cisco Talos
+    ids: [talos, talos-cna@cisco.com, b86d76f8-0f8a-4a96-a78d-d8abfc7fc29b]
+  - key: mandiant
+    name: Mandiant
+    ids: [Mandiant, mandiant-cve@google.com, 027e81ed-0dd4-4685-ab4d-884aec5bb484]
+  - key: secconsult
+    name: SEC Consult
+    ids: [SEC-VLab, 551230f0-3615-47bd-b7cc-93e92e730bbf]
+  - key: cyberdanube
+    name: CyberDanube
+    ids: [CyberDanube, office@cyberdanube.com, 7d092a75-6bbd-48c6-a15a-0297458009bc]
+  - key: bugcrowd
+    name: Bugcrowd
+    ids: [Bugcrowd, 4ac701fe-44e9-4bcd-9585-dd6449257611]
+  - key: tenable
+    name: Tenable
+    ids: [tenable, vulnreport@tenable.com, 5ac1ecc2-367a-4d16-a0b2-35d495ddd0be]
+    vendors: [Tenable]
+  - key: rapid7
+    name: Rapid7
+    ids: [rapid7, cve@rapid7.com, 9974b330-7714-4307-a722-5648477acda7]
+    vendors: [Rapid7, Rapid7 (Velocidex)]
+  - key: redhat
+    name: Red Hat
+    # also writes records for open-source projects (CNA of last resort, redhat-cnalr) – their vendor only for its own products
+    ids: [redhat, "*@redhat.com", 53f830b8-0a3f-465b-8143-3b8a9948e749, 74b3a70d-cca6-4d34-9789-e83b222ae3be]
+    vendors: [Red Hat, Redhat]
+  # coordinators (CERTs, government) – they publish for vendors without a CNA of their own
+  - key: incd
+    name: INCD (Israel)
+    # its address at cyber.gov.il would read as "cyber" – CyberArk's by the name rule
+    ids: [INCD, cna@cyber.gov.il, a57ee1ae-c9c1-4f40-aa7b-cf10760fde3f]
+  - key: certcc
+    name: CERT/CC
+    ids: [certcc, cert@cert.org, cret@cert.org, 37e5125f-f79b-445b-8fad-9564f167944b]
+  - key: cisa
+    name: CISA
+    ids: [icscert, cisa-cg, ics-cert@hq.dhs.gov, 7d14cffa-0d7d-4270-9dc0-52cabd5a23a6, 9119a7d8-5eab-497f-8521-727c672e3725]
+    vendors: [CISA]
+  - key: certvde
+    name: CERT@VDE
+    ids: [CERTVDE, info@cert.vde.com, 270ccfa6-a436-4e77-922e-914ec3a9685c]
+  - key: incibe
+    name: INCIBE
+    ids: [INCIBE, cve-coordination@incibe.es, 0cbda920-cd7f-484a-8e76-bf7f4b7f4516]
+  - key: certpl
+    name: CERT.PL
+    ids: [CERT-PL, cvd@cert.pl, 4bb8329e-dd38-46c1-aafb-9bf32bcb93c6]
+  - key: ncscch
+    name: NCSC (Schweiz)
+    ids: [NCSC.ch, vulnerability@ncsc.ch, 455daabc-a392-441d-aa46-37d35189897c]
+  - key: jpcert
+    name: JPCERT/CC
+    ids: [jpcert, vultures@jpcert.or.jp, ede6fdc4-6654-4307-a26d-3331c018e2ce]
+  - key: twcert
+    name: TWCERT/CC
+    ids: [twcert, cve@cert.org.tw, twcert@cert.org.tw, cded6c7f-6ce5-4948-8f87-aa7a3bbb6b0e]
+  - key: krcert
+    name: KrCERT/CC
+    ids: [krcert, vuln@krcert.or.kr, cdd7a122-0fae-4202-8d86-14efbacc2863]
+
+  # ---------------------------------------------------------------- vendors the name rule cannot see
+  - key: google
+    name: Google
+    # addresses at google.com are Google's by the name rule – these are the other names (Mandiant above is not Google's)
+    ids: [Chrome, ChromeOS, google_android, Google_Devices, GoogleCloud, chrome-cve-admin@google.com, security@android.com, 14ed7db2-1595-443d-9d34-6215bf890778, 1ea499d5-4dc2-4c43-8d69-d7cbe07d1359, 83238938-5644-45f0-9007-c0392bcf6222, f45cbf4e-4146-4068-b7e1-655ffc2c548c, ebfee0ef-53dd-4cf3-9e2a-08a5bd7a7e28, 7f6e188d-c52a-4a19-8674-3c3fa7d1fc7f, baff130e-b8d5-4e15-b3d3-c3cf5d5545c6]
+    vendors: [Google]
+  - key: jenkins
+    name: Jenkins Project
+    ids: [jenkins, jenkinsci-cert@googlegroups.com, 39769cd5-e6e2-4dc8-927e-97b3aa056f5b]
+    vendors: [Jenkins Project]
+  - key: php
+    name: PHP Group
+    ids: [php, security@php.net, dd77f84a-d19a-4638-8c3d-a322d820ed2b]
+    vendors: [The PHP Group]
+  - key: psf
+    name: Python Software Foundation
+    ids: [PSF, cna@python.org, 28c92f92-d60d-412d-b760-e73465c3df22]
+    vendors: [Python Software Foundation]
+  - key: go
+    name: Go Project
+    ids: [Go, security@golang.org, 1bb62c36-49e3-4200-9d77-64a1400537cc]
+    vendors: [Golang]
+  - key: facebook
+    name: Meta
+    ids: [Meta, facebook, cve-assign@fb.com, 4fc57720-52fe-4431-a0fb-3d2c8747b827]
+    vendors: [Facebook]
+  - key: hp
+    name: HP Inc.
+    ids: [hp, hp-security-alert@hp.com, 74586083-13ce-40fd-b46a-8e5d23cfbcb2]
+    vendors: [HP Inc.]
+  - key: hpe
+    name: HPE
+    ids: [hpe, security-alert@hpe.com, eb103674-0d28-4225-80f8-39fb86215de0]
+    vendors: [HPE, HPE Aruba Networking]
+  - key: schneider
+    name: Schneider Electric
+    ids: [schneider, cybersecurity@se.com, cybersecurity@schneider-electric.com, 076d1eb6-cfab-4401-b34d-6dfc2a413bdb]
+    vendors: [Schneider Electric]
+  - key: xen
+    name: Xen Project
+    ids: [XEN, security@xen.org, 23aa2041-22e1-471f-9209-9b7396fa234f]
+    vendors: [Xen Project]
+  - key: openxchange
+    name: Open-Xchange
+    ids: [OX, security@open-xchange.com, 8ce71d90-2354-404b-a86e-bec2cc4e6981]
+    vendors: [Open-Xchange, Dovecot (Open-Xchange)]
+  - key: netscaler
+    name: NetScaler
+    ids: [NetScaler, 50a63c94-1ea7-4568-8c11-eb79e7c5a2b5]
+    vendors: [Cloud Software Group, Citrix]
+  - key: kubernetes
+    name: Kubernetes
+    ids: [kubernetes, security@kubernetes.io, jordan@liggitt.net, a6081bf6-c852-4425-ad4f-a67919267565]
+    vendors: [Kubernetes]
+  - key: nodejs
+    name: Node.js
+    ids: [nodejs, cve-request@iojs.org, 386269d4-a6c6-4eaa-bf8e-bc0b0d010558]
+    vendors: [OpenJS Foundation]
+  - key: dell
+    name: Dell
+    ids: [dell, security_alert@emc.com, c550e75a-17ff-4988-97f0-544cde3820fe, "*@dell.com"]
+    vendors: [Dell]
+  # short names the rule cannot read
+  - key: amazon
+    name: Amazon
+    ids: [AMZN]
+    vendors: [Amazon, AWS]
+  - key: erlang
+    name: Erlang Ecosystem Foundation
+    ids: [EEF]
+    vendors: [Erlang]
+  - key: fsas
+    name: Fsas Technologies
+    ids: [FTI]
+    vendors: [Fsas Technologies (Fujitsu)]
+  - key: openai
+    name: OpenAI
+    ids: [OAI]
+    vendors: [OpenAI]
+  - key: servicenow
+    name: ServiceNow
+    ids: [SN]
+    vendors: [ServiceNow]
+  - key: teamviewer
+    name: TeamViewer
+    ids: [TV]
+    vendors: [TeamViewer]
+  # named by the NVD only by their UUID (their cvelistV5 short name is their name – the rule sees that)
+  - key: linux
+    name: Linux kernel
+    # its short name "Linux" would also begin Linux Mint's and the Linux Foundation's names
+    ids: [Linux, 416baaa9-dc9f-4396-8d5f-8c081fb06d67]
+    vendors: [Linux]
+  - key: canon
+    name: Canon
+    ids: [Canon, Canon_EMEA, f98c90f0-e9bd-4fa7-911b-51993f3571fd, 4586e0a2-224d-4f8a-9cb4-8882b208c0b3]
+    vendors: [Canon]
+  - key: canonical
+    name: Canonical
+    ids: [canonical, security@ubuntu.com, cc1ad9ee-3454-478d-9317-d3e869d708bc]
+    vendors: [Canonical]
+  - key: manageengine
+    name: ManageEngine
+    # cvelistV5 "ManageEngine" (the products' CNA names see it); the NVD names it only by its UUID – without this
+    # entry Zoho's own ranges of an NVD record were a third party's ("CNA (nicht der Hersteller)")
+    ids: [ManageEngine, 0fc0942c-577d-436f-ae8e-945763c79b02]
+    vendors: [Zoho ManageEngine]
+  - key: crowdstrike
+    name: CrowdStrike
+    ids: [13ddcd98-6f4a-40a8-8e24-29ca0aee4661]
+    vendors: [CrowdStrike]
+  - key: gitea
+    name: Gitea
+    ids: [88ee5874-cf24-4952-aea0-31affedb7ff2]
+    vendors: [Gitea]
+  - key: netgear
+    name: NETGEAR
+    ids: [a2826606-91e7-4eb6-899e-8484bd4575d5]
+    vendors: [NETGEAR]
+  - key: watchguard
+    name: WatchGuard
+    ids: [5d1c2695-1a31-4499-88ae-e847036fd7e3]
+    vendors: [WatchGuard]
+  - key: papercut
+    name: PaperCut
+    ids: [eb41dac7-0af8-4f84-9f6d-0272772514f4]
+    vendors: [PaperCut]
+  - key: fortra
+    name: Fortra
+    ids: [df4dee71-de3a-4139-9588-11b62fe6c0ff]
+    vendors: [Fortra]
+  - key: postgresql
+    name: PostgreSQL
+    ids: [f86ef6dc-4d3a-42ad-8f28-e6d5547a5007]
+    vendors: [Postgresql]
+  - key: concretecms
+    name: Concrete CMS
+    ids: [ff5b8ace-8b95-4078-9743-eac1ca5451de]
+    vendors: [Concretecms]
+  - key: beyondtrust
+    name: BeyondTrust
+    ids: [BT, 13061848-ea10-403d-bd75-c83a022c2891]
+    vendors: [BeyondTrust]
+  - key: sonatype
+    name: Sonatype
+    ids: [103e4ec9-0a87-450b-af77-479448ddef11]
+    vendors: [Sonatype]
+  - key: glibc
+    name: GNU C Library
+    ids: [3ff69d7a-14f2-4f67-a097-88dee7810d18]
+    vendors: [Gnu]
+  - key: nable
+    name: N-able
+    ids: [a5532a13-c4dd-4202-bef1-e0b8f2f8d12b]
+    vendors: [N-able]
+  - key: clickhouse
+    name: ClickHouse
+    ids: [cb7ba516-3b07-4c98-b0c2-715220f1a8f6]
+    vendors: [ClickHouse]
+  - key: ivanti
+    name: Ivanti
+    ids: [3c1d8aa1-5a33-4ea4-8992-aadd6440af75]
+    vendors: [Ivanti]
+  - key: nokia
+    name: Nokia
+    ids: [b48c3b8f-639e-4c16-8725-497bc411dad0]
+    vendors: [Nokia]
+  - key: teltonika
+    name: Teltonika Networks
+    ids: [tlt_net, 001d69cf-3fc9-4203-93fb-9865b54e05b2]
+    vendors: [Teltonika Networks]
+  - key: delinea
+    name: Delinea
+    ids: [1443cd92-d354-46d2-9290-d812316ca43a]
+    vendors: [Delinea]
+  - key: omnissa
+    name: Omnissa
+    ids: [de5a6978-88fe-4c27-a7df-d0d5b52d5b52]
+    vendors: [Omnissa]
+  - key: tplink
+    name: TP-Link
+    ids: [TPLink, f23511db-6c3e-4e32-a477-6aa17d310630]
+    vendors: [TP-Link]
+  - key: centreon
+    name: Centreon
+    ids: [bd4443e6-1eef-43f3-9886-25fc9ceeaae7]
+    vendors: [Centreon]
+  - key: connectwise
+    name: ConnectWise
+    ids: [7d616e1a-3288-43b1-a0dd-0a65d3e70a49]
+    vendors: [ConnectWise]
+  - key: kong
+    name: Kong
+    ids: [Kong, 02762ae7-200e-4b20-9b2b-a77d5b8fc4cb]
+    vendors: [Konghq]
+  - key: extreme
+    name: Extreme Networks
+    ids: [1c053176-eef3-4d6a-ae0b-24728c86587b]
+    vendors: [Extreme Networks]
+  - key: openjs
+    name: OpenJS Foundation
+    ids: [openjs, ce714d77-add3-4f53-aff5-83d477b104bb]
+    vendors: [OpenJS Foundation, Openjsf]
+  - key: typo3
+    name: TYPO3
+    ids: [f4fb688c-4412-4426-b4b8-421ecf27b14a]
+    vendors: [Typo3]
+  - key: commvault
+    name: Commvault
+    ids: [050066fd-a2f9-4f32-ab5d-4c53f48bc333]
+    vendors: [Commvault]
+  - key: neo4j
+    name: Neo4j
+    ids: [3b236295-4ccd-4a1f-a1c1-a72eecc8d7b6]
+    vendors: [Neo4j]
+  - key: rust
+    name: Rust
+    ids: [986d4109-89ea-491f-99fd-a8e4803919bd]
+    vendors: [Rust-lang]
+  - key: django
+    name: Django Software Foundation
+    ids: [DSF, 6a34fbeb-21d4-45e7-8e0a-62b95bc12c92]
+    vendors: [Djangoproject]
+  - key: nutanix
+    name: Nutanix
+    ids: [2ffdacf6-8681-47df-b023-4f11abd61c1d]
+    vendors: [Nutanix]
+  - key: ubiquiti
+    name: Ubiquiti
+    ids: [fe490ce8-0395-4072-90d8-2707e1bdf984]
+    vendors: [Ubiquiti]
+  - key: proton
+    name: Proton
+    ids: [b2fa7fcc-7d08-41f0-853b-11242c5539db]
+    vendors: [Proton AG]
+  - key: anthropic
+    name: Anthropic
+    ids: [98a01053-8a31-4f6d-9aa9-252be161adc6]
+    vendors: [Anthropic]
+  - key: infoblox
+    name: Infoblox
+    ids: [f84ca5ce-fbe7-4668-8724-994599108a02]
+    vendors: [Infoblox]
+  - key: esaqa
+    name: esaqa
+    ids: [fdf66990-8419-4c8c-8848-ec15d75773b4]
+    vendors: [esaqa GmbH]
+  - key: securepoint
+    name: Securepoint
+    ids: [e332479a-61a9-45a7-8215-ab0f2118ff59]
+    vendors: [Securepoint]
+  - key: samsung
+    name: Samsung
+    ids: [a8bfbd5c-5645-475e-a8f4-6c140c17bd29]
+    vendors: [Samsung]

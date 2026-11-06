@@ -82,7 +82,8 @@ In *Settings → Backup & export* every encrypted backup has **"Download"**:
    that passphrase – without it the file is useless, with it anyone can read it.
 2. Confirm with **"Download"**, then [confirm your identity again](/docs/anmeldung#erneut-bestaetigen) (password and
    code, or Entra).
-3. The browser saves the file. Keep it safe – do not leave it in the downloads folder, do not pass it on.
+3. The browser downloads the file itself – with its own progress display, straight to disk. Keep it safe – do not
+   leave it in the downloads folder, do not pass it on.
 
 Rules:
 
@@ -91,10 +92,13 @@ Rules:
 - Every download is in the [audit log](/docs/betrieb#protokoll) ("Encrypted backup downloaded", with file and size) and counts
   as "notable".
 - At most 6 downloads per hour and admin, and only one at a time.
-- The browser keeps the whole file in memory until it is saved – very large backups (from about 1 GB) are better copied
-  by command on the server (`docker cp`, below).
+- The file is never held whole in memory, neither in the browser nor on the server – backups of several GB download
+  this way too. Copying by command on the server (`docker cp`, below) still works, e.g. for a script.
+- After the confirmation the page fetches a download link and starts the download at once. The link works only once,
+  only for a minute and only in your session – passing it on or opening it later does not work.
 - The server streams the file; with the bundled nginx also big files without being buffered in the proxy. A reverse
-  proxy of your own should not buffer `/api/admin/backup/files/` either (nginx: `proxy_buffering off`).
+  proxy of your own should not buffer `/api/admin/backup/download/` either and not log the address (nginx:
+  `proxy_buffering off`, `access_log off`). Up to 0.1.51 it was `/api/admin/backup/files/`.
 
 ### Local install (docker compose) {#schritte-lokal}
 

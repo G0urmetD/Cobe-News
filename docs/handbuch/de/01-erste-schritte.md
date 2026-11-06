@@ -114,6 +114,17 @@ Die Zahlen neben *News* und *Vendor News* in der Seitenleiste zeigen deine ungel
 - Der Knopf links oben in der Kopfzeile klappt die Seitenleiste ein und aus (Tastatur: Strg+B bzw. ⌘+B). Eingeklappt
   bleiben nur die Symbole.
 
+### Meldungen {#meldungen .admin}
+
+Über *Einstellungen* zeigt ein Kasten **Meldungen** die drei neuesten Ereignisse der App selbst (keine News): wer sich
+angemeldet hat, wer einem Produkt folgt oder eins zu Vendor News hinzugefügt hat, wer auf Freigabe wartet, wer ein Konto
+angelegt, freigegeben, abgelehnt, deaktiviert oder zum Admin gemacht hat, eine zurückgespielte Sicherung. Deine eigenen
+Aktionen stehen nicht darin; Anmeldungen kurz hintereinander werden zu einer Zeile („Anna und 2 weitere haben sich
+angemeldet“). Wer auf Freigabe wartet, ist farbig hervorgehoben. Ein Klick führt an die passende Stelle – zum Produkt,
+zu *Benutzer & Rollen* oder ins [Protokoll](/docs/betrieb#protokoll), gefiltert auf den Eintrag; **Alle im Protokoll**
+öffnet das ganze. Der Kasten fragt jede Minute nach, solange der Tab sichtbar ist. Eingeklappt bleibt eine Glocke (mit
+Punkt, solange jemand auf Freigabe wartet), die die Liste öffnet. Nur Admins sehen ihn.
+
 ### Benutzermenü {#benutzermenue}
 
 Ein Klick auf deinen Namen unten in der Seitenleiste öffnet:

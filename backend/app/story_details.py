@@ -345,7 +345,7 @@ def parse_cve5(data: bytes) -> dict:
         "mitigation": any(r["category"] == "workaround" for r in rems) or None,
         "remediations": rems,
         "revision": {"current": _s(meta.get("dateUpdated"), 40), "initial": _s(meta.get("datePublished"), 40), "version": "", "summary": "", "count": 0},
-        "match": [{"source": "nvd", "data": {"configs": [], "cna": [{"affectedData": cna_rows}], "desc": text("descriptions")}}],
+        "match": [{"source": "nvd", "data": {"configs": [], "cna": [{"affectedData": cna_rows}], "desc": text("descriptions"), "assigner": _s(meta.get("assignerShortName"), 60)}}],
     }
 
 

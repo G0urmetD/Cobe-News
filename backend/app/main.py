@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 
-from app import __version__, api_tokens, api_v1, audit, audit_api, bodylimit, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, reader, restore_test, sessions_api, source_health, sqlite_import, suspicious, teams, tls, update_check, vendor, webpush
+from app import __version__, activity_api, api_tokens, api_v1, audit, audit_api, bodylimit, calendar_feed, catalog_check, crypto, cve_watch, db, delivery_log, metrics, notify, passkeys_api, personal, preload, reader, restore_test, sessions_api, source_health, sqlite_import, suspicious, teams, tls, update_check, vendor, webpush
 from app import news as news_svc
 from app.admin_api import router as admin_router
 from app.api import router
@@ -90,6 +90,18 @@ CSP = (
 )
 # browser features the UI never uses – not even a page injected into it gets them (desktop notifications are not one)
 PERMISSIONS = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
+
+# paths whose rest is a secret of its own (a backup download's ticket – admin_api.backup_download): the access log, the
+# audit log's "Woher" and the warnings show only the prefix. The ticket is spent by then anyway – this keeps it out
+SECRET_PATHS = ("/api/admin/backup/download/",)
+
+
+def shown_path(path: str) -> str:
+    for prefix in SECRET_PATHS:
+        if path.startswith(prefix):
+            return prefix + "…"
+    return path
 
 
 def _secure_headers(request: Request, resp: Response, api: bool) -> Response:
@@ -267,6 +279,15 @@ class FetchLoop:
             got = await teams.sync(s)
         if got:
             log.info("teams: %s", got)
+        # the members of the mapped groups (app/preload.py): accounts before their first sign-in, unused ones deleted
+        # – its failure must never skip the account sync below (that one switches off who is gone or left a group)
+        try:
+            async with db.session() as s:
+                loaded = await preload.sync(s)
+            if loaded:
+                log.info("preload: %s", loaded)
+        except Exception:  # noqa: BLE001 - logged; the next round tries again
+            log.exception("preload failed")
         async with db.session() as s:
             changed = await directory_sync.run(s)
         if changed:
@@ -313,6 +334,21 @@ def warn_weak_key() -> bool:
     return bool(weak)
 
 
+async def log_audit_lock() -> dict | None:
+    """At the start: whether the audit log's database lock is active (audit_lock.py) – one line, a warning when it is set
+    up but not active (the app as a superuser, a lock with a part missing). Never stops the start."""
+    from app import audit_lock
+
+    try:
+        async with db.engine().connect() as conn:
+            st = await audit_lock.state(conn)
+    except Exception:  # noqa: BLE001 - only a log line
+        log.exception("audit log: the database lock's state could not be read")
+        return None
+    (log.info if st["active"] or st["reason"] in ("no_lock", "pending") else log.warning)("audit log: %s", audit_lock.describe(st))
+    return st
+
+
 def create_app() -> FastAPI:
     cfg = get_config()
     loop = FetchLoop()
@@ -334,6 +370,7 @@ def create_app() -> FastAPI:
         db.init(cfg.database_url)
         await db.wait_ready()
         await db.migrate()
+        await log_audit_lock()
         with contextlib.suppress(OSError):
             from app import backup
 
@@ -424,6 +461,7 @@ def create_app() -> FastAPI:
     app.include_router(restore_test.router)
     app.include_router(update_check.router)
     app.include_router(audit_api.router)
+    app.include_router(activity_api.router)
     app.include_router(api_v1.router)
     app.include_router(metrics.router)
     app.include_router(docs_router)
@@ -439,7 +477,7 @@ def create_app() -> FastAPI:
         # connection or a timeout from anywhere else is no database outage: it stays a 500 with its stack trace
         if not from_db(exc):
             raise exc
-        log.warning("request %s %s: database unavailable (%s)", request.method, request.url.path, type(exc).__name__)
+        log.warning("request %s %s: database unavailable (%s)", request.method, shown_path(request.url.path), type(exc).__name__)
         return JSONResponse({"detail": {"code": "unavailable"}}, status_code=503, headers={"Retry-After": "10"})
 
     for unavailable in DB_UNAVAILABLE:
@@ -468,7 +506,7 @@ def create_app() -> FastAPI:
         if api and request.method not in SAFE:
             sent = request.headers.get("x-csrf-token") or ""
             if not csrf or not sent or not hmac.compare_digest(csrf, sent):
-                suspicious.csrf_failed(request.method, request.url.path, client_ip(request), cookie=bool(csrf), header=bool(sent))  # throttled
+                suspicious.csrf_failed(request.method, shown_path(request.url.path), client_ip(request), cookie=bool(csrf), header=bool(sent))  # throttled
                 return _secure_headers(request, JSONResponse({"detail": {"code": "csrf_failed"}}, status_code=403), api)
         t0 = time.monotonic()
         # a request id (in the access log line, the answer's X-Request-ID and the audit log – they can be matched) and
@@ -478,7 +516,7 @@ def create_app() -> FastAPI:
         if api:
             ip, via = client_route(request)
             family, version, system = audit.parse_ua(request.headers.get("user-agent"))
-            ctx = audit.RequestContext(ip, via, request.method, request.url.path[:300], rid, family, version, system)
+            ctx = audit.RequestContext(ip, via, request.method, shown_path(request.url.path)[:300], rid, family, version, system)
             ctx_token = audit.set_request(ctx)
         try:
             resp = await call_next(request)
@@ -493,7 +531,7 @@ def create_app() -> FastAPI:
                 resp.delete_cookie(sessions.CSRF_COOKIE, path="/")  # the unprefixed one of older versions
         _secure_headers(request, resp, api)
         if api and request.url.path != "/api/health":
-            access.info("%s %s %s %s %.0fms rid=%s", client_ip(request), request.method, request.url.path, resp.status_code, (time.monotonic() - t0) * 1000, rid)
+            access.info("%s %s %s %s %.0fms rid=%s", client_ip(request), request.method, shown_path(request.url.path), resp.status_code, (time.monotonic() - t0) * 1000, rid)
         return resp
 
     static = cfg.static_dir

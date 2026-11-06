@@ -67,9 +67,11 @@
   label: ManageEngine OpManager
   vendor: Zoho ManageEngine
   cpes: [a:zohocorp:manageengine_opmanager, a:zohocorp:manageengine_opmanager_plus, a:zohocorp:manageengine_opmanager_msp, a:manageengine:opmanager]
+  cna: [[ManageEngine, OpManager], [ManageEngine, "OpManager, Remote Monitoring and Management"], [Zohocorp, ManageEngine OpManager]]
   kw: [OpManager]
   aliases: [OpManager Plus, OpManager MSP]
-  example: "12.8"
+  scheme: build
+  example: 12.8 Build 128329
   where: web_about
 - key: whatsup-gold
   label: Progress WhatsUp Gold

@@ -19,6 +19,13 @@ export const AUDIT_GROUPS = {
     "user.reset",
     "user.unlocked",
     "role.changed",
+    "user.approval_pending",
+    "user.approved",
+    "user.declined",
+    "role.approval_pending",
+    "role.approved",
+    "role.declined",
+    "directory.preloaded",
     "account.password_changed",
     "account.totp_enabled",
     "account.totp_removed",
@@ -37,6 +44,7 @@ export const AUDIT_GROUPS = {
     "login.locked_unknown",
     "login.ip_blocked",
     "login.emergency_slowed",
+    "login.pending_refused",
     "setup.completed",
     "setup.token_issued",
   ],
@@ -178,6 +186,17 @@ export interface AuditChain {
   rekeyed_at: string | null
   /** another check (the hourly one) is running – this is the state as it is */
   busy?: boolean
+  /** the database lock (0.1.52, backend app/audit_lock.py): PostgreSQL itself refuses changing or deleting an entry */
+  lock?: AuditLock
+}
+
+export interface AuditLock {
+  active: boolean
+  /** why not: no database image, set up but the table follows at the next start, the app as a superuser, incomplete */
+  reason: "no_lock" | "pending" | "superuser" | "incomplete" | null
+  /** entries a restore set aside (kept in the database, not deleted) and when the last time */
+  set_aside: number
+  set_aside_at: string | null
 }
 
 /** The chain's state in words for the badge. */
@@ -274,6 +293,37 @@ export function withoutChip(f: AuditFilters, key: Chip["key"]): AuditFilters {
   if (key === "target") return { ...f, targetType: "", targetId: "", targetLabel: "" }
   if (key === "actor") return { ...f, actor: "", actorLabel: "" }
   return { ...f, [key]: "" }
+}
+
+/** The params a link into the Protokoll carries (the sidebar's notices: lib/activity.ts auditLink). */
+export const LINK_PARAMS = ["action", "actor", "who", "target_type", "target_id", "what", "open"] as const
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** A link's filters (?action=…&actor=…&target_type=…&target_id=…, the chips' names who/what) and the entry to open
+ *  (?open=<id>) – each checked: a crafted link sets no filter the server would refuse, it only shows less. `actions`:
+ *  the action keys taken (this version's, and those the notices know already). */
+export function linkFilters(params: URLSearchParams, actions: readonly string[] = ALL_ACTIONS): { filters: AuditFilters; open: number | null } {
+  const f: AuditFilters = { ...NO_FILTERS }
+  const get = (k: string, max: number) => {
+    const v = params.get(k)?.trim() ?? ""
+    return v.length <= max ? v : ""
+  }
+  const action = get("action", 80)
+  if (action && actions.includes(action)) f.action = action
+  const actor = get("actor", 40)
+  if (UUID_RE.test(actor) || ["system", "sync", "cli"].includes(actor)) {
+    f.actor = actor
+    f.actorLabel = get("who", 200)
+  }
+  const type = get("target_type", 40)
+  if (/^[a-z_]+$/.test(type)) {
+    f.targetType = type
+    f.targetId = get("target_id", 300)
+    f.targetLabel = get("what", 200)
+  }
+  const n = Number(get("open", 20))
+  return { filters: f, open: Number.isSafeInteger(n) && n > 0 ? n : null }
 }
 
 /** The group of an action (the server's word first). */
@@ -452,7 +502,7 @@ const SETTINGS_LINK: Record<string, string> = {
   audit: "/settings/audit?tab=retention",
 }
 export const SETTINGS_SECTIONS = [...Object.keys(SETTINGS_LINK), "webpush"]
-export const SIGNIN_SECTIONS = ["sessions", "mfa", "ldap", "entra"]
+export const SIGNIN_SECTIONS = ["sessions", "mfa", "ldap", "entra", "directory", "preload"]
 
 /** The path in the app of a changed setting ("Einstellungen › Über Cobe News › Neue Versionen"), or null. */
 export function settingsPath(t: TFunction, target: AuditEntry["target"]): string | null {

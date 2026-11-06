@@ -12,6 +12,10 @@ Verdicts:
 - ``stale``         set by vendor.findings, not here: "unklare Altdaten" – a "possible" whose data is unclear and that
                     was published long before the installed release line existed (not counted, not notified)
 
+A product of the ``build`` scheme (Zoho ManageEngine: "14.6 Build 14600") is compared by its build; a fix is shown as a
+build ("14.9 Build 14920": another source's build bound or the vendor's "versions below 14920" in the description),
+never as NVD's version line ("< 14.9").
+
 Sources: Palo Alto's advisory JSON (per product line "< 11.2.4-h22, < 11.2.7-h21, …" and an explicit list of affected
 versions), Fortinet's CSAF ("FortiOS >=7.6.1|<=7.6.6", "FortiOS 7.4 all versions"), the NVD's CVE records (CPE
 configurations with version ranges, and the CNA's affected data – Microsoft writes build ranges there), Veeam's
@@ -25,7 +29,7 @@ import re
 from dataclasses import dataclass, field
 
 from app import version_input
-from app.vendor_versions import VEEAM_BUILD_DEPTH, V, from_cpe, ios_classic, parse, windows_cpe
+from app.vendor_versions import BUILD_DEPTH, VEEAM_BUILD_DEPTH, V, from_cpe, ios_classic, parse, windows_cpe
 
 ORDER = {"affected": 5, "possible": 4, "service": 3, "unversioned": 2, "stale": 1, "not_affected": 0}
 
@@ -48,27 +52,153 @@ def worst(a: Verdict | None, b: Verdict | None) -> Verdict | None:
 
 # Where a verdict comes from – Verdict.detail["by"]; the drawer says "laut Hersteller" only for the vendor's own word:
 #   vendor  the vendor's advisory (Palo Alto, Fortinet, Veeam), a CSAF provider's own document, the CNA's affected
-#           rows of a CVE record (they name the product's vendor – eval_cna matches no other)
+#           rows of a CVE record whose CNA is the product's vendor (cna_by; rows of a record that does not say who
+#           wrote it – stored before 0.1.52 – count as the vendor's, as they did)
+#   cna     the affected rows of a CVE record whose CNA is not the product's vendor (GitHub's advisory database, VulDB,
+#           MITRE, HackerOne …: detail["cna"] names it) – a third party: never the vendor's weight against the NVD
 #   nvd     the NVD's own analysis (CPE configurations)
 #   adp     CISA's ADP enrichment of a CVE record
 #   bsi     a CSAF document of the BSI (CERT-Bund) – a third party that sums up the vendors' data
 #   csaf    a CSAF document of another publisher that is not a provider of csaf.yaml
 #   osv     an OSV record (the ecosystem's advisory database)
 BY_VENDOR = "vendor"
+BY_CNA = "cna"
 THIRD_PARTY = frozenset({"bsi", "csaf"})
 
 
-def _from(v: Verdict | None, by: str | None) -> Verdict | None:
-    """The verdict with its origin – one that already has one keeps it (a combination takes the deciding side's)."""
+def _from(v: Verdict | None, by: str | None, cna: str = "") -> Verdict | None:
+    """The verdict with its origin – one that already has one keeps it (a combination takes the deciding side's).
+    `cna`: the name of a CNA that is not the vendor (by "cna")."""
     if v is not None and by and "by" not in v.detail:
-        v.detail = {**v.detail, "by": by}
+        v.detail = {**v.detail, "by": by, **({"cna": cna} if cna and by == BY_CNA else {})}
     return v
 
 
 def _like(base: Verdict | None, status: str, reason: str, fixed: str | None = None) -> Verdict:
     """A verdict derived from another one (a version we cannot compare, a short version …): the same origin."""
-    by = base.detail.get("by") if base is not None else None
-    return Verdict(status, reason, fixed, {"by": by} if by else {})
+    d = base.detail if base is not None else {}
+    return Verdict(status, reason, fixed, {k: d[k] for k in ("by", "cna") if d.get(k)})
+
+
+# ---------------------------------------------------------------- who wrote a CVE record: its CNA (catalog/cnas.yaml)
+
+
+_CNA_SLD = frozenset({"co", "or", "com", "ac", "gov", "org", "net", "ne", "go"})
+
+
+def _compact(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _cna_token(ident: str) -> str:
+    """The name in a CNA's identifier: a short name compacted ("palo_alto" → paloalto), the domain of an address
+    without its top level ("psirt@paloaltonetworks.com" → paloaltonetworks, "security@qnapsecurity.com.tw" →
+    qnapsecurity); "" for a UUID (the NVD names many CNAs only so)."""
+    if "@" in ident and not ident.startswith("@"):
+        labels = ident.rsplit("@", 1)[1].lower().split(".")[:-1]
+        if len(labels) > 1 and labels[-1] in _CNA_SLD:
+            labels = labels[:-1]
+        return _compact(labels[-1]) if labels else ""
+    if re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", ident.lower()):
+        return ""
+    return _compact(ident)
+
+
+# words that never decide alone which vendor a CNA is (cert.at is not cert-manager, an unknown "micro" no Micro Focus)
+_CNA_STOP = frozenset(
+    {"cert", "csirt", "psirt", "sirt", "cna", "cve", "sec", "security", "secure", "cyber", "micro", "open", "cloud", "soft", "software",
+     "data", "net", "network", "networks", "tech", "technology", "technologies", "systems", "system", "info", "web", "smart", "digital",
+     "global", "group", "labs", "lab", "solutions", "services", "project", "foundation", "inc", "corp", "the", "apps", "dev", "code", "linux"}
+)  # fmt: skip
+# what may follow the CNA's name in the vendor's name ("Palo Alto Networks" for palo_alto, "Juniper Networks" for
+# juniper) – the legal form and the like, never a word of its own ("Phoenix Contact" is not Phoenix Technologies)
+_VENDOR_TAIL = frozenset(
+    {"networks", "network", "inc", "corp", "corporation", "co", "company", "ltd", "limited", "llc", "gmbh", "ag", "se", "sa", "plc", "bv",
+     "systems", "software", "technologies", "technology", "security", "group", "labs", "international", "holdings", "project",
+     "foundation", "communications", "enterprises", "enterprise", "solutions", "io", "team", "community", "org", "app", "and"}
+)  # fmt: skip
+# what may follow the vendor's name in a CNA's name (GitHub_M, GitHub_P, qnapsecurity.com.tw)
+_CNA_TAIL = frozenset({"m", "p", "security", "sec", "psirt", "sirt", "cert", "cna", "cve"})
+
+
+def _token_is(tok: str, vendor: str) -> bool:
+    """A CNA's name is the vendor's: the same – or the vendor's name in whole words followed only by a legal form or the
+    like (paloalto – Palo Alto Networks, juniper – Juniper Networks), or the vendor's name followed by a CNA suffix
+    (githubm – GitHub, qnapsecurity – QNAP). The shorter one has 4 letters at least and is no generic word (_CNA_STOP):
+    not git – GitHub, cert – cert-manager, phoenix – Phoenix Contact."""
+    c = _compact(vendor)
+    if not tok or not c:
+        return False
+    if tok == c:
+        return True
+    if len(tok) < len(c):
+        if len(tok) < 4 or tok in _CNA_STOP or not c.startswith(tok):
+            return False
+        # on a word boundary of the vendor's name ("paloalto" – Palo Alto Networks; "cert" is no word of "certmanager"
+        # written as one) – or a name written as one word ending in a legal form (CPE: arubanetworks, extremenetworks)
+        words = [w for w in (_compact(x) for x in re.split(r"[^A-Za-z0-9]+", vendor)) if w]
+        head = ""
+        for i, w in enumerate(words):
+            head += w
+            if head == tok:
+                return all(x in _VENDOR_TAIL for x in words[i + 1 :])
+            if len(head) > len(tok):
+                break
+        return _tail_only(c[len(tok) :], _VENDOR_TAIL)
+    return len(c) >= 4 and c not in _CNA_STOP and tok.startswith(c) and _tail_only(tok[len(c) :], _CNA_TAIL | _VENDOR_TAIL)
+
+
+@functools.lru_cache(maxsize=4096)
+def _tail_only(rest: str, tails: frozenset) -> bool:
+    """`rest` is nothing but words of `tails`, written together ("networks", "softwarefoundation")."""
+    return not rest or any(rest.startswith(w) and _tail_only(rest[len(w) :], tails) for w in tails)
+
+
+@functools.cache
+def _cna_table() -> tuple[dict[str, dict], dict[str, dict]]:
+    """cnas.yaml as lookups: identifier → CNA, and domain → CNA for its "*@<domain>" entries."""
+    from app import vendor_catalog
+
+    ids: dict[str, dict] = {}
+    domains: dict[str, dict] = {}
+    for c in vendor_catalog.CNAS:
+        for x in c.get("ids") or []:
+            x = str(x).lower()
+            if x.startswith("*@"):
+                domains[x[2:]] = c
+            else:
+                ids[x] = c
+    return ids, domains
+
+
+@functools.lru_cache(maxsize=4096)
+def _cna_origin(ident: str, vendor: str, cna_vendors: tuple, cpes: tuple) -> tuple[bool, str]:
+    """(whether the CNA is the product's vendor, its shown name) – the vendor by the names it goes by: the catalogue's
+    vendor ("Splunk (Cisco)": also Splunk and Cisco), the vendors of the product's CNA names and of its CPEs (NetScaler,
+    vendor "Cloud Software Group": citrix)."""
+    vendors = [n for n in _vendor_names(vendor) if n] + [str(a) for a in cna_vendors if a]
+    vendors += [f[1].replace("_", " ") for c in cpes if len(f := cpe_fields(str(c))) == 3]
+    low = ident.lower()
+    ids, domains = _cna_table()
+    c = ids.get(low) or (domains.get(low.rsplit("@", 1)[1]) if "@" in low and not low.startswith("@") else None)
+    if c is not None:
+        mine = {str(v).lower() for v in c.get("vendors") or []}
+        return any(v.lower() in mine for v in vendors), str(c.get("name") or "")
+    tok = _cna_token(ident)
+    name = ident.rsplit("@", 1)[1] if "@" in ident and not ident.startswith("@") else ("" if not tok else ident)
+    return any(_token_is(tok, v) for v in vendors), name
+
+
+def cna_by(product: dict, data: dict) -> tuple[str, str]:
+    """Who speaks in the CNA's affected rows of a CVE record (data["assigner"]: cvelistV5's assignerShortName, the
+    NVD's sourceIdentifier): ("vendor", "") when its CNA is the product's vendor, ("cna", name) when it is someone else
+    – GitHub's advisory database, VulDB, MITRE, an unknown CNA (the safe side: a third party). A record that does not
+    say (stored before 0.1.52, until its next fetch): the vendor's, as before."""
+    ident = data.get("assigner")
+    if not isinstance(ident, str) or not ident.strip():
+        return BY_VENDOR, ""
+    mine, name = _cna_origin(ident.strip(), str(product.get("vendor") or ""), tuple(a for a, _ in product.get("cna") or []), tuple(product.get("cpes") or ()))
+    return (BY_VENDOR, "") if mine else (BY_CNA, name)
 
 
 # ---------------------------------------------------------------- helpers
@@ -117,6 +247,9 @@ def _vkey_text(text: str) -> str:
 
 
 _ALT = re.compile(r"^(.*?\S)\s*\(([^()]*)\)\s*$")
+# a knowledge-base article or a commit where a version should be – the generic rule skips the word and read the number
+# as a version (KB88287 = 88287: every VMware Cloud Foundation release "affected, Fix KB88287")
+_REFERENCE = re.compile(r"(?i)^(?:kb\s*-?\s*\d{4,}|commit\b)")
 _PLAIN = re.compile(r"^v?\d+(?:\.\d+)+$")
 
 
@@ -127,15 +260,51 @@ def bound_v(scheme: str, text) -> V | None:
     if not isinstance(text, str):
         return None
     t = text.strip()
+    if _REFERENCE.match(t):
+        return None  # "KB88287" (CISA's ADP for VCF), "commit 8670835" (BSI for FFmpeg): a document or a commit, no version
     if m := _ALT.match(t):
         outer, inner = m.group(1), m.group(2).strip()
         iv = (parse(scheme, inner) or parse("generic", inner)) if _PLAIN.match(inner) else None
         ov = parse(scheme, outer) or parse("generic", outer)
-        if iv is not None and (ov is None or ov.key[:1] == iv.key[:1]):
-            return iv
+        if iv is not None and (ov is None or ov.key[:1] == iv.key[:1] or re.fullmatch(r"(?:19|20)\d{2}", outer)):
+            return iv  # also "2019 (14.0)": the product's year, its version in brackets (Trend Micro Apex One)
         if ov is not None:
             return ov
     return parse(scheme, t) or parse("generic", t)
+
+
+_DATE = re.compile(r"^(?:19|20)\d{2}-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\d|3[01]))?$")  # 2022-03-17, Kaspersky's 2021-06
+DATE_FROM = 1900  # a version whose first part is a year or more is itself written as a date (2024.3.1, 20250108)
+
+
+_DATE_BUILD = re.compile(r"^(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:\.\d{1,4})?$")
+DATE_BUILD_FROM = 10000  # a version whose first part has five digits or more may itself be such a build
+
+
+def other_scale(text: str, v: V | None, scheme: str = "generic") -> bool:
+    """A bound on a date scale against a version that is not: a date ("through 2022-03-17": 3CX CVE-2021-45491 – read
+    as a version 2022.3.17, above every release 20.x) or a build named by its date (Azure DevOps Server "< 20230601.3"
+    for an installed 2022.2 Patch 12 – read as a version 20230601, above every release). Not comparable."""
+    if v is None or not v.key:
+        return False
+    t = text.strip()
+    if (v.key[0] < DATE_FROM and bool(_DATE.match(t))) or (v.key[0] < DATE_BUILD_FROM and bool(_DATE_BUILD.match(t))):
+        return True
+    # a bare build number against a dotted version, on a scale far above its first part: Teams for Desktop
+    # "< 25060212643" for 25060.205.3499.6849, Acronis "Cyber Protect 15 < 35979" for 16 (build 39938), Horizon's old
+    # "< 2203" (YYMM) for 8.2412 – a year ("2019": Apex One's product line as the start of a range) is left as it was
+    if scheme == "build" or v.depth < 2:
+        return False
+    if (m := _LEAD.match(t)) and not _YEAR.match(m.group(1)) and int(m.group(1)) >= BARE_FACTOR * max(v.key[0], 1):
+        return True  # Office's "2401.17231.20236" (Version 2401, Build 17231.20236) for 16.0.18227.20162
+    # a firmware code where a version should be (Lenovo XCC "tei392m" for 9.40): the generic rule skipped the letters
+    return bool(_CODE.match(t)) and v.text[:1].isdigit()
+
+
+BARE_FACTOR = 100
+_YEAR = re.compile(r"^(?:19|20)\d{2}$")
+_LEAD = re.compile(r"^(\d{4,})(?:[.-]\d+)*$")  # a bare number, or the first part of a version (Terraform's "202107-1")
+_CODE = re.compile(r"^[a-z]{3,}\d{2,}[a-z]?$", re.I)
 
 
 def upto(v: V, end: V, incl: bool, line: bool = False) -> bool:
@@ -630,7 +799,7 @@ def eval_configs(product: dict, configs: list, v: V | None) -> Verdict | None:
                         results.append(Verdict("possible", "unparsed_data"))
                         continue
                     listed.append(exact)
-                    n = _count_numbers(cv.replace("\\", ""))
+                    n = exact.depth if scheme == "build" else _count_numbers(cv.replace("\\", ""))
                     if v == exact:
                         results.append(Verdict("affected", "in_list"))
                     elif any_upd and v.key[:n] == exact.key[:n] and any(x for x in v.key[n:]):
@@ -645,6 +814,9 @@ def eval_configs(product: dict, configs: list, v: V | None) -> Verdict | None:
                 if not bounds:
                     results.append(Verdict("possible", "all_versions"))
                     continue
+                if any(other_scale(str(b), v, scheme) for b in bounds.values()):
+                    results.append(Verdict("possible", "other_scale"))  # a date where a version should be (3CX "2022-03-17")
+                    continue
                 parsed = {k: parse(scheme, str(b)) for k, b in bounds.items()}
                 if any(p is None for p in parsed.values()):
                     results.append(Verdict("possible", "unparsed_data"))
@@ -656,6 +828,8 @@ def eval_configs(product: dict, configs: list, v: V | None) -> Verdict | None:
                 hi_ok = end is None or upto(v, end, "versionEndIncluding" in parsed)
                 if lo_ok and hi_ok:
                     fix = parsed["versionEndExcluding"].text if "versionEndExcluding" in parsed else None
+                    if scheme == "build" and fix is not None and parsed["versionEndExcluding"].depth < BUILD_DEPTH:
+                        fix = None  # "< 14.9" (NVD lists 14.9 Build 14910 as affected next to it): which build fixes it, the line does not say
                     detail = {"after": parsed["versionEndIncluding"].text} if "versionEndIncluding" in parsed else {}
                     results.append(Verdict("affected", "in_range", fix, detail))
                 else:
@@ -756,9 +930,10 @@ def _adp_rows(blocks: list) -> list:
     return out
 
 
-def eval_cna(product: dict, affected: list, v: V | None, by: str = BY_VENDOR) -> Verdict | None:
-    """CVE 5 affected rows (the CNA's – `by` "vendor" – or CISA's ADP rows, `by` "adp")."""
-    return _from(_eval_cna(product, affected, v), by)
+def eval_cna(product: dict, affected: list, v: V | None, by: str = BY_VENDOR, cna: str = "") -> Verdict | None:
+    """CVE 5 affected rows (the CNA's – `by` "vendor", or "cna" with its name when the CNA is not the vendor – or
+    CISA's ADP rows, `by` "adp")."""
+    return _from(_eval_cna(product, affected, v), by, cna)
 
 
 def _eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
@@ -828,6 +1003,11 @@ def _eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                     if (start is None and str(start_text or "").strip() not in _OPEN) or (end is None and str(end_text).strip() != "*"):
                         results.append(Verdict("possible", "unparsed_data"))
                         continue
+                    if other_scale(str(end_text), v, scheme) or other_scale(str(start_text or ""), v, scheme):
+                        # Azure DevOps Server "< 20230601.3" (a build named by its date) for 2022.2 Patch 12: not
+                        # comparable – and no "not affected" of NVD's listed patches outweighs it (not unparsed_data)
+                        results.append(Verdict("possible", "other_scale"))
+                        continue
                     if depth and end is not None:
                         lines_named.add(end.key[:depth])
                         if (v.key + (0,) * depth)[:depth] != (end.key + (0,) * depth)[:depth]:
@@ -837,7 +1017,7 @@ def _eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                         tops.append(end)
                     inside = (start is None or v >= start) and (end is None or upto(v, end, incl, line))
                     if not inside:
-                        if status == "affected" and end is not None and not incl and not line and len(end.key) >= 3 and (start is None or v >= start) and _same_line(v, end):
+                        if status == "affected" and end is not None and not incl and not line and len(end.key) >= 3 and (start is None or v >= start) and (scheme == "build" or _same_line(v, end)):
                             # only an exclusive bound is a fix ("< 12.9.8"); "≤ 12.9.7" or "≤ 12.9.*" names the last
                             # affected release known – above it the defaultStatus still speaks; a two-part end ("< 12.9")
                             # is no fix of the whole major line 12 (12.10.1): the defaultStatus decides
@@ -871,7 +1051,9 @@ def _eval_cna(product: dict, affected: list, v: V | None) -> Verdict | None:
                         continue
                     row_spoke = True
                     tops.append(ev)
-                    if v == ev:
+                    # build scheme: a bare line ("14.6") names every build of it – "14.6 Build 14600" is in it, not newer
+                    line_only = scheme == "build" and v is not None and ev.depth < BUILD_DEPTH <= v.depth and v.key[:2] == ev.key[:2]
+                    if v == ev or line_only:
                         matched = True
                         # only "unaffected" clears it – "unknown" (or no status) leaves it open
                         if status == "affected":
@@ -990,15 +1172,67 @@ def filter_ok(product: dict, data: dict) -> bool:
     return any(w.strip() and w.strip().lower() in desc for w in str(flt).split("|"))
 
 
+# build scheme: the build that fixes it, as the vendor's text says it ("ServiceDesk Plus versions below 14920",
+# "ADSelfService Plus before build 6003", "OpManager before 12.3 Build 123196", "Password Manager Pro before 11.2 11200")
+_BUILD_TOKEN = r"(\d{1,2}\.\d\.\d{3}|(?:\d{1,2}\.\d{1,2}\s*,?\s*)?(?:build\s*)?\d{4,6})"
+_BUILD_BEFORE = r"(?:\s+\([\w ]{1,20}\))?\s+(?:\d{1,2}(?:\.\d{1,2})?\s+)?(?:(?:versions?|builds?)\s+)?(?:before|below|prior\s+to|lower\s+than|earlier\s+than)\s+(?:version\s+|build\s+number\s+)?"
+
+
+def _build_names(product: dict) -> list[str]:
+    names = [str(k) for k in product.get("kw") or []] + [b for _, b in product.get("cna") or []]
+    return sorted({n for n in names if len(n) >= 3}, key=len, reverse=True)
+
+
+@functools.lru_cache(maxsize=256)
+def _build_fix_rx(name: str) -> re.Pattern:
+    return re.compile(r"(?i)(?<![\w-])" + re.escape(name) + _BUILD_BEFORE + _BUILD_TOKEN + r"(?![\w.])")
+
+
+def text_build_fix(product: dict, text: str) -> V | None:
+    """The fixed build a description names for the product – the text right after its name, so "ServiceDesk Plus MSP
+    before 10530" is not ServiceDesk Plus' fix. Only read for the fix shown (never for the verdict)."""
+    for name in _build_names(product):
+        if (m := _build_fix_rx(name).search(text[: VTEXT_MAX * 2])) is not None:
+            got = parse("build", m.group(1).strip())
+            if got is not None and got.depth >= BUILD_DEPTH:
+                return got
+    return None
+
+
+def _with_build_fix(product: dict, data: dict, got: Verdict | None, v: V | None, *more: Verdict | None) -> Verdict | None:
+    """Build scheme: an affected verdict without a build as its fix gets the build another source names (the CNA's
+    "< 6402" next to NVD's "< 6.4"), else the one the description names ("versions below 14920") – a build above the
+    installed one; never a version line ("14.9") as the fix."""
+    if got is None or got.status != "affected" or v is None or (product.get("scheme") or "generic") != "build":
+        return got
+    fixed = parse("build", got.fixed) if got.fixed else None
+    if fixed is not None and fixed.depth >= BUILD_DEPTH:
+        return got
+    detail = dict(got.detail)
+    after = parse("build", str(detail.get("after") or "")) if detail.get("after") else None
+    if after is None or after.depth < BUILD_DEPTH:
+        # "≤ 14.7" (NVD) next to the CNA's "≤ 14810": the last affected build the other source names
+        lasts = [f for m in more if m is not None and m.status == "affected" and m.detail.get("after") and (f := parse("build", str(m.detail["after"]))) is not None and f.depth >= BUILD_DEPTH and f >= v]
+        if lasts:
+            detail["after"] = max(lasts).text
+    cands = [f for m in more if m is not None and m.status == "affected" and m.fixed and (f := parse("build", m.fixed)) is not None and f.depth >= BUILD_DEPTH and f > v]
+    if not cands and (f := text_build_fix(product, str(data.get("desc") or ""))) is not None and f > v:
+        cands = [f]
+    if cands:
+        return Verdict(got.status, got.reason, min(cands).text, detail)
+    # no build anywhere: no fix shown rather than the line ("14.9" – every build of it, also the affected ones)
+    return Verdict(got.status, got.reason, None, detail)
+
+
 def eval_cvelist(product: dict, data: dict, v: V | None) -> Verdict | None:
     """A CVE record of cvelistV5: the CNA's affected data decides (the vendor itself, mostly); CISA's ADP enrichment only
     where the CNA does not name the product – its rows are less precise (no hotfix changes, CPE names)."""
     if not filter_ok(product, data):
         return None
-    got = eval_cna(product, data.get("cna") or [], v)
+    got = eval_cna(product, data.get("cna") or [], v, *cna_by(product, data))
     if got is None and data.get("adp") and product.get("cpes"):
         got = eval_cna(_adp_product(product), _adp_rows(data.get("adp")), v, "adp")
-    return got
+    return _with_build_fix(product, data, got, v)
 
 
 def osv_packages(product: dict, data: dict) -> list[dict]:
@@ -1051,31 +1285,38 @@ def eval_osv(product: dict, data: dict, v: V | None) -> Verdict | None:
 def eval_nvd(product: dict, data: dict, v: V | None) -> Verdict | None:
     if not filter_ok(product, data):
         return None
+    got, a, b = _nvd_verdict(product, data, v)
+    return _with_build_fix(product, data, got, v, a, b)
+
+
+def _nvd_verdict(product: dict, data: dict, v: V | None) -> tuple[Verdict | None, Verdict | None, Verdict | None]:
+    """The verdict of an NVD record – and the two it was made of (NVD's analysis, the CNA's or CISA's rows)."""
     a = _from(eval_configs(product, data.get("configs") or [], v), "nvd")
     cna, adp = data.get("cna") or [], data.get("adp") or []
     if "adp" not in data and len(cna) > 1:
         cna, adp = cna[:1], cna[1:]  # stored before 0.1.47 (one list, the CNA's block first): the others are ADPs
-    b = eval_cna(product, cna, v)
+    b = eval_cna(product, cna, v, *cna_by(product, data))
     if b is None and (a is None or a.status == "possible") and adp and product.get("cpes"):
         # CISA's ADP only where the CNA does not name the product and NVD's analysis decides nothing (none, or only
         # "possibly": vCenter's exact update CPEs, CVE-2024-37080 – CISA's "8.0 < 8.0u2d" settles it) – never over a
         # clear NVD verdict (VMware Cloud Foundation CVE-2022-22948: CISA "4.0 – < 5.0", NVD "< 4.4.1")
         b = eval_cna(_adp_product(product), _adp_rows(adp), v, "adp")
     if a is None or b is None:
-        return a or b
+        return a or b, a, b
     if a.status == "affected" and b.status == "not_affected" and b.reason in ("out_of_range", "fixed") and b.detail.get("by") == BY_VENDOR and _vendor_ranges(product, cna):
+        # (only the vendor's own word – a CNA that is not the vendor, by "cna", leaves NVD's "affected" as it is)
         # the vendor names its affected ranges and says this version is not affected – outside of them with every
         # other version "unaffected" (defaultStatus), or the fix of its line (GitLab CVE-2026-84284: "19.3 < 19.3.6"
         # for 19.3.7) –, NVD's range takes in more (PAN-OS CVE-2026-0262: NVD "< 10.2.7", the vendor 10.2 on only;
         # GitLab: NVD "< 19.4.2"): one says no, the other yes – "possibly", with both named
-        return Verdict("possible", "vendor_unaffected", a.fixed, {"by": "nvd"})
+        return Verdict("possible", "vendor_unaffected", a.fixed, {"by": "nvd"}), a, b
     if a.status == "affected" or b.status == "affected":
-        return a if a.status == "affected" else b
+        return (a if a.status == "affected" else b), a, b
     if b.status == "not_affected" and a.status in ("possible", "not_affected"):
-        return b  # the CNA (mostly the vendor itself) decides where NVD's CPEs are less precise
+        return b, a, b  # the CNA (mostly the vendor itself) decides where NVD's CPEs are less precise
     if a.status == "not_affected" and b.status == "possible" and b.reason == "unparsed_data":
-        return a  # the CNA wrote prose ("versions prior to v22.09"): NVD's analysed ranges decide (BookStack CVE-2022-40690)
-    return worst(a, b)
+        return a, a, b  # the CNA wrote prose ("versions prior to v22.09"): NVD's analysed ranges decide (BookStack CVE-2022-40690)
+    return worst(a, b), a, b
 
 
 # ---------------------------------------------------------------- CSAF advisories (BSI, Siemens, Cisco): ranges per product
@@ -1414,6 +1655,14 @@ def evaluate(product: dict, source: str, data: dict, version: str | None) -> Ver
         if lo is None or hi is None or lo.status == hi.status:
             return lo or hi
         return _like(lo, "possible", "build_needed", lo.fixed or hi.fixed)
+    if scheme == "build" and v is not None and v.depth < BUILD_DEPTH:
+        # "14.6" without its build: decided only where the first and the last build of 14.6 get the same verdict
+        # (build bounds "< 14620" inside the line: "möglicherweise"; "< 10509" or "≤ 14.7": the same for every build)
+        lo = _evaluate(product, source, data, V(v.key + (0,) * (BUILD_DEPTH - v.depth), v.text))
+        hi = _evaluate(product, source, data, V(v.key + (VEEAM_TOP,) * (BUILD_DEPTH - v.depth), v.text))
+        if lo is None or hi is None or lo.status == hi.status:
+            return lo or hi
+        return _like(lo, "possible", "build_number_needed", lo.fixed or hi.fixed)
     if v is not None and scheme not in ("panos", "windows", "ivanti", "cloud", "distro", "sap") and v.depth < (depth := _depth(product)):
         # a short version ("7.4" for FortiOS, "1.25" for nginx) stands for every release inside it: decided only where
         # all of them the data can tell apart get the same verdict – never "not affected" because 7.4 = 7.4.0 is

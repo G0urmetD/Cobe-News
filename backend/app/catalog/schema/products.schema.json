@@ -421,7 +421,8 @@
                   "nginx_plus",
                   "checkpoint",
                   "horizon_yymm",
-                  "leading_zeros"
+                  "leading_zeros",
+                  "ipfire_core"
                 ],
                 "type": "string"
               },
@@ -520,6 +521,8 @@
                 "sfos",
                 "java",
                 "sap",
+                "build",
+                "fw_index",
                 "distro",
                 "cloud",
                 "generic"
