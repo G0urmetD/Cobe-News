@@ -67,6 +67,7 @@ export const AUDIT_GROUPS = {
     "restore_test.run",
     "restore_test.done",
     "export.downloaded",
+    "backup.downloaded",
     "audit.exported",
     "audit.chain_problem",
     "audit.chain_rekeyed",

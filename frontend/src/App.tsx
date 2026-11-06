@@ -26,7 +26,7 @@ export default function App() {
   if (auth.failed)
     return (
       <div className="flex min-h-svh items-center justify-center p-4">
-        <QueryError error={new Error("load")} onRetry={() => void auth.refresh()} className="w-full max-w-md" />
+        <QueryError error={auth.error ?? new Error("load")} onRetry={() => void auth.refresh()} className="w-full max-w-md" />
       </div>
     )
   return (

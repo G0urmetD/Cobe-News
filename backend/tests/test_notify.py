@@ -392,7 +392,7 @@ async def test_a_failing_channel_never_blocks_the_others(admin_client, hooks):
     assert listed["n8n"]["last_error"] == "timeout" and listed["Teams"]["last_error"] is None and listed["Teams"]["last_sent_at"]
     card = Hooks.body(hooks.to("prod-01.westeurope.logic.azure.com")[0])
     assert card["type"] == "message" and card["attachments"][0]["contentType"] == "application/vnd.microsoft.card.adaptive"
-    assert card["attachments"][0]["content"]["actions"][0]["url"] == "https://news.corp.example:8095/"
+    assert card["attachments"][0]["content"]["actions"][0]["url"].startswith("https://news.corp.example:8095/?story=")  # the one story itself
     # pausing: nothing tried; a second failure doubles the pause
     assert await _dispatch() == {}
     await _unpause()

@@ -68,6 +68,7 @@ import { errorText, isStale } from "@/lib/errors"
 import { confirmDiscard } from "@/lib/unsaved"
 import { ChannelLog, HealthBadge } from "@/pages/settings-delivery-log"
 import { IntegrationSheetContent, Loading, SaveBar, SheetActions, SheetBody, SheetLoading, StaleNotice } from "@/pages/settings-shared"
+import { iso } from "@/lib/bidi"
 
 const ICON: Record<ChannelType, React.ElementType> = {
   email: Mail,
@@ -192,7 +193,14 @@ function UsedBy({ c }: { c: NotifyChannel }) {
   if (!c.rules.length) return <p className="text-xs text-muted-foreground italic">{t("channels.unused")}</p>
   return (
     <p className="text-xs">
-      <span className="text-muted-foreground">{t("channels.usedBy")}</span> {c.rules.map((r) => (r.enabled ? r.name : `${r.name} (${t("channels.ruleOff")})`)).join(", ")}
+      <span className="text-muted-foreground">{t("channels.usedBy")}</span>{" "}
+      {c.rules.map((r, i) => (
+        <span key={r.id}>
+          {i > 0 && ", "}
+          <bdi>{r.name}</bdi>
+          {!r.enabled && ` (${t("channels.ruleOff")})`}
+        </span>
+      ))}
     </p>
   )
 }
@@ -266,7 +274,9 @@ export function ChannelsPane() {
     refresh()
   }
   const remove = async (c: NotifyChannel) => {
-    const text = c.rules.length ? t("channels.removeTextUsed", { name: c.name, rules: c.rules.map((r) => `„${r.name}“`).join(", ") }) : t("channels.removeText", { name: c.name })
+    const text = c.rules.length
+      ? t("channels.removeTextUsed", { name: iso(c.name), rules: c.rules.map((r) => `„${iso(r.name)}“`).join(", ") })
+      : t("channels.removeText", { name: iso(c.name) })
     if (!(await confirmAction({ title: t("channels.removeTitle"), text, confirm: t("common.remove") }))) return
     try {
       await api.del(`/api/admin/notify/channels/${c.id}`)

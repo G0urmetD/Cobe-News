@@ -223,17 +223,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // person chose there ("Mein Team / Alle", remembered in this browser)
   const counts = useReaderCounts(readScope(user?.id)).data
   const n = counts?.news_enabled ? counts.news : 0
-  const nv = counts?.vendor ?? 0
+  const nv = counts?.vendor_enabled === false ? 0 : (counts?.vendor ?? 0)
   // followed products a vulnerability affects – the tone of the "Vendor News" badge (and a dot when nothing is
   // unread): red only when an exploited vulnerability affects a version – not for a "possibly" one (as the cards)
   const vendor = useQuery({
     queryKey: ["vendor", "badge"],
-    queryFn: polled<{ affected: number; exploited: boolean }>((o) => api.get("/api/vendor/badge", o)),
+    queryFn: polled<{ affected: number; exploited: boolean; enabled?: boolean }>((o) => api.get("/api/vendor/badge", o)),
     refetchInterval: 5 * 60_000,
     staleTime: 60_000,
   }).data
-  const hit = vendor?.affected ?? 0
-  const exploited = vendor?.exploited ?? false
+  // Vendor News switched off: no number, no dot (the server answers zero then, too)
+  const vendorOn = vendor?.enabled !== false && counts?.vendor_enabled !== false
+  const hit = vendorOn ? (vendor?.affected ?? 0) : 0
+  const exploited = vendorOn && (vendor?.exploited ?? false)
   const vendorTone = exploited ? "--sev-critical" : hit ? "--warning" : "--primary"
   const vendorBadge: NavBadge | undefined = nv
     ? {

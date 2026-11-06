@@ -511,3 +511,222 @@ def test_cisa_adp_settles_a_possibly_of_nvds_analysis(cat):
     assert evaluate(gl, "nvd", {**data, "adp": []}, "16.0.0").status == "possible"  # NVD alone: not listed
     assert evaluate(gl, "nvd", data, "16.0.0").status == "affected"
     assert evaluate(gl, "nvd", data, "17.0.1").status == "not_affected"
+
+
+# ---------------------------------------------------------------- 0.1.51: who speaks, the BSI, the vendor's "unaffected", fixes per line
+
+
+def _adv(source: str, ident: str, data: dict, cves: list | None = None):  # noqa: ANN202
+    from app import vendor
+
+    return vendor.Adv(f"{source}:{ident}", source, ident, ident, "", "", cves or [ident], None, "high", False, None, None, data)
+
+
+def _bsi(products: list) -> dict:
+    return {"publisher": "BSI (CSAF)", "products": products}
+
+
+def _python_cna(rows: list) -> dict:
+    return {"configs": [], "desc": "", "cna": [{"affectedData": [{"vendor": "Python Software Foundation", "product": "CPython", "defaultStatus": "unaffected", "versions": rows}]}]}
+
+
+def test_every_verdict_says_where_it_comes_from(cat, pan):
+    """Verdict.detail["by"]: "laut Hersteller" only for the vendor's own word (the drawer: lib/vendor-reason.ts)."""
+    gl = cat["gitlab"]
+    assert evaluate(cat["panos"], "paloalto", pan["CVE-2026-0322"]["data"], "11.2.4-h5").detail["by"] == "vendor"
+    cna = _gitlab_cna([{"version": "17.0", "lessThan": "17.0.1", "status": "affected"}])
+    assert evaluate(gl, "nvd", cna, "17.0.0").detail["by"] == "vendor"  # the CNA's rows name the product's vendor
+    configs = [{"nodes": [{"cpeMatch": [{"vulnerable": True, "criteria": "cpe:2.3:a:gitlab:gitlab:*:*:*:*:*:*:*:*", "versionEndExcluding": "17.0.1"}]}]}]
+    assert evaluate(gl, "nvd", {"configs": configs, "cna": [], "desc": ""}, "17.0.0").detail["by"] == "nvd"
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    only_adp = {**advs[0]["data"], "cna": [], "configs": []}
+    assert evaluate(gl, "nvd", only_adp, "16.10.6").detail["by"] == "adp"
+    assert evaluate(gl, "cvelist", {"desc": "", "cna": [], "adp": advs[0]["data"]["adp"]}, "16.0.0").detail["by"] == "adp"
+    entry = {"name": "GitLab", "vendor": "GitLab", "cpe": "a:gitlab:gitlab", "affected": [{"to": "17.0.1", "text": "<17.0.1"}], "fixed": ["17.0.1"], "not_affected": []}
+    assert evaluate(gl, "csaf", _bsi([entry]), "17.0.0").detail["by"] == "bsi"
+    assert evaluate(gl, "csaf", {"publisher": "Example CERT", "products": [entry]}, "17.0.0").detail["by"] == "csaf"
+    assert evaluate(gl, "csaf", {"publisher": "Siemens ProductCERT (CSAF)", "products": [entry]}, "17.0.0").detail["by"] == "vendor"
+    assert evaluate(gl, "csaf", {"publisher": "BSI (CSAF)", "provider": "x", "products": [entry]}, "17.0.0") is None  # a provider speaks only for its vendors
+    # a derived verdict keeps the origin of the one it comes from (a short version, a version we cannot compare)
+    assert evaluate(gl, "nvd", cna, "17.0").reason == "short_version" and evaluate(gl, "nvd", cna, "17.0").detail["by"] == "vendor"
+
+
+def test_bsi_every_version_does_not_beat_the_cve_records(cat):
+    """D: the BSI lists the product without a version ("alle Versionen") – the CVE records say this version is not
+    affected: "possibly", with the BSI named; where the records say "affected", their range (and fix) counts."""
+    from app import vendor
+
+    gl = cat["gitlab"]
+    bsi = _adv("csaf", "WID-SEC-W-2026-0001", _bsi([{"name": "GitLab", "vendor": "GitLab", "cpe": "a:gitlab:gitlab", "affected": [{"all": True, "text": "alle Versionen"}], "fixed": [], "not_affected": []}]), ["CVE-2026-1"])
+    nvd = _adv("nvd", "CVE-2026-1", _gitlab_cna([{"version": "17.0", "lessThan": "17.0.1", "status": "affected"}]))
+    g = vendor.groups_of([bsi, nvd])[0]
+    assert g["primary"] is bsi
+    got = vendor.group_verdict(gl, g, "19.5.3")
+    assert (got.status, got.reason, got.detail["by"]) == ("possible", "all_listed_disputed", "bsi")
+    got = vendor.group_verdict(gl, g, "17.0.0")
+    assert (got.status, got.reason, got.fixed) == ("affected", "in_range", "17.0.1")
+    alone = vendor.group_verdict(gl, vendor.groups_of([bsi])[0], "19.5.3")
+    assert (alone.status, alone.reason) == ("affected", "all_listed")  # nothing says otherwise
+
+
+def test_bsi_per_line_bounds_never_beat_the_cnas_affected(cat):
+    """D: the BSI merges two CVEs into per-line bounds ("<3.16.0, <3.15.2 …": 3.15.2 fixed) – the vendor says every
+    version below 3.16.0 is affected by one of them (CVE-2026-103995): affected, never a false "not affected"."""
+    from app import story_details, vendor
+
+    py = cat["python"]
+    entry = {"name": "Python", "vendor": "Open Source", "cpe": "a:python:python", "affected": [{"to": "3.16.0", "text": "<3.16.0"}, {"to": "3.15.2", "text": "<3.15.2"}], "fixed": ["3.16.0", "3.15.2"], "not_affected": []}
+    bsi = _adv("csaf", "WID-SEC-W-2026-4189", _bsi([entry]), ["CVE-2026-103995", "CVE-2026-114583"])
+    one = _adv("nvd", "CVE-2026-103995", _python_cna([{"version": "0", "lessThan": "3.16.0", "status": "affected"}]))
+    two = _adv("nvd", "CVE-2026-114583", _python_cna([{"version": "3.15.0", "lessThan": "3.15.2", "status": "affected"}]))
+    assert evaluate(py, "csaf", bsi.data, "3.15.2").status == "not_affected"  # the document alone
+    g = vendor.groups_of([bsi, one, two])[0]
+    got = vendor.group_verdict(py, g, "3.15.2")
+    assert (got.status, got.fixed) == ("affected", "3.16.0")
+    # the stories' "betrifft deine Systeme" judges the same way
+    details = {"kind": "bsi", "publisher": "BSI (CSAF)", "products": [entry], "match": [{"source": "nvd", "data": one.data}, {"source": "nvd", "data": two.data}]}
+
+    class V:
+        id, version, label = None, "3.15.2", ""
+
+    rows = story_details.matches(details, [(py, [V()])])
+    assert rows and rows[0]["versions"][0]["status"] == "affected"
+    every = {**details, "products": [{**entry, "affected": [{"all": True, "text": "alle Versionen"}], "fixed": []}], "match": [{"source": "nvd", "data": _python_cna([{"version": "3.0", "lessThan": "3.10.1", "status": "affected"}])}]}
+    assert story_details.matches(every, [(py, [V()])])[0]["versions"][0]["status"] == "possible"
+
+
+def test_the_vendors_unaffected_against_nvds_range_is_possible(cat):
+    """E: the vendor's CNA names its ranges with every other version "unaffected" (or the fix of the installed line),
+    NVD's analysis takes in more (GitLab CVE-2026-84284: NVD "< 19.4.2", GitLab "19.3 < 19.3.6", "19.4 < 19.4.2";
+    PAN-OS CVE-2026-0262: NVD "< 10.2.7", PAN-OS 10.2 on only) – "possibly", not "affected"."""
+    gl = cat["gitlab"]
+    data = _gitlab_cna([{"version": "19.3", "lessThan": "19.3.6", "status": "affected"}, {"version": "19.4", "lessThan": "19.4.2", "status": "affected"}])
+    data["configs"] = [{"nodes": [{"cpeMatch": [{"vulnerable": True, "criteria": "cpe:2.3:a:gitlab:gitlab:*:*:*:*:*:*:*:*", "versionEndExcluding": "19.4.2"}]}]}]
+    for v in ("19.3.7", "18.11.0"):
+        got = evaluate(gl, "nvd", data, v)
+        assert (got.status, got.reason, got.detail["by"]) == ("possible", "vendor_unaffected", "nvd"), v
+    assert evaluate(gl, "nvd", data, "19.3.5").status == "affected" and evaluate(gl, "nvd", data, "19.4.1").status == "affected"
+    assert evaluate(gl, "nvd", data, "19.4.2").status == "not_affected"
+    # CISA's rows are no vendor: NVD's range stays
+    _, advs = src.parse_nvd((FIX / "nvd_gitlab_adp.json").read_bytes())
+    adp = {**advs[0]["data"], "cna": [], "configs": data["configs"]}
+    assert evaluate(gl, "nvd", adp, "18.11.0").status == "affected"
+
+
+def test_a_fixed_release_above_a_range_in_its_line_is_fixed(cat):
+    """F: GitLab ">=12.8, <12.9.8", ">=12.10, <12.10.7", ">=13.0, <13.0.1": 12.9.8 (and 12.9.9) are fixed – was
+    "possibly" (not every named version below it); PAN-OS "12.2.0 < 12.2.4" with defaultStatus "affected": 12.2.4-h1 is
+    fixed – was "affected" by the default (CVE-2026-0316); a line no row names keeps the default."""
+    gl = cat["gitlab"]
+    data = _gitlab_cna([{"version": ">=12.8, <12.9.8", "status": "affected"}, {"version": ">=12.10, <12.10.7", "status": "affected"}, {"version": ">=13.0, <13.0.1", "status": "affected"}], default="")
+    for v, want in (("12.9.8", "not_affected"), ("12.9.9", "not_affected"), ("12.9.7", "affected"), ("12.10.7", "not_affected"), ("12.11.0", "possible")):
+        assert evaluate(gl, "nvd", data, v).status == want, v
+    assert evaluate(gl, "nvd", data, "12.9.8").reason == "fixed"
+    pan = {"configs": [], "desc": "", "cna": [{"affectedData": [{"vendor": "Palo Alto Networks", "product": "PAN-OS", "defaultStatus": "affected", "versions": [
+        {"version": "12.2.0", "lessThan": "12.2.4", "status": "affected", "changes": [{"at": "12.2.4", "status": "unaffected"}], "versionType": "custom"},
+        {"version": "11.2.0", "lessThan": "11.2.16", "status": "affected", "changes": [{"at": "11.2.16", "status": "unaffected"}], "versionType": "custom"},
+    ]}]}]}
+    p = cat["panos"]
+    assert evaluate(p, "nvd", pan, "12.2.4-h1").status == "not_affected" and evaluate(p, "nvd", pan, "11.2.16").status == "not_affected"
+    assert evaluate(p, "nvd", pan, "12.2.3").status == "affected" and evaluate(p, "nvd", pan, "11.2.4-h23").status == "affected"
+    assert (evaluate(p, "nvd", pan, "10.2.13-h5").status, evaluate(p, "nvd", pan, "10.2.13-h5").reason) == ("affected", "default_affected")
+
+
+def test_commit_ranges_are_no_versions(cat):
+    """The Linux kernel's CNA writes commit ranges (versionType "git") next to its semver rows: read as versions they
+    made every kernel "affected, fixed in 8dbed691…" (CVE-2026-52943) – only the semver rows decide."""
+    lx = cat["linux"]
+    git = [{"version": "6fa01ccd883021105e9f8af7d04b9f156fa3494a", "lessThan": "8dbed691e43a50903658130bde0fcb5abc425b37", "status": "affected", "versionType": "git"}]
+    semver = [
+        {"version": "7.2", "status": "affected"},
+        {"version": "0", "lessThan": "7.2", "status": "unaffected", "versionType": "semver"},
+        {"version": "7.2.9", "lessThanOrEqual": "7.2.*", "status": "unaffected", "versionType": "semver"},
+    ]
+    data = {"configs": [], "desc": "", "cna": [{"affectedData": [{"vendor": "Linux", "product": "Linux", "defaultStatus": "unaffected", "versions": git}, {"vendor": "Linux", "product": "Linux", "defaultStatus": "affected", "versions": semver}]}]}
+    assert evaluate(lx, "nvd", data, "7.1.13").status == "not_affected"
+    got = evaluate(lx, "nvd", data, "7.2.5")
+    assert got.status == "affected" and (got.fixed is None or "." in got.fixed)  # never a commit as the fix
+    assert evaluate(lx, "nvd", data, "7.2.10").status == "not_affected"
+    only_git = {**data, "cna": [{"affectedData": [{"vendor": "Linux", "product": "Linux", "defaultStatus": "unaffected", "versions": git}]}]}
+    assert evaluate(lx, "nvd", only_git, "7.1.13") is None  # commits alone say nothing about a release
+
+
+def test_a_third_partys_possibly_stays_when_not_every_cve_has_a_record(cat):
+    """H1 (review 0.1.51): the BSI says "possibly" for a document on two CVEs; one record says "not affected", the
+    other CVE has no record that judges the product (prose only, unanalysed) – that one may affect the version: the
+    "possibly" stays (group and the stories' drawer). With a judging record for every CVE their "not affected" counts."""
+    from app import story_details, vendor
+
+    gl = cat["gitlab"]
+    entry = {"name": "GitLab", "vendor": "GitLab", "cpe": "a:gitlab:gitlab", "affected": [{"to": "17.0.5", "text": "<17.0.5"}], "fixed": ["17.0.5"], "not_affected": []}
+    bsi = _adv("csaf", "WID-SEC-W-2026-0002", _bsi([entry]), ["CVE-2026-10", "CVE-2026-11"])
+    a = _adv("nvd", "CVE-2026-10", _gitlab_cna([{"version": "16.0", "lessThan": "16.0.3", "status": "affected"}]))
+    b = _adv("nvd", "CVE-2026-11", {"configs": [], "desc": "prose only", "cna": []})
+    assert vendor.group_verdict(gl, vendor.groups_of([bsi])[0], "17.0").status == "possible"
+    got = vendor.group_verdict(gl, vendor.groups_of([bsi, a, b])[0], "17.0")
+    assert got.status == "possible" and got.detail["by"] == "bsi"
+    b2 = _adv("nvd", "CVE-2026-11", _gitlab_cna([{"version": "15.0", "lessThan": "15.0.1", "status": "affected"}]))
+    assert vendor.group_verdict(gl, vendor.groups_of([bsi, a, b2])[0], "17.0").status == "not_affected"  # both judged
+
+    class V:
+        id, version, label = None, "17.0", ""
+
+    details = {"kind": "bsi", "publisher": "BSI (CSAF)", "products": [entry], "cves": ["CVE-2026-10", "CVE-2026-11"], "match": [{"source": "nvd", "data": a.data}, {"source": "nvd", "data": b.data}]}
+    rows = story_details.matches(details, [(gl, [V()])])
+    assert rows and rows[0]["versions"][0]["status"] == "possible"
+    both = {**details, "match": [{"source": "nvd", "data": a.data}, {"source": "nvd", "data": b2.data}]}
+    assert story_details.matches(both, [(gl, [V()])]) == []  # not affected: not shown
+
+
+def test_an_inclusive_bound_is_no_fix(cat):
+    """M1 (review 0.1.51): "≤ 12.9.7" or "≤ 12.9.*" names the last affected release known, not a fix – above it the
+    defaultStatus "affected" still speaks; only an exclusive "< X" is a fix of its line."""
+    gl = cat["gitlab"]
+    incl = _gitlab_cna([{"version": "12.9.0", "lessThanOrEqual": "12.9.7", "status": "affected"}], default="affected")
+    assert (evaluate(gl, "nvd", incl, "12.9.8").status, evaluate(gl, "nvd", incl, "12.9.8").reason) == ("affected", "default_affected")
+    line = _gitlab_cna([{"version": "12.0", "lessThanOrEqual": "12.9.*", "status": "affected"}], default="affected")
+    assert evaluate(gl, "nvd", line, "12.10.1").reason == "default_affected"
+    excl = _gitlab_cna([{"version": "12.9.0", "lessThan": "12.9.8", "status": "affected"}], default="affected")
+    assert (evaluate(gl, "nvd", excl, "12.9.8").status, evaluate(gl, "nvd", excl, "12.9.8").reason) == ("not_affected", "fixed")
+
+
+def test_only_the_vendors_own_ranges_outweigh_nvds_range(cat):
+    """L4 (review 0.1.51): "possibly" against NVD's "affected" only where the product's own vendor (catalogue vendor or
+    CNA names) delimits ranges – a CNA listing single versions with defaultStatus "unaffected" (VulDB, MITRE style)
+    leaves NVD's analysis as it is."""
+    gl = cat["gitlab"]
+    configs = [{"nodes": [{"cpeMatch": [{"vulnerable": True, "criteria": "cpe:2.3:a:gitlab:gitlab:*:*:*:*:*:*:*:*", "versionEndExcluding": "19.4.2"}]}]}]
+    single = {**_gitlab_cna([{"version": "19.4.0", "status": "affected"}, {"version": "19.4.1", "status": "affected"}]), "configs": configs}
+    assert evaluate(gl, "nvd", single, "18.11.0").status == "affected"  # single versions: NVD's range stays
+    ranged = {**_gitlab_cna([{"version": "19.4", "lessThan": "19.4.2", "status": "affected"}]), "configs": configs}
+    assert evaluate(gl, "nvd", ranged, "18.11.0").reason == "vendor_unaffected"
+    from app.vendor_match import _vendor_ranges
+
+    assert _vendor_ranges(gl, ranged["cna"]) and not _vendor_ranges(gl, single["cna"])
+    assert not _vendor_ranges({**gl, "vendor": "", "cna": None}, ranged["cna"])  # no vendor known: unsure, no demotion
+
+
+def test_a_two_part_end_is_no_fix_of_the_major_line(cat):
+    """Final review 0.1.51: "< 12.9" with defaultStatus "affected" said nothing about 12.10.1 – the defaultStatus
+    decides there, not a "fix" of the whole major line 12."""
+    gl = cat["gitlab"]
+    d = _gitlab_cna([{"version": "12.0", "lessThan": "12.9", "status": "affected"}], default="affected")
+    assert (evaluate(gl, "nvd", d, "12.10.1").status, evaluate(gl, "nvd", d, "12.10.1").reason) == ("affected", "default_affected")
+    assert evaluate(gl, "nvd", d, "12.8.3").status == "affected"
+    three = _gitlab_cna([{"version": "12.0", "lessThan": "12.9.0", "status": "affected"}], default="affected")
+    assert evaluate(gl, "nvd", three, "12.9.4").reason == "fixed"  # a three-part end in the line: its fix
+
+
+def test_a_document_with_the_full_stored_cve_list_is_never_complete(cat):
+    """Optional (final review 0.1.51): a stored CSAF document keeps its first 30 CVEs – with 30 of them it may name
+    more, its "possibly" stays even when all 30 records say "not affected"."""
+    from app import vendor
+
+    gl = cat["gitlab"]
+    entry = {"name": "GitLab", "vendor": "GitLab", "cpe": "a:gitlab:gitlab", "affected": [{"to": "17.0.5", "text": "<17.0.5"}], "fixed": ["17.0.5"], "not_affected": []}
+    cves = [f"CVE-2026-{20000 + i}" for i in range(vendor.STORED_CVES)]
+    bsi = _adv("csaf", "WID-SEC-W-2026-0030", _bsi([entry]), cves)
+    recs = [_adv("nvd", c, _gitlab_cna([{"version": "16.0", "lessThan": "16.0.3", "status": "affected"}])) for c in cves]
+    assert vendor.group_verdict(gl, vendor.groups_of([bsi, *recs])[0], "17.0").status == "possible"
+    short = _adv("csaf", "WID-SEC-W-2026-0031", _bsi([entry]), cves[:29])
+    assert vendor.group_verdict(gl, vendor.groups_of([short, *recs[:29]])[0], "17.0").status == "not_affected"

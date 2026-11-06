@@ -2,7 +2,23 @@ import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useSearchParams } from "react-router"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, ArrowRight, BookOpen, Copy, DatabaseBackup, FileDown, FileJson, FileSpreadsheet, Info, KeyRound, Loader2, Lock, Server, ShieldCheck } from "lucide-react"
+import {
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  Copy,
+  DatabaseBackup,
+  Download,
+  FileDown,
+  FileJson,
+  FileSpreadsheet,
+  Info,
+  KeyRound,
+  Loader2,
+  Lock,
+  Server,
+  ShieldCheck,
+} from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -16,7 +32,20 @@ import { Field } from "@/components/cobe/form"
 import { SubTabs } from "@/components/cobe/sub-tabs"
 import { Ts } from "@/components/cobe/time"
 import { api, ApiError, saveBlob } from "@/lib/api"
-import { BACKUP_KEY, backupErrorKey, backupState, fmtBytes, nowNote, removedBy, restoreCommand, STATE_COLOR, useBackup, type BackupStatus } from "@/lib/backup"
+import {
+  BACKUP_KEY,
+  backupErrorKey,
+  backupFileUrl,
+  backupState,
+  canDownload,
+  fmtBytes,
+  nowNote,
+  removedBy,
+  restoreCommand,
+  STATE_COLOR,
+  useBackup,
+  type BackupStatus,
+} from "@/lib/backup"
 import { copyWithToast } from "@/lib/clipboard"
 import { docPath } from "@/lib/docs"
 import { errorText, isStale } from "@/lib/errors"
@@ -173,7 +202,7 @@ function BackupCard({ s, restoreConfigured }: { s: BackupStatus; restoreConfigur
         <RetentionForm key={`${s.keep}|${s.rev}`} s={s} />
 
         {/* 4. background: the files and how to restore one */}
-        <div className="space-y-2">
+        <div className="@container space-y-2">
           <p className="text-xs text-muted-foreground">
             <Explained label={t("backup.files", { count: s.backups.length })} text={t("backup.filesHint", { dir: s.dir })} />
           </p>
@@ -181,11 +210,12 @@ function BackupCard({ s, restoreConfigured }: { s: BackupStatus; restoreConfigur
             <p className="text-xs text-muted-foreground">{t("backup.filesEmpty")}</p>
           ) : (
             <ul className={cn("divide-y rounded-lg border", FILE_GRID)}>
-              <li className={cn("hidden px-3 py-2 text-xs text-muted-foreground sm:grid", FILE_ROW)} aria-hidden>
+              <li className={cn("hidden px-3 py-2 text-xs text-muted-foreground @2xl:grid", FILE_ROW)} aria-hidden>
                 <span>{t("backup.col.name")}</span>
                 <span>{t("backup.col.at")}</span>
                 <span className="text-right">{t("backup.col.size")}</span>
                 <span>{t("backup.col.key")}</span>
+                <span className="text-right">{t("backup.col.download")}</span>
               </li>
               {files.map((f) => (
                 <FileRow key={f.name} f={f} />
@@ -302,9 +332,10 @@ function RetentionForm({ s }: { s: BackupStatus }) {
 }
 
 /** The list's columns: one grid for the head and every row (subgrid) – the widths come from the longest entry, never
- *  a fixed width a pill could stick out of. Below sm each row is a small block of its own. */
-const FILE_GRID = "sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto_minmax(0,auto)]"
-const FILE_ROW = "sm:col-span-full sm:grid-cols-subgrid sm:gap-x-4"
+ *  a fixed width a pill could stick out of; the file name keeps 12rem, a pill wraps instead. By the list's own width
+ *  (a container query – the settings page is narrower than the window): below 42rem each row is a small block. */
+const FILE_GRID = "@2xl:grid @2xl:grid-cols-[minmax(12rem,1fr)_auto_auto_minmax(0,auto)_auto]"
+const FILE_ROW = "@2xl:col-span-full @2xl:grid-cols-subgrid @2xl:gap-x-4"
 
 /** What the key column says, explained on hover, focus and tap (UX.md: jargon gets its explanation). */
 function KeyNote({ s }: { s: BackupStatus }) {
@@ -398,7 +429,7 @@ function TapTip({ text, children, className }: { text: string; children: React.R
 function KeyPill({ encrypted }: { encrypted: boolean }) {
   const { t } = useTranslation()
   // wraps onto a second line where the column is narrow (h-auto) – never wider than its cell
-  const wrap = "h-auto min-h-5 max-w-full py-0.5 leading-tight whitespace-normal"
+  const wrap = "h-auto min-h-5 max-w-full rounded-[10px] py-0.5 leading-tight whitespace-normal"
   return encrypted ? (
     <TapTip text={t("backup.encryptedHint")}>
       <Pill color="--success" fg="--success-fg" className={wrap}>
@@ -417,20 +448,58 @@ function KeyPill({ encrypted }: { encrypted: boolean }) {
 function FileRow({ f }: { f: BackupStatus["backups"][number] }) {
   const { t, i18n } = useTranslation()
   return (
-    <li className={cn("grid gap-1 px-3 py-2 text-xs sm:items-center", FILE_ROW)}>
+    <li className={cn("grid gap-1 px-3 py-2 text-xs @2xl:items-center", FILE_ROW)}>
       <span className="min-w-0 font-mono wrap-break-word">{f.name}</span>
       <span className="flex gap-1.5 whitespace-nowrap">
-        <span className="text-muted-foreground sm:hidden">{t("backup.col.at")}:</span>
+        <span className="text-muted-foreground @2xl:hidden">{t("backup.col.at")}:</span>
         <Ts at={f.at} />
       </span>
-      <span className="flex gap-1.5 whitespace-nowrap tabular-nums sm:justify-end">
-        <span className="text-muted-foreground sm:hidden">{t("backup.col.size")}:</span>
+      <span className="flex gap-1.5 whitespace-nowrap tabular-nums @2xl:justify-end">
+        <span className="text-muted-foreground @2xl:hidden">{t("backup.col.size")}:</span>
         {fmtBytes(f.size, i18n.language)}
       </span>
       <span className="min-w-0">
         <KeyPill encrypted={f.encrypted} />
       </span>
+      <span className="flex @2xl:justify-end">{canDownload(f) ? <DownloadButton name={f.name} /> : <ServerOnly />}</span>
     </li>
+  )
+}
+
+/** An encrypted backup to this computer: asked first (what the file is, that it needs the passphrase, keep it safe),
+ *  then a fresh proof of identity (withReauth) – the server streams it, logs it and allows a few per hour. */
+function DownloadButton({ name }: { name: string }) {
+  const { t } = useTranslation()
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    if (!(await confirmAction({ title: t("backup.dl.title"), text: t("backup.dl.text", { name }), confirm: t("backup.dl.confirm"), destructive: false }))) return
+    setBusy(true)
+    try {
+      const { blob, filename } = await withReauth(() => api.getFile(backupFileUrl(name)))
+      saveBlob(blob, filename)
+      toast.success(t("backup.dl.done", { name: filename }))
+    } catch (e) {
+      toast.error(errorText(t, e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => void run()} disabled={busy} aria-label={t("backup.dl.label", { name })}>
+      {busy ? <Loader2 className="animate-spin" /> : <Download />} {busy ? t("backup.dl.running") : t("backup.dl.button")}
+    </Button>
+  )
+}
+
+/** A plain backup has no download – the row says why (on hover, focus and tap). */
+function ServerOnly() {
+  const { t } = useTranslation()
+  return (
+    <TapTip text={t("backup.dl.plainWhy")} className="rounded-sm">
+      <span className="inline-flex items-center gap-1 text-muted-foreground">
+        <Server className="size-3.5 shrink-0" aria-hidden /> {t("backup.dl.serverOnly")}
+      </span>
+    </TapTip>
   )
 }
 

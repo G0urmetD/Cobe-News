@@ -3,6 +3,8 @@ import { ApiError } from "@/lib/api"
 
 /** Maps backend error codes to user-facing text. Unknown codes fall back to a generic message. */
 export function errorText(t: TFunction, err: unknown): string {
+  // no answer at all (fetch failed): offline, or the server not reachable (0.1.51 – before: "Das hat nicht geklappt")
+  if (err instanceof TypeError) return t(typeof navigator !== "undefined" && navigator.onLine === false ? "offline.text" : "errors.network")
   if (!(err instanceof ApiError)) return t("errors.generic")
   const d = err.data
   switch (err.code) {
@@ -26,12 +28,15 @@ export function errorText(t: TFunction, err: unknown): string {
     case "forward_rate_limited":
     case "forward_duplicate":
     case "watch_rate_limited":
+    case "backup_download_rate_limited":
       return t(`errors.${err.code}`, { minutes: Math.max(1, Math.ceil(Number(d.retry_after ?? 60) / 60)) })
     case "directory_unavailable":
       return d.reason ? `${t("errors.directory_unavailable")} (${t(`dir.err.${String(d.reason)}`, { defaultValue: String(d.reason) })})` : t("errors.directory_unavailable")
     default: {
       const key = `errors.${err.code}`
       const text = t(key)
+      // a server error without a code of its own (a 500, a 502 of the proxy while the app restarts): said as such
+      if (text === key && err.status >= 500) return t("errors.server", { status: err.status })
       return text === key ? t("errors.generic_code", { code: err.code }) : text
     }
   }

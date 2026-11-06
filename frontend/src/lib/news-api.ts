@@ -3,6 +3,7 @@ import { api, DETAIL_TIMEOUT_MS, detailRetry } from "@/lib/api"
 import { polledPages } from "@/lib/poll"
 import type { Epss, ExploitHint, Ssvc } from "@/lib/vendor-api"
 import type { AdvisoryChange } from "@/lib/advisory-changes"
+import { type AskedRange, type NewsRange, rangeParams, resolveRange } from "@/lib/news-range"
 
 export type NewsSeverity = "critical" | "high" | "medium" | "low" | "info"
 export const NEWS_SEVERITIES: NewsSeverity[] = ["critical", "high", "medium", "low", "info"]
@@ -174,15 +175,23 @@ export interface NewsPage {
   enabled: boolean
   /** the arrival number of the newest story stored when this page was read – "all read" marks up to it */
   upto?: number
+  /** my read watermark's time – "Seit meinem letzten Besuch" counts from it */
+  mark_at?: string
+  /** the range as this list asked it (a preset's times when its first page was loaded – the next pages and "Alle als
+   *  gelesen" use the same; kept by the browser, not sent by the server) */
+  asked?: AskedRange
 }
 
 /** The body of "Alle als gelesen": the list's filter, and only what had arrived when its first page was loaded (a
  *  story arriving meanwhile was not counted in the dialog and was never seen – it stays new). */
 export function readAllBody(
-  f: { sources: string[]; severities: string[]; topics?: string[]; q: string; muted?: boolean; ours?: boolean; scope?: "all" | "team" },
+  f: { sources: string[]; severities: string[]; topics?: string[]; q: string; muted?: boolean; ours?: boolean; scope?: "all" | "team"; ids?: string[] },
   first: NewsPage | undefined,
 ) {
+  // a notification's stories: those only, nothing else is filtered (as the list asks them)
+  if (f.ids?.length) return { ids: f.ids, muted: true, ...(first?.upto !== undefined ? { upto: first.upto } : {}) }
   return {
+    ...(first?.asked ?? {}),
     source: f.sources,
     severity: f.severities,
     ...(f.topics?.length ? { topic: f.topics } : {}),
@@ -206,17 +215,33 @@ export interface NewsFilter {
   /** "Betrifft unsere Produkte": only stories about a followed product – of my teams under "Mein Team" */
   ours?: boolean
   scope?: "all" | "team"
+  /** "Zeitraum" – a preset is resolved when the first page is asked */
+  range?: NewsRange
+  /** a notification's stories: only these (the page sends no other filter with them) */
+  ids?: string[]
 }
 
 const PAGE = 60
 
-export function newsQuery(f: NewsFilter, before: string | null) {
+/** The next page: the cursor and the range the first page was asked with ("7 Tage" does not move between pages). */
+export interface NewsCursor {
+  before: string
+  asked: AskedRange
+}
+
+export function newsQuery(f: NewsFilter, cursor: NewsCursor | null, asked: AskedRange = cursor?.asked ?? resolveRange(f.range)) {
   const p = new URLSearchParams({ state: f.state, limit: String(PAGE) })
   // the next pages by cursor: stories arriving or read meanwhile neither repeat nor skip one; counts only once
-  if (before) {
-    p.set("before", before)
+  if (cursor) {
+    p.set("before", cursor.before)
     p.set("counts", "false")
   }
+  if (f.ids?.length) {
+    p.set("ids", f.ids.join(","))
+    if (f.muted) p.set("muted", "true")
+    return `/api/news?${p.toString()}`
+  }
+  rangeParams(asked, p)
   for (const s of f.sources) p.append("source", s)
   for (const s of f.severities) p.append("severity", s)
   for (const s of f.topics ?? []) p.append("topic", s)
@@ -252,9 +277,14 @@ export const useNews = (asked: NewsFilter, enabled = true) => {
   return useInfiniteQuery({
     queryKey: ["news", "list", f],
     enabled,
-    queryFn: polledPages<NewsPage, string | null>((o, pageParam) => api.get(newsQuery(f, pageParam), o)),
-    initialPageParam: null as string | null,
-    getNextPageParam: (last) => (last.more ? last.next : undefined),
+    queryFn: polledPages<NewsPage, NewsCursor | null>(async (o, cursor) => {
+      // a preset as times of now – once per first page (a refresh of the list asks "Heute" anew), kept for the next ones
+      const asked = cursor?.asked ?? resolveRange(f.range)
+      const page = await api.get<NewsPage>(newsQuery(f, cursor, asked), o)
+      return { ...page, asked }
+    }),
+    initialPageParam: null as NewsCursor | null,
+    getNextPageParam: (last): NewsCursor | undefined => (last.more && last.next ? { before: last.next, asked: last.asked ?? {} } : undefined),
     // another search or filter: the stories shown stay (dimmed) until the new ones are there – no flash of "Lädt …" per
     // keystroke. Not across the tabs: "Gelesen" showing the new stories for a moment would be wrong.
     placeholderData: (prev, prevQuery) => ((prevQuery?.queryKey[2] as NewsFilter | undefined)?.state === f.state ? prev : undefined),
@@ -265,11 +295,23 @@ export const useNews = (asked: NewsFilter, enabled = true) => {
   })
 }
 
+/** A search term of 1–2 characters: the server sends the list without its numbers (api.short_search – no index serves
+ *  it), the page says so. As the audit log's search: from 3 characters on. */
+export const SEARCH_MIN = 3
+export const isShortSearch = (q: string) => {
+  const term = q.trim().replace(/[%_]/g, "").trim() // as the server's filter: % and _ are no wildcards, they drop out
+  return term.length > 0 && term.length < SEARCH_MIN
+}
+
+const STORY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/** A story's id as the server gives it (a UUID) – anything else in ?story= is no story at all. */
+export const isStoryId = (id: string | null | undefined): id is string => !!id && STORY_ID.test(id)
+
 export const useNewsDetail = (id: string | null) =>
   useQuery({
     queryKey: ["news", "detail", id],
     queryFn: ({ signal }) => api.get<NewsDetail>(`/api/news/${id}`, { signal, timeoutMs: DETAIL_TIMEOUT_MS }),
-    enabled: !!id,
+    enabled: isStoryId(id),
     retry: detailRetry,
     retryDelay: 1000,
   })
@@ -465,3 +507,21 @@ export interface DesktopPrefs {
 }
 
 export const useDesktopPrefs = (enabled = true) => useQuery({ queryKey: ["me", "desktop"], queryFn: () => api.get<DesktopPrefs>("/api/me/desktop"), enabled, staleTime: 60_000 })
+
+/** A reason of the rating as a sentence – a kind this page does not know (a newer server, an imported story) as a
+ *  generic sentence with its value, never the raw key (0.1.51). */
+export function reasonText(t: (k: string, o?: Record<string, unknown>) => string, r: { kind: string; value: string; in_text?: boolean }) {
+  const other = r.value ? t("news.reason.other", { value: r.value }) : t("news.reason.otherPlain")
+  const base =
+    r.kind === "vendor"
+      ? t("news.reason.vendor", { value: t(`news.sev.${r.value}`, { defaultValue: r.value }) })
+      : (r.kind === "kev" || r.kind === "euvd") && !r.value
+        ? t(`news.reason.${r.kind}Plain`)
+        : KNOWN_REASONS.has(r.kind)
+          ? t(`news.reason.${r.kind}`, { value: r.value })
+          : other
+  return r.in_text ? `${base} ${t("news.reason.inText")}` : base
+}
+
+/** The kinds the server rates by (app/news.py: rate, the catalogues) – each with its sentence in the texts. */
+const KNOWN_REASONS = new Set(["bsi", "cvss", "euvd", "exploited", "impact", "kev", "ransomware", "topic", "vendor", "vulnerability"])

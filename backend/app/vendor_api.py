@@ -12,7 +12,7 @@ from pydantic import ConfigDict, Field, field_validator
 from sqlalchemy import and_, select, update
 
 from app import advisory_changes as changes_svc
-from app import audit, catalog_check, exploits, reader, teams
+from app import advisory_cleanup, audit, catalog_check, exploits, plaintext, reader, teams
 from app import catalog_care as care
 from app import vendor as svc
 from app import vendor_catalog as catalog
@@ -146,9 +146,17 @@ def _reading_out(rd: reader.VendorReading | None, key: str, fs: list[dict], coun
 
 
 async def _overview_row(
-    db, f: VendorFollow, vs: list[VendorVersion], kev, euvd, rv: care.Review | None = None, may: set[str] | None = None, rd: reader.VendorReading | None = None
+    db,
+    f: VendorFollow,
+    vs: list[VendorVersion],
+    kev,
+    euvd,
+    rv: care.Review | None = None,
+    may: set[str] | None = None,
+    rd: reader.VendorReading | None = None,
+    deadline: float | None = None,
 ) -> dict:
-    view = await svc.product_view(db, f, vs, kev=kev, euvd=euvd)
+    view = await svc.product_view(db, f, vs, kev=kev, euvd=euvd, deadline=deadline)
     score_svc.apply(view)  # Dringlichkeit: once per view and day (app/vendor_score.py)
     p = view["product"]
     summ = svc.summary(view, vs)
@@ -223,11 +231,15 @@ async def _status(db) -> dict:
     # only the queries the round still asks: the error of a product no longer followed is no error of a source now
     active = await svc.active_keys(db)
     errors = [s for s in states if s.error and s.key in active]
+    fetched = any(s.last_ok_at for s in states)
+    tried = [s for s in states if s.key in active and s.last_fetch_at]
     return {
         "enabled": bool(cfg.get("enabled", True)),
         "last_ok_at": _iso(max((s.last_ok_at for s in states if s.last_ok_at), default=None)),
         "errors": len(errors),
-        "fetched": any(s.last_ok_at for s in states),
+        "fetched": fetched,
+        # nothing has ever answered and every source asked so far failed: not "Erster Abruf läuft" (that never ended)
+        "failed": not fetched and bool(tried) and all(s.error for s in tried),
     }
 
 
@@ -248,7 +260,9 @@ async def overview(user: Reader, db: Db, scope: Literal["all", "team"] = "all") 
         rv = await care.review_ctx(db, [v for x in vers.values() for v in x])
         may = await care.confirmable(db, user)
         rd = await reader.vendor_reading(db, user, [f.product for f in fs])
-        rows = [await _overview_row(db, f, vers.get(f.id, []), kev, euvd, rv, may, rd) for f in fs]
+        # after a change for all (KEV, EPSS, catalogue, settings): the previous views until the new ones are ready
+        dl = svc.stale_deadline(svc.STALE_WAIT)
+        rows = [await _overview_row(db, f, vers.get(f.id, []), kev, euvd, rv, may, rd, dl) for f in fs]
         _same_data(rows)
         changed = await changes_svc.recent_by_product(db, [f.product for f in fs])
         for r in rows:
@@ -260,19 +274,24 @@ async def overview(user: Reader, db: Db, scope: Literal["all", "team"] = "all") 
 @router.get("/vendor/badge")
 async def badge(user: Reader, db: Db) -> dict:
     """The number on "Vendor News" in the sidebar (polled on every page): how many followed products a vulnerability
-    affects, and whether an exploited one does (red) – from the same cached views as the overview, without its payload."""
+    affects, and whether an exploited one does (red) – from the same cached views as the overview, without its payload.
+    Vendor News switched off: nothing (no red dot for a switched-off page). After a change for all the previous views
+    count until the new ones are ready (product_view: polled on every page, it never waits seconds for them)."""
+    if not (await svc.config(db)).get("enabled", True):
+        return {"affected": 0, "exploited": False, "enabled": False}
     fs = await svc.follows(db)
     vers = await svc.versions_of(db, [f.id for f in fs])
     kev, euvd = await svc.kev_index(db), await svc.euvd_cves(db)
     affected = 0
     exploited = False
+    dl = svc.stale_deadline(svc.STALE_WAIT)
     for f in fs:
-        view = await svc.product_view(db, f, vers.get(f.id, []), kev=kev, euvd=euvd)
+        view = await svc.product_view(db, f, vers.get(f.id, []), kev=kev, euvd=euvd, deadline=dl)
         top, counts = view.get("_counts") or _counts(view["findings"])
         view["_counts"] = (top, counts)
         affected += bool(counts["affected"])
         exploited = exploited or bool(counts["exploited_affected"])
-    return {"affected": affected, "exploited": exploited}
+    return {"affected": affected, "exploited": exploited, "enabled": True}
 
 
 def _follow_target(f: VendorFollow) -> audit.Target:
@@ -411,8 +430,10 @@ async def put_follow(key: str, body: FollowIn, request: Request, admin: Admin, d
         db.add(f)
         audit.record(db, admin, "catalog.followed", _follow_target(f), {"enabled": f.enabled, "tags": f.tags})
         await db.commit()
+        await advisory_cleanup.on_follow(db, p)  # its queries start in full: what the cleanup removed comes back
         await svc.relink(db, p)
     else:
+        switched_on = "enabled" in body.model_fields_set and body.enabled and not f.enabled
         if body.enabled and not f.enabled:
             # switched on again: what is found now is the baseline, not news – also for its versions (the events that
             # told the earlier notifications apart were pruned while it was off)
@@ -430,6 +451,8 @@ async def put_follow(key: str, body: FollowIn, request: Request, admin: Admin, d
             audit.record(db, admin, "catalog.follow_changed", _follow_target(f), {"changes": changes})
         f.updated_at = now
         await db.commit()
+        if switched_on and (p := svc.product_of(f)) is not None:
+            await advisory_cleanup.on_follow(db, p)
     svc.bump([key])
     _wake(request)
     return {"ok": True}
@@ -469,7 +492,9 @@ async def add_custom(body: CustomIn, request: Request, admin: Admin, db: Db) -> 
     db.add(f)
     audit.record(db, admin, "catalog.custom_added", audit.target("product", key, body.label), {"cpe": cpe, "category": body.category})
     await db.commit()
-    await svc.relink(db, catalog.custom_product({**f.custom, "key": key}))
+    p = catalog.custom_product({**f.custom, "key": key})
+    await advisory_cleanup.on_follow(db, p)  # its CPE may have been followed before: a full fetch
+    await svc.relink(db, p)
     svc.bump([key])
     _wake(request)
     return {"key": key}
@@ -479,6 +504,19 @@ class VersionIn(_M):
     version: str = Field(min_length=1, max_length=200)  # a pasted line (SELECT @@VERSION); what is stored is at most 64
     label: str = Field(default="", max_length=100)
     count: int | None = Field(default=None, ge=1, le=100000)
+
+    @field_validator("label")
+    @classmethod
+    def _label(cls, v: str) -> str:
+        return plaintext.label(v)  # no direction or invisible characters (0.1.51)
+
+
+def _no_twin(have: list[VendorVersion], norm: str, label: str, own: uuid.UUID | None = None) -> None:
+    """The same version with the same label once per product (0.1.51 – before, a second "3.9.0" without a label was
+    taken silently and showed as a twin). The same version with another label (a second site) stays fine."""
+    key = label.casefold()
+    if any(x.id != own and x.version == norm and (x.label or "").casefold() == key for x in have):
+        raise api_error(409, "version_exists", version=norm, label=label)
 
 
 def _checked(product: dict, text: str) -> str:
@@ -501,6 +539,7 @@ async def add_version(key: str, body: VersionIn, request: Request, admin: Admin,
     have = (await svc.versions_of(db, [f.id])).get(f.id, [])
     if len(have) >= MAX_VERSIONS:
         raise api_error(422, "too_many_versions")
+    _no_twin(have, norm, body.label)
     now = datetime.now(UTC)
     # entered: confirmed by the one who entered it (Versionen prüfen, app/catalog_care.py)
     v = VendorVersion(id=uuid.uuid4(), follow_id=f.id, version=norm, label=body.label, count=body.count, created_at=now, updated_at=now, confirmed_at=now, confirmed_by=admin.id)
@@ -524,6 +563,8 @@ async def update_version(vid: uuid.UUID, body: VersionIn, request: Request, admi
     v, f = await _version(db, vid)
     p = svc.product_of(f) or {}
     norm = _checked(p, body.version)
+    if f is not None:
+        _no_twin((await svc.versions_of(db, [f.id])).get(f.id, []), norm, body.label, own=v.id)
     if norm != v.version:
         v.baseline_at = None  # another version: evaluated anew; what it finds then is the baseline
     if f is not None and (changes := audit.diff({"version": v.version, "label": v.label, "count": v.count}, {"version": norm, "label": body.label, "count": body.count}, ("version", "label", "count"))):

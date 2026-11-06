@@ -59,13 +59,35 @@ markieren“, „Artikel öffnen“ (der Originalartikel in einem neuen Tab) und
   einem Produkt folgt ([mehr](#unsere-produkte)) – er gilt zusätzlich zu allen anderen Filtern.
 - Quelle, Schwere, Thema und „Betrifft unsere Produkte“ merkt sich zusätzlich der Browser für dein Konto (wenn du keine
   Standard-Ansicht hast).
-- „Filter zurücksetzen“ hebt Quelle, Schwere, Thema und „Betrifft unsere Produkte“ auf.
+- **Zeitraum**: nur Meldungen aus einer Zeitspanne. Schnellauswahl: *Letzte Stunde*, *Heute* (ab 00:00), *Gestern*,
+  *24 Stunden*, *7 Tage*, *30 Tage* und *Seit meinem letzten Besuch*. Oder ein **eigener Zeitraum** mit *Von* und *Bis*
+  (Datum und Uhrzeit in der Ortszeit deines Browsers, z. B. MEZ); ein leeres Feld ist ein offenes Ende, ein Datum ohne
+  Uhrzeit bei *Bis* schließt den ganzen Tag ein. *Zeit bezieht sich auf* wählt, ob das Datum der Meldung zählt
+  (**Veröffentlicht**, Standard) oder wann Cobe News sie abgeholt hat (**Eingegangen** – auch ältere Meldungen, die
+  eine Quelle erst jetzt liefert). Ist ein Zeitraum aktiv, zeigt der Knopf ihn kurz („Heute“, „05.11. 08:00 – jetzt“)
+  und darunter erscheint ein Chip („Zeitraum: heute, seit 00:00 ×“) mit der Zahl der Treffer; das × hebt ihn auf.
+  Der Zeitraum gilt für die Liste, die Schnellfilter-Zahlen, „Nur ungelesene“ und „Alle als gelesen“.
+- **Seit meinem letzten Besuch** zählt ab dem Zeitpunkt, an dem du zuletzt „Alle als gelesen“ **ohne** Filter gewählt
+  hast (vorher: seit dein Konto angelegt wurde) – daneben steht, wie lange das her ist („vor 14 Stunden“). Gezählt wird
+  nach Eingang; anders als „Nur ungelesene“ bleibt eine Meldung in der Liste, wenn du sie öffnest.
+- Im Link und in einer gespeicherten Ansicht steht die Schnellauswahl als Name, nicht als feste Uhrzeit: eine Ansicht
+  „Heute“ zeigt auch morgen den dann aktuellen Tag. Ein eigener Zeitraum steht mit seinen Zeitpunkten darin.
+- „Filter zurücksetzen“ hebt Quelle, Schwere, Thema, „Betrifft unsere Produkte“ und den Zeitraum auf.
 - **Nur ungelesene**: blendet Gelesenes aus. **Stummgeschaltete zeigen**: zeigt auch die Meldungen, deren CVEs du alle
   stummgeschaltet hast (blass) – sonst fehlen sie.
 - **Ansichten**: die Filter unter einem Namen speichern, als Standard setzen, als Link teilen
   ([Ansichten](/docs/erste-schritte#ansichten)).
 - „Alle als gelesen“ wirkt genau auf die ungelesenen Meldungen, die gerade zu Suche und Filtern passen
   ([Gelesen und ungelesen](/docs/erste-schritte#gelesen)).
+
+### Aus einer Benachrichtigung {#aus-benachrichtigung}
+
+Eine Benachrichtigung mit mehreren Meldungen verlinkt sie zusammen: `https://<cobe-news>/?ids=<id>,<id>,…` (höchstens
+50). Die Liste zeigt dann genau diese Meldungen, die neueste zuerst – gelesen oder nicht, auch stummgeschaltete – und
+den Chip „Aus der Benachrichtigung: 3 Meldungen ×“. Die übrigen Filter ruhen solange; das ×, „Filter zurücksetzen“
+oder eine Änderung an einem Filter führt zurück zur normalen Liste. Eine Meldung, die inzwischen gelöscht wurde
+(Aufbewahrungszeit), fehlt einfach. „Alle als gelesen“ markiert hier nur diese Meldungen. Ein solcher Link wird nie
+Teil einer gespeicherten Ansicht; zusammen mit `&story=<id>` öffnet er gleich eine der Meldungen.
 
 ### Jede Meldung nur einmal {#doppelte}
 

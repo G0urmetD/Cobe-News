@@ -396,7 +396,12 @@ Typische Gründe für **„möglicherweise“**:
 - der Hinweis nennt eure Release-Linie nicht,
 - die NVD nennt „alle Versionen“ ohne Grenze,
 - nur einzelne Hotfix-Stände sind betroffen, eurer wird nicht genannt,
-- ein PAN-OS-Hinweis ohne Angabe zu Panorama.
+- ein PAN-OS-Hinweis ohne Angabe zu Panorama,
+- die Quellen widersprechen sich: laut Hersteller nicht betroffen, laut NVD im betroffenen Bereich – oder laut BSI
+  „alle Versionen“ ohne Versionsangabe, laut den CVE-Daten nicht betroffen.
+
+Jeder Grund nennt seine Quelle: „laut Hersteller“ steht nur, wo das Urteil vom Hersteller selbst kommt (sein Hinweis
+oder seine Angaben im CVE-Eintrag); sonst „laut NVD“, „laut CISA (ADP)“, „laut BSI“, „laut OSV“ oder „Quelle: …“.
 
 Nennen mehrere Quellen dieselbe Schwachstelle, entscheidet der Hinweis des Herstellers vor der [NVD](term:nvd), die
 NVD vor der CVE-Liste ([cvelistV5](term:cvelist)) und OSV zuletzt – Einzelheiten:

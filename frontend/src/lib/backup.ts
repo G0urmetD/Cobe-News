@@ -115,6 +115,11 @@ export function restoreCommand(name: string, dir = "/data/backups"): string {
   return `docker compose stop app\ndocker compose run --rm --no-deps app python -m app.cli restore ${file}\ndocker compose start app`
 }
 
+/** Only an encrypted backup leaves the server through the browser (the server refuses a plain one: it is the whole
+ *  database, readable). The name goes into the path as one segment. */
+export const canDownload = (f: Pick<BackupFile, "encrypted">) => f.encrypted
+export const backupFileUrl = (name: string) => `/api/admin/backup/files/${encodeURIComponent(name)}`
+
 /** The last outcome's error in the reader's language (the backend's own text stays available as detail). */
 export const backupErrorKey = (last: BackupLast) => `backup.err.${last.code ?? "failed"}`
 

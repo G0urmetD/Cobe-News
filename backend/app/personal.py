@@ -462,36 +462,41 @@ def story(ev: VendorEvent, lang: str) -> notify.Story:
     return s
 
 
-def _ordered(events: list[VendorEvent]) -> list[VendorEvent]:
-    return sorted(events, key=lambda e: (notify.RANK.get(e.severity, 0), e.created_at), reverse=True)
+def _ordered(events: list[VendorEvent], lang: str) -> list[tuple[VendorEvent, notify.Story]]:
+    """The events with their stories in the order every way shows them and cuts them (notify.priority: exploited or
+    critical first, then by severity, the newest first) – the mail, the Teams card and the push summary agree."""
+    pairs = [(e, story(e, lang)) for e in events]
+    return sorted(pairs, key=lambda p: notify.priority(p[1]), reverse=True)
 
 
 def render_mail(events: list[VendorEvent], lang: str, tz: str | None = None) -> tuple[str, str, str]:
     """The person's mail – times in their own zone (`tz`: their quiet hours' zone, else Europe/Berlin). The LIST shown
-    are cut in the order the mail shows them (notify.priority: exploited or critical first, then by severity, newest)."""
+    are cut in the order the mail shows them (_ordered)."""
     lang = _lang(lang)
-    shown = sorted((story(e, lang) for e in events), key=notify.priority, reverse=True)[:LIST]
+    shown = [s for _, s in _ordered(events, lang)[:LIST]]
     return notify.render_mail(LABELS[lang]["label"], shown, len(events), lang, footer=LABELS[lang]["footer"], tz=tz)
 
 
-def render_teams(events: list[VendorEvent], lang: str, *, test: bool = False) -> dict:
+def render_teams(events: list[VendorEvent], lang: str, *, test: bool = False, tz: str | None = None) -> dict:
+    """The person's Teams card – cut and ordered as the mail (_ordered), times in their zone (`tz`)."""
     lang = _lang(lang)
-    shown = _ordered(events)[:LIST] if events else []
-    stories = [story(e, lang) for e in shown] or [notify.EXAMPLE]
-    return notify.render_teams(LABELS[lang]["label"], stories, len(events) or 1, lang, test=test)
+    shown = [s for _, s in _ordered(events, lang)[:LIST]] if events else []
+    stories = shown or [notify.EXAMPLE]
+    return notify.render_teams(LABELS[lang]["label"], stories, len(events) or 1, lang, test=test, tz=tz)
 
 
 def push_payloads(events: list[VendorEvent], lang: str) -> list[dict]:
     """One event: itself (product, title, severity, a link to it in Vendor News); more: one summary."""
     lang = _lang(lang)
-    top = _ordered(events)
+    pairs = _ordered(events, lang)
+    top = [e for e, _ in pairs]
     if len(top) == 1:
-        s = story(top[0], lang)
+        s = pairs[0][1]
         d = top[0].data or {}
         # the catalogue's label of today (a product renamed, split or merged since the event keeps its old one)
         product = notify.label_now(top[0].product, str(d["product"])) if d.get("product") else str(d.get("cve") or top[0].product)
         return [webpush.vendor_payload(str(top[0].id), s.title, product, top[0].severity, event_path(top[0]), lang)]
-    first = story(top[0], lang)
+    first = pairs[0][1]
     sev = notify.LABELS[lang]["sev"].get(top[0].severity, top[0].severity)
     lb = LABELS[lang]
     return [
@@ -502,7 +507,8 @@ def push_payloads(events: list[VendorEvent], lang: str) -> list[dict]:
             "title": lb["summary"].format(n=len(top)),
             "body": lb["summary_text"].format(sev=sev, first=first.title[:120]),
             "severity": top[0].severity,
-            "url": "/vendor",
+            # all of them in Vendor News: their product when they are of one, else the overview (as the mail's button)
+            "url": notify.overview_path([s for _, s in pairs], len(pairs)),
         }
     ]
 
@@ -815,7 +821,7 @@ async def _send(job: _Job, smtp: dict, key: webpush.Vapid | None) -> tuple[notif
                 await notify.send_mail(smtp, [job.address], subject, text_, html)
             elif job.way == "teams":
                 url = check_teams_url(job.url)
-                await notify.post(url, notify._json(render_teams(job.events, job.lang)), notify.JSON_HEADERS, policy=notify.PUBLIC_ONLY)
+                await notify.post(url, notify._json(render_teams(job.events, job.lang, tz=job.tz)), notify.JSON_HEADERS, policy=notify.PUBLIC_ONLY)
             else:
                 if key is None:
                     return notify.NotifyError("not_configured"), []

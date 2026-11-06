@@ -46,9 +46,9 @@ angelegten**.
 
 ## Schritt für Schritt: sichern, herunterladen, einspielen {#schritt-fuer-schritt}
 
-Die Sicherungen liegen **nur auf dem Server**. Einen Download oder ein Einspielen im Browser gibt es bewusst nicht –
-eine Sicherung enthält alle Daten. Herunterladen (auf ein anderes System kopieren) und Einspielen geschehen per Befehl
-auf dem Server. Der [Rücksicherungs-Test](#ruecksicherungs-test) ist dagegen nur eine Probe: Er spielt die neueste
+Die Sicherungen liegen **auf dem Server**. Eine **verschlüsselte** Sicherung (`.tar.enc`) lässt sich auch in der App
+herunterladen ([Herunterladen in der App](#herunterladen-app)); eine unverschlüsselte nur per Befehl auf dem Server – sie
+enthält die ganze Datenbank lesbar. **Eingespielt** wird immer per Befehl auf dem Server, nie im Browser. Der [Rücksicherungs-Test](#ruecksicherungs-test) ist dagegen nur eine Probe: Er spielt die neueste
 Sicherung in eine Wegwerf-Datenbank und ändert an euren Daten nichts.
 
 Die Beispiele nehmen die Datei `cobe-news-20261104-123000.tar.enc`; die Ausgabe der Sicherung und die Liste auf der
@@ -75,6 +75,28 @@ docker exec cobe-news-app cat /data/secret.key > cobe-news-secret.key   # Portai
 
 Steht `SECRET_KEY` in der `.env` bzw. in den Variablen des Stacks, ist das der Schlüssel – dann diesen Wert aufbewahren.
 
+### Herunterladen in der App {#herunterladen-app}
+
+In *Einstellungen → Sicherung & Export* steht bei jeder verschlüsselten Sicherung **„Herunterladen“**:
+
+1. **„Herunterladen“** klicken. Die Seite fragt zuerst: Die Datei enthält die ganze Datenbank, verschlüsselt; zum
+   Einspielen braucht es genau diese Passphrase – ohne sie ist die Datei nutzlos, mit ihr kann jeder sie lesen.
+2. Mit **„Herunterladen“** bestätigen, dann die [erneute Bestätigung](/docs/anmeldung#erneut-bestaetigen) eurer
+   Identität (Passwort und Code bzw. Entra).
+3. Der Browser speichert die Datei. Sie sicher aufbewahren – nicht im Download-Ordner liegen lassen, nicht weitergeben.
+
+Regeln:
+
+- Nur `.tar.enc`. Bei einer unverschlüsselten Sicherung steht „Nur auf dem Server“ – sie enthält die ganze Datenbank
+  lesbar und bleibt deshalb auf dem Server (Kopieren per Befehl, unten).
+- Jeder Download steht im [Protokoll](/docs/betrieb#protokoll) („Verschlüsselte Sicherung heruntergeladen“, mit Datei und Größe)
+  und zählt zu „Nur Auffälliges“.
+- Höchstens 6 Downloads je Stunde und Admin, und immer nur einer zur Zeit.
+- Der Browser hält die Datei bis zum Speichern ganz im Arbeitsspeicher – sehr große Sicherungen (ab etwa 1 GB) besser
+  per Befehl auf dem Server kopieren (`docker cp`, unten).
+- Die Datei wird vom Server gestreamt; mit dem mitgelieferten nginx auch große Dateien ohne Zwischenspeicher im Proxy.
+  Ein eigener Reverse Proxy sollte für `/api/admin/backup/files/` ebenso nicht puffern (nginx: `proxy_buffering off`).
+
 ### Lokale Installation (docker compose) {#schritte-lokal}
 
 Im Installationsordner, z. B. `/opt/cobe-news`; die Container heißen `cobe-news-app` und `cobe-news-db`, die Dateien
@@ -91,7 +113,8 @@ docker compose exec -T app python -m app.cli backup --passphrase-file - < /root/
 Die erste Zeile verschlüsselt mit der Passphrase der App ([Passphrase-Datei](#passphrase-datei)) oder, ohne sie,
 gar nicht. Die zweite gibt die Passphrase über die Standardeingabe mit – sie steht in keiner Befehlszeile.
 
-**2. Herunterladen** – `docker compose cp` schreibt die Kopie mit eurem Benutzer (die Dateien in `data/backups/` darf
+**2. Herunterladen** – eine verschlüsselte Sicherung auch [in der App](#herunterladen-app). Per Befehl:
+`docker compose cp` schreibt die Kopie mit eurem Benutzer (die Dateien in `data/backups/` darf
 nur der Container lesen), `scp` bringt sie auf ein anderes System:
 
 ```bash
@@ -146,7 +169,8 @@ docker exec news-app-1 python -m app.cli backup
 docker exec -i news-app-1 python -m app.cli backup --passphrase-file - < /root/.cobe-news-backup-pass
 ```
 
-**2. Herunterladen** – eine Datei mit `docker cp`, alle auf einmal mit `tar` aus dem Container (ohne halbfertige und
+**2. Herunterladen** – eine verschlüsselte Sicherung auch [in der App](#herunterladen-app). Per Befehl: eine Datei mit
+`docker cp`, alle auf einmal mit `tar` aus dem Container (ohne halbfertige und
 versteckte Dateien), dann mit `scp` weg:
 
 ```bash
@@ -227,8 +251,9 @@ und der technischen Meldung. Häufige Gründe:
 
 | Die Passphrase-Datei (BACKUP_PASSPHRASE_FILE) ließ sich nicht lesen | der Kasten über der Liste nennt den Grund – [Passphrase-Datei](#passphrase-datei) |
 
-Darunter steht die Liste der Sicherungen auf dem Server (Datei, Erstellt, Größe, Verschlüsselung), die neuesten 10, mit
-„Alle anzeigen“ alle:
+Darunter steht die Liste der Sicherungen auf dem Server (Datei, Erstellt, Größe, Verschlüsselung, Herunterladen), die
+neuesten 10, mit „Alle anzeigen“ alle. Eine verschlüsselte hat den Knopf „Herunterladen“
+([Herunterladen in der App](#herunterladen-app)), eine unverschlüsselte den Hinweis „Nur auf dem Server“:
 
 | Anzeige | Bedeutung |
 |---|---|
@@ -243,7 +268,7 @@ Passphrase hat, sonst „Wird unverschlüsselt angelegt – die App selbst kennt
 verschlüsselte Sicherungen in der Liste, kommen die von einem Befehl mit Passphrase (z. B. dem cron-Job) – deshalb
 können beide Arten nebeneinander stehen.
 
-Darunter: wo die Sicherungen liegen und dass Herunterladen und Einspielen nur auf dem Server gehen (mit dem Link zu
+Darunter: wo die Sicherungen liegen, was sich herunterladen lässt und dass eingespielt nur auf dem Server wird (mit dem Link zu
 [Schritt für Schritt](#schritt-fuer-schritt)), die Befehle zum Wiederherstellen der neuesten Sicherung mit dem Knopf
 „Befehle zum Wiederherstellen kopieren“ und ein Hinweis auf den [Rücksicherungs-Test](#ruecksicherungs-test).
 

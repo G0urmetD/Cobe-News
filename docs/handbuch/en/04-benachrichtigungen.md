@@ -489,7 +489,7 @@ the same content as compact text. The colour follows the severity.
 | **Source** | the source's name |
 | **Category** | the story's [topics](/docs/news-quellen#themen) (at most three) and the severity, e.g. "Zero-day · Actively exploited · Critical"; without a topic the severity and the kind of source ("High · Authority") |
 | **Short description** | the first one or two sentences of the summary, at most about 200 characters – cut at a sentence end, a too long first sentence at the last word end with "…" |
-| Footer | date and "Open in Cobe News" |
+| Footer | date in local time with the zone (Europe/Berlin, e.g. "2026-11-02 09:00 CET") and "Open in Cobe News" |
 
 Example (Telegram):
 
@@ -501,7 +501,7 @@ Product: Chrome < 142.0.7444.59
 Source: BleepingComputer
 Category: Zero-day · Actively exploited · Critical
 Google released an emergency update for Chrome. CVE-2026-1234 is already exploited.
-2026-11-02 08:00 UTC · Open in Cobe News
+2026-11-02 09:00 CET · Open in Cobe News
 ```
 
 When **more than 3** stories come at once (a [summary](#einmal-pro-kanal)), it becomes a **compact list**: one line per
@@ -534,8 +534,13 @@ no tracking pixels.
   News".
 - **From 6 stories** a compact list: one line per story – severity, product, the title as a link into Cobe News –
   without summaries.
+- **Button "Open Cobe News".** With one story it opens exactly that story. With several it opens the news list filtered
+  to exactly the message's stories – also those under "… and N more" (chip "From the notification (N)", up to 50 stories;
+  more: the whole list). Vendor News findings of one product open that product, of several products Vendor News. The
+  same goes for the button in Slack and Teams, the click on ntfy, Gotify and desktop push messages and the personal
+  messages; a forwarded story opens itself.
 - **Time.** Local time with the zone's abbreviation, so it is unambiguous: "2026-11-04 11:19 CET" (summer: CEST; in
-  German "MEZ"/"MESZ"). Channels use Europe/Berlin; [personal messages](#meine-produkte) the person's time zone (from
+  German "MEZ"/"MESZ") – likewise in the chat cards, push texts and forwards. Channels use Europe/Berlin; [personal messages](#meine-produkte) the person's time zone (from
   their [quiet hours](#ruhezeiten), else Europe/Berlin as well).
 - **Light and dark.** The mail has a light and a dark colour scheme; programs with a dark mode (Apple Mail, iOS, Outlook
   for Mac and Outlook.com, Thunderbird) show the dark one, the severity stays readable in both.

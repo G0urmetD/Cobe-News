@@ -31,6 +31,7 @@ import { ChannelIcon, ChannelsPane } from "@/pages/settings-channels"
 import { DeliveryLogPane } from "@/pages/settings-delivery-log"
 import { DryRunPanel } from "@/pages/settings-dry-run"
 import { Loading, SaveBar, SettingsCard, SheetActions, SheetBody, SheetLoading, StaleNotice } from "@/pages/settings-shared"
+import { isoList } from "@/lib/bidi"
 
 function SeverityPicker({ value, onChange }: { value: NewsSeverity[]; onChange: (v: NewsSeverity[]) => void }) {
   const { t } = useTranslation()
@@ -173,7 +174,7 @@ function ChannelChip({ c }: { c: NotifyChannel }) {
   const problem = noServer ? t("channels.mailMissing") : c.last_error ? errorCategoryText(t, c.last_error) : null
   return (
     <Pill color={problem ? "--warning" : "--muted-foreground"} title={problem ?? t(`notify.channel.${c.type}`)}>
-      <ChannelIcon type={c.type} /> {c.name}
+      <ChannelIcon type={c.type} /> <bdi>{c.name}</bdi>
     </Pill>
   )
 }
@@ -260,15 +261,17 @@ function RuleList({ onEdit, onChannels }: { onEdit: (r: NotifyRule | "new") => v
                     <BellRing className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1 space-y-1.5">
-                    <p className="text-sm font-medium">{r.name}</p>
+                    <p className="text-sm font-medium">
+                      <bdi>{r.name}</bdi>
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {r.kinds.map((k) => t(`notify.kind.${k}`)).join(", ") +
                         " · " +
                         (r.severities.length ? r.severities.map((s) => t(`news.sev.${s}`)).join(", ") : t("notify.allSeverities")) +
                         " · " +
-                        (names.length ? names.join(", ") : t("notify.allSources")) +
+                        (names.length ? isoList(names) : t("notify.allSources")) +
                         (r.topics?.length && r.kinds.includes("news") ? " · " + t("notify.topicsList", { names: r.topics.map((x) => t(`news.topic.${x}`)).join(", ") }) : "") +
-                        (ruleTeams(r).length ? " · " + t("notify.teamsList", { names: ruleTeams(r).join(", ") }) : "") +
+                        (ruleTeams(r).length ? " · " + t("notify.teamsList", { names: isoList(ruleTeams(r)) }) : "") +
                         " · " +
                         (r.lang === "en" ? "English" : "Deutsch")}
                     </p>

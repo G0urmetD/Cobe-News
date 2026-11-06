@@ -44,8 +44,9 @@ is done, the oldest beyond that are deleted – **also those made by cron**.
 
 ## Step by step: back up, download, restore {#schritt-fuer-schritt}
 
-The backups are **on the server only**. There is deliberately no download or restore in the browser – a backup holds
-all the data. Downloading (copying to another system) and restoring are done by command on the server. The
+The backups are **on the server**. An **encrypted** backup (`.tar.enc`) can also be downloaded in the app
+([Download in the app](#herunterladen-app)); an unencrypted one by command on the server only – it holds the whole
+database readable. A **restore** is always done by command on the server, never in the browser. The
 [restore test](#ruecksicherungs-test), on the other hand, is only a trial run: it restores the newest backup into a
 throwaway database and changes nothing in your data.
 
@@ -73,6 +74,28 @@ docker exec cobe-news-app cat /data/secret.key > cobe-news-secret.key   # Portai
 
 If `SECRET_KEY` is in the `.env` or in the stack's variables, that is the key – keep that value.
 
+### Download in the app {#herunterladen-app}
+
+In *Settings → Backup & export* every encrypted backup has **"Download"**:
+
+1. Click **"Download"**. The page asks first: the file holds the whole database, encrypted; restoring it needs exactly
+   that passphrase – without it the file is useless, with it anyone can read it.
+2. Confirm with **"Download"**, then [confirm your identity again](/docs/anmeldung#erneut-bestaetigen) (password and
+   code, or Entra).
+3. The browser saves the file. Keep it safe – do not leave it in the downloads folder, do not pass it on.
+
+Rules:
+
+- Only `.tar.enc`. An unencrypted backup shows "Server only" – it holds the whole database readable and therefore stays
+  on the server (copy it by command, below).
+- Every download is in the [audit log](/docs/betrieb#protokoll) ("Encrypted backup downloaded", with file and size) and counts
+  as "notable".
+- At most 6 downloads per hour and admin, and only one at a time.
+- The browser keeps the whole file in memory until it is saved – very large backups (from about 1 GB) are better copied
+  by command on the server (`docker cp`, below).
+- The server streams the file; with the bundled nginx also big files without being buffered in the proxy. A reverse
+  proxy of your own should not buffer `/api/admin/backup/files/` either (nginx: `proxy_buffering off`).
+
 ### Local install (docker compose) {#schritte-lokal}
 
 In the installation folder, e.g. `/opt/cobe-news`; the containers are `cobe-news-app` and `cobe-news-db`, the files are
@@ -89,7 +112,8 @@ docker compose exec -T app python -m app.cli backup --passphrase-file - < /root/
 The first line encrypts with the app's passphrase ([passphrase file](#passphrase-datei)) or, without one, not at all.
 The second hands the passphrase over through standard input – it is on no command line.
 
-**2. Download** – `docker compose cp` writes the copy as your user (only the container may read the files in
+**2. Download** – an encrypted backup also [in the app](#herunterladen-app). By command: `docker compose cp` writes the
+copy as your user (only the container may read the files in
 `data/backups/`), `scp` takes it to another system:
 
 ```bash
@@ -144,7 +168,8 @@ docker exec news-app-1 python -m app.cli backup
 docker exec -i news-app-1 python -m app.cli backup --passphrase-file - < /root/.cobe-news-backup-pass
 ```
 
-**2. Download** – one file with `docker cp`, all at once with `tar` out of the container (without half-written and
+**2. Download** – an encrypted backup also [in the app](#herunterladen-app). By command: one file with `docker cp`, all
+at once with `tar` out of the container (without half-written and
 hidden files), then away with `scp`:
 
 ```bash
@@ -223,7 +248,9 @@ message. Common reasons:
 
 | The passphrase file (BACKUP_PASSPHRASE_FILE) could not be read | the box above the list names the reason – [passphrase file](#passphrase-datei) |
 
-Below is the list of backups on the server (file, created, size, encryption), the newest 10, all with "Show all":
+Below is the list of backups on the server (file, created, size, encryption, download), the newest 10, all with "Show
+all". An encrypted one has the button "Download" ([Download in the app](#herunterladen-app)), an unencrypted one the
+note "Server only":
 
 | Shown | Meaning |
 |---|---|
@@ -237,7 +264,7 @@ Next to the button the page says what "Back up now" will make: "Encrypted, with 
 passphrase, otherwise "Will be unencrypted – the app itself knows no passphrase". Encrypted backups beside it in the
 list come from a command with a passphrase (e.g. the cron job) – that is why both kinds can stand side by side.
 
-Below that: where the backups are and that download and restore work on the server only (with the link to
+Below that: where the backups are, what can be downloaded and that a restore works on the server only (with the link to
 [Step by step](#schritt-fuer-schritt)), the commands to restore the newest backup with the button "Copy the restore
 commands", and a note on the [restore test](#ruecksicherungs-test).
 

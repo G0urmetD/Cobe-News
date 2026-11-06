@@ -236,7 +236,7 @@ async def test_version_change_is_evaluated_at_once_without_fetching(admin_client
     r = await admin_client.put(f"/api/vendor/versions/{vid}", json={"version": "11.2.4-h5", "label": "RZ Nord"})
     assert r.status_code == 200
     f = {x["ident"]: x for x in (await reader_client.get("/api/vendor/products/panos")).json()["findings"]}
-    assert f["CVE-2026-0322"]["versions"][0] | {"score": None} == {"score": None, "id": vid, "version": "11.2.4-h5", "status": "affected", "reason": "in_range", "fixed": "11.2.4-h22", "detail": {}}
+    assert f["CVE-2026-0322"]["versions"][0] | {"score": None} == {"score": None, "id": vid, "version": "11.2.4-h5", "status": "affected", "reason": "in_range", "fixed": "11.2.4-h22", "detail": {"by": "vendor"}}
     assert len(sites.calls) == n
 
 

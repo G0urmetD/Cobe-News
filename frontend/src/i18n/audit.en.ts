@@ -116,6 +116,7 @@ const auditEn: Record<string, string> = {
   "audit.action.backup.deleted": "Backups removed",
   "audit.action.restore_test.run": "Restore test started",
   "audit.action.export.downloaded": "Export downloaded",
+  "audit.action.backup.downloaded": "Encrypted backup downloaded",
   "audit.action.audit.exported": "Audit log exported",
   "audit.action.source.created": "Source added",
   "audit.action.source.changed": "Source changed",

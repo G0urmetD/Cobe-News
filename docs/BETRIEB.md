@@ -71,20 +71,20 @@ der Release-Pipeline, siehe [Release](#release)), schaltet die Datei `docker-com
 
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
-COBE_NEWS_VERSION=0.1.50                                   # eine Version, nicht latest – gilt für alle drei Images
+COBE_NEWS_VERSION=0.1.51                                   # eine Version, nicht latest – gilt für alle drei Images
 ```
 
 Die Datei ersetzt bei `app`, `db` und `proxy` nur das Image (der `build`-Teil fällt weg); alles andere – Volumes, Netze,
 `.env` – bleibt, wie es ist. Ohne `COBE_NEWS_VERSION` bricht `docker compose` mit einem Hinweis ab, statt still etwas
 anderes zu starten. Einzelne Images lassen sich per Digest festnageln: `COBE_NEWS_IMAGE`, `COBE_NEWS_DB_IMAGE`,
-`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.50@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
+`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.51@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
 **Bis 0.1.48** nahm die Datei nur `COBE_NEWS_IMAGE` (die App) – wer sie so nutzt, setzt jetzt `COBE_NEWS_VERSION` und
 nimmt `COBE_NEWS_IMAGE` heraus (sonst bliebe die App auf der alten Version). Vor dem Start die Signaturen prüfen
 (cosign ≥ 2, keyless – die Identität ist der Release-Workflow dieses Repositorys):
 
 ```bash
 for i in cobe-news cobe-news-db cobe-news-proxy; do
-  cosign verify ghcr.io/g0urmetd/$i:0.1.50 \
+  cosign verify ghcr.io/g0urmetd/$i:0.1.51 \
     --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -93,7 +93,7 @@ docker compose up -d --remove-orphans   # ohne --build
 docker compose config --images          # zeigt, welche Images Compose nimmt
 ```
 
-`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.50@sha256:<digest>` in der
+`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.51@sha256:<digest>` in der
 jeweiligen Image-Variable), startet genau das geprüfte Image, auch wenn der Tag später anders zeigen sollte. Ein Update:
 `COBE_NEWS_VERSION` auf die neue Version setzen, Signaturen prüfen, `docker compose pull && docker compose up -d
 --remove-orphans` (die Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen
@@ -1374,7 +1374,7 @@ zum nächsten Lauf (`FOR UPDATE SKIP LOCKED` – kein Warten, kein Deadlock). De
 | Revisionen der Hinweise (`vendor_advisory_changes`) und Änderungs-Ereignisse | die letzten 20 je Hinweis, keine älter als ein Jahr (täglich) | 1 Jahr | fest |
 | Einzelabfragen je CVE (`vendor_fetch` `nvdcve:`, `cvelistcve:`, `osvcve:`) | 30 Tage (täglich) | 30 Tage | fest |
 | EPSS-Werte (`epss_scores`) | 30 Tage nicht mehr gefragt (täglich) | 30 Tage | fest |
-| Hinweise (`vendor_advisories` mit Produkt-Zuordnung und Stand) | bleiben – auch die nicht mehr gefolgter Produkte (wird wieder gefolgt, sind sie sofort da) | – | – |
+| Hinweise (`vendor_advisories` mit Produkt-Zuordnung und Stand) | ein Jahr nach dem letzten Speichern (täglich, `advisory_cleanup`), wenn **alles** zutrifft: kein gefolgtes und eingeschaltetes Produkt verweist darauf, keine seiner CVEs wird beobachtet, keine gespeicherte Meldung nennt eine davon und keine Meldungs-Details zeigen auf ihn, keine Revision im letzten Jahr, und keine noch gestellte Abfrage würde ihn liefern (ein NVD-Eintrag mit einer CPE, die ein gefolgtes Produkt abfragt – etwa die gemeinsame CPE der Windows-Server-Rollen; Palo-Alto- bzw. Veeam-Einträge, solange eine Palo-Alto- bzw. die Veeam-Abfrage läuft). NVD- und cvelistV5-Einträge ganz ohne CPE bleiben, solange sie ein Katalogprodukt nennen (nur die Stichwortsuche der letzten Tage brachte sie). **Nie** gelöscht: CSAF-Dokumente (ein Wasserzeichen je Anbieter, der Erstabruf reicht nur 90 Tage zurück – ein gelöschtes älteres Dokument käme nie wieder) und Fortinet (der PSIRT-Feed listet nur die neuesten). Nach einer Löschung beginnen alle Abfragen, die kein eingeschaltetes Produkt mehr stellt (`nvd:`, `nvdkw:`, `paloalto:`, `veeam:`), von vorn; ebenso die eines Produkts, dem wieder gefolgt wird: der nächste Abruf holt alles neu, die Auswertung wartet darauf (auch auf die Stichwortsuche `nvdkw:`) – der Ausgangsstand entsteht mit den Hinweisen, nichts Altes wird gemeldet | 1 Jahr | fest |
 | API-Tokens | 30 Tage nach Widerruf oder Ablauf | fest | – |
 | Sitzungen | nach Ablauf (stündlich; vorher schon beim nächsten Aufruf) | – | Zeitlimits der Sitzungen (Handbuch, Anmeldung) |
 | Anmeldesperren (`auth_locks`), Passkey-Challenges, Zähler im Speicher | nach Ablauf (stündlich) | – | – |
@@ -1406,6 +1406,11 @@ wegräumen oder `SQLITE_IMPORT=0` setzen.
   ein Timeout für vergessene offene Transaktionen (5 min); die App hält höchstens 15 Verbindungen.
 - Speichergrenze des Containers: `DB_MEM` (Standard 512m). Ein Blick hinein:
   `docker compose exec db psql -U cobe_news cobe_news`.
+- Speichergrenze der App: `APP_MEM` (Standard 512m). Die App hält die ausgewerteten Befunde der gefolgten Produkte im
+  Speicher. Gemessen (0.1.50, Lasttest mit 20 Nutzern): 10 Produkte / 5 000 Hinweise um 200 MiB, 48 Produkte /
+  50 000 Hinweise / 30 000 Meldungen 430 MiB. Ab etwa 30 Produkten oder 20 000 Hinweisen `APP_MEM=768m`, ab 100
+  Produkten `1g`; der Standard bleibt 512m (reicht für die übliche Installation, ein höherer Wert reserviert nichts,
+  begrenzt nur). An der Grenze beendet Docker die App und startet sie neu (`OOMKilled` in `docker inspect`).
 
 ### Rollen
 
@@ -1538,6 +1543,23 @@ Während einer Sicherung oder Wiederherstellung liegen Dump und (verschlüsselt)
 `data/.backup-work/` – **neben** `data/backups/`, nicht darin. Was ein abgebrochener Lauf dort (oder bis 0.1.21 als
 `.partial-…`/`.restore-…` in `data/backups/`) liegen ließ, räumt die nächste Sicherung, Wiederherstellung oder der
 nächste Start der App weg, sobald es älter als 6 Stunden ist; `--exclude` hält Halbfertiges ohnehin vom Kopieren fern.
+
+**Herunterladen in der App** (ab 0.1.51): nur **verschlüsselte** Sicherungen (`.tar.enc`), Knopf „Herunterladen“ in der
+Liste; eine unverschlüsselte zeigt „Nur auf dem Server“ und wird abgelehnt (403 `backup_not_encrypted`) – sie enthält
+die ganze Datenbank lesbar und bleibt beim Kopieren per `docker cp`/`docker compose cp`. Die Seite fragt zuerst (die
+Datei braucht zum Einspielen die Passphrase, sicher aufbewahren), dann `GET /api/admin/backup/files/<Name>` mit erneuter
+Bestätigung (`reauth_required`) und dem CSRF-Token (wie der Export – ein Link einer fremden Seite lädt nichts). Nur
+Namen aus der Liste und dem Namensmuster (kein Pfad, keine versteckten oder halbfertigen Dateien), geöffnet mit
+`O_NOFOLLOW` als normale Datei, beim Senden noch einmal geprüft (dieselbe Datei: Gerät und Inode). Gestreamt in Stücken
+von 1 MiB, nie ganz im Speicher, mit `Content-Length` und `Cache-Control: no-store`; höchstens 6 je Stunde
+(`backup_download_rate_limited`, 429) und einer zur Zeit (`backup_download_busy`, 409) je Admin – der Platz wird schon bei der Prüfung belegt (mit einem
+Token je Download) und nur von diesem Download wieder freigegeben: am Ende, bei einem Fehler oder Abbruch, oder wenn die
+Antwort nie gesendet wird; nach 6 Stunden gilt ein Platz als verwaist. Der Browser hält die Datei bis zum Speichern im
+Arbeitsspeicher (`fetch` → Blob) – sehr große Sicherungen (ab etwa 1 GB) besser per `docker cp` kopieren. Protokoll:
+`backup.downloaded` mit Datei und Größe, als auffällig markiert. Das mitgelieferte nginx reicht die Route ungepuffert
+durch (`location ^~ /api/admin/backup/files/` mit `proxy_buffering off`): sonst legte es eine große Datei in seinen
+Zwischenordner – ein tmpfs, also in die 128 MB Speicher des Proxys; `proxy_read_timeout 60s` bleibt (Zeit zwischen zwei
+Lesevorgängen, die App sendet ohne Pause). Ein eigener Reverse Proxy: für diesen Pfad ebenso nicht puffern.
 
 **Wiederherstellung** – nur auf dem Server, mit angehaltener App:
 
@@ -1825,7 +1847,7 @@ Gearbeitet wird nie direkt auf `main` (geschützt), sondern in eigenen Branches 
 Pipeline. Ein Release startet nur mit einem Tag:
 
 ```bash
-git tag v0.1.50 && git push origin v0.1.50   # die Version aus backend/app/__init__.py
+git tag v0.1.51 && git push origin v0.1.51   # die Version aus backend/app/__init__.py
 ```
 
 Die einzige Pipeline, [`.github/workflows/release.yml`](../.github/workflows/release.yml), prüft dann, dass der Tag zu
@@ -1833,17 +1855,22 @@ allen Versionsangaben passt (`backend/app/__init__.py`, `backend/pyproject.toml`
 `frontend/package.json`, `frontend/package-lock.json`) und `CHANGELOG.md` einen Abschnitt `## <Version> – …` hat, lässt die
 Backend-Tests (mit PostgreSQL 18), die Frontend-Prüfungen, Tests und den Build laufen und prüft die Abhängigkeiten auf
 bekannte Schwachstellen. Erst wenn alles grün ist, baut sie die drei Images für amd64 und arm64 – die App (`Dockerfile`),
-die Datenbank (`deploy/postgres`) und den Proxy (`deploy/nginx`) –, legt sie als `ghcr.io/g0urmetd/cobe-news:<Version>`,
-`ghcr.io/g0urmetd/cobe-news-db:<Version>` und `ghcr.io/g0urmetd/cobe-news-proxy:<Version>` (je auch `:latest`) ab, mit
-Provenance und SBOM, signiert alle drei (cosign, ohne gespeicherten Schlüssel) und schreibt den GitHub-Release mit dem
-Text aus dem Changelog und den drei Digests. Neue Pakete auf ghcr.io sind zuerst privat: nach dem ersten Release mit
+die Datenbank (`deploy/postgres`) und den Proxy (`deploy/nginx`) – mit Provenance und SBOM und legt sie **nur unter ihrem
+Digest** ab, ohne Tag; dann signiert sie alle drei Digests (cosign, ohne gespeicherten Schlüssel). Erst wenn alle drei
+gebaut und signiert sind, prüft der Job `publish` Signaturen und Attestierungen und setzt die Tags auf genau diese
+Digests – ohne Neubau: `ghcr.io/g0urmetd/cobe-news:<Version>`, `ghcr.io/g0urmetd/cobe-news-db:<Version>`,
+`ghcr.io/g0urmetd/cobe-news-proxy:<Version>`, und `:latest` nur, wenn der Tag das höchste Release ist (ein Backport auf
+eine ältere Linie schiebt `latest` nie zurück; nie zwei Releases gleichzeitig). Scheitert vorher etwas, bleibt kein Tag
+zurück – nur Digests ohne Tag –, `latest` zeigt weiter auf das vorige vollständige Release. Weil die Signatur den Digest
+abdeckt, gilt sie für jeden Tag darauf. Zuletzt schreibt sie den GitHub-Release mit dem Text aus dem Changelog und den
+drei Digests. Neue Pakete auf ghcr.io sind zuerst privat: nach dem ersten Release mit
 `cobe-news-db` und `cobe-news-proxy` beide unter *Packages → Package settings* auf *Public* stellen (wie `cobe-news`),
 sonst scheitert das Holen ohne Anmeldung (Portainer: „unauthorized“).
 
 Prüfen der Signaturen (die Images `-db` und `-proxy` gibt es ab 0.1.49):
 
 ```bash
-v=0.1.50
+v=0.1.51
 for i in cobe-news cobe-news-db cobe-news-proxy; do
   cosign verify ghcr.io/g0urmetd/$i:$v \
     --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \

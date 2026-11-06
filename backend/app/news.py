@@ -1773,6 +1773,9 @@ async def store(db: AsyncSession, src: NewsSource, entries: list[dict], keep: ti
     if fresh_kev:
         await retopic_cves(db, fresh_kev)
     await db.commit()
+    from app import vendor
+
+    vendor.euvd_changed()  # Vendor News' EUVD CVEs (stories of the EUVD and those it carries) are read again
     return added
 
 

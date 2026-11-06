@@ -379,7 +379,13 @@ Typical reasons for **"possibly"**:
 - the advisory does not name your release line,
 - NVD says "all versions" without a limit,
 - only single hotfix levels are affected and yours is not named,
-- a PAN-OS advisory that says nothing about Panorama.
+- a PAN-OS advisory that says nothing about Panorama,
+- the sources disagree: not affected according to the vendor, in the affected range according to the NVD – or "every
+  version" without a version according to the BSI, not affected according to the CVE data.
+
+Every reason names its source: "according to the vendor" appears only where the verdict comes from the vendor itself
+(its advisory or its data in the CVE record); otherwise "according to the NVD", "CISA (ADP)", "the BSI", "OSV" or
+"source: …".
 
 When several sources name the same vulnerability, the vendor's advisory decides before the [NVD](term:nvd), the NVD
 before the CVE list ([cvelistV5](term:cvelist)), and OSV comes last – details:

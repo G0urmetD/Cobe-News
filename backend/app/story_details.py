@@ -42,7 +42,7 @@ from app import vendor
 from app import vendor_sources as src
 from app.models import NewsItem, NewsSource, StoryDetail, VendorAdvisory, VendorFetch, VendorFollow, VendorKev, VendorVersion
 from app.news import NewsError, _date, html_to_text
-from app.vendor_match import cpe_fields, evaluate, name_words, ranges_of, worst
+from app.vendor_match import THIRD_PARTY, cpe_fields, evaluate, name_words, ranges_of, with_third_party, worst
 from app.vendor_versions import parse
 
 log = logging.getLogger("cobe_news.details")
@@ -52,6 +52,7 @@ FRESH = timedelta(days=30)  # younger stories: the CSAF is asked again daily (co
 CSAF_EVERY = timedelta(hours=24)
 NVD_EVERY = timedelta(days=7)
 MAX_CVES = 3  # NVD lookups per story (CVSS and ranges of the first ones)
+DETAIL_CVES = 60  # CVEs a CSAF document's details keep
 MAX_PRODUCTS = 25
 MAX_VERSIONS = 400
 CSAF_PER_ROUND = 25
@@ -256,7 +257,7 @@ def parse_csaf(data: bytes, kind: str, max_products: int = MAX_PRODUCTS) -> dict
         "more_products": max(0, len(plist) - max_products),
         "tlp": tlp,
         "page": page,
-        "cves": sorted(set(cves))[:60],
+        "cves": sorted(set(cves))[:DETAIL_CVES],
         "cvss": sorted(cvss, key=lambda c: -c["score"])[:1],
         # "Exploit Status: nicht bekannt", "keine Ausnutzung bekannt", "hasn't been exploited" – denied, not exploited
         "exploited": any(re.search(r"exploit|ausgenutzt|in the wild", t, re.I) and not re.search(r"\bno\b|\bnot\b|\bnever\b|n['’]t\b|\bnicht\b|\bnie\b|\bkein", t, re.I) for t in threats),
@@ -671,7 +672,7 @@ def csaf_advisory(d: dict, url: str, *, title: str = "", summary: str = "", publ
         "title": d["title"] or title,
         "summary": d["summary"] or summary,
         "url": url,
-        "cves": d["cves"][:30],
+        "cves": d["cves"][: vendor.STORED_CVES],
         "cvss": score,
         "severity": src.severity_of(score, {"kritisch": "critical", "hoch": "high", "mittel": "medium", "niedrig": "low"}.get(d["severity_text"].lower(), d["severity_text"])),
         "exploited": d["exploited"],
@@ -831,13 +832,23 @@ def matches(details: dict | None, fol: list[tuple[dict, list[VendorVersion]]]) -
         rows = []
         for v in vers or [None]:
             text = v.version if v else None
-            verdict = None
+            own = records = None
             if details.get("kind") in ("bsi", "siemens", "cisco", "fortinet"):
                 # through evaluate() as Vendor News judges the same document: a short version ("7.4") stands for every
                 # release inside it, an unparsed one is "possible"
-                verdict = evaluate(p, "csaf", details, text)
+                own = evaluate(p, "csaf", details, text)
+            judged = 0  # records that judged the product – one per CVE of the details (nvd_details)
             for m in details.get("match") or []:
-                verdict = worst(verdict, evaluate(p, m["source"], m["data"], text))
+                r = evaluate(p, m["source"], m["data"], text)
+                records = worst(records, r)
+                judged += r is not None
+            # the BSI is no vendor: next to the CVE records its document decides only where they do not (as Vendor News) –
+            # their "not affected" only when every CVE of the document has a record that judged the product
+            n = len(details.get("match") or [])
+            listed = details.get("cves") or []
+            # a full list (parse_csaf keeps 60) may name more CVEs than it holds: never complete
+            complete = n > 0 and judged == n and judged >= len(set(listed)) and len(listed) < DETAIL_CVES
+            verdict = with_third_party(own, records, complete) if own is not None and own.detail.get("by") in THIRD_PARTY else worst(own, records)
             if verdict is None:
                 continue
             rows.append({"id": str(v.id) if v else None, "version": text, "label": v.label if v else "", "status": verdict.status, "fixed": verdict.fixed, "reason": verdict.reason})

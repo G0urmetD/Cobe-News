@@ -32,6 +32,7 @@ import {
 import { errorText } from "@/lib/errors"
 import { cn } from "@/lib/utils"
 import { Loading } from "@/pages/settings-shared"
+import { iso, isoList } from "@/lib/bidi"
 
 const TONE: Record<string, string> = { ok: "--success", warn: "--warning", bad: "--destructive", none: "--muted-foreground" }
 
@@ -80,7 +81,7 @@ function DeliveryRow({ d, showChannel }: { d: Delivery; showChannel: boolean }) 
     setBusy(true)
     try {
       const r = await api.post<SendResult>(`/api/admin/notify/log/${d.id}/resend`, {})
-      if (r.ok) toast.success(t("dlog.resent", { name: d.channel_name }))
+      if (r.ok) toast.success(t("dlog.resent", { name: iso(d.channel_name) }))
       else toast.error(sendError(t, r))
     } catch (e) {
       toast.error(errorText(t, e))
@@ -99,12 +100,12 @@ function DeliveryRow({ d, showChannel }: { d: Delivery; showChannel: boolean }) 
           <p className="text-sm font-medium [overflow-wrap:anywhere]">{itemsText(t, d)}</p>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <Pill color="--muted-foreground">{t(`dlog.kind.${d.kind}`)}</Pill>
-            {showChannel && <span className="font-medium text-foreground">{whereText(t, d)}</span>}
+            {showChannel && <bdi className="font-medium text-foreground">{whereText(t, d)}</bdi>}
             <Ts at={d.at} rel />
             <span className={d.ok ? "text-success" : "text-destructive"}>{outcomeText(t, d)}</span>
             {d.attempts.length > 1 && <span>{t("dlog.attempts", { count: d.attempts.length })}</span>}
-            {d.rules.length > 0 && <span>{t("dlog.byRules", { names: d.rules.map((r) => r.name).join(", ") })}</span>}
-            {d.kind === "forward" && d.team_name && <span>{t("dlog.toTeam", { team: d.team_name })}</span>}
+            {d.rules.length > 0 && <span>{t("dlog.byRules", { names: isoList(d.rules.map((r) => r.name)) })}</span>}
+            {d.kind === "forward" && d.team_name && <span>{t("dlog.toTeam", { team: iso(d.team_name) })}</span>}
             {d.person && (
               <span className="inline-flex items-center gap-1">
                 <UserRound className="size-3" />

@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Query, Response
+from fastapi.responses import StreamingResponse
 from pydantic import ConfigDict, Field, field_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -662,6 +663,51 @@ async def backup_now(admin: Admin, db: Db) -> dict:
         raise api_error(409, "backup_busy")
     await db.commit()
     return {"started": True, "status": await backup.status(db)}
+
+
+@router.get("/backup/files/{name}")
+async def backup_download(name: str, admin: Admin, sess: ActiveSession, db: Db, _guard: DownloadGuard) -> StreamingResponse:
+    """An encrypted backup (.tar.enc) as a download – a fresh proof of identity first (it is the whole database, readable
+    with the passphrase), only from this site's page (CSRF token), logged (backup.downloaded, notable), a few per hour and
+    one at a time per admin. Streamed: never whole in memory. An unencrypted one stays on the server (403)."""
+    from app import backup
+
+    require_reauth(sess, admin)
+    uid = str(admin.id)
+    try:
+        dl = backup.prepare_download(name, uid)
+    except backup.DownloadRefused as exc:
+        raise api_error(exc.status, exc.code, **({"retry_after": exc.retry} if exc.retry else {})) from None
+    try:
+        audit.record(db, admin, "backup.downloaded", audit.target("backup", dl.name, dl.name), {"size": dl.size, "encrypted": True})
+        await db.commit()
+    except BaseException:
+        backup.release_download(dl, uid)  # no answer goes out: the slot is free again
+        raise
+    headers = {
+        "Content-Disposition": f'attachment; filename="{dl.name}"',  # the name matched backup.NAME_RX: no quote, no path
+        "Content-Length": str(dl.size),
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+    }
+    return _BackupStream(dl, uid, backup.stream_download(dl, uid), media_type="application/octet-stream", headers=headers)
+
+
+class _BackupStream(StreamingResponse):
+    """The download's answer: frees the admin's slot once it is over however it ends – sent, failed, cancelled, or the
+    client gone before the body began (then the stream itself never runs and could not free it)."""
+
+    def __init__(self, dl, uid: str, *a, **kw) -> None:  # noqa: ANN001, ANN002, ANN003 - a backup.Download
+        super().__init__(*a, **kw)
+        self._dl, self._uid = dl, uid
+
+    async def __call__(self, scope, receive, send) -> None:  # noqa: ANN001
+        from app import backup
+
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            backup.release_download(self._dl, self._uid)
 
 
 class BackupSettingsIn(_M):

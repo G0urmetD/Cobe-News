@@ -179,6 +179,7 @@ async def refresh(db: AsyncSession, *, force: bool = False) -> int | None:
         return None
     meter = source_health.start()
     changed = asked = 0
+    moved: set[str] = set()  # the CVEs whose score changed – only their products' views are recomputed
     try:
         for part in batches(due)[:PER_ROUND]:
             body = await vendor.get(url(part), db=db, conditional=False, limit=LIMIT)
@@ -191,6 +192,7 @@ async def refresh(db: AsyncSession, *, force: bool = False) -> int | None:
                 values.append({"cve": c, "score": r["score"] if r else None, "percentile": r["percentile"] if r else None, "day": (r["date"] if r else "")[:10], "fetched_at": at})
                 if r and old.get(c) != (r["score"], r["percentile"]):
                     changed += 1
+                    moved.add(c)
             stmt = pg_insert(EpssScore).values(values)
             await db.execute(stmt.on_conflict_do_update(index_elements=["cve"], set_={k: stmt.excluded[k] for k in ("score", "percentile", "day", "fetched_at")}))
             await db.commit()
@@ -207,7 +209,7 @@ async def refresh(db: AsyncSession, *, force: bool = False) -> int | None:
     await _prune(db)
     if changed:
         invalidate()
-        vendor.bump()  # the findings show the scores
+        await vendor.bump_cves(db, moved)  # the findings show the scores – of these CVEs' products only (soft)
     return changed
 
 

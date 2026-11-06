@@ -101,6 +101,19 @@ server {
         proxy_set_header X-Forwarded-Proto https;
     }
 
+    # an encrypted backup as a download (Settings → Sicherung): passed straight through, not buffered – a big file would
+    # otherwise be spooled into the proxy's temp folder, a tmpfs, i.e. its 128m of memory. proxy_read_timeout stays:
+    # it is the time between two reads, and the app sends without a pause
+    location ^~ /api/admin/backup/files/ {
+        proxy_pass http://app:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_buffering off;
+    }
+
     location / {
         proxy_pass http://app:8000;
         proxy_http_version 1.1;

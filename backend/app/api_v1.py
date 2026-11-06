@@ -380,16 +380,29 @@ async def findings(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> dict:
     """One list for a SIEM or a ticket system: each finding once per product, the most relevant first."""
-    want = set(status) or {"affected", "possible"}
-    rows: list[dict] = []
-    for f, _vs, view in await _views(db):
-        for x in view["findings"]:
-            if x["status"] not in want or (severity and x["severity"] not in severity) or (exploited is not None and bool(x["exploited"]) != exploited):
-                continue
-            rows.append({**_finding(x), "product": f.product})
-    order = {"affected": 0, "possible": 1, "service": 2, "unversioned": 3, "stale": 4, "not_affected": 5}
-    rows.sort(key=lambda r: (order.get(r["status"], 9), not r["exploited"], -(r["cvss"] or 0), r["product"], r["id"]))
+    want = frozenset(status) or frozenset({"affected", "possible"})
+    views = await _views(db)
+    # the sorted list is made once per state of the views and filter – a page of it is a slice (it was built and sorted
+    # anew for every page: ~330 ms per page at 44 000 findings, whatever the limit)
+    key = (tuple((f.product, view["stamp"]) for f, _vs, view in views), want, frozenset(severity), exploited)
+    rows = _sorted.get(key)
+    if rows is None:
+        rows = []
+        for f, _vs, view in views:
+            for x in view["findings"]:
+                if x["status"] not in want or (severity and x["severity"] not in severity) or (exploited is not None and bool(x["exploited"]) != exploited):
+                    continue
+                rows.append({**_finding(x), "product": f.product})
+        order = {"affected": 0, "possible": 1, "service": 2, "unversioned": 3, "stale": 4, "not_affected": 5}
+        rows.sort(key=lambda r: (order.get(r["status"], 9), not r["exploited"], -(r["cvss"] or 0), r["product"], r["id"]))
+        _sorted[key] = rows
+        while len(_sorted) > SORTED_KEEP:
+            _sorted.pop(next(iter(_sorted)))  # the oldest first (insertion order)
     return {"items": rows[offset : offset + limit], "total": len(rows), "offset": offset, "limit": limit}
+
+
+_sorted: dict[tuple, list[dict]] = {}  # (views' stamps, filter) → the sorted findings of /vendor/findings
+SORTED_KEEP = 8  # filters kept at once (a SIEM pages with one; every change of a view makes a new key)
 
 
 # ---------------------------------------------------------------- the description

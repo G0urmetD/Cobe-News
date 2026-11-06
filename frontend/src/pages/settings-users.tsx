@@ -45,6 +45,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { PasskeyList, SessionList } from "@/components/cobe/security"
 import { type Passkey, type SessionRow, useUserPasskeys, useUserSessions } from "@/lib/security-api"
 import { Loading, SheetActions, SheetBody } from "@/pages/settings-shared"
+import { isoList } from "@/lib/bidi"
 
 /** Wraps a control that is off for a reason – the reason on hover (a disabled button gets no pointer events). */
 function Why({ why, children, className = "inline-flex" }: { why?: string; children: React.ReactNode; className?: string }) {
@@ -180,7 +181,7 @@ export function UsersPane() {
                     ) : (
                       t("users.neverLoggedIn")
                     )}
-                    {!!u.teams?.length && ` · ${t("users.teams", { names: u.teams.join(", ") })}`}
+                    {!!u.teams?.length && ` · ${t("users.teams", { names: isoList(u.teams) })}`}
                   </p>
                 </div>
                 {/* phone: two rows of their own below the name, indented to it – origin and TOTP, then the controls (role

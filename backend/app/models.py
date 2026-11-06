@@ -440,7 +440,8 @@ class VendorAdvisory(Base):
 
     __tablename__ = "vendor_advisories"
     # cves: GIN – "which advisories name these CVEs" (CVE beobachten, KEV changes) without reading every record
-    __table_args__ = (Index("ix_vendor_advisories_published", "published_at"), Index("ix_vendor_advisories_cves", "cves", postgresql_using="gin"))
+    # ident: CVE beobachten reads by `cves ?| … OR ident IN (…)` (app/cve_watch.py) – without it the OR read every row
+    __table_args__ = (Index("ix_vendor_advisories_published", "published_at"), Index("ix_vendor_advisories_cves", "cves", postgresql_using="gin"), Index("ix_vendor_advisories_ident", "ident"))
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)  # <source>:<ident> – nvd:CVE-…, paloalto:CVE-…, fortinet:FG-IR-…, csaf:SSA-…, cvelist:CVE-…, osv:CVE-…
     source: Mapped[str] = mapped_column(Text)  # nvd | paloalto | fortinet | veeam | csaf | cvelist | osv

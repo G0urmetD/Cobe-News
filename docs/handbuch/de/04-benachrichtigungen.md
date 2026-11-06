@@ -509,7 +509,7 @@ Gotify bekommen denselben Inhalt als knappen Text. Die Farbe richtet sich nach d
 | **Quelle** | der Name der Quelle |
 | **Kategorie** | die [Themen](/docs/news-quellen#themen) der Meldung (höchstens drei) und die Schwere, z. B. „Zero-Day · Aktiv ausgenutzt · Kritisch“; ohne Thema die Schwere und die Art der Quelle („Hoch · Behörde“) |
 | **Kurzbeschreibung** | die ersten ein bis zwei Sätze der Zusammenfassung, höchstens rund 200 Zeichen – am Satzende abgeschnitten, ein zu langer erster Satz am letzten Wortende mit „…“ |
-| Fuß | Datum und „In Cobe News öffnen“ |
+| Fuß | Datum in Ortszeit mit Zone (Europe/Berlin, z. B. „02.11.2026 09:00 MEZ“) und „In Cobe News öffnen“ |
 
 Beispiel (Telegram):
 
@@ -521,7 +521,7 @@ Produkt: Chrome < 142.0.7444.59
 Quelle: heise online
 Kategorie: Zero-Day · Aktiv ausgenutzt · Kritisch
 Google hat ein Notfall-Update für Chrome veröffentlicht. Die Lücke CVE-2026-1234 wird bereits ausgenutzt.
-02.11.2026 08:00 UTC · In Cobe News öffnen
+02.11.2026 09:00 MEZ · In Cobe News öffnen
 ```
 
 Kommen **mehr als 3** Meldungen auf einmal (eine [Sammelnachricht](#einmal-pro-kanal)), wird daraus eine **kompakte
@@ -557,8 +557,13 @@ nach – keine Bilder, keine Zählpixel.
   „Artikel öffnen“ und „In Cobe News öffnen“.
 - **Ab 6 Meldungen** eine kompakte Liste: eine Zeile je Meldung – Schwere, Produkt, der Titel als Link in Cobe News –
   ohne Zusammenfassungen.
+- **Knopf „Cobe News öffnen“.** Bei einer Meldung öffnet er genau diese. Bei mehreren öffnet er die News-Liste, gefiltert
+  auf genau die Meldungen der Nachricht – auch die unter „… und N weitere“ (Chip „Aus der Benachrichtigung (N)“, bis
+  50 Meldungen; mehr: die ganze Liste). Vendor-News-Befunde eines Produkts öffnen dieses Produkt, mehrere Produkte
+  Vendor News. Dasselbe gilt für den Knopf in Slack und Teams, den Klick auf ntfy-, Gotify- und Desktop-Push-Nachrichten
+  und die persönlichen Nachrichten; eine weitergeleitete Meldung öffnet sich selbst.
 - **Zeit.** In Ortszeit mit Zonenkürzel, damit sie eindeutig ist: „04.11.2026 11:19 MEZ“ (Sommer: MESZ; englisch
-  „CET“/„CEST“). Kanäle nehmen Europe/Berlin; die [persönlichen Nachrichten](#meine-produkte) die Zeitzone der Person
+  „CET“/„CEST“) – ebenso in den Chat-Karten, Push-Texten und Weiterleitungen. Kanäle nehmen Europe/Berlin; die [persönlichen Nachrichten](#meine-produkte) die Zeitzone der Person
   (aus ihren [Ruhezeiten](#ruhezeiten), sonst ebenfalls Europe/Berlin).
 - **Hell und dunkel.** Die Mail hat ein helles und ein dunkles Farbschema; Programme mit Dunkelmodus (Apple Mail, iOS,
   Outlook für Mac und Outlook.com, Thunderbird) zeigen das dunkle, die Schwere bleibt in beiden gut lesbar.

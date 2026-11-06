@@ -5,6 +5,8 @@ export interface AuthData {
   loading: boolean
   /** /api/auth/config or /api/auth/state could not be read – an error with "try again", not the sign-in form */
   failed: boolean
+  /** why (0.1.51): the page says it – "the server cannot reach its database", "not reachable" – not only "failed" */
+  error?: unknown
   config: AuthConfig | null
   user: ApiUser | null
   /** a sign-in in progress (after a reload): mfa | password | enroll */
@@ -12,7 +14,10 @@ export interface AuthData {
 }
 
 export type AuthAction =
-  { type: "loaded"; config: AuthConfig; stage: string | null; user?: ApiUser | null } | { type: "failed" } | { type: "user"; user: ApiUser | null } | { type: "signedOut" }
+  | { type: "loaded"; config: AuthConfig; stage: string | null; user?: ApiUser | null }
+  | { type: "failed"; error?: unknown }
+  | { type: "user"; user: ApiUser | null }
+  | { type: "signedOut" }
 
 export const initialAuth: AuthData = { loading: true, failed: false, config: null, user: null, stage: null }
 
@@ -24,12 +29,13 @@ export function authReducer(s: AuthData, a: AuthAction): AuthData {
       return {
         loading: false,
         failed: false,
+        error: undefined,
         config: a.config,
         user: a.stage === "active" && a.user ? a.user : null,
         stage: (STAGES as readonly string[]).includes(a.stage ?? "") ? (a.stage as AuthData["stage"]) : null,
       }
     case "failed":
-      return { ...s, loading: false, failed: true }
+      return { ...s, loading: false, failed: true, error: a.error }
     // a finished sign-in, or one ended: a resumed step (mfa, enroll) never outlives it
     case "user":
       return { ...s, user: a.user, stage: null }

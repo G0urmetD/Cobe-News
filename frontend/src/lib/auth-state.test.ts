@@ -20,6 +20,9 @@ describe("sign-in state", () => {
 
   it("an unreachable server is an error, not the sign-in form", () => {
     expect(authReducer(initialAuth, { type: "failed" })).toMatchObject({ loading: false, failed: true })
+    // the reason stays for the page to say (0.1.51: "the server cannot reach its database" instead of "failed")
+    const why = new Error("503")
+    expect(authReducer(initialAuth, { type: "failed", error: why }).error).toBe(why)
   })
 
   it("only an active session counts as signed in", () => {

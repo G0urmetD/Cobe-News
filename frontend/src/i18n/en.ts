@@ -4,6 +4,7 @@ import careEn from "./care.en"
 import deliveryEn from "./delivery.en"
 import deliveryOpsEn from "./delivery-ops.en"
 import readerEn from "./reader.en"
+import newsRangeEn from "./news-range.en"
 import docsEn from "./docs.en"
 import healthEn from "./health.en"
 import vendorEn from "./vendor.en"
@@ -325,6 +326,11 @@ const en: Record<string, string> = {
   "errors.toStart": "To the start page",
   "errors.http_504": "The server did not answer in time – the action may still be running. Please check again shortly.",
   "errors.timeout": "The server did not answer in time. Please try again.",
+  "errors.unavailable": "The server cannot reach its database right now – please try again in a moment.",
+  "errors.server": "The server reported an error (HTTP {{status}}) – please try again in a moment.",
+  "errors.network": "The server cannot be reached – please check the connection and try again.",
+  "offline.title": "No network connection",
+  "offline.text": "This browser is offline – the page goes on loading as soon as the connection is back.",
   "errors.token_invalid": "Not a valid bot token (form 123456789:AA…).",
   "errors.token_missing": "The bot token is missing.",
   "errors.too_many_attempts": "A sign-in for this account is already running. Please wait a moment.",
@@ -445,8 +451,11 @@ const en: Record<string, string> = {
   "news.reason.topic": "security topic (“{{value}}”)",
   "news.reason.vendor": "Vendor's rating: {{value}}",
   "news.reason.vulnerability": "vulnerability or patch (“{{value}}”)",
+  "news.reason.other": "note from the source (“{{value}}”)",
+  "news.reason.otherPlain": "note from the source",
   "news.resetFilter": "Reset filter",
   "news.search": "Title, text, CVE …",
+  "news.searchShort": "At least 3 characters – shorter terms search every story, take longer and come without the filters' numbers.",
   "news.setUp": "Set up news",
   "news.sev.critical": "Critical",
   "news.sev.high": "High",
@@ -971,6 +980,9 @@ const en: Record<string, string> = {
   "settings.nav.backup": "Backup & export",
   "errors.backup_busy": "A backup is already running – please wait a moment.",
   "errors.backup_failed": "The backup failed.",
+  "errors.backup_not_encrypted": "Unencrypted backups stay on the server – they hold the whole database.",
+  "errors.backup_download_busy": "A backup download is already running – please wait until it is done.",
+  "errors.backup_download_rate_limited": "Many backups downloaded in the last hour already. Possible again in {{minutes}} min.",
   "backup.title": "Backup",
   "backup.desc": "A copy of the whole database (pg_dump) as a file on the server – for when something is lost or the server moves.",
   "backup.state.none": "No backup yet",
@@ -1025,15 +1037,26 @@ const en: Record<string, string> = {
   "backup.col.at": "Created",
   "backup.col.size": "Size",
   "backup.col.key": "Encryption",
+  "backup.col.download": "Download",
   "backup.restoreHint":
     "A restore replaces the whole database and is done on the server only: stop the app, restore the backup (the current state is backed up first), start the app. Whoever signed in only after the backup signs in again.",
-  "backup.serverOnlyTitle": "Download and restore: on the server",
+  "backup.serverOnlyTitle": "Download and restore",
   "backup.serverOnly":
-    "The backups are on the server only ({{dir}} in the container). There is deliberately no download or restore in the browser – both are done by command on the server: copy (docker cp, scp), or stop the app, restore, start the app.",
+    "The backups are on the server ({{dir}} in the container). Encrypted ones can be downloaded here – after a fresh confirmation, noted in the audit log; unencrypted ones are copied on the server only (docker cp, scp), they hold the whole database readable. A restore is always done on the server: stop the app, restore, start the app.",
   "backup.stepsLink": "Step by step: back up, download, restore",
   "backup.restoreTestNote": "The restore test is only a trial run: it restores the newest backup into a throwaway database and changes nothing in your data.",
   "backup.restoreTestOff": "Not set up yet – it needs POSTGRES_RESTORE_PASSWORD.",
   "backup.restoreTestLink": "Open the restore test",
+  "backup.dl.button": "Download",
+  "backup.dl.running": "Downloading …",
+  "backup.dl.label": "Download {{name}}",
+  "backup.dl.title": "Download the encrypted backup?",
+  "backup.dl.text":
+    "{{name}} holds the whole database, encrypted with the passphrase. Restoring it needs exactly that passphrase – without it the file is useless, with it anyone can read it. Keep the file safe (do not leave it in the downloads folder, do not pass it on); a restore is done on the server only. The download is noted in the audit log.",
+  "backup.dl.confirm": "Download",
+  "backup.dl.done": "{{name}} downloaded – keep it safe",
+  "backup.dl.serverOnly": "Server only",
+  "backup.dl.plainWhy": "Unencrypted backups stay on the server – they hold the whole database. Copy them with docker cp (handbook: step by step).",
   "backup.copyRestore": "Copy the restore commands",
   "backup.fileName": "<file>",
   "backup.nowNote.encrypted": "Encrypted, with the master key. Takes a few seconds, depending on the data; only one backup runs at a time.",
@@ -1837,5 +1860,6 @@ Object.assign(en, auditEn)
 Object.assign(en, deliveryOpsEn)
 Object.assign(en, careEn)
 Object.assign(en, readerEn)
+Object.assign(en, newsRangeEn)
 
 export default en

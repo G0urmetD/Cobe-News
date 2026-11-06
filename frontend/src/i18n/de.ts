@@ -4,6 +4,7 @@ import careDe from "./care.de"
 import deliveryDe from "./delivery.de"
 import deliveryOpsDe from "./delivery-ops.de"
 import readerDe from "./reader.de"
+import newsRangeDe from "./news-range.de"
 import docsDe from "./docs.de"
 import healthDe from "./health.de"
 import vendorDe from "./vendor.de"
@@ -329,6 +330,11 @@ const de: Record<string, string> = {
   "errors.toStart": "Zum Lagebild",
   "errors.http_504": "Der Server hat nicht rechtzeitig geantwortet – die Aktion läuft womöglich noch. Bitte gleich nachsehen.",
   "errors.timeout": "Der Server hat nicht rechtzeitig geantwortet. Bitte erneut versuchen.",
+  "errors.unavailable": "Der Server erreicht seine Datenbank gerade nicht – bitte in einem Moment erneut versuchen.",
+  "errors.server": "Der Server hat einen Fehler gemeldet (HTTP {{status}}) – bitte in einem Moment erneut versuchen.",
+  "errors.network": "Der Server ist nicht erreichbar – bitte die Verbindung prüfen und erneut versuchen.",
+  "offline.title": "Keine Netzverbindung",
+  "offline.text": "Dieser Browser ist offline – die Seite lädt weiter, sobald die Verbindung wieder da ist.",
   "errors.token_invalid": "Kein gültiges Bot-Token (Form 123456789:AA…).",
   "errors.token_missing": "Das Bot-Token fehlt.",
   "errors.too_many_attempts": "Für dieses Konto läuft gerade schon eine Anmeldung. Bitte einen Moment warten.",
@@ -452,8 +458,11 @@ const de: Record<string, string> = {
   "news.reason.topic": "Security-Thema („{{value}}“)",
   "news.reason.vendor": "Einstufung des Herstellers: {{value}}",
   "news.reason.vulnerability": "Sicherheitslücke oder Patch („{{value}}“)",
+  "news.reason.other": "Hinweis der Quelle („{{value}}“)",
+  "news.reason.otherPlain": "Hinweis der Quelle",
   "news.resetFilter": "Filter zurücksetzen",
   "news.search": "Titel, Text, CVE …",
+  "news.searchShort": "Mindestens 3 Zeichen – kürzere Begriffe durchsuchen alle Meldungen, dauern länger und kommen ohne die Zahlen der Filter.",
   "news.setUp": "News einrichten",
   "news.sev.critical": "Kritisch",
   "news.sev.high": "Hoch",
@@ -984,6 +993,9 @@ const de: Record<string, string> = {
   "settings.nav.backup": "Sicherung & Export",
   "errors.backup_busy": "Es läuft schon eine Sicherung – bitte kurz warten.",
   "errors.backup_failed": "Die Sicherung ist fehlgeschlagen.",
+  "errors.backup_not_encrypted": "Unverschlüsselte Sicherungen nur auf dem Server – sie enthalten die ganze Datenbank.",
+  "errors.backup_download_busy": "Es läuft schon ein Download einer Sicherung – bitte warten, bis er fertig ist.",
+  "errors.backup_download_rate_limited": "Schon viele Sicherungen in der letzten Stunde heruntergeladen. In {{minutes}} Min. wieder möglich.",
   "backup.title": "Sicherung",
   "backup.desc": "Eine Kopie der ganzen Datenbank (pg_dump) als Datei auf dem Server – für den Fall, dass etwas verloren geht oder der Server umzieht.",
   "backup.state.none": "Noch keine Sicherung",
@@ -1039,15 +1051,26 @@ const de: Record<string, string> = {
   "backup.col.at": "Erstellt",
   "backup.col.size": "Größe",
   "backup.col.key": "Verschlüsselung",
+  "backup.col.download": "Herunterladen",
   "backup.restoreHint":
     "Wiederherstellen ersetzt die ganze Datenbank und geht nur auf dem Server: App anhalten, Sicherung einspielen (vorher wird der aktuelle Stand gesichert), App starten. Wer sich erst nach der Sicherung angemeldet hat, meldet sich neu an.",
-  "backup.serverOnlyTitle": "Herunterladen und Einspielen: auf dem Server",
+  "backup.serverOnlyTitle": "Herunterladen und Einspielen",
   "backup.serverOnly":
-    "Die Sicherungen liegen nur auf dem Server ({{dir}} im Container). Herunterladen und Einspielen gibt es bewusst nicht im Browser – beides geht per Befehl auf dem Server: kopieren (docker cp, scp) bzw. App anhalten, einspielen, App starten.",
+    "Die Sicherungen liegen auf dem Server ({{dir}} im Container). Verschlüsselte lassen sich hier herunterladen – nach erneuter Bestätigung, im Protokoll vermerkt; unverschlüsselte nur auf dem Server kopieren (docker cp, scp), sie enthalten die ganze Datenbank lesbar. Eingespielt wird immer auf dem Server: App anhalten, einspielen, App starten.",
   "backup.stepsLink": "Schritt für Schritt: sichern, herunterladen, einspielen",
   "backup.restoreTestNote": "Der Rücksicherungs-Test ist nur eine Probe: Er spielt die neueste Sicherung in eine Wegwerf-Datenbank und ändert an euren Daten nichts.",
   "backup.restoreTestOff": "Noch nicht eingerichtet – dafür braucht es POSTGRES_RESTORE_PASSWORD.",
   "backup.restoreTestLink": "Zum Rücksicherungs-Test",
+  "backup.dl.button": "Herunterladen",
+  "backup.dl.running": "Lädt …",
+  "backup.dl.label": "{{name}} herunterladen",
+  "backup.dl.title": "Verschlüsselte Sicherung herunterladen?",
+  "backup.dl.text":
+    "{{name}} enthält die ganze Datenbank, verschlüsselt mit der Passphrase. Zum Einspielen braucht es genau diese Passphrase – ohne sie ist die Datei nutzlos, mit ihr kann jeder sie lesen. Die Datei sicher aufbewahren (nicht im Download-Ordner liegen lassen, nicht weitergeben); eingespielt wird nur auf dem Server. Der Download wird im Protokoll vermerkt.",
+  "backup.dl.confirm": "Herunterladen",
+  "backup.dl.done": "{{name}} heruntergeladen – sicher aufbewahren",
+  "backup.dl.serverOnly": "Nur auf dem Server",
+  "backup.dl.plainWhy": "Unverschlüsselte Sicherungen nur auf dem Server – sie enthalten die ganze Datenbank. Kopieren per docker cp (Handbuch: Schritt für Schritt).",
   "backup.copyRestore": "Befehle zum Wiederherstellen kopieren",
   "backup.fileName": "<datei>",
   "backup.nowNote.encrypted": "Verschlüsselt, mit Hauptschlüssel. Dauert je nach Datenmenge einige Sekunden; es läuft immer nur eine Sicherung.",
@@ -1861,5 +1884,6 @@ Object.assign(de, auditDe)
 Object.assign(de, deliveryOpsDe)
 Object.assign(de, careDe)
 Object.assign(de, readerDe)
+Object.assign(de, newsRangeDe)
 
 export default de

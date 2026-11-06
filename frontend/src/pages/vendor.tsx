@@ -64,7 +64,8 @@ import { ApiError, api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
 import { restoreFocus } from "@/lib/focus"
-import { fmtDay, fmtDayFrom } from "@/lib/format"
+import { fmtDayFrom } from "@/lib/format"
+import { reasonText } from "@/lib/vendor-reason"
 import { NEWS_SEV_COLOR, type NewsSeverity } from "@/lib/news-api"
 import { careReason } from "@/lib/catalog-care"
 import { CategoryIcon } from "@/lib/catalog-icons"
@@ -196,7 +197,13 @@ function HeadLine({ scope }: { scope: VendorScope | null }) {
   if (!st?.enabled) return null
   const parts: React.ReactNode[] = []
   if (next) parts.push(<span key="eol">{t("vendor.head.nextEnd", { product: next.item.product.label, when: fmtDayFrom(next.date) })}</span>)
-  if (!st.fetched)
+  if (!st.fetched && st.failed)
+    parts.push(
+      <span key="first" className="text-warning">
+        {t("vendor.firstFetchFailed")}
+      </span>,
+    )
+  else if (!st.fetched)
     parts.push(
       <span key="first">
         <Loader2 className="inline size-3 animate-spin align-[-2px]" aria-hidden /> {t("vendor.firstFetch")}
@@ -866,6 +873,9 @@ function ProductDrawer({ productKey, open, onClose, onClosed }: { productKey: st
               <SheetTitle className="text-lg leading-snug">{head.label}</SheetTitle>
               <SheetDescription className="sr-only">{t("vendor.description")}</SheetDescription>
             </>
+          ) : q.isError ? (
+            // not found (or not loaded): the error card below says it – no "Wird geladen …" that never ends
+            <SheetTitle className="text-sm text-muted-foreground">{t("vendor.notLoaded")}</SheetTitle>
           ) : (
             <SheetTitle className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" /> {t("vendor.loading")}
@@ -1074,7 +1084,7 @@ const Vulns = memo(function Vulns({
             return (
               <li key={v.id} className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs">
                 <span className="font-mono font-medium">{v.version}</span>
-                {v.label && <span className="text-muted-foreground">{v.label}</span>}
+                {v.label && <bdi className="text-muted-foreground">{v.label}</bdi>}
                 {s?.affected ? <StatusPill status="affected">{s.affected}</StatusPill> : null}
                 {s?.possible ? <StatusPill status="possible">{s.possible}</StatusPill> : null}
                 {!s?.affected && !s?.possible && <CheckCircle2 className="size-3.5 text-success" />}
@@ -1160,14 +1170,6 @@ const Vulns = memo(function Vulns({
 })
 
 const SOURCE_LABEL = ADVISORY_SOURCE_LABEL
-
-function reasonText(t: (k: string, o?: Record<string, unknown>) => string, r: Finding["versions"][number]) {
-  const base = t(`vendor.reason.${r.reason}`, { defaultValue: r.reason, line: r.detail.line ?? "", released: r.detail.released ? fmtDay(r.detail.released) : "" })
-  const extra = [r.detail.platform && t("vendor.reason.platform", { value: r.detail.platform }), r.detail.after && t("vendor.reason.after", { value: r.detail.after })].filter(
-    Boolean,
-  )
-  return [base, ...extra].join(" · ")
-}
 
 const FindingRow = memo(function FindingRow({
   f,

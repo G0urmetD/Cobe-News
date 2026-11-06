@@ -443,3 +443,128 @@ async def test_a_team_rule_calls_only_its_teams_products_ours(admin_client):
 def test_product_name_drops_only_the_range(product, want):
     """Review L7: numbers that are part of a product's name stay in the subject's name."""
     assert notify.product_name(product) == want
+
+
+# ---------------------------------------------------------------- 0.1.51: the general link, local time everywhere, personal order
+
+BASE = "https://news.corp.example:8095"
+
+
+def _vendor(n: int, product: str = "panos", **data) -> VendorEvent:  # noqa: ANN003
+    return VendorEvent(id=uuid.uuid4(), key=f"vuln:{product}:x:{n}", kind="vuln", product=product, severity=data.pop("severity", "high"), created_at=WINTER - timedelta(minutes=n),
+                       scope=f"vuln:{product}:x", data={"product": product, "version": "1.0", "status": "affected", "ident": f"ADV-{n}", "headline": f"Befund {n}", **data})  # fmt: skip
+
+
+def test_the_general_link_opens_exactly_the_stories_of_the_message():
+    one, two = story(1), story(2)
+    # one story: the story itself; a test: the start page (its story may be an example)
+    assert notify.overview_link([one], 1) == f"{BASE}/?story={one.id}" == notify._open(one)
+    assert notify.overview_link([one], 1, test=True) == f"{BASE}/"
+    # several news stories: the news list filtered to exactly them – all of the message, not only those shown
+    refs = [("news", one.id), ("news", two.id), ("news", "00000000-0000-4000-8000-000000000099")]
+    assert notify.overview_link([one, two], 3, refs) == f"{BASE}/?ids={one.id},{two.id},00000000-0000-4000-8000-000000000099"
+    assert notify.overview_link([one, two], 2) == f"{BASE}/?ids={one.id},{two.id}"
+    # not all known, too many or too long: the news list
+    assert notify.overview_link([one, two], 5) == f"{BASE}/"
+    many = [("news", str(uuid.uuid4())) for _ in range(notify.NEWS_IDS_MAX + 1)]
+    assert notify.overview_link([one, two], len(many), many) == f"{BASE}/"
+    fifty = many[: notify.NEWS_IDS_MAX]
+    link = notify.overview_link([one, two], len(fifty), fifty)
+    assert link.count(",") == notify.NEWS_IDS_MAX - 1 and len(link) <= notify.LINK_MAX
+    # Vendor News: one product – that product; several – Vendor News; watched CVEs – their list
+    a, b, c = (notify.vendor_story(_vendor(n, p), "de") for n, p in ((1, "panos"), (2, "panos"), (3, "fortios")))
+    assert notify.overview_link([a, b], 2) == f"{BASE}/vendor?product=panos"
+    assert notify.overview_link([a, b], 3) == f"{BASE}/vendor"  # one not shown: its product unknown
+    assert notify.overview_link([a, c], 2) == f"{BASE}/vendor"
+    watched = [personal.story(VendorEvent(id=uuid.uuid4(), key=f"watch:{n}", kind="watch", product="", severity="high", created_at=WINTER, data={"cve": f"CVE-2026-{n}", "what": "fix", "fixed": ["1.2"]}), "de") for n in (1, 2)]
+    assert notify.overview_link(watched, 2) == f"{BASE}/watch"
+    # source health – the health view; a mix of kinds – the start page
+    assert notify.overview_path([], 2, [("health", "a"), ("health", "b")]) == "/settings/integrations?view=health"
+    assert notify.overview_link([one, a], 2, [("news", one.id), ("vendor", a.id)]) == f"{BASE}/"
+
+
+def test_every_format_takes_the_general_link():
+    one, two = story(1), story(2)
+    want = f"{BASE}/?ids={one.id},{two.id}"
+    _, text, html = notify.render_mail("R", [one, two], 2, "de")
+    assert f'href="{want}"' in html and f"Cobe News öffnen: {want}\n" in text
+    _, text, html = notify.render_mail("R", [one], 1, "de")
+    assert f'href="{notify._open(one)}" style="display:inline-block;padding:11px 20px' in html and f"Cobe News öffnen: {notify._open(one)}\n" in text
+    assert notify.render_slack("R", [one, two], 2, "de")["blocks"][-1]["elements"][0]["url"] == want
+    assert notify.render_teams("R", [one, two], 2, "de")["attachments"][0]["content"]["actions"][0]["url"] == want
+    assert notify.render_push("R", [one, two], 2, "de")[3] == want
+    refs = [("news", one.id), ("news", two.id), ("news", "x3")]
+    assert notify.render_push("R", [one, two], 3, "de", refs=refs)[3] == f"{BASE}/?ids={one.id},{two.id},x3"
+
+
+async def test_the_round_passes_everything_the_message_carries(monkeypatch):
+    rule = NotifyRule(id=uuid.uuid4(), name="Alles", lang="de")
+    rows = [notify.Row(story(n), rule, ("news", uuid.uuid4())) for n in range(1, 15)]
+    [m] = notify.plan(rows)
+    assert len(m.stories) == notify.LIST and m.refs == [("news", str(r.mark[1])) for r in rows]
+    seen = {}
+
+    def fake(rule, stories, total, lang, **kw):  # noqa: ANN001, ANN003
+        seen.update(kw)
+        return "s", "t", "h"
+
+    async def fake_send(*_a):  # noqa: ANN002
+        return None
+
+    monkeypatch.setattr(notify, "render_mail", fake)
+    monkeypatch.setattr(notify, "send_mail", fake_send)
+    t = notify.Target(id=uuid.uuid4(), name="Mail", type="email", recipients=["soc@corp.example"])
+    await notify.deliver(t, m.stories, m.total, "de", "Alles", refs=m.refs)
+    assert seen["refs"] == m.refs
+
+
+def test_chat_cards_and_forwards_show_local_time():
+    from app import forward
+
+    s = story(1, published_at=WINTER, product="P 1.0")
+    many = [story(n, published_at=WINTER) for n in range(1, 3)]
+    outs = [
+        str(notify.render_slack("R", [s], 1, "de")),
+        str(notify.render_teams("R", [s], 1, "de")),
+        str(notify.render_discord("R", [s], 1, "de")),
+        notify.render_telegram("R", [s], 1, "de"),
+        str(notify.render_mattermost("R", [s], 1, "de")),
+        str(notify.render_mattermost("R", many, 2, "de")),
+    ]
+    for out in outs:
+        assert "04.11.2026 10:19 MEZ" in out.replace("\\", "") and "UTC" not in out
+    assert "2026-11-04 10:19 CET" in str(notify.render_slack("R", [s], 1, "en"))
+    f = forward.Forward(sender="Anna", team="SOC", comment="", title="Gerät: Lücke", summary="Text.", url="https://x.example/a", link=f"{BASE}/?story={s.id}",
+                        severity="high", source="Q", published_at=WINTER, kind="news", product="", source_kind="press", tlp="")  # fmt: skip
+    for out in (forward.render_telegram(f, "de"), str(forward.render_teams(f, "de")), forward.render_text(f, "de")[1], forward.render_mail(f, "de")[1]):
+        assert "04.11.2026 10:19 MEZ" in out and "UTC" not in out
+    # the forward's mail button opens the forwarded story
+    assert f'href="{f.link}" style="display:inline-block' in forward.render_mail(f, "de")[2]
+    # a personal Teams card: the person's zone
+    card = str(personal.render_teams([_vendor(1)], "de", tz="America/New_York"))
+    assert "EST" in card and "MEZ" not in card
+
+
+def test_personal_teams_card_and_push_summary_follow_the_mails_order():
+    plain = [_vendor(n, severity="high") for n in range(1, personal.LIST + 3)]
+    hot = _vendor(50, severity="medium", exploited=True, headline="Ausgenutzt")
+    hot.created_at = WINTER - timedelta(days=5)
+    events = [*plain, hot]
+    card = personal.render_teams(events, "de")["attachments"][0]["content"]["body"]
+    texts = [str(x) for x in card]
+    first = next(i for i, x in enumerate(texts) if "Befund" in x or "Ausgenutzt" in x)
+    assert "Ausgenutzt" in texts[first]  # cut and shown first, as in the mail
+    [push] = personal.push_payloads(events, "de")
+    assert "Ausgenutzt" in push["body"] and push["url"] == "/vendor?product=panos"
+    [push] = personal.push_payloads([*events, _vendor(99, "fortios")], "de")
+    assert push["url"] == "/vendor"
+
+
+def test_web_push_summary_opens_the_rest_of_the_round():
+    from app import webpush
+
+    ids = [str(uuid.uuid4()) for _ in range(3)]
+    assert webpush.summary_payload(3, "de", ids)["url"] == "/?ids=" + ",".join(ids)
+    assert webpush.summary_payload(4, "de", ids)["url"] == "/"  # not all known
+    assert webpush.summary_payload(60, "de", [str(uuid.uuid4()) for _ in range(60)])["url"] == "/"
+    assert webpush.summary_payload(3, "de")["url"] == "/"

@@ -35,8 +35,9 @@ class _M(NoNul):
 # ---------------------------------------------------------------- Vendor News: the followed products' findings
 
 
-async def vendor_views(db: AsyncSession, keys: set[str] | None = None) -> list[tuple[str, list[dict]]]:
-    """(product, findings) of the followed products (of `keys` when given) – from the cached views (app/vendor.py)."""
+async def vendor_views(db: AsyncSession, keys: set[str] | None = None, *, wait: float | None = None) -> list[tuple[str, list[dict]]]:
+    """(product, findings) of the followed products (of `keys` when given) – from the cached views (app/vendor.py).
+    `wait`: after a change for all, the previous views once the new ones take longer (product_view's deadline)."""
     fs = await vendor_svc.follows(db)
     if keys is not None:
         fs = [f for f in fs if f.product in keys]
@@ -44,7 +45,8 @@ async def vendor_views(db: AsyncSession, keys: set[str] | None = None) -> list[t
         return []
     vers = await vendor_svc.versions_of(db, [f.id for f in fs])
     kev, euvd = await vendor_svc.kev_index(db), await vendor_svc.euvd_cves(db)
-    return [(f.product, (await vendor_svc.product_view(db, f, vers.get(f.id, []), kev=kev, euvd=euvd))["findings"]) for f in fs]
+    dl = vendor_svc.stale_deadline(wait)
+    return [(f.product, (await vendor_svc.product_view(db, f, vers.get(f.id, []), kev=kev, euvd=euvd, deadline=dl))["findings"]) for f in fs]
 
 
 @router.get("/reader/counts")
@@ -63,10 +65,13 @@ async def counts(user: Reader, db: Db, scope: Literal["all", "team"] = "all") ->
     n_news = await reader.news_unread_count(db, user.id, m, where, now, _with_source) if news_on else 0
     # as the page resolves it: "Mein Team" only while Teams is on and the person is in a team (else all products)
     mine = await teams.my_products(db, user.id) if scope == "team" and await personal.in_team(db, user.id) else None
-    views = await vendor_views(db, mine)
-    rd = await reader.vendor_reading(db, user, [p for p, _ in views], now, m)
-    n_vendor = sum(rd.count(p, fs) for p, fs in views)
-    return {"news": n_news, "vendor": n_vendor, "news_enabled": news_on}
+    vendor_on = bool((await vendor_svc.config(db)).get("enabled", True))
+    n_vendor = 0
+    if vendor_on:  # Vendor News switched off: no number on it (and no view is computed for it)
+        views = await vendor_views(db, mine, wait=vendor_svc.STALE_WAIT)
+        rd = await reader.vendor_reading(db, user, [p for p, _ in views], now, m)
+        n_vendor = sum(rd.count(p, fs) for p, fs in views)
+    return {"news": n_news, "vendor": n_vendor, "news_enabled": news_on, "vendor_enabled": vendor_on}
 
 
 class VendorReadIn(_M):

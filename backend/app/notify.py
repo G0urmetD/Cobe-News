@@ -356,8 +356,63 @@ def _open(s: Story) -> str:
     return s.link or _link(s.id)
 
 
-def _date(d: datetime, lang: str) -> str:
-    return d.astimezone(UTC).strftime("%d.%m.%Y %H:%M UTC" if lang == "de" else "%Y-%m-%d %H:%M UTC")
+def _date(d: datetime, lang: str, tz: str | None = None) -> str:
+    """A story's time in a chat card, a push text or a team forward: local, with the zone (_local) – the installation's
+    Europe/Berlin for channels, the person's zone for personal notifications."""
+    return _local(d, lang, tz)
+
+
+# ---------------------------------------------------------------- the general link of a message ("Cobe News öffnen")
+#
+# One story: the story itself (_open – a news story in the list, a Vendor News event at its product / finding). Several
+# news stories: the news list filtered to exactly them (NEWS_PATH?ids=…, at most NEWS_IDS_MAX – more, or a link longer
+# than LINK_MAX: the news list); several Vendor News events: their product in Vendor News when it is one, else Vendor
+# News (watched CVEs: the list of watched CVEs); source health: the health view; a mix of kinds: the start page.
+
+NEWS_PATH = "/"  # the news list (the index route) – `?ids=<id>,<id>,…` shows only these stories ("Aus der Benachrichtigung (N)")
+NEWS_IDS_MAX = 50  # stories the news list takes in `ids`
+LINK_MAX = 1900  # characters of a general link (Slack's button takes 3000, _safe_url keeps 2000)
+
+
+def _ref_kind(s: Story) -> str:
+    return "news" if s.kind == "news" else "vendor" if s.kind.startswith("vendor.") else "health"
+
+
+def overview_path(stories: list[Story], total: int, refs: list[tuple[str, str]] | None = None) -> str:
+    """The path (of this app) that opens all `total` items of a message. `refs`: (kind, id) of every item – news,
+    vendor, health – as the message carries them (Message.items); without them the stories shown (and the list is
+    only complete when they are all)."""
+    refs = refs if refs is not None else [(_ref_kind(s), s.id) for s in stories]
+    kinds = {k for k, _ in refs}
+    base = get_config().base_url
+    if kinds == {"news"}:
+        ids = list(dict.fromkeys(str(i) for _, i in refs))
+        path = f"{NEWS_PATH}?{urlencode({'ids': ','.join(ids)}, safe=',')}"
+        if len(ids) == total and len(ids) <= NEWS_IDS_MAX and len(base) + len(path) <= LINK_MAX:
+            return path
+        return NEWS_PATH
+    if kinds == {"vendor"}:
+        paths = [_open(s).removeprefix(base) for s in stories]
+        where = {urlsplit(p).path for p in paths}
+        if where == {"/watch"}:
+            return "/watch"
+        products = {dict(x.split("=", 1) for x in urlsplit(p).query.split("&") if "=" in x).get("product", "") for p in paths}
+        if where == {"/vendor"} and len(products) == 1 and "" not in products and len(stories) == total:
+            return "/vendor?" + urlencode({"product": products.pop()})
+        return "/vendor"
+    if kinds == {"health"}:
+        return "/settings/integrations?view=health"
+    return "/"
+
+
+def overview_link(stories: list[Story], total: int, refs: list[tuple[str, str]] | None = None, *, test: bool = False) -> str:
+    """The URL of a message's button ("Cobe News öffnen"): one story – the story; more – overview_path; a test – the
+    start page (its story may be an example)."""
+    if test or not stories:
+        return get_config().base_url + "/"
+    if total == 1 and len(stories) == 1:
+        return _open(stories[0])
+    return get_config().base_url + overview_path(stories, total, refs)
 
 
 def _head(lb: dict, total: int, test: bool) -> str:
@@ -571,6 +626,7 @@ def render_mail(
     rules: list[str] | None = None,
     rule_ids: list[str] | None = None,
     tz: str | None = None,
+    refs: list[tuple[str, str]] | None = None,
 ) -> tuple[str, str, str]:
     """(subject, text, html) in the mail style (HTML escaped by Jinja's autoescape). The stories in their order
     (priority: our products, actively exploited, severity, newest); up to COMPACT_FROM - 1 as cards (facts line,
@@ -607,6 +663,7 @@ def render_mail(
             }
         )
     why = None if footer else _why(lb, rule, rules, rule_ids, test)
+    button = overview_link(stories, total, refs, test=test)  # one story: it; more: exactly them in Cobe News
     footer = footer or [f"{lb['footer']} {lb['footer2']}"]
     subject = _subject(rule, stories, total, lang, test)
     body = _env.get_template("mail.html.j2").render(
@@ -620,7 +677,7 @@ def render_mail(
         stories=cards,
         compact=compact,
         more=more,
-        app_url=get_config().base_url + "/",
+        app_url=button,
         labels=lb,
         why=why,
         footer=footer,
@@ -651,7 +708,7 @@ def render_mail(
         lines.append("")
     if more:
         lines += [more, ""]
-    lines += [f"{lb['button']}: {get_config().base_url}/", "", "-- "]
+    lines += [f"{lb['button']}: {button}", "", "-- "]
     if why:
         lines.append(ol(f"{why['text']} · {why['label']}: {why['url']}"))
     lines += [ol(f) for f in footer]
@@ -810,7 +867,7 @@ def _slack_esc(v: str) -> str:
 SLACK_SECTION_MAX = 2900  # a section's text: at most 3000 characters
 
 
-def render_slack(rule: str, stories: list[Story], total: int, lang: str, *, test: bool = False) -> dict:
+def render_slack(rule: str, stories: list[Story], total: int, lang: str, *, test: bool = False, refs: list[tuple[str, str]] | None = None) -> dict:
     lb = LABELS[lang]
     head = _head(lb, total, test)
     # a header is plain text (no mentions) – angle brackets still swapped, so it never even looks like <!channel>
@@ -844,7 +901,7 @@ def render_slack(rule: str, stories: list[Story], total: int, lang: str, *, test
             blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": f"{_date(s.published_at, lang)} · <{_safe_url(_open(s))}|{lb['open']}>"}]})
     if total > shown:
         blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": _slack_esc(lb["more"].format(n=total - shown))}]})
-    blocks.append({"type": "actions", "elements": [{"type": "button", "text": {"type": "plain_text", "text": lb["button"]}, "url": get_config().base_url + "/"}]})
+    blocks.append({"type": "actions", "elements": [{"type": "button", "text": {"type": "plain_text", "text": lb["button"]}, "url": _safe_url(overview_link(stories, total, refs, test=test))}]})
     # at most 50 blocks: the button stays the last one
     blocks = [*blocks[:49], blocks[-1]] if len(blocks) > 50 else blocks
     return {"text": f"[Cobe News] {head}: " + "; ".join(_slack_esc(s.headline) for s in stories)[:300], "blocks": blocks}
@@ -858,7 +915,9 @@ def _teams_esc(v: str) -> str:
 TEAMS_COLOR = {"critical": "Attention", "high": "Warning", "medium": "Warning", "low": "Accent", "info": "Default"}
 
 
-def render_teams(rule: str, stories: list[Story], total: int, lang: str, *, test: bool = False) -> dict:
+def render_teams(
+    rule: str, stories: list[Story], total: int, lang: str, *, test: bool = False, refs: list[tuple[str, str]] | None = None, tz: str | None = None
+) -> dict:
     lb = LABELS[lang]
     head = _head(lb, total, test)
     body: list[dict] = [{"type": "TextBlock", "text": f"{head} · {_teams_esc(rule)}", "weight": "Bolder", "size": "Medium", "wrap": True}]
@@ -879,7 +938,7 @@ def render_teams(rule: str, stories: list[Story], total: int, lang: str, *, test
         if b := brief(s.summary):
             items.append({"type": "TextBlock", "text": _teams_esc(b), "wrap": True})
         items.append(
-            {"type": "TextBlock", "text": f"{_date(s.published_at, lang)} · [{_teams_esc(lb['open'])}]({_safe_url(_open(s))})", "isSubtle": True, "spacing": "Small", "wrap": True, "color": TEAMS_COLOR[s.severity]}
+            {"type": "TextBlock", "text": f"{_date(s.published_at, lang, tz)} · [{_teams_esc(lb['open'])}]({_safe_url(_open(s))})", "isSubtle": True, "spacing": "Small", "wrap": True, "color": TEAMS_COLOR[s.severity]}
         )
         body.append({"type": "Container", "separator": True, "items": items, "selectAction": {"type": "Action.OpenUrl", "url": _open(s)}})
     if total > len(stories):
@@ -889,7 +948,7 @@ def render_teams(rule: str, stories: list[Story], total: int, lang: str, *, test
         "type": "AdaptiveCard",
         "version": "1.4",
         "body": body,
-        "actions": [{"type": "Action.OpenUrl", "title": lb["button"], "url": get_config().base_url + "/"}],
+        "actions": [{"type": "Action.OpenUrl", "title": lb["button"], "url": _safe_url(overview_link(stories, total, refs, test=test))}],
     }
     return {"type": "message", "attachments": [{"contentType": "application/vnd.microsoft.card.adaptive", "content": card}]}
 
@@ -1058,7 +1117,7 @@ def _top(stories: list[Story]) -> str:
     return max(stories, key=lambda s: RANK.get(s.severity, 0)).severity
 
 
-def render_push(rule: str, stories: list[Story], total: int, lang: str, *, test: bool = False) -> tuple[str, str, str, str]:
+def render_push(rule: str, stories: list[Story], total: int, lang: str, *, test: bool = False, refs: list[tuple[str, str]] | None = None) -> tuple[str, str, str, str]:
     """(title, message, top severity, click URL) of an ntfy or Gotify message – plain text: neither renders anything of
     it (ntfy's markdown stays off, Gotify's content type is text/plain), and nothing of it goes into a header. The same
     card as the chats (Produkt, Quelle, Kategorie, short description), a compact list for many stories."""
@@ -1091,7 +1150,7 @@ def render_push(rule: str, stories: list[Story], total: int, lang: str, *, test:
         shown += 1
     if total > shown:
         out += ["", lb["more"].format(n=total - shown)]
-    click = _open(stories[0]) if total == 1 and not test else get_config().base_url + "/"
+    click = overview_link(stories, total, refs, test=test)  # one story: it; more: exactly them in Cobe News
     return one_line(title)[:250], plain_block("\n".join(out))[:PUSH_TEXT_MAX], _top(stories), click
 
 
@@ -1470,13 +1529,15 @@ async def deliver(
     test: bool = False,
     key: str = "",
     rule_ids: list[str] | None = None,
+    refs: list[tuple[str, str]] | None = None,
 ) -> None:
     """One message to one channel – or NotifyError. `key`: what the message carries (its stories / events) – the
     webhook's delivery id is derived from it (none, e.g. a test: a new id each time). `rule_ids`: the rules that brought
-    it (the mail's footer links to them)."""
+    it (the mail's footer links to them). `refs`: (kind, id) of everything the message carries – its general link
+("Cobe News öffnen") opens exactly these (overview_link)."""
     lang = lang if lang in LABELS else "de"
     if t.type == "email":
-        subject, text, body = render_mail(label, stories, total, lang, test=test, rules=rules, rule_ids=rule_ids)
+        subject, text, body = render_mail(label, stories, total, lang, test=test, rules=rules, rule_ids=rule_ids, refs=refs)
         await send_mail(smtp or {}, t.recipients, subject, text, body)
         return
     if t.type == "telegram":
@@ -1489,16 +1550,16 @@ async def deliver(
             raise NotifyError("rejected", _telegram_detail(reply))
         return
     if t.type in ("ntfy", "gotify", "mattermost"):
-        title, message, severity, click = render_push(label, stories, total, lang, test=test)
+        title, message, severity, click = render_push(label, stories, total, lang, test=test, refs=refs)
         await send_text(t, title=title, message=message, severity=severity, click=click, mattermost=render_mattermost(label, stories, total, lang, test=test))
         return
     if not t.url:
         raise NotifyError("not_configured")
     check_url(t.type, t.url, allow_http=t.allow_http)
     if t.type == "slack":
-        await post(t.url, _json(render_slack(label, stories, total, lang, test=test)), JSON_HEADERS)
+        await post(t.url, _json(render_slack(label, stories, total, lang, test=test, refs=refs)), JSON_HEADERS)
     elif t.type == "teams":
-        await post(t.url, _json(render_teams(label, stories, total, lang, test=test)), JSON_HEADERS)
+        await post(t.url, _json(render_teams(label, stories, total, lang, test=test, refs=refs)), JSON_HEADERS)
     elif t.type == "discord":
         await post(t.url, _json(render_discord(label, stories, total, lang, test=test)), JSON_HEADERS)
     elif t.type == "webhook":
@@ -2137,6 +2198,11 @@ class Message:
     by: list[dict] = field(default_factory=list)  # the rules that brought it: [{"id", "name"}] (the delivery log)
 
     @property
+    def refs(self) -> list[tuple[str, str]]:
+        """(kind, id) of everything the message carries – the general link opens exactly these (overview_link)."""
+        return [(kind, str(item)) for kind, item, _ in self.items]
+
+    @property
     def key(self) -> str:
         """What the message carries – the same message sent again has the same key (webhook delivery id)."""
         return ",".join(sorted(f"{kind}:{item}" for kind, item, _ in self.items))
@@ -2285,7 +2351,7 @@ async def _run(db: AsyncSession, gate: asyncio.Lock, job: _Job, smtp: dict) -> i
         if job.target is not None:
             try:
                 async with asyncio.timeout_at(deadline):
-                    await deliver(job.target, m.stories, m.total, m.lang, m.label, rules=m.rules, smtp=smtp, key=m.key, rule_ids=[r["id"] for r in m.by])
+                    await deliver(job.target, m.stories, m.total, m.lang, m.label, rules=m.rules, smtp=smtp, key=m.key, rule_ids=[r["id"] for r in m.by], refs=m.refs)
             except NotifyError as exc:
                 err = exc
             except TimeoutError:
@@ -2492,7 +2558,7 @@ async def resend(db: AsyncSession, ch: NotifyChannel, row, actor=None) -> Notify
         t = resolve(ch)
         await dbm.release(db)  # nothing open while the channel is asked
         async with asyncio.timeout(CHANNEL_DEADLINE):
-            await deliver(t, m.stories, m.total, m.lang, m.label, rules=m.rules, smtp=smtp, key=m.key, rule_ids=[str(r.get("id") or "") for r in m.by])
+            await deliver(t, m.stories, m.total, m.lang, m.label, rules=m.rules, smtp=smtp, key=m.key, rule_ids=[str(r.get("id") or "") for r in m.by], refs=m.refs)
     except NotifyError as exc:
         err = exc
     except TimeoutError:

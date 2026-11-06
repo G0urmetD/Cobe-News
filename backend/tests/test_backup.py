@@ -821,3 +821,224 @@ async def test_a_hanging_read_never_freezes_the_app(backups_here, tmp_path, monk
             await backup.create()
     finally:
         t.cancel()
+
+
+# ---------------------------------------------------------------- download of encrypted backups (0.1.51)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_download_limits():
+    backup._dl_starts.clear()
+    backup._dl_running.clear()
+    yield
+    backup._dl_starts.clear()
+    backup._dl_running.clear()
+
+
+async def _csrf(c) -> dict:  # noqa: ANN001
+    if "cobe_news_csrf" not in c.cookies:
+        await c.get("/api/auth/config")
+    return {"X-CSRF-Token": c.cookies.get("cobe_news_csrf", "")}
+
+
+async def _download(c, name: str, **kw):  # noqa: ANN001, ANN003
+    return await c.get(f"/api/admin/backup/files/{name}", headers=await _csrf(c), **kw)
+
+
+async def test_an_encrypted_backup_downloads_whole_and_is_logged(admin_client, backups_here):
+    from app.models import AuditEntry
+
+    res = await backup.create(passphrase="eine lange Passphrase")
+    r = await _download(admin_client, res.name)
+    assert r.status_code == 200, r.text
+    assert r.content == res.path.read_bytes() and r.headers["content-length"] == str(res.size)
+    assert r.headers["content-disposition"] == f'attachment; filename="{res.name}"' and r.headers["cache-control"] == "no-store"
+    assert r.headers["content-type"] == "application/octet-stream"
+    async with db.session() as s:
+        e = (await s.scalars(select(AuditEntry).where(AuditEntry.action == "backup.downloaded"))).one()
+    assert e.notable and e.target_id == res.name and e.details == {"size": res.size, "encrypted": True} and e.actor_name == "anna"
+    assert backup._dl_running == {}  # the slot is free again
+
+
+async def test_a_plain_backup_stays_on_the_server(admin_client, backups_here):
+    res = await backup.create()
+    r = await _download(admin_client, res.name)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "backup_not_encrypted"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "..%2F..%2Fsecret.key",
+        "%2E%2E%2Fsecret.key",
+        "secret.key",
+        ".partial-x",
+        "cobe-news-20261101-120000.tar.enc.partial",
+        "cobe-news-20261101-120000.tar.enc%00",
+        "cobe-news-20991231-235959.tar.enc",  # the pattern, but not in the list
+    ],
+)
+async def test_only_names_of_the_list_never_a_path(admin_client, backups_here, name):
+    await backup.create(passphrase="eine lange Passphrase")
+    (backups_here / "cobe-news-20261101-120000.tar.enc.partial").write_bytes(b"half")
+    r = await _download(admin_client, name)
+    assert r.status_code in (404, 422), (name, r.status_code, r.text)
+    assert b"half" not in r.content and crypto.master() not in r.content
+
+
+async def test_a_symlink_in_the_folder_is_never_followed(admin_client, backups_here, tmp_path):
+    await backup.create(passphrase="eine lange Passphrase")
+    outside = tmp_path / "outside.tar.enc"
+    outside.write_bytes(b"not a backup of ours")
+    link = backups_here / "cobe-news-20261101-120000.tar.enc"
+    link.symlink_to(outside)
+    r = await _download(admin_client, link.name)
+    assert r.status_code == 404 and b"not a backup" not in r.content
+
+
+async def test_the_download_needs_an_admin_a_fresh_proof_and_the_csrf_token(admin_client, reader_client, backups_here):
+    res = await backup.create(passphrase="eine lange Passphrase")
+    assert (await _download(reader_client, res.name)).status_code == 403
+    # a link on another site, an address typed in: no CSRF token
+    r = await admin_client.get(f"/api/admin/backup/files/{res.name}")
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "csrf_failed"
+    async with db.session() as s:
+        await s.execute(update(UserSession).values(reauth_at=datetime.now(UTC) - timedelta(hours=1)))
+        await s.commit()
+    r = await _download(admin_client, res.name)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "reauth_required"
+    async with db.session() as s:
+        from app.models import AuditEntry
+
+        assert await s.scalar(select(func.count()).select_from(AuditEntry).where(AuditEntry.action == "backup.downloaded")) == 0
+
+
+async def test_a_few_per_hour_and_one_at_a_time(admin_client, backups_here, monkeypatch):
+    res = await backup.create(passphrase="eine lange Passphrase")
+    backup._dl_running[str(admin_client.user.id)] = ("other", __import__("time").monotonic())
+    r = await _download(admin_client, res.name)
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "backup_download_busy"
+    backup._dl_running.clear()
+    monkeypatch.setattr(backup, "DOWNLOADS_PER_HOUR", 2)
+    assert (await _download(admin_client, res.name)).status_code == 200
+    assert (await _download(admin_client, res.name)).status_code == 200
+    r = await _download(admin_client, res.name)
+    assert r.status_code == 429 and r.json()["detail"]["code"] == "backup_download_rate_limited" and 0 < r.json()["detail"]["retry_after"] <= 3601
+
+
+async def test_a_big_backup_is_streamed_in_chunks(admin_client, backups_here, monkeypatch):
+    """Never whole in memory: read in DOWNLOAD_CHUNK steps from one descriptor; the answer is exactly the file."""
+    backups_here.mkdir(parents=True, exist_ok=True)
+    big = backups_here / "cobe-news-20261101-120000.tar.enc"
+    payload = os.urandom(5 * 1024 * 1024 + 123)
+    big.write_bytes(payload)
+    reads: list[int] = []
+    real = os.read
+
+    def counting(fd, n):  # noqa: ANN001
+        reads.append(n)
+        return real(fd, n)
+
+    monkeypatch.setattr(backup, "DOWNLOAD_CHUNK", 1 << 20)
+    monkeypatch.setattr(backup.os, "read", counting)
+    async with admin_client.stream("GET", f"/api/admin/backup/files/{big.name}", headers=await _csrf(admin_client)) as r:
+        assert r.status_code == 200
+        got = b"".join([chunk async for chunk in r.aiter_bytes()])
+    assert got == payload and r.headers["content-length"] == str(len(payload))
+    assert len(reads) >= 6 and max(reads) <= 1 << 20
+
+
+async def test_a_backup_replaced_after_the_check_is_not_sent(backups_here):
+    backups_here.mkdir(parents=True, exist_ok=True)
+    f = backups_here / "cobe-news-20261101-120000.tar.enc"
+    f.write_bytes(b"A" * 100)
+    dl = backup.prepare_download(f.name, "u1")
+    f.unlink()
+    f.write_bytes(b"B" * 100)  # another file under the same name
+    with pytest.raises(backup.DownloadRefused):
+        async for _ in backup.stream_download(dl, "u1"):
+            pass
+    assert backup._dl_running == {}
+
+
+async def test_two_downloads_in_parallel_one_waits(admin_client, backups_here, monkeypatch):
+    """Review 0.1.51 L1: the slot is claimed by the check itself – requests while the first is still streaming get 409,
+    and the first one's end frees it."""
+    import threading
+
+    backups_here.mkdir(parents=True, exist_ok=True)
+    f = backups_here / "cobe-news-20261101-120000.tar.enc"
+    f.write_bytes(os.urandom(3 * 65536))
+    monkeypatch.setattr(backup, "DOWNLOAD_CHUNK", 65536)
+    started, gate = threading.Event(), threading.Event()
+    real = os.read
+
+    def held(fd, n):  # noqa: ANN001 - the first download's read waits until the others have asked
+        started.set()
+        assert gate.wait(10)
+        return real(fd, n)
+
+    monkeypatch.setattr(backup.os, "read", held)
+    first = asyncio.create_task(_download(admin_client, f.name))
+    for _ in range(200):
+        if started.is_set():
+            break
+        await asyncio.sleep(0.02)
+    assert started.is_set()  # the first is streaming
+    both = await asyncio.gather(_download(admin_client, f.name), _download(admin_client, f.name))
+    assert [r.status_code for r in both] == [409, 409] and all(r.json()["detail"]["code"] == "backup_download_busy" for r in both)
+    gate.set()
+    r = await first
+    assert r.status_code == 200 and r.content == f.read_bytes()
+    assert backup._dl_running == {}
+    assert (await _download(admin_client, f.name)).status_code == 200
+
+
+async def test_requests_at_the_same_moment_get_one_slot(backups_here):
+    """Two checks in a row before either stream starts (the race of 0.1.51): only the first gets the slot."""
+    backups_here.mkdir(parents=True, exist_ok=True)
+    f = backups_here / "cobe-news-20261101-120000.tar.enc"
+    f.write_bytes(b"x" * 100)
+    dl = backup.prepare_download(f.name, "u1")
+    with pytest.raises(backup.DownloadRefused) as exc:
+        backup.prepare_download(f.name, "u1")
+    assert exc.value.code == "backup_download_busy"
+    assert backup.prepare_download(f.name, "u2").token  # another admin has a slot of his own
+    backup.release_download(dl, "u1")
+    assert backup.prepare_download(f.name, "u1").token != dl.token
+
+
+async def test_a_download_frees_only_its_own_slot(backups_here, monkeypatch):
+    """After a stale slot (DOWNLOAD_SLOT_MAX) a new download claims it; the old one ending later must not free the new."""
+    backups_here.mkdir(parents=True, exist_ok=True)
+    f = backups_here / "cobe-news-20261101-120000.tar.enc"
+    f.write_bytes(b"x" * 100)
+    old = backup.prepare_download(f.name, "u1")
+    backup._dl_running["u1"] = (old.token, backup._dl_running["u1"][1] - backup.DOWNLOAD_SLOT_MAX - 1)  # stale
+    new = backup.prepare_download(f.name, "u1")
+    async for _ in backup.stream_download(old, "u1"):  # the old one ends now
+        pass
+    assert backup._dl_running["u1"][0] == new.token
+    backup.release_download(new, "u1")
+    assert backup._dl_running == {}
+
+
+async def test_an_answer_never_sent_frees_the_slot(admin_client, backups_here):
+    """The client gone before the body began: the stream never runs – the answer frees the slot itself."""
+    from app.admin_api import _BackupStream
+
+    backups_here.mkdir(parents=True, exist_ok=True)
+    f = backups_here / "cobe-news-20261101-120000.tar.enc"
+    f.write_bytes(b"x" * 100)
+    dl = backup.prepare_download(f.name, "u1")
+    resp = _BackupStream(dl, "u1", backup.stream_download(dl, "u1"), media_type="application/octet-stream")
+
+    async def gone(message):  # noqa: ANN001
+        raise OSError("client disconnected")
+
+    async def receive():
+        return {"type": "http.disconnect"}
+
+    with pytest.raises(Exception):  # noqa: B017, PT011 - Starlette names the disconnect its own way
+        await resp({"type": "http", "asgi": {"spec_version": "2.4"}}, receive, gone)
+    assert backup._dl_running == {}

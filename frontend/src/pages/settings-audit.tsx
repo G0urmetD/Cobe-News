@@ -29,7 +29,6 @@ import {
   TriangleAlert,
   Users,
   UsersRound,
-  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -40,6 +39,7 @@ import { Switch } from "@/components/ui/switch"
 import { EmptyState, Section } from "@/components/cobe/common"
 import { HelpLink } from "@/components/cobe/doc-markdown"
 import { Explained } from "@/components/cobe/explained"
+import { FilterChip } from "@/components/cobe/filter-chip"
 import { SubTabs } from "@/components/cobe/sub-tabs"
 import { Ts } from "@/components/cobe/time"
 import { api, saveBlob } from "@/lib/api"
@@ -258,18 +258,13 @@ function EntriesPane() {
       {chips.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-5 py-2 text-sm" aria-label={t("audit.chip.label")} role="group">
           {chips.map((c) => (
-            <span key={c.key} className="inline-flex max-w-full items-center gap-1 rounded-full border bg-background py-0.5 pr-1 pl-2.5 text-xs">
-              <span className="text-muted-foreground">{c.label}:</span>
-              <bdi className="truncate font-medium">{c.value}</bdi>
-              <button
-                type="button"
-                className="ml-0.5 rounded-full p-0.5 text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                aria-label={t("audit.chip.remove", { label: `${c.label}: ${c.value}` })}
-                onClick={() => setFilters((f) => withoutChip(f, c.key))}
-              >
-                <X className="size-3.5" />
-              </button>
-            </span>
+            <FilterChip
+              key={c.key}
+              label={c.label}
+              value={c.value}
+              removeLabel={t("audit.chip.remove", { label: `${c.label}: ${c.value}` })}
+              onRemove={() => setFilters((f) => withoutChip(f, c.key))}
+            />
           ))}
           {first?.total != null && (
             <span className="text-xs text-muted-foreground tabular-nums" role="status">

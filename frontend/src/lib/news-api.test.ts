@@ -43,7 +43,7 @@ describe("paging", () => {
     expect(first.get("before")).toBeNull()
     expect(first.get("counts")).toBeNull()
     expect(first.get("q")).toBe("lücke")
-    const next = new URL(newsQuery(f, "2026-10-28T08:00:00+00:00|abc"), "https://n.example.com").searchParams
+    const next = new URL(newsQuery(f, { before: "2026-10-28T08:00:00+00:00|abc", asked: {} }), "https://n.example.com").searchParams
     expect(next.get("before")).toBe("2026-10-28T08:00:00+00:00|abc")
     expect(next.get("counts")).toBe("false")
     expect(next.getAll("source")).toEqual(["x"])

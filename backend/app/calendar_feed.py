@@ -244,7 +244,7 @@ def _nope(status: int = 404, retry: int | None = None) -> Response:
     return Response("not found\n" if status == 404 else "too many requests\n", status_code=status, media_type="text/plain", headers=h)
 
 
-@router.get(PATH + "{name}", include_in_schema=False)
+@router.api_route(PATH + "{name}", methods=["GET", "HEAD"], include_in_schema=False)  # HEAD: calendar clients probing
 async def feed(name: str, request: Request, db: Db) -> Response:
     now = time.monotonic()
     ip = bruteforce.source_key(client_ip(request))  # IPv6 per /64, as the sign-in's counters

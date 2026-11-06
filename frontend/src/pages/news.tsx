@@ -21,6 +21,9 @@ import { WatchStar } from "@/components/cobe/watch-star"
 import { confirmAction } from "@/components/cobe/confirm"
 import { MuteButton, MuteItems, type MuteTarget, MuteUntilDialog } from "@/components/cobe/mute-menu"
 import { ViewsMenu, useDefaultView } from "@/components/cobe/views-menu"
+import { FilterChip } from "@/components/cobe/filter-chip"
+import { NewsRangeControl } from "@/components/cobe/news-range"
+import { NO_RANGE, rangeActive, rangeChip } from "@/lib/news-range"
 import { IN_PAGE, type NewsUrlFilter, readNewsFilter, writeNewsFilter } from "@/lib/reader-api"
 import { ApiError, api } from "@/lib/api"
 import { errorText } from "@/lib/errors"
@@ -38,6 +41,9 @@ import {
   type NewsTopic,
   type TopicReason,
   cardTopics,
+  isShortSearch,
+  reasonText,
+  isStoryId,
   loadNewsFilter,
   mergePages,
   readAllBody,
@@ -66,7 +72,10 @@ export function NewsPage() {
   // carry it; the sources and severities are also remembered for this person in this browser (the fallback when the
   // page is reached without a filter and without a default view)
   const filter = useMemo(() => readNewsFilter(params), [params])
-  const state = filter.unread ? "new" : "all"
+  // a notification's stories (?ids=…, "Aus der Benachrichtigung"): exactly those, read or not, muted or not – the other
+  // filters are set aside while it is on (touching one of them ends it)
+  const notified = filter.ids.length > 0
+  const state = filter.unread && !notified ? "new" : "all"
   const fallback = useCallback(
     (p: URLSearchParams) => {
       const f = loadNewsFilter(user?.id)
@@ -77,7 +86,7 @@ export function NewsPage() {
   const deciding = useDefaultView("news", fallback).pending
   const choose = useCallback(
     (next: Partial<NewsUrlFilter>) => {
-      setParams((p) => writeNewsFilter(p, next), { replace: true, state: IN_PAGE })
+      setParams((p) => writeNewsFilter(p, next.ids === undefined && p.has("ids") ? { ...next, ids: [] } : next), { replace: true, state: IN_PAGE })
       if (next.sources !== undefined || next.severities !== undefined || next.topics !== undefined || next.ours !== undefined) {
         const cur = readNewsFilter(new URLSearchParams(window.location.search))
         saveNewsFilter(user?.id, {
@@ -150,7 +159,9 @@ export function NewsPage() {
   const scope = filter.ours && vscope.scope === "team" ? "team" : "all"
   const waitScope = filter.ours && vscope.scope === null
   const list = useNews(
-    { state, sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope },
+    notified
+      ? { state, sources: [], severities: [], topics: [], q: "", muted: true, ours: false, ids: filter.ids }
+      : { state, sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope, range: filter.range },
     !deciding && !waitScope,
   )
   const mark = useMarkRead()
@@ -184,7 +195,10 @@ export function NewsPage() {
     [sources, t],
   )
   const quick = filter.topics.filter((x) => QUICK_TOPICS.includes(x))
-  const anyFilter = activeSources.length > 0 || filter.severities.length > 0 || filter.topics.length > 0 || filter.ours
+  const ranged = rangeActive(filter.range) && !notified
+  const anyFilter = activeSources.length > 0 || filter.severities.length > 0 || filter.topics.length > 0 || filter.ours || rangeActive(filter.range) || notified
+  // what the list shows in all (the chip row's "N Treffer")
+  const hits = first?.counts ? (state === "new" ? first.counts.new : first.counts.new + first.counts.read) : null
   const showOurs = !!first?.ours_on || filter.ours
 
   const markRef = useRef(mark.mutate)
@@ -218,7 +232,10 @@ export function NewsPage() {
     })
     if (!ok) return
     try {
-      const body = readAllBody({ sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope }, first)
+      const body = readAllBody(
+        { sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope, ids: notified ? filter.ids : undefined },
+        first,
+      )
       const r = await api.post<{ marked: number }>("/api/news/read-all", body)
       toast.success(t("news.readAllDone", { count: r.marked }))
       // the lists and the number – not the sources or every story's details
@@ -308,13 +325,38 @@ export function NewsPage() {
           className="h-9"
           contentClassName="w-80"
         />
+        <NewsRangeControl value={notified ? NO_RANGE : filter.range} onChange={(range) => choose({ range })} markAt={first?.mark_at} />
         <ViewsMenu page="news" />
         {anyFilter && (
-          <Button variant="ghost" size="sm" onClick={() => choose({ sources: [], severities: [], topics: [], ours: false })}>
+          <Button variant="ghost" size="sm" onClick={() => choose({ sources: [], severities: [], topics: [], ours: false, range: NO_RANGE, ids: [] })}>
             {t("news.resetFilter")}
           </Button>
         )}
       </div>
+      {(ranged || notified) && (
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("newsRange.chips")}>
+          {notified ? (
+            <FilterChip
+              label={t("newsRange.idsLabel")}
+              value={t("newsRange.idsValue", { count: filter.ids.length })}
+              removeLabel={t("newsRange.idsRemove")}
+              onRemove={() => choose({ ids: [] })}
+            />
+          ) : (
+            <FilterChip
+              label={t("newsRange.title")}
+              value={rangeChip(t, filter.range, { markAt: first?.mark_at, asked: first?.asked })}
+              removeLabel={t("newsRange.remove")}
+              onRemove={() => choose({ range: NO_RANGE })}
+            />
+          )}
+          {hits !== null && (
+            <span className="text-xs text-muted-foreground tabular-nums" role="status">
+              {t("newsRange.hits", { count: hits })}
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {/* one click for the topics asked most – the same filter as "Thema" (OR with the topics chosen there) */}
         <ToggleGroup
@@ -351,13 +393,13 @@ export function NewsPage() {
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <div className="flex items-center gap-2">
-          <Switch id="news-unread" checked={filter.unread} onCheckedChange={(v) => choose({ unread: v })} />
+          <Switch id="news-unread" checked={filter.unread && !notified} onCheckedChange={(v) => choose({ unread: v })} />
           <Label htmlFor="news-unread" className="text-sm">
             {t("reader.onlyUnread")}
           </Label>
         </div>
         <div className="flex items-center gap-2">
-          <Switch id="news-muted" checked={filter.muted} onCheckedChange={(v) => choose({ muted: v })} />
+          <Switch id="news-muted" checked={filter.muted || notified} onCheckedChange={(v) => choose({ muted: v })} />
           <Label htmlFor="news-muted" className="text-sm" title={t("reader.mute.onlyYou")}>
             {t("reader.showMuted")}
           </Label>
@@ -391,7 +433,11 @@ export function NewsPage() {
         </p>
       ) : items.length === 0 ? (
         enabled && (
-          <EmptyState icon={Newspaper} title={t(state === "new" ? "news.emptyNew" : "reader.emptyAll")} text={t(state === "new" ? "news.emptyNewText" : "reader.emptyAllText")} />
+          <EmptyState
+            icon={Newspaper}
+            title={t(notified ? "newsRange.idsEmpty" : state === "new" ? "news.emptyNew" : "reader.emptyAll")}
+            text={t(notified ? "newsRange.idsEmptyText" : ranged ? "newsRange.emptyText" : state === "new" ? "news.emptyNewText" : "reader.emptyAllText")}
+          />
         )
       ) : (
         <div
@@ -456,10 +502,25 @@ function SearchBox({ applied, onSearch, onPending }: { applied: string; onSearch
     return () => clearTimeout(id)
   }, [input, sent, onSearch])
   useEffect(() => onPending(input.trim().slice(0, 100) !== applied), [input, applied, onPending])
+  // 1–2 characters: no index serves them – the list comes without its numbers (api.short_search, as the audit log)
+  const short = isShortSearch(input)
   return (
     <div className="relative">
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input value={input} onChange={(e) => setInput(e.target.value)} maxLength={100} placeholder={t("news.search")} className="h-9 w-56 pl-8" aria-label={t("news.search")} />
+      <Input
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        maxLength={100}
+        placeholder={t("news.search")}
+        className="h-9 w-56 pl-8"
+        aria-label={t("news.search")}
+        aria-describedby={short ? "news-search-short" : undefined}
+      />
+      {short && (
+        <p id="news-search-short" className="absolute top-full left-0 z-10 mt-1 w-72 rounded-md border bg-popover px-2 py-1 text-xs text-muted-foreground shadow-sm">
+          {t("news.searchShort")}
+        </p>
+      )}
     </div>
   )
 }
@@ -678,16 +739,6 @@ function StoryMenu({ n, onToggle }: { n: NewsItem; onToggle: (n: NewsItem, read:
   )
 }
 
-function reasonText(t: (k: string, o?: Record<string, unknown>) => string, r: { kind: string; value: string; in_text?: boolean }) {
-  const base =
-    r.kind === "vendor"
-      ? t("news.reason.vendor", { value: t(`news.sev.${r.value}`) })
-      : (r.kind === "kev" || r.kind === "euvd") && !r.value
-        ? t(`news.reason.${r.kind}Plain`)
-        : t(`news.reason.${r.kind}`, { value: r.value })
-  return r.in_text ? `${base} ${t("news.reason.inText")}` : base
-}
-
 function NewsDrawer({
   id,
   card,
@@ -725,7 +776,8 @@ function NewsDrawer({
     if (d.unread) seenRef.current(d)
   }, [open, d])
   const head = d ?? card
-  const missing = q.error instanceof ApiError && q.error.status === 404
+  // no such story: gone (404) – or an address no story can have (?story=not-a-uuid: never asked, 0.1.51)
+  const missing = !isStoryId(id) || (q.error instanceof ApiError && q.error.status === 404)
   const goneRef = useRef(onGone)
   useEffect(() => {
     goneRef.current = onGone
