@@ -552,13 +552,17 @@ class DownloadRefused(Exception):
         self.status, self.code, self.retry = status, code, retry
 
 
-@dataclass(frozen=True)
+@dataclass
 class Download:
     name: str
     size: int
     dev: int
     ino: int
     token: str = ""  # its claim on the admin's slot (release_download frees only its own)
+    # the checked file, held open until the stream ends or the download is released: while it is open its inode cannot
+    # be given to another file – Linux hands a freed inode number out again at once, so a file replaced under the same
+    # name could otherwise pass the device/inode check (CI on ext4/tmpfs; macOS never reuses one so soon)
+    fd: int = -1
 
 
 def _open_backup(name: str) -> tuple[int, os.stat_result]:
@@ -590,20 +594,22 @@ def prepare_download(name: str, user_id: str) -> Download:
     starts = [t for t in _dl_starts.get(user_id, []) if now - t < 3600]
     if len(starts) >= DOWNLOADS_PER_HOUR:
         raise DownloadRefused(429, "backup_download_rate_limited", retry=int(3600 - (now - starts[0])) + 1)
-    fd, st = _open_backup(name)
-    os.close(fd)  # opened again by the stream itself – an answer that is never sent leaves nothing open
+    fd, st = _open_backup(name)  # kept open: release_download (or the stream's end) closes it
     starts.append(now)
     _dl_starts[user_id] = starts
     # the slot is claimed here, in the same step as the check (no await in between): a second request in parallel finds
     # it taken. Freed by release_download – when the stream ends, fails or is cancelled, or the answer is never sent
     token = secrets.token_hex(8)
     _dl_running[user_id] = (token, now)
-    return Download(name=name, size=st.st_size, dev=st.st_dev, ino=st.st_ino, token=token)
+    return Download(name=name, size=st.st_size, dev=st.st_dev, ino=st.st_ino, token=token, fd=fd)
 
 
 def release_download(dl: Download, user_id: str) -> None:
     """Frees the admin's slot – only when it is still this download's (a newer one, after a stale slot, keeps its own).
-    Called more than once for one download (the stream's end and the answer's end): harmless."""
+    Called more than once for one download (the stream's end and the answer's end): harmless. Closes the checked file."""
+    fd, dl.fd = dl.fd, -1
+    if fd >= 0:
+        os.close(fd)
     held = _dl_running.get(user_id)
     if held is not None and held[0] == dl.token:
         del _dl_running[user_id]
@@ -613,10 +619,15 @@ async def stream_download(dl: Download, user_id: str):  # noqa: ANN201 - an asyn
     """The file in chunks, never whole in memory – the same file that was checked (device and inode), exactly the size
     announced (Content-Length). A backup removed by the retention meanwhile is still read to its end (open descriptor).
     The slot was claimed by prepare_download; freed here at the end (also on an error or a cancel)."""
-    fd = -1
+    fd, dl.fd = dl.fd, -1  # the stream owns the checked file now
     try:
-        fd, st = _open_backup(dl.name)
-        if (st.st_dev, st.st_ino) != (dl.dev, dl.ino):
+        if fd < 0:
+            raise DownloadRefused(404, "not_found")  # released already (or streamed twice)
+        try:  # still the file under its name? (the open descriptor keeps its inode from being reused)
+            now = os.stat(get_config().backup_dir / dl.name, follow_symlinks=False)
+        except OSError:
+            raise DownloadRefused(404, "not_found") from None
+        if (now.st_dev, now.st_ino) != (dl.dev, dl.ino):
             raise DownloadRefused(404, "not_found")  # replaced since the check: the answer ends short, never another file
         left = dl.size
         while left > 0:
