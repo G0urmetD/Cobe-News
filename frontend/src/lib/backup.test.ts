@@ -1,7 +1,21 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import de from "@/i18n/de"
 import en from "@/i18n/en"
-import { backupErrorKey, backupFileUrl, backupState, canDownload, fmtBytes, nowNote, removedBy, restoreCommand, STATE_COLOR, type BackupPassphrase } from "@/lib/backup"
+import { api } from "@/lib/api"
+import {
+  backupErrorKey,
+  backupFileUrl,
+  backupState,
+  canDownload,
+  downloadBackup,
+  fmtBytes,
+  nowNote,
+  removedBy,
+  restoreCommand,
+  startDownload,
+  STATE_COLOR,
+  type BackupPassphrase,
+} from "@/lib/backup"
 
 describe("fmtBytes", () => {
   it("uses decimal units and the reader's separator", () => {
@@ -115,5 +129,43 @@ describe("download of encrypted backups", () => {
       expect(en[key as keyof typeof en], key).toBeTruthy()
     }
     expect(de["backup.dl.plainWhy"]).toContain("Unverschlüsselte Sicherungen nur auf dem Server – sie enthalten die ganze Datenbank")
+  })
+})
+
+describe("the browser's own download (0.1.52)", () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it("asks for a ticket, then hands the address to the browser – no Blob, no fetch of the file", async () => {
+    const post = vi.spyOn(api, "post").mockResolvedValue({ url: "/api/admin/backup/download/abc_DEF-123", expires_in: 60 })
+    const started: string[] = []
+    await downloadBackup("cobe-news-20261104-123000.tar.enc", (url) => started.push(url))
+    expect(post).toHaveBeenCalledWith("/api/admin/backup/files/cobe-news-20261104-123000.tar.enc/ticket")
+    expect(started).toEqual(["/api/admin/backup/download/abc_DEF-123"])
+  })
+
+  it("starts nothing when the server refuses or answers an address of another kind", async () => {
+    const started: string[] = []
+    vi.spyOn(api, "post").mockRejectedValueOnce(new Error("reauth_required"))
+    await expect(downloadBackup("x.tar.enc", (url) => started.push(url))).rejects.toThrow("reauth_required")
+    for (const url of ["https://evil.example/api/admin/backup/download/x", "//evil.example/x", "/api/admin/backup/download/x?y=1", "/somewhere"]) {
+      vi.spyOn(api, "post").mockResolvedValueOnce({ url, expires_in: 60 })
+      await expect(downloadBackup("x.tar.enc", (u) => started.push(u))).rejects.toThrow("unexpected download address")
+    }
+    expect(started).toEqual([])
+  })
+
+  it("clicks a hidden link with download in the page and removes it again", () => {
+    const events: string[] = []
+    const a = {
+      href: "",
+      download: "x",
+      rel: "",
+      hidden: false,
+      click: () => events.push(`click ${a.href} download=${JSON.stringify(a.download)} rel=${a.rel} hidden=${a.hidden}`),
+      remove: () => events.push("remove"),
+    }
+    const doc = { createElement: () => a, body: { append: () => events.push("append") } } as unknown as Document
+    startDownload("/api/admin/backup/download/abc", doc)
+    expect(events).toEqual(["append", 'click /api/admin/backup/download/abc download="" rel=noreferrer hidden=true', "remove"])
   })
 })

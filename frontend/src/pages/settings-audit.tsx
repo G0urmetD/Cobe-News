@@ -16,6 +16,7 @@ import {
   KeyRound,
   Loader2,
   Lock,
+  LockOpen,
   type LucideIcon,
   Plug,
   Plus,
@@ -46,8 +47,10 @@ import { api, saveBlob } from "@/lib/api"
 import {
   actionText,
   actorText,
+  ALL_ACTIONS,
   AUDIT_KEY,
   type AuditChain,
+  type AuditLock,
   type AuditEntry,
   type AuditFilters,
   type AuditGroup,
@@ -63,6 +66,8 @@ import {
   fmtNumber,
   GROUP_KEYS,
   isFiltered,
+  LINK_PARAMS,
+  linkFilters,
   methodText,
   NO_FILTERS,
   type Range,
@@ -79,8 +84,10 @@ import {
   valueChips,
   withoutChip,
 } from "@/lib/audit"
+import { ACTIVITY_ACTIONS } from "@/lib/activity"
 import { copyWithToast } from "@/lib/clipboard"
 import { errorText, isStale } from "@/lib/errors"
+import { fmtDateTime } from "@/lib/format"
 import { withReauth } from "@/lib/reauth"
 import { cn } from "@/lib/utils"
 import { Loading, NumberField, SaveBar, StaleNotice } from "@/pages/settings-shared"
@@ -114,7 +121,8 @@ export function AuditSettings() {
   return (
     <>
       <SubTabs parts={parts} active={tab} to={(k) => (k === "entries" ? "?" : `?tab=${k}`)} label={t("settings.nav.audit")} />
-      {tab === "retention" ? <RetentionPane /> : <EntriesPane />}
+      {/* a link with filters (a notice in the sidebar) starts the list anew with them – also when the page is open */}
+      {tab === "retention" ? <RetentionPane /> : <EntriesPane key={LINK_PARAMS.map((k) => params.get(k) ?? "").join("|")} />}
     </>
   )
 }
@@ -123,9 +131,11 @@ export function AuditSettings() {
 
 function EntriesPane() {
   const { t, i18n } = useTranslation()
-  const [filters, setFilters] = useState<AuditFilters>(NO_FILTERS)
+  const [params] = useSearchParams()
+  const [link] = useState(() => linkFilters(params, [...ALL_ACTIONS, ...ACTIVITY_ACTIONS]))
+  const [filters, setFilters] = useState<AuditFilters>(link.filters)
   const [typed, setTyped] = useState("")
-  const [open, setOpen] = useState<Set<number>>(new Set())
+  const [open, setOpen] = useState<Set<number>>(() => new Set(link.open ? [link.open] : []))
   const [exporting, setExporting] = useState(false)
   // the search waits for a pause in typing – not a request per key
   useEffect(() => {
@@ -174,6 +184,7 @@ function EntriesPane() {
       actions={
         <>
           <ChainBadge chain={chain} />
+          <LockBadge lock={chain?.lock} />
           <Button variant="outline" size="sm" onClick={() => void runExport()} disabled={exporting} title={t("audit.exportHint")}>
             {exporting ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} {t("audit.export")}
           </Button>
@@ -418,6 +429,42 @@ function ChainBadge({ chain }: { chain: AuditChain | undefined }) {
           {t("audit.chain.rekeyed")} <Ts at={chain.rekeyed_at} />
         </span>
       )}
+    </span>
+  )
+}
+
+/** The database lock (0.1.52): one short line beside the chain – active, or not and why; the rest in the tooltip. */
+function LockBadge({ lock }: { lock: AuditLock | undefined }) {
+  const { t } = useTranslation()
+  if (!lock) return null
+  const why = lock.reason ?? "incomplete"
+  const tip = [
+    t(lock.active ? "audit.lock.tip.active" : `audit.lock.tip.${why}`),
+    lock.set_aside > 0 ? t("audit.lock.setAside", { count: lock.set_aside, at: lock.set_aside_at ? fmtDateTime(lock.set_aside_at) : "" }) : null,
+    t("audit.lock.limit"),
+  ]
+    .filter(Boolean)
+    .join(" – ")
+  const Icon = lock.active ? Lock : LockOpen
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs whitespace-nowrap",
+        lock.active ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+      )}
+      role="status"
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <Explained
+        label={
+          <span className="max-sm:sr-only">
+            {lock.active ? t("audit.lock.active") : t("audit.lock.inactive", { why: t(`audit.lock.why.${why}`) })}
+            {/* entries a restore (or someone with the app's password) moved out of the log: kept, and said here */}
+            {lock.set_aside > 0 && ` · ${t("audit.lock.setAsideShort", { count: lock.set_aside })}`}
+          </span>
+        }
+        text={tip}
+      />
     </span>
   )
 }

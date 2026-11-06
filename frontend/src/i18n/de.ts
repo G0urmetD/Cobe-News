@@ -1,4 +1,5 @@
 import aboutDe from "./about.de"
+import activityDe from "./activity.de"
 import auditDe from "./audit.de"
 import careDe from "./care.de"
 import deliveryDe from "./delivery.de"
@@ -932,6 +933,70 @@ const de: Record<string, string> = {
     "Das Konto ist in AD bzw. Entra ID deaktiviert – deshalb automatisch ausgeschaltet. Wird es dort wieder aktiviert, schaltet der Abgleich es wieder ein. Zum dauerhaften Aussperren: „Weitere Aktionen → Dauerhaft sperren“.",
   "users.offGone": "Nicht mehr im Verzeichnis",
   "users.offGoneHint": "Das Konto gibt es in AD bzw. Entra ID nicht mehr – deshalb automatisch ausgeschaltet.",
+  // ---- approval of directory accounts (0.1.52)
+  "settings.approval.title": "Automatische Anmeldung",
+  "settings.approval.desc": "Ob Mitglieder der zugeordneten AD- und Entra-ID-Gruppen sofort hineinkommen – oder erst nach der Freigabe durch einen Admin.",
+  "signin.approval.auto": "Automatische Anmeldung über AD/Entra ID zulassen",
+  "signin.approval.autoHint":
+    "An: Wer in einer zugeordneten Gruppe (oder einer Team-Gruppe) ist, meldet sich sofort an. Aus: Neue Konten und der Aufstieg zum Admin warten auf die Freigabe unter Benutzer.",
+  "signin.approval.tip":
+    "Die Mitglieder der zugeordneten Gruppen stehen in beiden Fällen schon vor der ersten Anmeldung unter Benutzer („noch nie angemeldet“). Absenken einer Rolle und Ausschalten (gelöscht, deaktiviert, keine Gruppe mehr) geschehen immer sofort.",
+  "signin.approval.offAbout":
+    "Freigabe nötig: Neue Konten stehen unter Benutzer als „Wartet auf Freigabe“, ein Aufstieg zum Admin als „Aufstieg zum Admin wartet auf Freigabe“. Die Freigabe gehört zur Verzeichnis-ID des Kontos, nicht zum Namen – ein neu angelegtes Konto mit gleichem Namen wartet wieder.",
+  "signin.approval.offTitle": "Freigabe durch einen Admin verlangen?",
+  "signin.approval.offText_zero": "Neue Konten aus AD/Entra ID und ein Aufstieg zum Admin warten ab jetzt auf die Freigabe. Gerade ist kein Verzeichniskonto aktiv.",
+  "signin.approval.offText_one":
+    "Neue Konten aus AD/Entra ID und ein Aufstieg zum Admin warten ab jetzt auf die Freigabe. Das {{count}} Verzeichniskonto, das schon aktiv ist, bleibt aktiv.",
+  "signin.approval.offText_other":
+    "Neue Konten aus AD/Entra ID und ein Aufstieg zum Admin warten ab jetzt auf die Freigabe. Die {{count}} Verzeichniskonten, die schon aktiv sind, bleiben aktiv.",
+  "signin.approval.onTitle": "Automatische Anmeldung wieder zulassen?",
+  "signin.approval.onNone": "Mitglieder der zugeordneten Gruppen melden sich wieder sofort an. Gerade wartet nichts auf Freigabe.",
+  "signin.approval.onWaiting_one":
+    "Mitglieder der zugeordneten Gruppen melden sich wieder sofort an. Was schon wartet ({{count}} Konto, {{raises}} Aufstieg zum Admin), bleibt wartend – außer du gibst es hier ausdrücklich frei.",
+  "signin.approval.onWaiting_other":
+    "Mitglieder der zugeordneten Gruppen melden sich wieder sofort an. Was schon wartet ({{count}} Konten, {{raises}} Aufstiege zum Admin), bleibt wartend – außer du gibst es hier ausdrücklich frei.",
+  "signin.approval.approveAll": "Auch alle wartenden freigeben",
+  "signin.approval.approveAllHint": "Jedes Konto mit der Rolle, die seine Gruppen gerade geben – jede Freigabe einzeln im Protokoll.",
+  "signin.approval.approveAllAdmins_one": "Dabei wird {{count}} Konto Admin.",
+  "signin.approval.approveAllAdmins_other": "Dabei werden {{count}} Konten Admin.",
+  "signin.approval.approvedAll_one": "Gespeichert – {{count}} Freigabe erteilt.",
+  "signin.approval.approvedAll_other": "Gespeichert – {{count}} Freigaben erteilt.",
+  "signin.approval.staleCounts": "Inzwischen wartet anderes auf Freigabe – nichts gespeichert, nichts freigegeben. Bitte die neuen Zahlen prüfen und noch einmal bestätigen.",
+  "users.offPending": "Wartet auf Freigabe",
+  "users.offPendingHint":
+    "Mitglied einer zugeordneten Gruppe (oder eines Teams), aber die automatische Anmeldung ist aus: Erst ein Admin schaltet das Konto ein („Freigeben“). Weder der Abgleich noch eine Anmeldung tun das. Wer sich vorher anmeldet, erfährt nach richtigem Passwort, dass das Konto wartet.",
+  "users.pendingBadge_one": "{{count}} wartet auf Freigabe",
+  "users.pendingBadge_other": "{{count}} warten auf Freigabe",
+  "users.filter": "Filter",
+  "users.filterAll": "Alle",
+  "users.filterWaiting": "Wartet auf Freigabe",
+  "users.approve": "Freigeben",
+  "users.approveAsAdmin": "Als Admin freigeben",
+  "users.approveAdminTitle": "Als Admin freigeben?",
+  "users.approveAdminText":
+    "{{name}} ist in einer Gruppe, die Admin gibt, und bekommt mit der Freigabe alle Rechte. Bei der ersten Anmeldung richtet das Konto seinen zweiten Faktor ein.",
+  "users.approveDone": "{{name}} ist freigegeben.",
+  "users.decline": "Ablehnen",
+  "users.declineTitle": "Freigabe ablehnen?",
+  "users.declineText":
+    "{{name}} bleibt ausgeschaltet – wie dauerhaft gesperrt: Weder der Abgleich noch eine Anmeldung schalten das Konto ein. Aufheben geht später über „Weitere Aktionen → Dauerhafte Sperre aufheben“.",
+  "users.raisePending": "Aufstieg zum Admin wartet auf Freigabe",
+  "users.raisePendingHint": "Das Konto ist neu in einer Gruppe, die Admin gibt. Bis ein Admin den Aufstieg freigibt, bleibt es Leser.",
+  "users.raiseDeclined": "Aufstieg abgelehnt",
+  "users.raiseDeclinedHint":
+    "Ein Admin hat den Aufstieg zum Admin abgelehnt – das Konto bleibt Leser, solange es in der Admin-Gruppe ist. Verlässt es die Gruppe und kommt wieder hinein, wird erneut gefragt.",
+  "users.raiseApprove": "Aufstieg freigeben",
+  "users.raiseTitle": "Aufstieg zum Admin freigeben?",
+  "users.raiseText": "{{name}} wird Admin. Laufende Sitzungen enden – bei der nächsten Anmeldung fragt Cobe News den zweiten Faktor ab.",
+  "users.keepReader": "Bleibt Leser",
+  "users.keepReaderTitle": "Aufstieg ablehnen?",
+  "users.keepReaderText": "{{name}} bleibt Leser. Solange das Konto in der Admin-Gruppe ist, wird nicht erneut gefragt.",
+  "errors.approval_pending": "Konto wartet auf Freigabe durch einen Admin.",
+  "errors.directory_pending": "Konto wartet auf Freigabe durch einen Admin.",
+  "errors.not_pending": "Hier wartet nichts (mehr) auf Freigabe – bitte neu laden.",
+  "errors.no_role": "Das Konto ist in keiner zugeordneten Gruppe mehr – es gibt nichts freizugeben.",
+  "errors.approve_needs_counts": "„Alle wartenden freigeben“ braucht die Zahlen, die der Dialog gezeigt hat – bitte die Seite neu laden.",
+  "errors.approve_needs_auto": "„Alle wartenden freigeben“ geht nur zusammen mit dem Einschalten der automatischen Anmeldung.",
   "users.offUnblocked": "Wartet auf Abgleich",
   "users.offUnblockedHint":
     "Die dauerhafte Sperre ist aufgehoben. Das Konto wird wieder aktiv, sobald eine Anmeldung oder der nächste Abgleich eine zugeordnete Gruppe oder ein Team findet.",
@@ -1062,13 +1127,13 @@ const de: Record<string, string> = {
   "backup.restoreTestOff": "Noch nicht eingerichtet – dafür braucht es POSTGRES_RESTORE_PASSWORD.",
   "backup.restoreTestLink": "Zum Rücksicherungs-Test",
   "backup.dl.button": "Herunterladen",
-  "backup.dl.running": "Lädt …",
+  "backup.dl.running": "Startet …",
   "backup.dl.label": "{{name}} herunterladen",
   "backup.dl.title": "Verschlüsselte Sicherung herunterladen?",
   "backup.dl.text":
     "{{name}} enthält die ganze Datenbank, verschlüsselt mit der Passphrase. Zum Einspielen braucht es genau diese Passphrase – ohne sie ist die Datei nutzlos, mit ihr kann jeder sie lesen. Die Datei sicher aufbewahren (nicht im Download-Ordner liegen lassen, nicht weitergeben); eingespielt wird nur auf dem Server. Der Download wird im Protokoll vermerkt.",
   "backup.dl.confirm": "Herunterladen",
-  "backup.dl.done": "{{name}} heruntergeladen – sicher aufbewahren",
+  "backup.dl.done": "Download von {{name}} gestartet – den Fortschritt zeigt der Browser. Die Datei sicher aufbewahren.",
   "backup.dl.serverOnly": "Nur auf dem Server",
   "backup.dl.plainWhy": "Unverschlüsselte Sicherungen nur auf dem Server – sie enthalten die ganze Datenbank. Kopieren per docker cp (Handbuch: Schritt für Schritt).",
   "backup.copyRestore": "Befehle zum Wiederherstellen kopieren",
@@ -1877,6 +1942,7 @@ const de: Record<string, string> = {
 
 Object.assign(de, vendorDe)
 Object.assign(de, aboutDe)
+Object.assign(de, activityDe)
 Object.assign(de, healthDe)
 Object.assign(de, docsDe)
 Object.assign(de, deliveryDe)

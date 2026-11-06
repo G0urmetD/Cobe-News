@@ -71,20 +71,20 @@ der Release-Pipeline, siehe [Release](#release)), schaltet die Datei `docker-com
 
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
-COBE_NEWS_VERSION=0.1.51                                   # eine Version, nicht latest – gilt für alle drei Images
+COBE_NEWS_VERSION=0.1.52                                   # eine Version, nicht latest – gilt für alle drei Images
 ```
 
 Die Datei ersetzt bei `app`, `db` und `proxy` nur das Image (der `build`-Teil fällt weg); alles andere – Volumes, Netze,
 `.env` – bleibt, wie es ist. Ohne `COBE_NEWS_VERSION` bricht `docker compose` mit einem Hinweis ab, statt still etwas
 anderes zu starten. Einzelne Images lassen sich per Digest festnageln: `COBE_NEWS_IMAGE`, `COBE_NEWS_DB_IMAGE`,
-`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.51@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
+`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.52@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
 **Bis 0.1.48** nahm die Datei nur `COBE_NEWS_IMAGE` (die App) – wer sie so nutzt, setzt jetzt `COBE_NEWS_VERSION` und
 nimmt `COBE_NEWS_IMAGE` heraus (sonst bliebe die App auf der alten Version). Vor dem Start die Signaturen prüfen
 (cosign ≥ 2, keyless – die Identität ist der Release-Workflow dieses Repositorys):
 
 ```bash
 for i in cobe-news cobe-news-db cobe-news-proxy; do
-  cosign verify ghcr.io/g0urmetd/$i:0.1.51 \
+  cosign verify ghcr.io/g0urmetd/$i:0.1.52 \
     --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -93,7 +93,7 @@ docker compose up -d --remove-orphans   # ohne --build
 docker compose config --images          # zeigt, welche Images Compose nimmt
 ```
 
-`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.51@sha256:<digest>` in der
+`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.52@sha256:<digest>` in der
 jeweiligen Image-Variable), startet genau das geprüfte Image, auch wenn der Tag später anders zeigen sollte. Ein Update:
 `COBE_NEWS_VERSION` auf die neue Version setzen, Signaturen prüfen, `docker compose pull && docker compose up -d
 --remove-orphans` (die Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen
@@ -404,7 +404,57 @@ Anmeldung oder im Abgleich, enden alle älteren Sitzungen des Kontos (eine Reade
 Admin-Sitzung ohne TOTP). Verzeichniskonten werden über ihre ID erkannt: wird ein Konto umbenannt (AD: neuer
 `sAMAccountName`; Entra: neuer UPN), folgt der Name bei der nächsten Anmeldung (AD auch im stündlichen Abgleich). Der
 Name eines Kontos, das im Verzeichnis gelöscht wurde („Abgleich: nicht mehr vorhanden“), wird frei (`name~1a2b3c4d`) –
-ein neu angelegtes Konto gleichen Namens (Entra: neue Objekt-ID) kann sich dann anmelden.
+ein neu angelegtes Konto gleichen Namens (Entra: neue Objekt-ID) kann sich dann anmelden (bei ausgeschalteter
+automatischer Anmeldung: nach der Freigabe). Die Mitglieder der zugeordneten Gruppen stehen schon vor der ersten
+Anmeldung unter *Benutzer* (siehe nächster Abschnitt).
+
+### Automatische Anmeldung, Freigabe und Vorab-Laden
+
+*Einstellungen → Anmeldung*, ganz oben: **„Automatische Anmeldung über AD/Entra ID zulassen“** (Einstellungsabschnitt
+`directory`, Schlüssel `auto_signin`, Standard **an** – nach dem Update verhält sich alles wie bisher). Ändern nur als
+Admin mit erneuter Bestätigung; protokolliert als `signin.config_changed` (Ziel `signin`/`directory`).
+
+- **Aus = Freigabe nötig.** Neue Verzeichniskonten – vorab geladen, bei der Anmeldung entstanden oder von einem Team
+  geladen – starten als *Wartet auf Freigabe* (`is_active=false`, `deactivated_reason="pending"`). Nur ein Admin schaltet
+  sie ein („Freigeben“ bzw. der Schalter *Aktiv*; als Admin mit erneuter Bestätigung), nie der Abgleich, ein Team oder
+  eine Anmeldung – auch nicht, wenn der Schalter später wieder an ist. „Ablehnen“ setzt `deactivated_reason="admin"`
+  (wie die dauerhafte Sperre). Ein **Aufstieg zum Admin** wartet ebenso (`users.pending_role="admin"`, das Konto bleibt
+  Leser; „Bleibt Leser“: `"declined"`, bis es die Admin-Gruppe verlässt). **Absenken und Ausschalten** (gelöscht,
+  deaktiviert, keine Gruppe) bleiben automatisch und sofort.
+- Die Freigabe hängt an der **Verzeichnis-ID** (`objectGUID` bzw. Entra-Objekt-ID), nie am Namen: ein im Verzeichnis neu
+  angelegtes Konto gleichen Namens wartet wieder. Ein Konto, das nie angemeldet war, vom Abgleich ausgeschaltet wurde
+  und zurückkommt, wartet ebenfalls.
+- Anmeldung eines wartenden Kontos: erst **nach** richtigem AD-Passwort bzw. erfolgreichem Microsoft-Login kommt
+  `approval_pending` (AD, HTTP 403) bzw. `/?login_error=directory_pending` (Entra) – „Konto wartet auf Freigabe durch
+  einen Admin“; kein Fehlversuch, keine Sitzung, Protokoll `login.pending_refused`. Mit falschem Passwort sieht es aus wie
+  immer. Wer noch kein Konto hat, bekommt eines (wartend), damit Admins es sehen.
+- **An → Aus**: aktive Verzeichniskonten bleiben aktiv. **Aus → An**: Wartendes bleibt wartend, außer „Auch alle
+  wartenden freigeben“ (`approve_pending`, jede Freigabe einzeln protokolliert). Dabei gehen die Zahlen mit, die der
+  Dialog gezeigt hat (`expect`); wartet inzwischen anderes (ein neues Konto, eine Ablehnung dazwischen), lehnt der
+  Server ab (409 `stale`, nichts freigegeben, nichts umgestellt) und der Dialog fragt mit den neuen Zahlen noch einmal. Der Notfall-Admin und lokale Konten
+  sind nie betroffen.
+- Protokoll: `user.approval_pending` (Details `source`, `why`: preload | signin | team | sync), `user.approved`,
+  `user.declined`, `role.approval_pending` (`from`, `to`), `role.approved`, `role.declined` – die wartenden und die
+  Freigaben sind auffällig markiert.
+
+**Vorab-Laden** (unabhängig vom Schalter): Die Mitglieder **jeder zugeordneten Gruppe** (Leser und Admin, AD/LDAP und
+Entra ID; verschachtelte Gruppen wie bei der Anmeldung – bei AD nur mit *Verschachtelte Gruppen*) bekommen ein Verzeichniskonto ohne Passwort und ohne Sitzung („Noch nie
+angemeldet“) – beim Hinzufügen oder Entfernen einer Zuordnung (im Hintergrund) und stündlich vor dem Konten-Abgleich
+(`app/preload.py`). Das Verzeichnis wird ohne offene Transaktion gefragt, geschrieben wird in Paketen zu 500 Konten (je
+eine kurze Transaktion); eine Gruppe hat höchstens 50 000 Mitglieder (`MEMBERS_MAX`). 5000 Mitglieder: 10 Seiten zu
+500 (LDAP, ein Bind) bzw. 6 Graph-Seiten zu 999 pro Gruppe, 10 kurze Schreib-Transaktionen, im Test wenige Sekunden. **Datensparsam:** ein Konto,
+das **nie angemeldet** war und in keiner zugeordneten Gruppe und keinem Team mehr ist, wird **gelöscht** – nur wenn alle
+zugeordneten Gruppen seines Verzeichnisses gelesen werden konnten, nie ein vom Admin gesperrtes/abgelehntes, nie eines
+mit laufender Anmeldung (Sitzung) oder das während des Ladens entstand. Das Protokoll behält es (`user.deleted`, Akteur
+`directory-sync`, `why: unused`; das Protokoll hat keinen Fremdschlüssel auf Konten). Pro Lauf, der etwas ändert, ein
+Eintrag `directory.preloaded` mit den Zahlen; nicht lesbare Gruppen (`failed_groups`) allein nur, wenn es andere sind
+als beim letzten Lauf oder der letzte Eintrag dazu einen Tag alt ist (Stand in der Einstellung `preload_state`) – ohne
+Graph-Berechtigungen also einer am Tag statt stündlich; Einzeleinträge höchstens 200 pro Lauf, der Rest gezählt (`not_listed`). Entra
+braucht dafür `GroupMember.Read.All` und `User.Read.All` (Anwendung) – dieselben wie Teams; ohne sie bleibt die Gruppe
+ungelesen und es ändert sich nichts. Konten, die sich je angemeldet haben, werden wie bisher nur ausgeschaltet.
+
+Migration `0037_directory_approval`: neue Spalte `users.pending_role` (leer). Nach einem Downgrade bleiben wartende
+Konten aus (`pending` ist kein `sync:`-Grund), ein wartender Aufstieg ist vergessen.
 
 ### Teams
 
@@ -469,7 +519,13 @@ den eigenen Proxy auf `http://127.0.0.1:8096` (`APP_PORT`) zeigen lassen – fer
 - `TLS_MODE` gilt als `external` (TLS endet am eigenen Proxy; ein ausdrücklich gesetztes `TLS_MODE` geht vor). HSTS
   sendet die App dabei **nicht** – bis 0.1.48 lief eine solche Installation als `selfsigned` ohne HSTS, und ein Jahr
   HSTS ließe sich nicht zurücknehmen. HSTS gibt es mit ausdrücklichem `TLS_MODE=external` (oder `HSTS=1`, das HSTS in
-  jedem Modus einschaltet),
+  jedem Modus einschaltet). **Vorher die Zertifikatskette prüfen**: Liefert der eigene Proxy nur das Server-Zertifikat
+  ohne Zwischenzertifikat (`openssl s_client -connect <FQDN>:443 -servername <FQDN> -showcerts` zeigt nur `0 s:`), lädt
+  mancher Browser die Kette selbst nach, mancher nicht – mit HSTS gibt es dann kein „Trotzdem fortfahren“ mehr
+  (`NET::ERR_CERT_AUTHORITY_INVALID`, die Seite ist gesperrt). Abhilfe: Zertifikat und Zwischenzertifikat in einer Datei
+  (`ssl_certificate …-fullchain.crt`); bis dahin `TLS_MODE` weglassen und im Browser unter
+  `chrome://net-internals/#hsts` den Namen löschen. Bis 0.1.48 kam HSTS hinter einem eigenen Proxy nie an (die App
+  vertraute dem Proxy nicht – falsches Gateway), seit 0.1.49 schon,
 - die App glaubt `X-Forwarded-For` und `X-Forwarded-Proto` von ihrem **Docker-Gateway** – das ist der Host selbst. Die
   App-Zeile im Log beim Start sagt es: `proxy: PROXY_ENABLED=0 – X-Forwarded-For trusted from 172.31.250.128 (the Docker
   gateway: a reverse proxy on this host)`; im Zugriffslog stehen danach die echten Client-Adressen.
@@ -940,6 +996,7 @@ categories.yaml           Kategorien in Anzeigereihenfolge: Schlüssel, Symbol (
 texts.yaml                Hinweise zu Produkten (hints) und „Wo steht die Version?“ (where), deutsch und englisch
 products/<kategorie>.yaml die Produkte einer Kategorie (Dateiname = Kategorie), Reihenfolge und Kommentare bleiben
 csaf.yaml                 die CSAF-Anbieter und für welche Hersteller (vendor der Produkte) sie sprechen
+cnas.yaml                 CNAs (wer einen CVE-Eintrag schreibt) und welche Hersteller sie sind
 build_maps/<name>.yaml    Build-Tabellen: was Admins sehen → was Hinweise vergleichen (app/build_maps.py), je Datei mit
                           Quelle und Abrufdatum: vmware.yaml (vCenter/ESXi, Broadcom KB 326316 / 316595), exchange.yaml
                           (CU/SU → Build), sqlserver.yaml (CU/GDR/KB → Build), vmware_tools.yaml (Code → Version),
@@ -987,6 +1044,33 @@ Nicht eingetragen (bewusst): Red Hat und SUSE (Pakete der Distribution – Vendo
 Linie und Support), Microsoft (VEX-Dokumente je CVE für alle Produkte – die Build-Grenzen stehen schon in den CNA-Daten
 der NVD), Fortinet und Palo Alto Networks (eigene Quellen).
 
+**CNAs** – wer einen CVE-Eintrag geschrieben hat: cvelistV5 nennt die CNA mit Kurznamen (`assignerShortName`, z. B.
+`palo_alto`, `GitHub_M`), die NVD mit `sourceIdentifier` (Adresse wie `psirt@fortinet.com` oder die UUID der CNA);
+gespeichert als `data.assigner` des Hinweises. Die betroffenen Versionen des Eintrags gelten nur als Wort des
+Herstellers („laut Hersteller“, mit Gewicht gegen die NVD-Analyse), wenn die CNA der Hersteller des Produkts ist –
+sonst „laut <CNA> (nicht der Hersteller)“, ohne dieses Gewicht. Ohne Eintrag in `cnas.yaml` gilt eine CNA als
+Hersteller, wenn ihr Kurzname oder die Domain ihrer Adresse der Name des Herstellers ist: gleich; oder der Name des
+Herstellers in ganzen Wörtern, danach nur eine Rechtsform oder Ähnliches (`palo_alto` – Palo Alto Networks, `juniper.net`
+– Juniper Networks; Liste `_VENDOR_TAIL` in `app/vendor_match.py`); oder der Name des Herstellers mit einem Anhang der
+CNA (`GitHub_P`, `qnapsecurity.com.tw`). Der kürzere Teil hat mindestens 4 Zeichen und ist kein allgemeines Wort
+(`cert`, `micro`, `open`, `cloud`, `data`, `net`, `tech`, `systems` … – `_CNA_STOP`): `cert.at` ist nicht cert-manager,
+Phoenix Technologies (`phoenix.com`) nicht Phoenix Contact. Sonst gilt sie als Dritter (die sichere Seite). CERT@VDE
+und HackerOne schreiben oft für einen Hersteller – der CVE-Eintrag sagt das aber in keinem Feld (nur im Titel und in
+`affected[].vendor`), sie bleiben Dritte. Eingetragen werden Dritte, die über fremde Produkte schreiben (GitHub, VulDB, MITRE, HackerOne,
+Wordfence, Patchstack, CERTs …), und Hersteller, die die Regel nicht erkennt (die NVD nennt viele CNAs nur mit ihrer
+UUID – Werte aus `services.nvd.nist.gov/rest/json/source/2.0`):
+
+```yaml
+- key: example                     # kurz, eindeutig
+  name: Example Corp               # angezeigt: „laut Example Corp (nicht der Hersteller)“
+  ids: [example_psirt, psirt@example.com, 0f0e0d0c-1111-2222-3333-444455556666]   # Kurzname, Adresse, UUID; "*@example.com" = jede Adresse dort
+  vendors: [Example Corp]          # Hersteller wie im Feld vendor der Produkte; leer: für kein Produkt der Hersteller
+```
+
+Hinweise, die vor 0.1.52 gespeichert wurden, haben bei der NVD noch keine CNA und gelten wie bisher als Wort des
+Herstellers; Migration 0036 lässt jede NVD-CPE-Abfrage beim nächsten Lauf einmal vollständig abrufen, dabei bekommen sie
+die CNA (cvelistV5-Einträge haben sie schon).
+
 Ein Produkt hinzufügen – in der Datei seiner Kategorie, z. B. `products/firewall.yaml`:
 
 ```yaml
@@ -1013,7 +1097,7 @@ Version besteht, wenn endoflife.date es nicht oder falsch zeigt – weniger Teil
 und ohne `depth` ist keine Version ungenau). Regeln für eingetragene Versionen (`app/version_input.py`): `pattern`
 (regulärer Ausdruck, dem eine Version genügen muss, z. B. nur Builds) mit `pattern_hint` (Text aus texts.yaml),
 `normalize` (Anzeigeformen übersetzen: `two_digit_year`, `netscaler`, `ise_patch`, `office_build`, `nginx_plus`,
-`checkpoint`, `horizon_yymm`, `leading_zeros` – Exchange `15.02.1748.024` → `15.2.1748.24`), `lines_only` (`lts`: nur
+`checkpoint`, `horizon_yymm`, `leading_zeros` – Exchange `15.02.1748.024` → `15.2.1748.24`, `ipfire_core` – IPFire `2.27 - Core Update 174` → `2.27 Core 174`), `lines_only` (`lts`: nur
 die Linien, die endoflife.date als LTS führt, sind die des Produkts – Firefox ESR, Jenkins LTS; `all`: jede gelistete
 Linie; eine Version dazwischen auf keiner davon wird abgelehnt, ältere und neuere als die bekannten nicht), `belongs` (`[{pattern, to}]` – Formen eines abgetrennten Produkts, z. B. pfSense Plus bei pfSense CE),
 `editions` (Editionen mit gleichen Versionsnummern und ihren Build-Bereichen, z. B. SharePoint 2016/2019/SE),
@@ -1392,6 +1476,7 @@ wegräumen oder `SQLITE_IMPORT=0` setzen.
   PostgreSQL 18 liegt das Datenverzeichnis darunter in `18/docker`, nicht mehr in `/var/lib/postgresql/data`).
 - Datenbank `cobe_news`, zwei Rollen (siehe [Rollen](#rollen)): `cobe_news` ist der Superuser des Containers (Passwort
   `POSTGRES_PASSWORD`), die App arbeitet als **`cobe_news_app`** ohne Superuser-Rechte (Passwort `POSTGRES_APP_PASSWORD`).
+  Dazu `cobe_news_audit` ohne Anmeldung – Besitzer des Protokolls ([Datenbank-Sperre](#datenbank-sperre)).
   Dazu die Wegwerf-Datenbank `cobe_news_restore_test` mit ihrer eigenen Rolle `cobe_news_restore` (Passwort
   `POSTGRES_RESTORE_PASSWORD`, siehe [Rücksicherungs-Test](#rücksicherungs-test)).
   Alle Passwörter stehen in der `.env` (von `scripts/setup-env.sh` erzeugt, nie im Repository). `POSTGRES_PASSWORD` **nicht
@@ -1420,12 +1505,29 @@ präparierten Sicherung) auch Programme im Datenbank-Container starten können (
 - **`cobe_news_app`** – die App, die Sicherung und die Wiederherstellung. Besitzer der Datenbank und aller Tabellen
   (darf also das Schema migrieren, sichern und wiederherstellen), aber `NOSUPERUSER NOCREATEDB NOCREATEROLE`: keine
   Programme auf dem Server, keine Dateien des Servers, keine nicht vertrauenswürdigen Erweiterungen, keine anderen Rollen.
+  Ausnahme seit 0.1.52: das Protokoll `audit_log` und das Schema `public` gehören `cobe_news_audit` – die App darf in
+  `public` anlegen (`CREATE`) und ihre eigenen Tabellen ändern und löschen, das Protokoll nur lesen und ergänzen.
+  Seit 0.1.52 verbindet sie sich auch mit keiner anderen Datenbank mehr: `app-role.sql` nimmt `PUBLIC` das `CONNECT`
+  auf `postgres` und `template1` (so legt PostgreSQL sie an; nur der Superuser braucht sie, und der braucht kein Recht) –
+  `DROP DATABASE` braucht eine Verbindung zu einer anderen Datenbank, die eigene lässt sich nicht löschen. Steht eine
+  andere Datenbank der App offen, sagt es die Zeile `db-init: WARNING – cobe_news_app may connect to …`.
+  Als Besitzerin der Datenbank darf die App Einstellungen für sie setzen (`ALTER DATABASE … SET`) – auch einen
+  `search_path`, der eigene Funktionen vor `pg_catalog` stellt. Damit davon nichts als Superuser läuft: `db-init` und
+  seine drei SQL-Dateien arbeiten nur mit `search_path = pg_catalog, pg_temp`, und für Sitzungen des Superusers in
+  dieser Datenbank (`docker compose exec db psql -U cobe_news cobe_news`) setzt `app-role.sql` bei jedem Start
+  `ALTER ROLE cobe_news IN DATABASE cobe_news SET search_path = pg_catalog, public` – das geht der Einstellung der
+  Datenbank vor, und nur ein Superuser kann es ändern.
+- **`cobe_news_audit`** (ab 0.1.52) – `NOLOGIN`, niemand ist Mitglied, niemand meldet sich damit an. Besitzer von
+  `audit_log`, dem Schema `public` und dem Schema `cobe_news_audit` (Sperr-Funktionen, beiseitegelegte Einträge).
+  Angelegt von `deploy/postgres/audit-lock.sql` bei jedem Start der Datenbank, nach `app-role.sql` – siehe
+  [Datenbank-Sperre](#datenbank-sperre).
 - **`cobe_news`** – der Superuser, den das PostgreSQL-Image beim ersten Start anlegt. Nur der Datenbank-Container kennt
   sein Passwort, die App nie. Sein Einstiegspunkt (`deploy/postgres/cobe-news-db.sh`) startet PostgreSQL über den
   offiziellen Einstiegspunkt, wartet, bis der Server Verbindungen annimmt, und führt dann bei **jedem Start**
-  `db-init.sh` (`app-role.sql`) aus: legt `cobe_news_app` an, falls sie fehlt, setzt ihr Passwort und überträgt die
-  Datenbank und alles, was der Superuser bisher angelegt hat (Tabellen mit Indizes und Sequenzen), an sie – mehrfach
-  ausgeführt ändert er nichts. Erst danach schreibt er eine Markierung (`/var/run/postgresql/.cobe-news-ready`, auf
+  `db-init.sh` (`app-role.sql`, dann `audit-lock.sql`) aus: legt `cobe_news_app` an, falls sie fehlt, setzt ihr
+  Passwort und überträgt die Datenbank und alles, was der Superuser bisher angelegt hat (Tabellen mit Indizes und
+  Sequenzen), an sie – außer dem gesperrten Protokoll; dann die Sperre des Protokolls – mehrfach ausgeführt ändert er
+  nichts. Erst danach schreibt er eine Markierung (`/var/run/postgresql/.cobe-news-ready`, auf
   tmpfs – bei jedem Start weg), und erst mit ihr meldet der Healthcheck „healthy“ (`pg_isready` **und** Markierung) – die
   App startet also nie gegen eine Datenbank ohne ihre Rolle. Scheitert die Einrichtung, hält er PostgreSQL an und endet
   mit Exit 1; die Restart-Policy versucht es erneut (`docker compose logs db`, Zeilen `db-init: …`). `docker stop`
@@ -1544,22 +1646,40 @@ Während einer Sicherung oder Wiederherstellung liegen Dump und (verschlüsselt)
 `.partial-…`/`.restore-…` in `data/backups/`) liegen ließ, räumt die nächste Sicherung, Wiederherstellung oder der
 nächste Start der App weg, sobald es älter als 6 Stunden ist; `--exclude` hält Halbfertiges ohnehin vom Kopieren fern.
 
-**Herunterladen in der App** (ab 0.1.51): nur **verschlüsselte** Sicherungen (`.tar.enc`), Knopf „Herunterladen“ in der
-Liste; eine unverschlüsselte zeigt „Nur auf dem Server“ und wird abgelehnt (403 `backup_not_encrypted`) – sie enthält
-die ganze Datenbank lesbar und bleibt beim Kopieren per `docker cp`/`docker compose cp`. Die Seite fragt zuerst (die
-Datei braucht zum Einspielen die Passphrase, sicher aufbewahren), dann `GET /api/admin/backup/files/<Name>` mit erneuter
-Bestätigung (`reauth_required`) und dem CSRF-Token (wie der Export – ein Link einer fremden Seite lädt nichts). Nur
-Namen aus der Liste und dem Namensmuster (kein Pfad, keine versteckten oder halbfertigen Dateien), geöffnet mit
-`O_NOFOLLOW` als normale Datei, beim Senden noch einmal geprüft (dieselbe Datei: Gerät und Inode). Gestreamt in Stücken
-von 1 MiB, nie ganz im Speicher, mit `Content-Length` und `Cache-Control: no-store`; höchstens 6 je Stunde
-(`backup_download_rate_limited`, 429) und einer zur Zeit (`backup_download_busy`, 409) je Admin – der Platz wird schon bei der Prüfung belegt (mit einem
-Token je Download) und nur von diesem Download wieder freigegeben: am Ende, bei einem Fehler oder Abbruch, oder wenn die
-Antwort nie gesendet wird; nach 6 Stunden gilt ein Platz als verwaist. Der Browser hält die Datei bis zum Speichern im
-Arbeitsspeicher (`fetch` → Blob) – sehr große Sicherungen (ab etwa 1 GB) besser per `docker cp` kopieren. Protokoll:
-`backup.downloaded` mit Datei und Größe, als auffällig markiert. Das mitgelieferte nginx reicht die Route ungepuffert
-durch (`location ^~ /api/admin/backup/files/` mit `proxy_buffering off`): sonst legte es eine große Datei in seinen
-Zwischenordner – ein tmpfs, also in die 128 MB Speicher des Proxys; `proxy_read_timeout 60s` bleibt (Zeit zwischen zwei
-Lesevorgängen, die App sendet ohne Pause). Ein eigener Reverse Proxy: für diesen Pfad ebenso nicht puffern.
+**Herunterladen in der App** (ab 0.1.51, ab 0.1.52 als Download des Browsers): nur **verschlüsselte** Sicherungen
+(`.tar.enc`), Knopf „Herunterladen“ in der Liste; eine unverschlüsselte zeigt „Nur auf dem Server“ und wird abgelehnt
+(403 `backup_not_encrypted`) – sie enthält die ganze Datenbank lesbar und bleibt beim Kopieren per
+`docker cp`/`docker compose cp`. Die Seite fragt zuerst (die Datei braucht zum Einspielen die Passphrase, sicher
+aufbewahren), dann zwei Schritte:
+
+1. `POST /api/admin/backup/files/<Name>/ticket` – ein Schreibzugriff, also mit dem CSRF-Token (ein Formular oder Skript
+   einer fremden Seite bekommt nichts), mit erneuter Bestätigung (`reauth_required`) und allen Prüfungen des Downloads
+   selbst (Name, verschlüsselt, belegt, Grenze je Stunde – die Seite zeigt den Grund). Die Antwort ist die Adresse
+   `/api/admin/backup/download/<Ticket>`: 256 Bit Zufall, auf dem Server nur als SHA-256 gehalten, 60 Sekunden gültig,
+   einmal verwendbar, gebunden an Admin, Sitzung und Datei; ein neues ersetzt das ältere desselben Admins. Gezählt
+   und belegt wird noch nichts.
+2. Die Seite lässt den Browser diese Adresse selbst laden (ein verstecktes `<a download>`): er speichert die Datei direkt
+   auf die Festplatte, mit seiner eigenen Fortschrittsanzeige, ohne neuen Tab – nie ganz im Arbeitsspeicher der Seite,
+   bei jeder Größe. Das Ticket ist beim ersten Aufruf verbraucht, was auch folgt; eine andere Sitzung (auch desselben
+   Admins), ein anderer Admin, ein abgelaufenes oder benutztes Ticket: 403 `backup_ticket_invalid` (für alle Gründe
+   dieselbe Antwort). Das Ticket ersetzt hier das CSRF-Token – nur die Seite, die es geholt hat, kennt es.
+
+Nur Namen aus der Liste und dem Namensmuster (kein Pfad, keine versteckten oder halbfertigen Dateien), geöffnet mit
+`O_NOFOLLOW` als normale Datei, beim Start noch einmal geprüft und beim Senden noch einmal (dieselbe Datei: Gerät und
+Inode). Gestreamt in Stücken von 1 MiB, nie ganz im Speicher, mit `Content-Length`, `Content-Disposition: attachment`,
+`Cache-Control: no-store`, `X-Content-Type-Options: nosniff` und `Referrer-Policy: no-referrer`; höchstens 6 je Stunde
+(`backup_download_rate_limited`, 429) und einer zur Zeit (`backup_download_busy`, 409) je Admin – der Platz wird beim
+Start des Downloads belegt (mit einem Token je Download) und nur von diesem Download wieder freigegeben: am Ende, bei
+einem Fehler oder Abbruch, oder wenn die Antwort nie gesendet wird; nach 6 Stunden gilt ein Platz als verwaist. Tickets,
+Plätze und Zähler liegen im Speicher des einen App-Prozesses (`--workers 1`); ein Neustart verwirft nur Tickets der
+letzten Minute. Protokoll: `backup.downloaded` mit Datei und Größe, als auffällig markiert, wenn der Download beginnt.
+Das Ticket steht in keinem Log: Das Zugriffsprotokoll der App und das „Woher“ im Protokoll zeigen nur
+`/api/admin/backup/download/…`. Das mitgelieferte nginx reicht die Route ungepuffert durch
+(`location ^~ /api/admin/backup/download/` mit `proxy_buffering off`, `proxy_max_temp_file_size 0`, `access_log off`):
+sonst legte es eine große Datei in seinen Zwischenordner – ein tmpfs, also in die 128 MB Speicher des Proxys;
+`proxy_read_timeout` und `send_timeout` dort 300 s (Zeit zwischen zwei Lese- bzw. Schreibvorgängen – ein kurz stockender
+Client bricht einen langen Download nicht ab). Ein eigener Reverse Proxy: für diesen Pfad ebenso nicht puffern und
+nicht protokollieren (bis 0.1.51 war es `/api/admin/backup/files/`).
 
 **Wiederherstellung** – nur auf dem Server, mit angehaltener App:
 
@@ -1580,7 +1700,8 @@ Ablauf:
    ihrer Größe; Prüfsummen; Schema-Stand (eine Sicherung einer neueren Version wird abgelehnt); Fingerabdruck des
    Schlüssels. Das Inhaltsverzeichnis des Dumps darf nur enthalten, was Cobe News anlegt (Tabellen, Daten, Sequenzen,
    Indizes, Constraints, die Erweiterung `pg_trgm`) – eine Funktion, ein Trigger, eine Sicht, ein anderes Schema: Abbruch,
-   bevor etwas geändert ist. Läuft noch eine App auf der Datenbank: Abbruch.
+   bevor etwas geändert ist (die zwei Trigger der [Datenbank-Sperre](#datenbank-sperre) auf `audit_log` werden nur
+   übergangen, nie eingespielt). Läuft noch eine App auf der Datenbank: Abbruch.
 3. Bestätigung („RESTORE“ tippen oder `--yes`), dann eine Sicherung des aktuellen Stands (`…-pre-restore.tar`, der Weg
    zurück – mit derselben Passphrase wie die Wiederherstellung; sie zählt nicht zur Aufbewahrung und bleibt 30 Tage).
 4. **Eine** Transaktion als `cobe_news_app` (kein Superuser): `DROP SCHEMA public`, der Dump Stück für Stück von
@@ -1588,6 +1709,15 @@ Ablauf:
    Schema **genau** so, wie es die Migrationen für den Schema-Stand der Sicherung anlegen (Spalten, Vorgaben,
    Constraints, Indizes, keine Funktionen, Trigger, Regeln, Rechte, Einstellungen der Datenbank oder Rolle, anderen
    Schemas). Weicht etwas ab oder bricht etwas ab, wird alles zurückgerollt – die Datenbank bleibt, wie sie war.
+   Mit der [Datenbank-Sperre](#datenbank-sperre) des Protokolls (die App darf `public` und `audit_log` nicht löschen)
+   statt `DROP SCHEMA public`: zuerst `cobe_news_audit.set_aside()` – die bisherigen Einträge wandern nach
+   `cobe_news_audit.audit_log_replaced`, gelöscht wird keiner –, dann alles andere in `public` gelöscht (jede Tabelle,
+   Sicht, Sequenz, Funktion und jeder Typ mit `CASCADE`; die Erweiterung `pg_trgm` bleibt), der Dump **ohne** die
+   Definition von `audit_log` (Tabelle, Indizes, Constraints, Sequenz bleiben die gesperrten), nur mit seinen Zeilen
+   (`COPY` – Einfügen darf die App), danach `cobe_news_audit.restored()` (die Sequenz hinter die höchste ID) und die
+   beiden Prüfungen; die Vergleichsbasis entsteht ebenso neben der gesperrten Tabelle. Alles in derselben Transaktion:
+   scheitert etwas, stehen auch die Einträge wieder, wo sie waren. Danach ist die Sperre weiter aktiv; die Ausgabe nennt
+   die beiseitegelegten Einträge, `backup.restored` trägt ihre Zahl (`set_aside`).
 5. Das Schema auf den Stand dieser Version bringen. Anmeldungen, die es zur Zeit der Sicherung gab, gelten wieder;
    spätere nicht.
 
@@ -1629,7 +1759,7 @@ Stunden), „Jetzt testen“; dazu `/metrics`. Keine Nachricht über Kanäle –
 
 Geprüft wird wie bei einer echten Wiederherstellung: Echtheit (Passphrase bzw. Signatur), nur die erwarteten Dateien,
 Prüfsummen, Inhaltsverzeichnis des Dumps, bekannter Schema-Stand; `pg_restore` → `psql` in einer Transaktion ohne
-Fehler; Zeilen je Tabelle genau wie im Manifest; Schema genau wie eine frisch migrierte Datenbank desselben Stands;
+Fehler (die [Datenbank-Sperre](#datenbank-sperre) gibt es dort nicht: Sicherungen tragen sie nie); Zeilen je Tabelle genau wie im Manifest; Schema genau wie eine frisch migrierte Datenbank desselben Stands;
 danach `alembic_version` wie in der Sicherung. Niedrige CPU-Priorität (nice 19), nur einer zur Zeit, die App startet
 keinen während einer Sicherung, Abbruch nach 1 Stunde. Vor jedem Test fragt die App den Server, ob die Rolle des Tests
 wirklich keine Rechte auf die Datenbank der App hat – sonst Abbruch (`unsafe`). Kosten: Platz für eine zweite Kopie der
@@ -1662,7 +1792,8 @@ Exit-Code 0 = bestanden, 1 = fehlgeschlagen. Darunter: `docker compose exec -T a
 ## Protokoll (Audit-Log)
 
 Code: `backend/app/audit.py` (Schreiben, Schwärzen, Kette, Aufräumen, Lesen, CSV), `audit_api.py` (nur Admins),
-Tabelle `audit_log` (Migrationen 0017, 0032). Handbuch: *Betrieb → Protokoll*.
+Tabelle `audit_log` (Migrationen 0017, 0032, 0033), Datenbank-Sperre: `audit_lock.py`, `deploy/postgres/audit-lock.sql`.
+Handbuch: *Betrieb → Protokoll*.
 
 - **Schreiben:** `audit.record()` in der Transaktion der Änderung; eine abgelehnte Änderung hinterlässt keinen Eintrag.
   Der Kontext der Anfrage kommt aus der Middleware (`main._guard`: Client-Adresse, Weg `direct`/`bundled`/`proxy`/
@@ -1699,8 +1830,8 @@ Tabelle `audit_log` (Migrationen 0017, 0032). Handbuch: *Betrieb → Protokoll*.
   eine Wiederherstellung mit `--ignore-key`) die Kette ab ihrem neuesten Eintrag neu verankert – protokolliert als
   `audit.chain_rekeyed` (auffällig), `rekeyed_at` steht dauerhaft auf der Seite. Damit werden auch geprüfte Funde
   bestätigt.
-- **Kein Datenbank-Trigger:** ein Trigger, der UPDATE/DELETE ablehnt, würde mit jeder Sicherung als FUNCTION/TRIGGER im
-  Dump landen – die Wiederherstellung nimmt nur Tabellen, Indizes und Sequenzen an (`backup._toc_check`).
+- **Datenbank-Sperre** (ab 0.1.52, siehe [unten](#datenbank-sperre)): PostgreSQL selbst lässt die App Einträge nur
+  hinzufügen, lesen und versiegeln – ändern, löschen, leeren lehnt die Datenbank ab.
 - **Aufräumen:** in Kettenreihenfolge bis zum ersten Eintrag innerhalb der Aufbewahrung, sobald der älteste einen Tag
   darüber liegt (also täglich). Zuerst ein `audit.pruned`-Eintrag mit dem neuen Anker (Position, Hash), versiegelt;
   dann Pakete zu 20 000 in eigenen Transaktionen. Ein Anker jenseits des zuletzt erklärten ist ein Fund (`anchor`). Ein
@@ -1723,6 +1854,97 @@ Tabelle `audit_log` (Migrationen 0017, 0032). Handbuch: *Betrieb → Protokoll*.
   Prüfen ~25 000 Einträge/s (beim Öffnen höchstens 50 000, stündlich 200 000 neue und 200 000 der Gesamtprüfung).
   Aufräumen von 1,3 Mio. Einträgen auf einmal (Aufbewahrung stark verkürzt) ~70 s in Paketen, ohne lange
   Sperren; im Normalfall einmal am Tag einen Tag Einträge.
+
+### Datenbank-Sperre
+
+Die Kette deckt eine Änderung **danach** auf; die Sperre (ab 0.1.52) verhindert sie: PostgreSQL selbst lehnt ab, dass
+die App einen Eintrag ändert oder löscht. Bis 0.1.51 gehörte `audit_log` wie jede Tabelle der App – ein Besitzer darf
+alles (löschen, leeren, Trigger abschalten, die Tabelle löschen); ein einfacher Trigger hätte das nicht verhindert und
+die Wiederherstellung blockiert (deshalb in 0.1.50 verworfen).
+
+**Wie** (`deploy/postgres/audit-lock.sql`, von `db-init.sh` als Superuser bei jedem Start der Datenbank nach
+`app-role.sql`, mehrfach ausgeführt ändert es nichts):
+
+- `audit_log` (mit Indizes und Sequenz) und das Schema `public` gehören der Rolle **`cobe_news_audit`** (`NOLOGIN`,
+  kein Mitglied). Das Schema gehört mit, weil der Besitzer eines Schemas jede Tabelle darin löschen darf
+  (`DROP TABLE`, `DROP SCHEMA … CASCADE`); die App behält `USAGE, CREATE` darauf, legt also weiter ihre Tabellen an
+  und löscht oder ändert sie als deren Besitzer.
+- `cobe_news_app` bekommt auf `audit_log` nur `SELECT, INSERT` und `UPDATE` auf die Spalten der Kette (`seq`,
+  `prev_hash`, `hash`, `details`, `notable`). Ein Trigger (`cobe_news_audit_lock`, `ENABLE ALWAYS`) lässt davon nur das
+  **Versiegeln** durch: ein noch nicht versiegelter Eintrag bekommt Position, Hashes und höchstens eine Markierung
+  dazu (`details.anomalies`, `notable` nur von falsch auf wahr) – sonst ändert sich nichts. Jedes andere UPDATE,
+  DELETE und TRUNCATE (`cobe_news_audit_lock_truncate`) lehnt er ab, auch für den Besitzer.
+- Gelöscht wird nur über zwei Funktionen von `cobe_news_audit` im Schema `cobe_news_audit` (`SECURITY DEFINER`, fester
+  `search_path`, nur für `cobe_news_app` ausführbar):
+  - `prune(bis_position, aufbewahrung_tage)` – das stündliche Aufräumen (`audit.prune`): Einträge in Kettenreihenfolge
+    bis zur Position, aber nur, wenn **keiner** davon jünger ist als die Aufbewahrung – und die zählt nie weniger als
+    **90 Tage**, egal was die App übergibt (die Grenze gilt in der Datenbank, die Einstellung „Aufbewahrung“ kann die App
+    selbst ändern). Der Eintrag „Alte Einträge aufgeräumt“ mit dem Anker wird wie bisher vorher geschrieben.
+  - `set_aside()` – nur die Wiederherstellung: verschiebt alle Einträge nach `cobe_news_audit.audit_log_replaced`
+    (Zeitpunkt, ID, Zeit, der ganze Eintrag als JSON) – **gelöscht wird nichts**. Die App darf diese Tabelle nur lesen;
+    das Aufräumen löscht dort, was älter als die Aufbewahrung ist (dieselbe Untergrenze). Die Seite zeigt die Zahl
+    („· n beiseitegelegt“) – auch eine, die nicht von einer Wiederherstellung stammt. Ansehen:
+    `docker compose exec db psql -U cobe_news cobe_news -c "SELECT replaced_at, id, at, entry->>'action' FROM cobe_news_audit.audit_log_replaced ORDER BY replaced_at, id"`.
+    Beiseitegelegtes ist **nicht** in den Sicherungen (`pg_dump --exclude-schema=cobe_news_audit`).
+  - dazu `restored()`: setzt nach einer Wiederherstellung die Sequenz hinter die höchste ID (das darf die App nicht).
+- Sicherungen tragen die Sperre nie: `pg_dump` lässt das Schema `cobe_news_audit` weg, die Wiederherstellung die zwei
+  Trigger. Eine Sicherung mit Sperre lässt sich deshalb überall einspielen (Rücksicherungs-Test, neuer Server, eigenes
+  PostgreSQL), und eine ohne in eine gesperrte Datenbank ([Wiederherstellung](#sicherung-wiederherstellung-export),
+  Schritt 4). Danach ist die Sperre weiter aktiv – sie hängt an der Datenbank, nicht an der Sicherung.
+
+**Anzeige und Log:** *Protokoll* zeigt neben der Kette „Datenbank-Sperre: aktiv“ bzw. „nicht aktiv (Grund)“, der
+Hinweis erklärt es (`GET /api/admin/audit/chain` → `lock`). Beim Start schreibt die App eine Zeile `audit log: database
+lock active …` bzw. `… NOT active: …`. Gründe: `no_lock` – ohne das Datenbank-Image (eigenes PostgreSQL, Entwicklung,
+Tests): nichts ändert sich, die App arbeitet wie bisher; `pending` – eingerichtet, aber die Tabelle gab es beim Start der
+Datenbank noch nicht (eine **neue Installation**: die App legt sie erst bei ihrem ersten Start an). Dann sieht der
+Datenbank-Container alle 10 Sekunden nach (bis zu 30 Minuten, im Hintergrund, als derselbe Benutzer ohne Rechte dazu),
+und sobald die Migration der App fertig ist – sie läuft in einer Transaktion, die Tabelle gibt es erst mit ihrem
+Abschluss – führt er `audit-lock.sql` einmal aus (`db-init: audit_log is there now … – locking it`, dann `audit log
+locked`; bekommt er die Tabelle nicht binnen 5 Sekunden, versucht er es 10 Sekunden später noch einmal). Neue
+Installationen sind also wenige Sekunden nach dem ersten Start der App gesperrt; kam die App in den 30 Minuten nicht,
+folgt die Sperre beim nächsten Start des Datenbank-Containers (`docker compose restart db`). `pending` gilt auch, wenn
+`audit-lock.sql` die Übernahme abgelehnt hat (ein fremder Trigger, eine Regel oder Zeilensicherheit auf `audit_log` –
+Zeile `db-init: WARNING – audit log NOT locked …` im Log der Datenbank); `superuser` – die App verbindet sich als
+Superuser, den hält keine Sperre auf; `incomplete` – ein Teil fehlt oder die App hat ein Recht zu viel (Log prüfen,
+Datenbank neu starten).
+
+**Bestehende Installation** (Update auf 0.1.52): nichts zu tun. Das Update legt den Datenbank-Container mit dem neuen
+Image neu an, sein `db-init` sperrt die vorhandene Tabelle, dann startet die App (`docker compose logs db | grep
+"audit log locked"`).
+
+**Aufheben** (Superuser; z. B. vor dem Weg zurück zu 0.1.51 – deren Aufräumen scheiterte am Trigger, und eine Sicherung
+mit den Triggern spielt sie nicht ein, ihr Inhaltsverzeichnis-Check lehnt Trigger ab):
+
+```bash
+docker compose exec db psql -U cobe_news cobe_news -c "ALTER TABLE public.audit_log OWNER TO cobe_news_app; ALTER SCHEMA public OWNER TO pg_database_owner; DROP SCHEMA cobe_news_audit CASCADE"
+```
+
+`DROP SCHEMA … CASCADE` nimmt die Funktionen, die beiden Trigger und die beiseitegelegten Einträge mit (vorher ansehen,
+s. o.). Mit dem 0.1.52-Image sperrt der nächste Start der Datenbank wieder.
+
+**Wogegen sie schützt – und wogegen nicht:** gegen eine kompromittierte App, ein gestohlenes Passwort von
+`cobe_news_app` und eine SQL-Injection: wer nur so weit kommt, kann Einträge hinzufügen (die Kette markiert
+nachträgliche), aber keinen bestehenden ändern, löschen oder jünger als 90 Tage aufräumen. **Nicht** gegen den
+Superuser `cobe_news` oder jemanden mit Zugriff auf Docker auf dem Host (`docker compose exec db psql -U cobe_news`
+hebt alles auf) – dagegen hilft nur die Zeile `audit chain head` in einem Log-System außerhalb. Die ganze Datenbank
+löschen (`DROP DATABASE`) kann das App-Passwort seit dem Datenbank-Image von 0.1.52 nicht mehr (keine Verbindung zu
+`postgres`/`template1`, siehe [Rollen](#rollen)); die Datenbank gehört aber weiter der App: sie kann ihre eigenen
+Tabellen löschen (laut, nicht leise – der Weg zurück ist die Sicherung) und Einstellungen der Datenbank setzen, die nur
+ihre eigenen Sitzungen treffen. Eine Datenbank, die dem Superuser gehört, schlösse auch das – das bräuchte eine andere
+Wiederherstellung (sie legt das Schema `public` neu an) und steht unter *Offene Punkte*.
+
+**Grenzen im Einzelnen** (Durchsicht 0.1.52): Die App besitzt die Erweiterung `pg_trgm` (Migration 0002) und kann sie
+löschen (`DROP EXTENSION pg_trgm CASCADE`) – mit ihr geht der Suchindex des Protokolls (`ix_audit_log_search`), keine
+Zeile (und der Suchindex der Meldungen); die Suche wird langsamer. Zurück: `CREATE EXTENSION pg_trgm` in der Datenbank
+(als App oder Superuser), dann legt der nächste Start der Datenbank den Index des Protokolls wieder an (`audit-lock.sql`). `INSERT` darf schon versiegelte Zeilen schreiben (`seq`, `hash` gesetzt) – das
+braucht das `COPY` der Wiederherstellung; eine so eingeschleuste, gefälschte Zeile hält die Datenbank nicht auf, nur die
+Prüfung der Kette (sie passt in keine Kette, deren Kopf außerhalb protokolliert ist). `set_aside()` kann die App
+jederzeit aufrufen, nicht nur bei einer Wiederherstellung: die Einträge sind dann nicht gelöscht, sondern beiseitegelegt
+(die Seite zeigt „· n beiseitegelegt“), und PostgreSQL schreibt eine Warnung ins Log der Datenbank (`set_aside() moved
+n audit log entries …`) – kam sie ohne Wiederherstellung, hat jemand das Passwort der App benutzt.
+
+**Wartung:** `VACUUM FULL audit_log` darf die App als Besitzerin der Datenbank weiterhin (es ändert keine Zeile);
+alles, was die Tabelle ändert (Spalten, Indizes, Besitz), nur noch der Superuser.
 
 ## API-Tokens und Metriken
 
@@ -1830,9 +2052,20 @@ frontend/public/sw.js         Service Worker – nur Push und Klick auf eine Ben
 backend/app/netaddr.py        Ziel-Prüfung (SSRF), DNS-Pinning
 backend/app/tls.py            Zertifikat
 deploy/nginx/                 Proxy-Image: nginx-Vorlage, Namen, Zertifikatswächter (Dockerfile)
-deploy/postgres/              Datenbank-Image: Einstiegspunkt mit der Rolle der App bei jedem Start (Dockerfile)
+deploy/postgres/              Datenbank-Image: Einstiegspunkt mit der Rolle der App und der Sperre des Protokolls bei jedem Start (Dockerfile)
 frontend/src/pages/           Oberfläche
 ```
+
+**Migrationen am Protokoll** (seit der [Datenbank-Sperre](#datenbank-sperre), 0.1.52): Mit Sperre darf die App
+`audit_log` nicht ändern. Eine Migration, die die Tabelle anfasst, prüft deshalb zuerst
+`app.audit_lock.ddl_skipped(op.get_bind(), revision)` – gesperrt lässt sie den Teil aus (eine Log-Zeile sagt es), ohne
+Sperre (Entwicklung, eigenes PostgreSQL) macht sie ihn selbst. Dieselbe Änderung kommt **idempotent** in
+`deploy/postgres/audit-lock.sql` (z. B. `ALTER TABLE public.audit_log ADD COLUMN IF NOT EXISTS …`, ein neuer Index mit
+`CREATE INDEX IF NOT EXISTS` und dem Namen `ix_audit_log_…`), vor die Übergabe an `cobe_news_audit`: Beim Update startet
+zuerst die Datenbank mit dem neuen Image (Superuser, vor der App), dann migriert die App. So machen es 0017, 0032 und
+0033 – auch die Vergleichsbasis einer Wiederherstellung migriert von vorn neben der gesperrten Tabelle. Eine neue
+Spalte ist für die App automatisch unveränderlich (der Trigger vergleicht alle Spalten außer denen der Kette);
+`tests/test_audit_lock.py` richtet die Sperre mit den echten SQL-Dateien ein.
 
 Regeln für neue Masken (was gesetzt ist vs. Eingabe, Reihenfolge, Tooltips, Leerzustände, Status-Farben, Datumsformat,
 Löschen, Fokus in Schubladen, 375 px, Hell/Dunkel): [`docs/UX.md`](UX.md).
@@ -1888,6 +2121,12 @@ Die Images statt eines lokalen Builds betreiben: [Veröffentlichtes Image statt 
 - AD/LDAP: der Servername wird vor der Verbindung geprüft (`netaddr.check_host`), aber nicht auf die geprüfte Adresse
   festgenagelt (kein DNS-Pinning wie bei den Kanälen) – ein DNS, das zwischen Prüfung und Verbindung die Antwort
   wechselt, könnte die Bind-Anfrage umlenken; LDAPS mit Zertifikatsprüfung schützt das Bind-Passwort trotzdem.
+- Datenbank-Image: die Datenbank `cobe_news` gehört der App (`cobe_news_app`). Sie kann deshalb Einstellungen der
+  Datenbank setzen (`ALTER DATABASE … SET`, auch `ALLOW_CONNECTIONS false` – ein Start der Datenbank scheitert dann,
+  bis der Superuser es über `postgres` zurücknimmt) und `VACUUM FULL` jeder Tabelle. Superuser als Besitzer und für
+  die App nur `CONNECT, CREATE, TEMP` schlösse das; die Wiederherstellung ohne Sperre legt dafür aber das Schema
+  `public` neu an (`DROP SCHEMA public … AUTHORIZATION pg_database_owner`), das ginge dann nicht mehr. Bis dahin:
+  kein `DROP DATABASE` (Rollen), kein Code der App als Superuser (fester `search_path`).
 - Vendor News: Cisco openVuln (mit Zugangsdaten) und Microsofts CVRF nicht eingebaut.
 - Katalog: Build-Tabellen fehlen noch für SEP (RU ↔ Build), Skype for Business (CU ↔ Build), LANCOM (SU/RU), Acronis
   (Build) und ManageEngine (nur Build-Nummern) – es gibt dafür keine offizielle Tabelle, die sich übernehmen ließe.

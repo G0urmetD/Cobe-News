@@ -14,8 +14,8 @@ completely set up.
 | Method | Who creates the account | Second factor | Role comes from |
 |---|---|---|---|
 | **Local** | an admin under *Settings → Users & roles* | [TOTP](term:totp) or a [passkey](#passkeys) in Cobe News – required for admins (TOTP), optional for readers or [required for everyone](#zweiter-faktor-alle) | the setting on the account |
-| **Active Directory / LDAP** | created automatically at the first sign-in | TOTP in Cobe News – required for admins, optional for readers or [required for everyone](#zweiter-faktor-alle) | the [role mapping](#gruppen-rollen) |
-| **Microsoft Entra ID** | created automatically at the first sign-in | Microsoft asks for it ([Conditional Access](term:conditionalaccess)); where a second factor is required and the token does not prove it, TOTP in Cobe News as well ([MFA proof](#entra-mfa-nachweis)) | the [role mapping](#gruppen-rollen) |
+| **Active Directory / LDAP** | created automatically once it is in a mapped group ([preloaded](#vorab-laden)) – without a password; active at once or after [approval](#freigabe), depending on automatic sign-in | TOTP in Cobe News – required for admins, optional for readers or [required for everyone](#zweiter-faktor-alle) | the [role mapping](#gruppen-rollen) |
+| **Microsoft Entra ID** | as AD: [preloaded](#vorab-laden), active at once or after [approval](#freigabe) | Microsoft asks for it ([Conditional Access](term:conditionalaccess)); where a second factor is required and the token does not prove it, TOTP in Cobe News as well ([MFA proof](#entra-mfa-nachweis)) | the [role mapping](#gruppen-rollen) |
 
 The sign-in page then shows "Sign in with Microsoft" (Entra ID) and below it the tabs "Active Directory" and
 "Local account".
@@ -113,6 +113,8 @@ In each row of the user list:
 | What | Where | Notes |
 |---|---|---|
 | Change role | *Role* selection | Local accounts only – for AD/Entra the role follows the group. Requires confirmation. All sessions of the account end. |
+| Approve / Decline | buttons in the row (*Waiting for approval*) | Only while [automatic sign-in](#freigabe) is off. "Approve" switches the account on – as admin with confirmation; switching *Active* on is the same. "Decline" keeps it off like *Block permanently*. |
+| Approve raise / Stays reader | buttons in the row (*Raise to admin waits for approval*) | "Approve raise" makes the reader an admin (confirmation, all sessions end). "Stays reader": not asked again while the account is in the admin group. |
 | Disable / enable | *Active* switch | Sessions end at once. For an admin account with confirmation. A directory account you disabled is never switched on again by the directory sync. |
 | Block permanently | "More actions" → "Block permanently" | Also for an account the sync or Teams has switched off already (its switch is off already). Afterwards it shows *Blocked by an admin*: neither the sync nor Teams nor a sign-in switches the account on again. Requires confirmation, all sessions end. |
 | Lift the permanent block | "More actions" → "Lift the permanent block" | Directory account: the sync decides again (*Waiting for the sync*) – active as soon as a sign-in or the next sync finds a mapped group or a team. Local account: active again at once. Requires confirmation. |
@@ -122,7 +124,8 @@ In each row of the user list:
 | Sessions & passkeys | "More actions" → "Sessions & passkeys" | End the account's running sessions, remove passkeys – each with confirmation, see [My sessions](#meine-sitzungen) and [Passkeys of an account](#passkeys-admin). |
 | Delete | "More actions" → "Delete" | Deletes the account and its read marks. A directory account comes back at the next sign-in while the group fits – to lock someone out, disable instead. |
 
-Why an account is off shows in its mark (explained on hover): *Blocked by an admin* is the permanent block. *No team any
+Why an account is off shows in its mark (explained on hover): *Blocked by an admin* is the permanent block (also after
+"Decline"). *Waiting for approval* is switched on by an admin only ([approval](#freigabe)). *No team any
 more*, *Teams switched off*, *No role group any more*, *Disabled in the directory* and *No longer in the directory* were
 set by the sync – it switches such accounts on again by itself as soon as they fit again. Whoever should not come back
 gets "Block permanently".
@@ -426,7 +429,7 @@ from step 5.
 
 | Permission | Type | Why Cobe News needs it | What does not work without it |
 |---|---|---|---|
-| `GroupMember.Read.All` | Application | Group search under *Role mapping* and for teams; groups of users with more than 200 groups (or without a groups claim in the token); groups in the hourly sync; [Teams](#teams): the members of a bound group (`transitiveMembers`) | The group search reports "The app registration lacks a permission" – Entra groups **cannot be mapped** in the interface. Users with more than 200 groups cannot sign in ("The sign-in with Microsoft failed."). Teams: the group shows "Microsoft Graph refuses access (403) …", nobody is loaded. |
+| `GroupMember.Read.All` | Application | Group search under *Role mapping* and for teams; groups of users with more than 200 groups (or without a groups claim in the token); groups in the hourly sync; [Teams](#teams) and [preloading](#vorab-laden): the members of a bound or mapped group (`transitiveMembers`) | The group search reports "The app registration lacks a permission" – Entra groups **cannot be mapped** in the interface. Users with more than 200 groups cannot sign in ("The sign-in with Microsoft failed."). Teams: the group shows "Microsoft Graph refuses access (403) …", nobody is loaded. |
 | `User.Read.All` | Application | Hourly sync: does the account still exist, is it enabled, which groups is it in; [Teams](#teams): name, UPN, e-mail and state of the loaded members | The sync for Entra is skipped (log: `directory sync (entra) skipped: forbidden`). Whoever is disabled, deleted or removed from the group in Entra keeps a running session until it expires (default: 60 minutes without activity, 12 hours at the latest); only the next sign-in checks again. Teams: Graph returns ids only, the group shows "Graph returns ids without names …", nobody is loaded. |
 
 For [Teams](#teams) with Entra groups **both are required** – Teams needs no new permission.
@@ -614,6 +617,67 @@ Local accounts and the emergency admin are never concerned. **If your own admin 
 mapping cannot be removed – you would lock yourself out. Remove it with another admin account, e.g. the emergency
 account.
 
+## Automatic sign-in and approval {#freigabe}
+
+At the very top of [Settings → Sign-in](/settings/auth) is the switch **"Allow automatic sign-in via AD/Entra ID"**. It
+applies to AD/LDAP and Entra ID together; local accounts and the emergency admin are never concerned. Changing it
+requires [confirmation](#erneut-bestaetigen) and is logged.
+
+- **On** (default, as up to 0.1.51): whoever is in a mapped group – or a [team](#teams) group – signs in at once.
+  Nothing changes with the update.
+- **Off**: an admin decides who gets in.
+  - **New accounts wait.** Preloaded accounts, accounts created at a sign-in and accounts loaded by a team are listed
+    under [Users](/settings/users) as *Waiting for approval*, their *Active* switch is off. "Approve" (or switching it
+    on) switches the account on with the role its groups give now – as admin only with confirmation. "Decline" keeps it
+    off for good (*Blocked by an admin*). No sync, no team and no sign-in switches a waiting account on.
+  - **A raise to admin waits.** When an approved reader lands in an admin group, they stay reader and the row shows
+    *Raise to admin waits for approval*. "Approve raise" (confirmation) makes them admin, their sessions end; "Stays
+    reader" does not ask again while they are in the admin group.
+  - **Lowering and switching off stay automatic.** Out of the admin group, deleted, disabled or in no group any more –
+    that happens at once as before ([sync](#abgleich)).
+  - **Sign-in of a waiting account**: only after the right AD password or a successful sign-in at Microsoft does it show
+    "Account is waiting for approval by an admin." – with a wrong password it looks as always. Whoever has no account
+    yet gets one at that moment (*Waiting for approval*), so admins see it.
+  - **Approval belongs to the directory id** (AD: `objectGUID`, Entra: object id), never to the name. An account deleted
+    in the directory and created again with the same name waits again. An account that never signed in, was switched
+    off by the sync and now comes back waits as well; one that was in use comes back by itself as before.
+
+What **switching** does, "Save" says first:
+
+- **On → off**: every directory account that is active already stays active (the dialog shows how many). Only new
+  ones wait.
+- **Off → on**: waiting accounts and raises are **not** switched on silently. The dialog says how many wait and offers
+  **"Also approve all waiting ones"** (default: off). Each account is switched on with the role of its groups, each
+  approval logged on its own; the dialog warns when someone becomes admin.
+
+While something waits, *Users & roles* in the settings navigation shows a number, and the user list has the filter
+"Waiting for approval".
+
+In the [audit log](/settings/audit): *Account waits for approval*, *Account approved*, *Approval declined*, *Raise to
+admin waits for approval*, *… approved*, *… declined*, *Sign-in refused – account waits for approval*; switching as
+*Sign-in configured*. Waiting accounts and approvals are marked under "Only notable".
+
+### Preloading members {#vorab-laden}
+
+Cobe News loads the members of **every mapped group** itself (reader and admin, AD/LDAP and Entra ID; nested groups as at
+the sign-in – for AD only with *Nested groups*) – as soon as a mapping is added or removed, then hourly with the [sync](#abgleich). So they are listed under
+[Users](/settings/users) before their first sign-in, as *Never signed in*: without a password and without a session.
+This happens whatever the switch above says – on, they are active at once; off, they wait for approval.
+
+- Whoever never signed in is kept up to date here: name, display name, e-mail, role (admin when one of their groups
+  gives admin) and on/off as in the directory. Whoever signed in once follows the sign-in and the hourly sync.
+- **Data minimisation**: an account that **never signed in** and is in **no mapped group and no team** any more is
+  **deleted** – not just switched off. Only when every mapped group of its directory could be read (a group that cannot
+  be read changes nothing), never an account an admin blocked or declined, and never one with a sign-in in progress.
+  Accounts that ever signed in are only switched off as before. The audit log keeps who was deleted (*Account deleted*,
+  reason "never signed in, in no mapped group any more").
+- Big groups are written in batches of 500 accounts as with Teams; a group may have at most 50,000 members. The audit
+  log gets one entry per run, *Members of the mapped groups loaded*; single entries (waiting, deleted accounts) at most
+  200 per run, the rest counted.
+- A local account of the same name is never taken over (*Name already taken*).
+- **Entra ID** needs `GroupMember.Read.All` and `User.Read.All` – the same [API permissions](#entra-api-berechtigungen)
+  as Teams. Without them the group stays unread and nothing changes.
+
 ## Hourly sync {#abgleich}
 
 Once an hour Cobe News asks the directory about every AD and Entra account:
@@ -621,7 +685,9 @@ Once an hour Cobe News asks the directory about every AD and Entra account:
 - **Deleted, disabled or no longer in a mapped group** → the account is disabled, all sessions end at once. The user
   list shows why: *No longer in the directory*, *Disabled in the directory* or *No role group any more*.
 - **Active again and in a group** → an account disabled by the sync is switched on again. An account an admin disabled
-  or [blocked permanently](#benutzer-verwalten) stays off.
+  or [blocked permanently](#benutzer-verwalten) stays off, and so does a *waiting* one ([approval](#freigabe)).
+- **Other group, higher role while automatic sign-in is off** → the raise to admin waits for [approval](#freigabe);
+  lowering happens at once.
 - **Other group, other role** → the role follows; all sessions end, the new role applies from the next sign-in.
 - **Renamed** → accounts are recognised by their ID, not their name. The new name (AD: `sAMAccountName`, Entra: UPN)
   follows at the next sign-in, for AD in the sync as well. The name of an account deleted in the directory is released,
@@ -642,7 +708,8 @@ kept; once switched on again they sign in as before.
 If you are signed in with an account of this sign-in method **yourself**, it cannot be switched off – you could not sign
 in again afterwards. Sign in with a local admin account (e.g. the emergency account) and switch it off from there.
 
-With [Teams](#teams) the sync first loads the members of all bound groups, then checks the accounts as above. Accounts a
+With [Teams](#teams) the sync first loads the members of all bound groups, then those of the mapped groups
+([preloading](#vorab-laden)), then checks the accounts as above. Accounts a
 team loaded that have never signed in are not looked up one by one – they hold no session, and the first sign-in checks
 everything anyway.
 
@@ -688,7 +755,8 @@ Entra reads `transitiveMembers` (users only) page by page. A group has at most 5
 ### Members and roles {#teams-mitglieder}
 
 - Loaded people appear at once under [Users](/settings/users) as AD or Entra accounts marked *Never signed in* until
-  their first sign-in. A local account of the same name is never taken over.
+  their first sign-in. A local account of the same name is never taken over. While [automatic sign-in](#freigabe) is
+  off, new team accounts wait for approval (the welcome e-mail goes out only afterwards).
 - A team group gives the **reader** role. If someone is also in an admin group of the [role mapping](#gruppen-rollen),
   they become admin – admin wins. Teams is an additional way to read, only while Teams is on; there is still no default
   role.

@@ -186,7 +186,9 @@ class User(Base):
     totp_secret_enc: Mapped[str | None] = mapped_column(Text)
     totp_last_step: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    deactivated_reason: Mapped[str | None] = mapped_column(Text)  # admin | sync:<why>
+    # admin | sync:<why> | pending – waits for an admin's approval (directory accounts while "Automatische Anmeldung über
+    # AD/Entra ID zulassen" is off, app/auth/directory.py): only an admin's approval switches it on, never the directory
+    deactivated_reason: Mapped[str | None] = mapped_column(Text)
     is_emergency: Mapped[bool] = mapped_column(Boolean, default=False)
     desktop: Mapped[dict] = mapped_column(Json, default=dict)  # desktop notifications: {enabled, severities, sources}
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -197,6 +199,10 @@ class User(Base):
     # directory accounts: their groups that were mapped to a role or bound to a team at the last sign-in or sync (lower
     # case) – what the instant re-check after a removed mapping reads (directory.reassess_mapping); None: not known yet
     role_groups: Mapped[list | None] = mapped_column(Json)
+    # a directory account's raise to admin that waits for an admin's approval ("admin": the groups give admin, the account
+    # stays reader until approved) or that an admin declined ("declined": stays reader until it leaves the admin groups)
+    # – None: nothing waits. Lowering a role is never held back (migration 0037)
+    pending_role: Mapped[str | None] = mapped_column(Text)
 
 
 class UserSession(Base):

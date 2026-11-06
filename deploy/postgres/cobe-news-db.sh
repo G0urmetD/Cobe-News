@@ -13,6 +13,10 @@
 # Signals: `docker stop` (SIGINT, the image's STOPSIGNAL) or SIGTERM → PostgreSQL's fast shutdown (SIGINT): open
 # transactions rolled back, a checkpoint, exit 0; SIGHUP → reload of the configuration (as with the official image;
 # one that comes during the first start is passed on once the server is up).
+# A new database (the app makes its tables at its first start): the audit log's lock follows as soon as the app's
+# migration has made audit_log – a background loop as the same user, every LATE_EVERY seconds for up to LATE_FOR,
+# runs audit-lock.sql once the table is there (db.migrate commits all migrations at once: the table is visible only
+# then) and ends; it ends with the server as well (docs/BETRIEB.md: Protokoll, Datenbank-Sperre).
 # A failed role set-up stops PostgreSQL and exits 1 – the restart policy tries again; the container never runs healthy
 # without the role (docs/BETRIEB.md: PostgreSQL, Rollen). PostgreSQL ending on its own (kill -9 …) ends the container.
 # bash, not sh: it reaps the finished PostgreSQL at once (its /proc entry goes) and `wait` still knows its exit status.
@@ -42,10 +46,14 @@ rm -f "$ready"
 docker-entrypoint.sh "$@" &
 pg=$!
 stopping=""
+late=""
+LATE_EVERY=10
+LATE_FOR=1800
 alive() { [ -e "/proc/$pg" ]; }
 signal() { kill -INT "$pg" 2>/dev/null || true; }
 stop() {
     stopping=1
+    [ -z "$late" ] || kill "$late" 2>/dev/null || true
     signal
 }
 trap stop INT TERM
@@ -62,7 +70,35 @@ finish() {
         rc=$?
         alive || break
     done
+    [ -z "$late" ] || kill "$late" 2>/dev/null || true
     exit "${1:-$rc}"
+}
+
+# psql (or db-init.sh) over the socket, as the superuser POSTGRES_USER (with its password, should pg_hba ask for it),
+# with the system catalog only on the search_path (app-role.sql: the app owns the database and may set one for it)
+superuser() {
+    env PGHOST=/var/run/postgresql PGPORT="${PGPORT:-5432}" PGUSER="${POSTGRES_USER:-postgres}" \
+        PGDATABASE="${POSTGRES_DB:-${POSTGRES_USER:-postgres}}" PGAPPNAME=cobe-news-db-init PGPASSWORD="${POSTGRES_PASSWORD:-}" \
+        PGOPTIONS="-c search_path=pg_catalog,pg_temp ${PGOPTIONS_EXTRA:-}" "$@"
+}
+
+# the audit log's lock of a new database, once the app has made the table (see above) – in the background, never
+# holding up PID 1; a lock it cannot get within 5 s (the app busy with the table) is tried again next time
+late_lock() {
+    trap - INT TERM HUP
+    end=$(($(date +%s) + LATE_FOR))
+    while [ "$(date +%s)" -lt "$end" ]; do
+        sleep "$LATE_EVERY"
+        alive || exit 0
+        there=$(superuser psql --no-psqlrc -XAtq -c "SELECT to_regclass('public.audit_log') IS NOT NULL AND to_regnamespace('cobe_news_audit') IS NOT NULL" 2>/dev/null) || continue
+        [ "$there" = t ] || continue
+        echo "db-init: audit_log is there now (the app's first start) – locking it"
+        if PGOPTIONS_EXTRA="-c lock_timeout=5s" superuser psql --no-psqlrc --quiet -v ON_ERROR_STOP=1 -f "$here/audit-lock.sql"; then
+            exit 0
+        fi
+        echo "db-init: audit log lock failed – again in ${LATE_EVERY} s" >&2
+    done
+    echo "db-init: audit_log still not there after $((LATE_FOR / 60)) min – its lock follows at the next start of the database"
 }
 
 # the real server: TCP on 127.0.0.1 – the temporary server of the first initdb listens on the socket only
@@ -84,12 +120,14 @@ if [ -n "$hup" ]; then
     kill -HUP "$pg" 2>/dev/null || true
 fi
 
-# over the socket, as the superuser POSTGRES_USER (with its password, should pg_hba ask for it)
-if PGHOST=/var/run/postgresql PGPORT="${PGPORT:-5432}" PGUSER="${POSTGRES_USER:-postgres}" \
-    PGDATABASE="${POSTGRES_DB:-${POSTGRES_USER:-postgres}}" PGAPPNAME=cobe-news-db-init PGPASSWORD="${POSTGRES_PASSWORD:-}" \
-    sh "$here/db-init.sh"; then
+if superuser sh "$here/db-init.sh"; then
     : >"$ready"
     echo "db-init: done – the database is ready for the app"
+    pending=$(superuser psql --no-psqlrc -XAtq -c "SELECT to_regclass('public.audit_log') IS NULL AND to_regnamespace('cobe_news_audit') IS NOT NULL" 2>/dev/null || true)
+    if [ "$pending" = t ] && [ -z "$stopping" ]; then
+        late_lock &
+        late=$!
+    fi
 elif [ -z "$stopping" ]; then
     echo "db-init: FAILED – stopping PostgreSQL; the container exits and its restart policy tries again (docs/BETRIEB.md: PostgreSQL, Rollen)" >&2
     stop

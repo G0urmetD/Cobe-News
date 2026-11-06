@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { useSearchParams } from "react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   Ban,
+  Check,
   Copy,
   Fingerprint,
   KeyRound,
@@ -18,6 +20,8 @@ import {
   Siren,
   Trash2,
   Undo2,
+  UserCheck,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -36,7 +40,7 @@ import { HelpLink } from "@/components/cobe/doc-markdown"
 import { Ts } from "@/components/cobe/time"
 import { copyWithToast } from "@/lib/clipboard"
 import { ApiError, api, type Role } from "@/lib/api"
-import { type UserRow, isBlocked, useUsers } from "@/lib/admin-api"
+import { type UserRow, isBlocked, isPending, useUsers } from "@/lib/admin-api"
 import { withReauth } from "@/lib/reauth"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
@@ -100,7 +104,21 @@ export function UsersPane() {
   const [creating, setCreating] = useState(false)
   const [temp, setTemp] = useState<{ title: string; value: string } | null>(null)
   const [security, setSecurity] = useState<UserRow | null>(null)
-  const refresh = () => void qc.invalidateQueries({ queryKey: ["admin", "users"] })
+  // "Wartet auf Freigabe": only the accounts and raises waiting for an admin (shown while there are any)
+  // ?waiting=1 (the sidebar notice "… wartet auf Freigabe") opens the list filtered – also when it is already open
+  const [params] = useSearchParams()
+  const waitingLink = params.get("waiting") === "1"
+  const [onlyWaiting, setOnlyWaiting] = useState(waitingLink)
+  const [seenLink, setSeenLink] = useState(waitingLink)
+  if (waitingLink !== seenLink) {
+    setSeenLink(waitingLink)
+    if (waitingLink) setOnlyWaiting(true)
+  }
+  // the sidebar's notices with it: a "… wartet auf Freigabe" line dealt with no longer stands out
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["admin", "users"] })
+    void qc.invalidateQueries({ queryKey: ["admin", "activity"] })
+  }
   // sensitive changes ask who is at the keyboard first (withReauth); an edit of an older state (another admin was
   // quicker) is refused – the list shows the current one again
   const act = async (fn: () => Promise<unknown>) => {
@@ -113,6 +131,37 @@ export function UsersPane() {
     }
   }
   if (!q.data) return <Loading error={q.error} onRetry={q.refetch} />
+  const waits = (u: UserRow) => isPending(u) || u.pending_role === "admin"
+  const waiting = q.data.filter(waits).length
+  const rows = onlyWaiting && waiting ? q.data.filter(waits) : q.data
+  // approval: a waiting account switched on (as admin: re-confirmed, asked first), or declined (stays off – asked)
+  const approve = async (u: UserRow) => {
+    if (
+      u.role === "admin" &&
+      !(await confirmAction({ title: t("users.approveAdminTitle"), text: t("users.approveAdminText", { name: u.display_name }), confirm: t("users.approve"), destructive: false }))
+    )
+      return
+    await act(async () => {
+      await api.post(`/api/admin/users/${u.id}/approve`, { version: u.version })
+      toast.success(t("users.approveDone", { name: u.display_name }))
+    })
+  }
+  const decline = async (u: UserRow) => {
+    if (!(await confirmAction({ title: t("users.declineTitle"), text: t("users.declineText", { name: u.display_name }), confirm: t("users.decline") }))) return
+    await act(() => api.post(`/api/admin/users/${u.id}/decline`, { version: u.version }))
+  }
+  const raise = async (u: UserRow, yes: boolean) => {
+    if (
+      !(await confirmAction({
+        title: t(yes ? "users.raiseTitle" : "users.keepReaderTitle"),
+        text: t(yes ? "users.raiseText" : "users.keepReaderText", { name: u.display_name }),
+        confirm: t(yes ? "users.raiseApprove" : "users.keepReader"),
+        destructive: false,
+      }))
+    )
+      return
+    await act(() => api.post(`/api/admin/users/${u.id}/${yes ? "approve-role" : "decline-role"}`, { version: u.version }))
+  }
   return (
     <>
       <Section
@@ -127,8 +176,26 @@ export function UsersPane() {
           </>
         }
       >
+        {waiting > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b px-5 py-2.5" role="group" aria-label={t("users.filter")}>
+            {[false, true].map((only) => (
+              <Button key={String(only)} size="sm" variant={onlyWaiting === only ? "secondary" : "ghost"} aria-pressed={onlyWaiting === only} onClick={() => setOnlyWaiting(only)}>
+                {only ? (
+                  <>
+                    <UserCheck /> {t("users.filterWaiting")}
+                    <Pill color="--warning" className="px-1.5 tabular-nums">
+                      {waiting}
+                    </Pill>
+                  </>
+                ) : (
+                  t("users.filterAll")
+                )}
+              </Button>
+            ))}
+          </div>
+        )}
         <ul className="divide-y">
-          {q.data.map((u) => {
+          {rows.map((u) => {
             const self = u.id === me?.id
             const protectedWhy = u.is_emergency ? t("users.protectedEmergency") : self ? t("users.protectedSelf") : undefined
             const roleWhy = protectedWhy ?? (u.auth_source !== "local" ? t("users.directoryRole") : undefined)
@@ -148,6 +215,16 @@ export function UsersPane() {
                       </Pill>
                     )}
                     {!u.is_active && <OffPill reason={u.deactivated_reason} />}
+                    {u.pending_role === "admin" && (
+                      <Pill color="--warning" title={t("users.raisePendingHint")}>
+                        {t("users.raisePending")}
+                      </Pill>
+                    )}
+                    {u.pending_role === "declined" && (
+                      <Pill color="--muted-foreground" title={t("users.raiseDeclinedHint")}>
+                        {t("users.raiseDeclined")}
+                      </Pill>
+                    )}
                     {u.must_change_password &&
                       (u.temp_password_expired ? (
                         <Pill color="--sev-critical" title={t("users.tempExpiredHint")}>
@@ -183,6 +260,17 @@ export function UsersPane() {
                     )}
                     {!!u.teams?.length && ` · ${t("users.teams", { names: isoList(u.teams) })}`}
                   </p>
+                  {/* waiting for an admin: the decision right in the row */}
+                  {(isPending(u) || u.pending_role === "admin") && (
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      <Button size="xs" onClick={() => void (isPending(u) ? approve(u) : raise(u, true))}>
+                        <Check /> {isPending(u) ? (u.role === "admin" ? t("users.approveAsAdmin") : t("users.approve")) : t("users.raiseApprove")}
+                      </Button>
+                      <Button size="xs" variant="outline" onClick={() => void (isPending(u) ? decline(u) : raise(u, false))}>
+                        <X /> {isPending(u) ? t("users.decline") : t("users.keepReader")}
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 {/* phone: two rows of their own below the name, indented to it – origin and TOTP, then the controls (role
                     filling the row, the switch with its label, the menu at the end); from sm on all in the one row */}
@@ -230,7 +318,7 @@ export function UsersPane() {
                         disabled={!!protectedWhy}
                         aria-label={t("users.active")}
                         title={protectedWhy ? undefined : t("users.active")}
-                        onCheckedChange={(x) => void act(() => api.patch(`/api/admin/users/${u.id}`, { is_active: x, version: u.version }))}
+                        onCheckedChange={(x) => (x && isPending(u) ? void approve(u) : void act(() => api.patch(`/api/admin/users/${u.id}`, { is_active: x, version: u.version })))}
                       />
                     </Why>
                   </label>

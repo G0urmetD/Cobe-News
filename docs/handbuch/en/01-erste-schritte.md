@@ -112,6 +112,16 @@ The numbers next to *News* and *Vendor News* in the sidebar show your unread sto
 - The button at the top left of the header collapses and expands the sidebar (keyboard: Ctrl+B or ⌘+B). Collapsed,
   only the icons remain.
 
+### Notices {#meldungen .admin}
+
+Above *Settings*, a **Notices** box shows the three latest events of the app itself (not news): who signed in, who
+follows a product or added one to Vendor News, who is waiting for approval, who created, approved, declined or
+deactivated an account or made someone an admin, a restored backup. Your own actions are left out; sign-ins close
+together become one line ("Anna and 2 others signed in"). Anyone waiting for approval is highlighted. A click leads to
+the matching place – the product, *Users & roles* or the [audit log](/docs/betrieb#protokoll), filtered to the entry;
+**All in the audit log** opens all of it. The box checks again every minute while the tab is visible. Collapsed, a bell
+remains (with a dot while someone waits for approval) that opens the list. Only admins see it.
+
 ### User menu {#benutzermenue}
 
 A click on your name at the bottom of the sidebar opens:

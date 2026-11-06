@@ -4,4 +4,5 @@
 !cobe-news-db.sh
 !db-init.sh
 !app-role.sql
+!audit-lock.sql
 !restore-role.sql

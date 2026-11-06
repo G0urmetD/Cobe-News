@@ -419,6 +419,13 @@ async def _login_ldap(db, username: str, password: str, ip: str, request: Reques
             return await _fail(db, account, ip)
         try:
             user = await _provision(db, du)
+        except directory.ApprovalPending:
+            # the right password of a member of a mapped group whose account waits for an admin's approval: said so
+            # (only after the directory accepted the password – a wrong one is answered as always), not counted as a
+            # failure, no session. The waiting account stays (admins see it under Benutzer)
+            log.info("ldap sign-in of %s refused: waiting for approval", username)
+            await db.commit()
+            raise api_error(403, "approval_pending") from None
         except directory.DirectoryError as exc:
             # right password, but no access (no mapped group, disabled, name taken): answered like a wrong password –
             # and counted – otherwise this page would confirm the AD password of every account
@@ -437,7 +444,7 @@ async def _provision(db, du: directory.DirectoryUser) -> User:
         return user
     except IntegrityError:
         await db.rollback()
-        return await directory.provision(db, du)
+        return await directory.provision(db, du)  # waiting (ApprovalPending) when the first one made it so
 
 
 @asynccontextmanager
@@ -664,6 +671,11 @@ async def oidc_callback(
         return _oidc_fail("entra_secret" if entra.secret_rejected(exc) else "entra_failed")
     try:
         user = await _provision(db, du)
+    except directory.ApprovalPending:
+        # Microsoft accepted the person, the account waits for an admin's approval: kept (admins see it), no session
+        log.info("entra sign-in of %s refused: waiting for approval", du.username)
+        await db.commit()
+        return _oidc_fail("directory_pending")
     except directory.DirectoryError as exc:
         await db.rollback()
         return _oidc_fail(f"directory_{exc.code}")

@@ -641,6 +641,90 @@ def test_an_empty_or_cut_key_file_is_never_used(key_file, content):
     assert key_file.read_bytes() == content  # left as it is – the operator decides
 
 
+def test_a_new_key_file_is_never_seen_empty(key_file, monkeypatch):
+    """0.1.52: the key is written to a temporary file and linked to the name – a start killed while writing leaves no
+    empty secret.key (before: created first, written after; every later start refused it)."""
+    real_fsync = os.fsync
+
+    def killed(fd):  # noqa: ANN001
+        raise KeyboardInterrupt  # the process dies after writing, before the key is durable
+
+    monkeypatch.setattr(crypto.os, "fsync", killed)
+    with pytest.raises(KeyboardInterrupt):
+        crypto.master()
+    assert not key_file.exists()  # no half-made secret.key …
+    assert not list(key_file.parent.glob(".secret.key.*"))  # … and no temporary file left behind
+    monkeypatch.setattr(crypto.os, "fsync", real_fsync)
+    crypto.reset_cache()
+    key = crypto.master()  # the next start simply makes one
+    assert len(key) == 44 and key_file.read_bytes() == key and (key_file.stat().st_mode & 0o777) == 0o600
+
+
+def test_a_data_folder_the_app_cannot_write_says_how_to_fix_it(key_file):
+    """Linux, docker compose: ./data belongs to whoever cloned the repository – the app (UID 10001) cannot write it."""
+    key_file.parent.chmod(0o555)
+    try:
+        with pytest.raises(crypto.KeyFileError, match="10001"):
+            crypto.master()
+    finally:
+        key_file.parent.chmod(0o755)
+    assert not key_file.exists()
+
+
+def test_without_hard_links_the_key_file_is_still_made(key_file, monkeypatch):
+    def no_links(src, dst):  # noqa: ANN001
+        raise OSError(1, "Operation not permitted")
+
+    monkeypatch.setattr(crypto.os, "link", no_links)
+    key = crypto.master()
+    assert len(key) == 44 and key_file.read_bytes() == key and not list(key_file.parent.glob(".secret.key.*"))
+
+
+@pytest.mark.parametrize("err", ["ENOSPC", "EIO", "EROFS", "EACCES"])
+def test_another_link_error_is_raised_not_papered_over(key_file, monkeypatch, err):
+    """Only "no hard links here" (EPERM, ENOTSUP/EOPNOTSUPP, EXDEV, EMLINK, ENOSYS) falls back to the old way – a full
+    disk or an I/O error is raised: no secret.key, no temporary file left."""
+    import errno
+
+    code = getattr(errno, err)
+
+    def broken(src, dst):  # noqa: ANN001
+        raise OSError(code, os.strerror(code))
+
+    monkeypatch.setattr(crypto.os, "link", broken)
+    with pytest.raises(OSError) as exc:
+        crypto.master()
+    assert exc.value.errno == code
+    assert not key_file.exists() and not list(key_file.parent.glob(".secret.key.*"))
+
+
+@pytest.mark.parametrize("err", ["EPERM", "EOPNOTSUPP", "EXDEV", "EMLINK", "ENOSYS"])
+def test_every_no_hard_links_answer_falls_back(key_file, monkeypatch, err):
+    import errno
+
+    code = getattr(errno, err)
+
+    def no_links(src, dst):  # noqa: ANN001
+        raise OSError(code, os.strerror(code))
+
+    monkeypatch.setattr(crypto.os, "link", no_links)
+    key = crypto.master()
+    assert len(key) == 44 and key_file.read_bytes() == key and not list(key_file.parent.glob(".secret.key.*"))
+
+
+def test_two_first_starts_share_one_key(key_file, monkeypatch):
+    """The slower process finds the name taken when it links – and reads the faster one's key."""
+    other = b"o" * 44
+    real_link = os.link
+
+    def faster_first(src, dst):  # noqa: ANN001
+        key_file.write_bytes(other)
+        return real_link(src, dst)
+
+    monkeypatch.setattr(crypto.os, "link", faster_first)
+    assert crypto.master() == other and key_file.read_bytes() == other
+
+
 def test_a_key_file_another_process_is_writing_is_waited_for(key_file):
     """Two processes at the first start: the slower one finds the file before the faster one has written it."""
     import threading
@@ -828,11 +912,11 @@ async def test_a_hanging_read_never_freezes_the_app(backups_here, tmp_path, monk
 
 @pytest.fixture(autouse=True)
 def _fresh_download_limits():
-    backup._dl_starts.clear()
-    backup._dl_running.clear()
+    for d in (backup._dl_starts, backup._dl_running, backup._dl_tickets):
+        d.clear()
     yield
-    backup._dl_starts.clear()
-    backup._dl_running.clear()
+    for d in (backup._dl_starts, backup._dl_running, backup._dl_tickets):
+        d.clear()
 
 
 async def _csrf(c) -> dict:  # noqa: ANN001
@@ -841,8 +925,19 @@ async def _csrf(c) -> dict:  # noqa: ANN001
     return {"X-CSRF-Token": c.cookies.get("cobe_news_csrf", "")}
 
 
+async def _ticket(c, name: str):  # noqa: ANN001
+    """Step 1 (0.1.52): the page asks for a ticket – a write, with the CSRF token."""
+    return await c.post(f"/api/admin/backup/files/{name}/ticket", headers=await _csrf(c), json={})
+
+
 async def _download(c, name: str, **kw):  # noqa: ANN001, ANN003
-    return await c.get(f"/api/admin/backup/files/{name}", headers=await _csrf(c), **kw)
+    """Both steps, as the page does them: the ticket, then the browser's own GET of the address (no CSRF header – an
+    <a download> sends none). A refused step 1 is the answer."""
+    r = await _ticket(c, name)
+    if r.status_code != 200:
+        return r
+    assert r.json()["url"].startswith("/api/admin/backup/download/") and r.json()["expires_in"] == 60
+    return await c.get(r.json()["url"], **kw)
 
 
 async def test_an_encrypted_backup_downloads_whole_and_is_logged(admin_client, backups_here):
@@ -853,11 +948,129 @@ async def test_an_encrypted_backup_downloads_whole_and_is_logged(admin_client, b
     assert r.status_code == 200, r.text
     assert r.content == res.path.read_bytes() and r.headers["content-length"] == str(res.size)
     assert r.headers["content-disposition"] == f'attachment; filename="{res.name}"' and r.headers["cache-control"] == "no-store"
-    assert r.headers["content-type"] == "application/octet-stream"
+    assert r.headers["content-type"] == "application/octet-stream" and r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["referrer-policy"] == "no-referrer"
     async with db.session() as s:
         e = (await s.scalars(select(AuditEntry).where(AuditEntry.action == "backup.downloaded"))).one()
     assert e.notable and e.target_id == res.name and e.details == {"size": res.size, "encrypted": True} and e.actor_name == "anna"
     assert backup._dl_running == {}  # the slot is free again
+
+
+# ---------------------------------------------------------------- the download ticket (0.1.52)
+
+
+async def _downloads_logged() -> int:
+    from app.models import AuditEntry
+
+    async with db.session() as s:
+        return int(await s.scalar(select(func.count()).select_from(AuditEntry).where(AuditEntry.action == "backup.downloaded")))
+
+
+async def test_a_ticket_is_used_once(admin_client, backups_here):
+    res = await backup.create(passphrase="eine lange Passphrase")
+    r = await _ticket(admin_client, res.name)
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    url = r.json()["url"]
+    ticket = url.rsplit("/", 1)[1]
+    assert len(ticket) == 43 and ticket not in str(backup._dl_tickets)  # 256 bits, kept only as its hash
+    assert await _downloads_logged() == 0  # the ticket alone is no download: nothing logged, counted or claimed
+    assert backup._dl_starts == {} and backup._dl_running == {}
+    assert (await admin_client.get(url)).content == res.path.read_bytes()
+    again = await admin_client.get(url)
+    assert again.status_code == 403 and again.json()["detail"]["code"] == "backup_ticket_invalid"
+    assert await _downloads_logged() == 1 and backup._dl_running == {}
+
+
+async def test_a_ticket_expires(admin_client, backups_here, monkeypatch):
+    res = await backup.create(passphrase="eine lange Passphrase")
+    monkeypatch.setattr(backup, "TICKET_TTL", 0.0)
+    url = (await _ticket(admin_client, res.name)).json()["url"]
+    r = await admin_client.get(url)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "backup_ticket_invalid"
+    assert await _downloads_logged() == 0 and backup._dl_running == {} and backup._dl_tickets == {}
+
+
+async def test_a_ticket_counts_only_in_its_own_session(admin_client, backups_here):
+    """Another session of the same admin, another admin, a reader, nobody signed in: refused – and a ticket shown to the
+    wrong session is gone for its owner too."""
+    from conftest import add_user, make_client, sign_in
+
+    res = await backup.create(passphrase="eine lange Passphrase")
+    bert = await add_user("bert", "admin", totp_secret="JBSWY3DPEHPK3PXP")
+    rudi = await add_user("rudi", "reader")
+    async with make_client() as anon:
+        url = (await _ticket(admin_client, res.name)).json()["url"]
+        assert (await anon.get(url)).status_code == 401
+        async with make_client() as reader:
+            await sign_in(reader, rudi)
+            assert (await reader.get(url)).status_code == 403
+        assert (await admin_client.get(url)).status_code == 200  # neither of them used it up
+        for who in (bert, admin_client.user):
+            url = (await _ticket(admin_client, res.name)).json()["url"]
+            async with make_client() as other:
+                await sign_in(other, who)  # another admin / the same admin in another browser
+                r = await other.get(url)
+                assert r.status_code == 403 and r.json()["detail"]["code"] == "backup_ticket_invalid" and res.path.read_bytes() not in r.content
+            r = await admin_client.get(url)
+            assert r.status_code == 403 and r.json()["detail"]["code"] == "backup_ticket_invalid"
+    assert await _downloads_logged() == 1 and backup._dl_running == {}
+
+
+async def test_a_ticket_ends_with_its_session(admin_client, backups_here):
+    res = await backup.create(passphrase="eine lange Passphrase")
+    url = (await _ticket(admin_client, res.name)).json()["url"]
+    async with db.session() as s:
+        await s.execute(update(UserSession).where(UserSession.user_id == admin_client.user.id).values(expires_at=datetime.now(UTC) - timedelta(seconds=1)))
+        await s.commit()
+    assert (await admin_client.get(url)).status_code == 401
+    assert await _downloads_logged() == 0
+
+
+async def test_a_new_ticket_replaces_the_older_one(admin_client, backups_here, monkeypatch):
+    """At most one ticket per admin – asking again and again neither counts as downloads nor fills the memory."""
+    res = await backup.create(passphrase="eine lange Passphrase")
+    monkeypatch.setattr(backup, "DOWNLOADS_PER_HOUR", 2)
+    urls = [(await _ticket(admin_client, res.name)).json()["url"] for _ in range(5)]
+    assert len(set(urls)) == 5 and len(backup._dl_tickets) == 1
+    assert (await admin_client.get(urls[0])).status_code == 403
+    assert (await admin_client.get(urls[-1])).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "ticket",
+    ["x", "A" * 43, "A" * 44, "..%2F..%2Fbackups%2Fcobe-news-20261101-120000.tar.enc", "cobe-news-20261101-120000.tar.enc", "%2E%2E"],
+)
+async def test_a_made_up_ticket_downloads_nothing(admin_client, backups_here, ticket):
+    res = await backup.create(passphrase="eine lange Passphrase")
+    r = await admin_client.get(f"/api/admin/backup/download/{ticket}")
+    assert r.status_code in (403, 404), (ticket, r.status_code)
+    assert res.path.read_bytes() not in r.content and await _downloads_logged() == 0
+
+
+async def test_a_backup_removed_after_the_ticket_is_not_found(admin_client, backups_here):
+    res = await backup.create(passphrase="eine lange Passphrase")
+    url = (await _ticket(admin_client, res.name)).json()["url"]
+    res.path.unlink()
+    r = await admin_client.get(url)
+    assert r.status_code == 404 and backup._dl_running == {} and backup._dl_starts == {} and await _downloads_logged() == 0
+
+
+async def test_the_ticket_never_lands_in_a_log(admin_client, backups_here, caplog):
+    """The access log line and the audit entry's request show the route, not the ticket."""
+    import logging
+
+    from app.models import AuditEntry
+
+    res = await backup.create(passphrase="eine lange Passphrase")
+    url = (await _ticket(admin_client, res.name)).json()["url"]
+    ticket = url.rsplit("/", 1)[1]
+    with caplog.at_level(logging.INFO, logger="cobe_news.access"):
+        assert (await admin_client.get(url)).status_code == 200
+        assert (await admin_client.get(url)).status_code == 403
+    assert "/api/admin/backup/download/…" in caplog.text and ticket not in caplog.text
+    async with db.session() as s:
+        e = (await s.scalars(select(AuditEntry).where(AuditEntry.action == "backup.downloaded"))).one()
+    assert e.req_method == "GET" and e.req_path == "/api/admin/backup/download/…"
 
 
 async def test_a_plain_backup_stays_on_the_server(admin_client, backups_here):
@@ -899,9 +1112,14 @@ async def test_a_symlink_in_the_folder_is_never_followed(admin_client, backups_h
 async def test_the_download_needs_an_admin_a_fresh_proof_and_the_csrf_token(admin_client, reader_client, backups_here):
     res = await backup.create(passphrase="eine lange Passphrase")
     assert (await _download(reader_client, res.name)).status_code == 403
-    # a link on another site, an address typed in: no CSRF token
-    r = await admin_client.get(f"/api/admin/backup/files/{res.name}")
-    assert r.status_code == 403 and r.json()["detail"]["code"] == "csrf_failed"
+    # a form or a script on another site: no CSRF token, no ticket
+    for token in ("", "wrong"):
+        r = await admin_client.post(f"/api/admin/backup/files/{res.name}/ticket", json={}, headers={"X-CSRF-Token": token})
+        assert r.status_code == 403 and r.json()["detail"]["code"] == "csrf_failed"
+    assert backup._dl_tickets == {}
+    # the address of 0.1.51 (a GET with the CSRF header) is gone: a link to it downloads nothing either
+    r = await admin_client.get(f"/api/admin/backup/files/{res.name}", headers=await _csrf(admin_client))
+    assert r.status_code in (404, 405) and res.path.read_bytes() not in r.content
     async with db.session() as s:
         await s.execute(update(UserSession).values(reauth_at=datetime.now(UTC) - timedelta(hours=1)))
         await s.commit()
@@ -941,7 +1159,8 @@ async def test_a_big_backup_is_streamed_in_chunks(admin_client, backups_here, mo
 
     monkeypatch.setattr(backup, "DOWNLOAD_CHUNK", 1 << 20)
     monkeypatch.setattr(backup.os, "read", counting)
-    async with admin_client.stream("GET", f"/api/admin/backup/files/{big.name}", headers=await _csrf(admin_client)) as r:
+    url = (await _ticket(admin_client, big.name)).json()["url"]
+    async with admin_client.stream("GET", url) as r:
         assert r.status_code == 200
         got = b"".join([chunk async for chunk in r.aiter_bytes()])
     assert got == payload and r.headers["content-length"] == str(len(payload))

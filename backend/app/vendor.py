@@ -54,7 +54,7 @@ from app.models import NewsItem, NewsItemSource, NewsSource, VendorAdvisory, Ven
 from app.news import NewsError
 from app.vendor_match import ORDER, THIRD_PARTY, Verdict, evaluate, name_matches, name_words, with_third_party
 from app.vendor_match import _cna_names as cna_names
-from app.vendor_versions import VEEAM_BUILD_DEPTH, V, parse
+from app.vendor_versions import BUILD_DEPTH, VEEAM_BUILD_DEPTH, V, parse
 
 log = logging.getLogger("cobe_news.vendor")
 
@@ -454,7 +454,7 @@ def _change_plans(links: list[tuple[dict, set[str]]], prev: dict[str, tuple], li
             before = stored
         else:  # no state yet (stored before 0.1.32) or another extractor: the stored record, read as now
             before = changes_svc.facts_of(source, sev, cvss, cves, data)
-        silent = bool(stored and stored.get("p", 1) != changes_svc.PARSER_V.get(source, 1)) or bool((a.get("data") or {}).get("initial"))
+        silent = changes_svc.reparsed(source, stored, data, a.get("data")) or bool((a.get("data") or {}).get("initial"))
         merged = new if silent else changes_svc.merge(before, new)  # silent: as the source says now, nothing kept
         facts = _stamped(merged, source)
         plan = {"facts": facts, "revision": state[1] if state is not None else 1, "change": None, "write": stored != facts}
@@ -1718,7 +1718,8 @@ def _line_name(rels: list[dict], scheme: str, v: V) -> str:
     r = _line(rels, v) if rels else None
     if r is not None:
         return str(r["name"])
-    return ".".join(str(x) for x in v.key[: 3 if scheme == "windows" else 2])
+    # build scheme (ManageEngine): the builds are one sequence – 14.6 → 14.9 is an update, the major its line
+    return ".".join(str(x) for x in v.key[: 3 if scheme == "windows" else 1 if scheme == "build" else 2])
 
 
 def target_versions(product: dict, groups: list[dict], found: list[dict], versions: list[VendorVersion]) -> dict[str, dict]:
@@ -2831,7 +2832,7 @@ def short_version(product: dict, text: str) -> bool:
         return False
     v = stored_v(product, text)
     # without release data nothing says how long a complete version is (7-Zip 24.09, KeePass 2.59): never short
-    want = VEEAM_BUILD_DEPTH if scheme == "veeam" else catalog.want_depth(product)
+    want = VEEAM_BUILD_DEPTH if scheme == "veeam" else BUILD_DEPTH if scheme == "build" else catalog.want_depth(product)
     return v is not None and want is not None and v.depth < want
 
 

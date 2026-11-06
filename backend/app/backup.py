@@ -49,7 +49,7 @@ from pathlib import Path
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import __version__, crypto, db
+from app import __version__, audit_lock, crypto, db
 from app import settings as settings_store
 from app.config import get_config
 
@@ -361,7 +361,11 @@ async def create(*, reason: str = "", passphrase: str | None = None, actor=None)
                 rows = await table_counts(conn)
                 revision = await conn.scalar(text("SELECT version_num FROM alembic_version"))
                 server = await conn.scalar(text("SHOW server_version"))
-                await _run("pg_dump", "--format=custom", "--no-owner", "--no-privileges", f"--snapshot={snap}", f"--file={work / 'db.dump'}")
+                # without the audit log lock's own schema (its functions, what a restore set aside – audit_lock.py):
+                # the database image makes it, a backup never carries it
+                await _run(
+                    "pg_dump", "--format=custom", "--no-owner", "--no-privileges", f"--exclude-schema={audit_lock.ROLE}", f"--snapshot={snap}", f"--file={work / 'db.dump'}"
+                )
         files = {"db.dump": {"sha256": _sha256(work / "db.dump"), "size": (work / "db.dump").stat().st_size}}
         if phrase:
             key = crypto.master().decode()
@@ -536,16 +540,33 @@ async def status(s: AsyncSession) -> dict:
 # An unencrypted backup holds the whole database readable – it never leaves the server through the browser (docker cp,
 # docs/handbuch: Sicherung → Schritt für Schritt). An encrypted one is useless without the passphrase: an admin may
 # download it after a fresh proof of identity, logged (backup.downloaded), a few per hour, one at a time.
+# 0.1.52: in two steps, so that the browser saves it itself (straight to disk, its own progress – never whole in the
+# page's memory): the page asks for a ticket (issue_ticket – a write with the CSRF token, after the fresh proof), then
+# lets the browser fetch GET /api/admin/backup/download/<ticket> (redeem_ticket). In memory like the slots: one app
+# process (uvicorn --workers 1); a restart only drops tickets of the last minute.
 DOWNLOADS_PER_HOUR = 6
 DOWNLOAD_CHUNK = 1 << 20  # bytes read per step (in a thread – the event loop never waits on the disk)
 DOWNLOAD_SLOT_MAX = 6 * 3600.0  # s: a slot older than this belongs to a download that never finished – freed
 _dl_starts: dict[str, list[float]] = {}  # admin id → monotonic start times of the last hour
 _dl_running: dict[str, tuple[str, float]] = {}  # admin id → (the download's token, when it was claimed)
+TICKET_TTL = 60.0  # s: a ticket is used at once (the page starts the download right after it got it)
+TICKET_RX = re.compile(r"^[A-Za-z0-9_-]{43}$")  # secrets.token_urlsafe(32): 256 bits
+
+
+@dataclass(frozen=True)
+class _Ticket:
+    user_id: str
+    session_id: str
+    name: str
+    expires: float  # monotonic
+
+
+_dl_tickets: dict[str, _Ticket] = {}  # SHA-256 of the ticket → what it allows; at most one per admin
 
 
 class DownloadRefused(Exception):
     """Not offered: `status`/`code` for the API (404 not_found, 403 backup_not_encrypted, 409 backup_download_busy,
-    429 backup_download_rate_limited with `retry` seconds)."""
+    429 backup_download_rate_limited with `retry` seconds, 403 backup_ticket_invalid)."""
 
     def __init__(self, status: int, code: str, retry: int | None = None) -> None:
         super().__init__(code)
@@ -579,21 +600,31 @@ def _open_backup(name: str) -> tuple[int, os.stat_result]:
     return fd, st
 
 
-def prepare_download(name: str, user_id: str) -> Download:
+def _check_download(name: str, user_id: str, now: float) -> tuple[list[float], os.stat_result]:
     """An encrypted backup of the list, checked for a download by this admin – names only from BACKUP_DIR's listing and
-    its pattern (no path, no hidden or half-written file, nothing outside the folder), a few per hour, one at a time."""
+    its pattern (no path, no hidden or half-written file, nothing outside the folder), a few per hour, one at a time.
+    Claims nothing: (the admin's starts of the last hour, the file's stat)."""
     m = NAME_RX.match(name)
     if not m or name not in {x["name"] for x in listing()}:
         raise DownloadRefused(404, "not_found")
     if not m.group(2):
         raise DownloadRefused(403, "backup_not_encrypted")
-    now = time.monotonic()
     held = _dl_running.get(user_id)
     if held is not None and now - held[1] < DOWNLOAD_SLOT_MAX:
         raise DownloadRefused(409, "backup_download_busy")
     starts = [t for t in _dl_starts.get(user_id, []) if now - t < 3600]
     if len(starts) >= DOWNLOADS_PER_HOUR:
         raise DownloadRefused(429, "backup_download_rate_limited", retry=int(3600 - (now - starts[0])) + 1)
+    fd, st = _open_backup(name)
+    os.close(fd)  # the ticket's check keeps nothing open; prepare_download opens the file itself and holds it
+    return starts, st
+
+
+def prepare_download(name: str, user_id: str) -> Download:
+    """The checks of _check_download, then the download counted and the admin's slot claimed. The file is opened again
+    and held open until the stream (or release_download) – what is checked here is what is sent."""
+    now = time.monotonic()
+    starts, _ = _check_download(name, user_id, now)
     fd, st = _open_backup(name)  # kept open: release_download (or the stream's end) closes it
     starts.append(now)
     _dl_starts[user_id] = starts
@@ -602,6 +633,34 @@ def prepare_download(name: str, user_id: str) -> Download:
     token = secrets.token_hex(8)
     _dl_running[user_id] = (token, now)
     return Download(name=name, size=st.st_size, dev=st.st_dev, ino=st.st_ino, token=token, fd=fd)
+
+
+def _ticket_key(ticket: str) -> str:
+    return hashlib.sha256(ticket.encode()).hexdigest()
+
+
+def issue_ticket(name: str, user_id: str, session_id: str) -> str:
+    """A ticket for one download of `name` by this admin in this session: the checks of the download itself (refused
+    the same way – the page shows why), nothing claimed or counted yet (that happens when the download starts). Random
+    (256 bits), kept only as its hash, valid TICKET_TTL seconds, used once. A new one replaces the admin's older one."""
+    now = time.monotonic()
+    _check_download(name, user_id, now)
+    for key, t in list(_dl_tickets.items()):
+        if t.expires <= now or t.user_id == user_id:
+            del _dl_tickets[key]
+    ticket = secrets.token_urlsafe(32)
+    _dl_tickets[_ticket_key(ticket)] = _Ticket(user_id=user_id, session_id=session_id, name=name, expires=now + TICKET_TTL)
+    return ticket
+
+
+def redeem_ticket(ticket: str, user_id: str, session_id: str) -> str:
+    """The backup's name a ticket was issued for – used up by this very call, whatever follows: once shown (in a log, a
+    download list) it is worth nothing. Refused (403 backup_ticket_invalid, one answer for every reason): unknown, used,
+    expired, another admin's or another session's (then it is gone for its owner too)."""
+    t = _dl_tickets.pop(_ticket_key(ticket), None) if TICKET_RX.match(ticket) else None
+    if t is None or t.expires <= time.monotonic() or t.user_id != user_id or not hmac.compare_digest(t.session_id, session_id):
+        raise DownloadRefused(403, "backup_ticket_invalid")
+    return t.name
 
 
 def release_download(dl: Download, user_id: str) -> None:
@@ -754,11 +813,61 @@ _TOC_OK = (
 )
 _TOC_LINE = re.compile(r"^\d+; \d+ \d+ (.*)$")
 # a dump made after a restore of up to 0.1.21 also names the schema public itself (re-created then, not in its
-# default state): left out – the restore makes it anew, in its default state (RESET)
-_TOC_SKIP = ("SCHEMA - public ", "COMMENT - SCHEMA public ")
+# default state): left out – the restore makes it anew, in its default state (RESET). A dump of a database with the
+# audit log's lock (0.1.52) names the schema too (its owner is the lock's role) and the lock's two triggers on audit_log:
+# left out as well – the database image makes them, never a backup (audit_lock.py)
+_TOC_SKIP = (
+    "SCHEMA - public ",
+    "COMMENT - SCHEMA public ",
+    *(f"TRIGGER public audit_log {t} " for t in audit_lock.TRIGGERS),
+)
 RESET = (
     "DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION pg_database_owner; GRANT USAGE ON SCHEMA public TO PUBLIC; "
     "COMMENT ON SCHEMA public IS 'standard public schema';"
+)
+# The same with the audit log's lock (audit_lock.py): the schema public and audit_log belong to the lock's role – the
+# app may drop neither. Everything else in public goes (each relation, routine and type, with CASCADE – as DROP SCHEMA
+# would; the extension pg_trgm stays, the locked table's search index needs it, and the dump's CREATE EXTENSION IF
+# NOT EXISTS keeps it). The entries of audit_log are set aside by the lock's function (moved, not deleted – in this
+# same transaction) and the backup's come in through COPY (INSERT is the app's right); the table itself, its indexes,
+# constraints and sequence are not restored (_locked_list) – they stay the locked ones.
+RESET_LOCKED = f"""DO $reset$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT format('DROP %s IF EXISTS public.%I CASCADE', CASE c.relkind WHEN 'v' THEN 'VIEW' WHEN 'm' THEN 'MATERIALIZED VIEW' WHEN 'S' THEN 'SEQUENCE'
+                  WHEN 'f' THEN 'FOREIGN TABLE' ELSE 'TABLE' END, c.relname) AS stmt
+      FROM pg_class c
+     WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f') AND pg_get_userbyid(c.relowner) <> '{audit_lock.ROLE}'
+       AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype IN ('e', 'i', 'a'))
+     ORDER BY c.relkind = 'S', c.relname
+  LOOP
+    EXECUTE r.stmt;
+  END LOOP;
+  FOR r IN
+    SELECT format('DROP ROUTINE IF EXISTS %s CASCADE', p.oid::regprocedure) AS stmt FROM pg_proc p
+     WHERE p.pronamespace = 'public'::regnamespace AND pg_get_userbyid(p.proowner) <> '{audit_lock.ROLE}'
+       AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
+  LOOP
+    EXECUTE r.stmt;
+  END LOOP;
+  FOR r IN
+    SELECT format('DROP TYPE IF EXISTS %s CASCADE', t.oid::regtype) AS stmt FROM pg_type t
+     WHERE t.typnamespace = 'public'::regnamespace AND t.typrelid = 0 AND t.typcategory <> 'A' AND pg_get_userbyid(t.typowner) <> '{audit_lock.ROLE}'
+       AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid AND d.deptype = 'e')
+  LOOP
+    EXECUTE r.stmt;
+  END LOOP;
+END
+$reset$"""
+SET_ASIDE = f"SELECT {audit_lock.ROLE}.set_aside()"
+# the locked table's own objects: never restored over it (they stay), only its rows (TABLE DATA)
+_LOCKED_OBJECTS = text(
+    """SELECT 'TABLE public audit_log ' UNION ALL SELECT 'CONSTRAINT public audit_log ' UNION ALL SELECT 'DEFAULT public audit_log '
+UNION ALL SELECT format('%s public %s ', k, c.relname) FROM pg_class c, unnest(ARRAY['SEQUENCE', 'SEQUENCE SET', 'SEQUENCE OWNED BY']) k
+ WHERE c.oid = pg_get_serial_sequence('public.audit_log', 'id')::regclass
+UNION ALL SELECT format('INDEX public %s ', c.relname) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE i.indrelid = 'public.audit_log'::regclass
+UNION ALL SELECT 'COMMENT - EXTENSION pg_trgm '"""
 )
 
 
@@ -785,6 +894,24 @@ def _toc_check(dump: Path) -> Path:
     listed = dump.with_name("toc.list")
     listed.write_text("\n".join(keep) + "\n")
     return listed
+
+
+def _locked_list(dump: Path, objects: list[str]) -> Path:
+    """toc.list without the locked audit log's own objects (`objects`: the starts of their entries, _LOCKED_OBJECTS) –
+    the table, its constraints, indexes and sequence stay as the lock made them; its rows are restored. The comment on
+    pg_trgm too: the extension stays (RESET_LOCKED), and one made before 0.1.22 belongs to the superuser."""
+    listed = dump.with_name("toc.list")
+    if not listed.is_file():
+        listed = _toc_check(dump)
+    keep = []
+    for line in listed.read_text().splitlines():
+        m = _TOC_LINE.match(line)
+        if m is not None and (m.group(1) + " ").startswith(tuple(objects)):
+            continue
+        keep.append(line)
+    out = dump.with_name("toc-locked.list")
+    out.write_text("\n".join(keep) + "\n")
+    return out
 
 
 @dataclass
@@ -916,16 +1043,18 @@ _SCHEMA = f"""SELECT coalesce(jsonb_agg(x ORDER BY x), '[]'::jsonb) FROM (
 ) s"""
 
 
-async def reference_schema(revision: str) -> list[str]:
+async def reference_schema(revision: str, *, locked: bool = False) -> list[str]:
     """_SCHEMA of a freshly migrated database at `revision` – made in a transaction on this database that is rolled
-    back (the app is stopped; nothing changes)."""
+    back (the app is stopped; nothing changes). `locked`: the audit log's lock is there – RESET_LOCKED instead of
+    RESET, and the migrations leave the locked table as it is (audit_lock.ddl_skipped): the reference then holds it as
+    the restored database will."""
     from alembic import command
 
     async with db.engine().connect() as conn:
         trans = await conn.begin()
         try:
             await conn.execute(text("SET LOCAL statement_timeout = 0"))
-            for stmt in RESET.split("; "):
+            for stmt in [RESET_LOCKED] if locked else RESET.split("; "):
                 await conn.execute(text(stmt.rstrip(";")))
             await conn.run_sync(lambda c: command.upgrade(db.alembic_config(c), revision))
             await conn.execute(text("SET LOCAL search_path TO public"))  # names print the same way as in the restore's check
@@ -977,15 +1106,28 @@ def _lower_priority(*procs) -> None:  # noqa: ANN002
 
 
 async def _pipe_restore(
-    dump: Path, rows: dict[str, int], schema: list[str] | None = None, timeout: float = DUMP_TIMEOUT_S, *, env: dict[str, str] | None = None, low_priority: bool = False
+    dump: Path,
+    rows: dict[str, int],
+    schema: list[str] | None = None,
+    timeout: float = DUMP_TIMEOUT_S,
+    *,
+    env: dict[str, str] | None = None,
+    low_priority: bool = False,
+    locked: list[str] | None = None,
 ) -> None:
     """pg_restore's SQL streamed into psql – never the whole script in memory (a big database in a 512m container).
     psql runs the reset, the dump and the checks as one transaction; only when pg_restore ended well does psql see the
     end of its input – otherwise psql is killed mid-transaction and PostgreSQL rolls everything back.
-    `env`: libpq's environment of another database (the restore test's – _pg_env(url)); the app's own by default."""
+    `env`: libpq's environment of another database (the restore test's – _pg_env(url)); the app's own by default.
+    `locked`: the audit log's lock is there (its objects, _LOCKED_OBJECTS) – its entries set aside, RESET_LOCKED, the
+    dump without the table's own objects, and the table's sequence put behind the restored ids, all in the same
+    transaction."""
     env = env if env is not None else _pg_env()
-    listed = dump.with_name("toc.list")
+    listed = _locked_list(dump, locked) if locked is not None else dump.with_name("toc.list")
+    reset = [f"--command={SET_ASIDE}", f"--command={RESET_LOCKED}"] if locked is not None else [f"--command={RESET}"]
     with tempfile.NamedTemporaryFile("w", suffix=".sql", dir=dump.parent, delete=False) as f:
+        if locked is not None:
+            f.write(f"SELECT {audit_lock.ROLE}.restored();\n")
         f.write(_CHECK_ROWS)
         if schema is not None:
             f.write(_CHECK_SCHEMA.format(lit=_dollar(json.dumps(schema)), schema=_SCHEMA))
@@ -995,7 +1137,7 @@ async def _pipe_restore(
     )
     dst = await asyncio.create_subprocess_exec(
         "psql", "--no-psqlrc", "--quiet", "--single-transaction", "--set=ON_ERROR_STOP=1", f"--set=rows={json.dumps(rows)}",
-        f"--command={RESET}", "--file=-", f"--file={check}",
+        *reset, "--file=-", f"--file={check}",
         stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env,
     )  # fmt: skip
     if low_priority:
@@ -1041,8 +1183,10 @@ async def restore(plan: Plan) -> dict[str, int]:
     """The dump of `plan` replaces the database, in one transaction that also checks the counts and the schema; then
     the schema migrated to this version."""
     want = {str(k): int(v) for k, v in (plan.manifest.get("rows") or {}).items()}
-    reference = await reference_schema(str(plan.manifest.get("revision")))
-    await _pipe_restore(plan.work / "db.dump", want, reference)
+    async with db.engine().connect() as conn:
+        locked = [str(x) for x in await conn.scalars(_LOCKED_OBJECTS)] if await audit_lock.installed(conn) else None
+    reference = await reference_schema(str(plan.manifest.get("revision")), locked=locked is not None)
+    await _pipe_restore(plan.work / "db.dump", want, reference, locked=locked)
     await db.dispose()  # pooled connections knew the old tables
     db.init(get_config().database_url)
     async with db.engine().connect() as conn:

@@ -131,6 +131,7 @@ const vendorDe: Record<string, string> = {
   "vendor.reason.line_all": "alle Versionen dieser Linie betroffen – kein Fix in der Linie, auf eine neuere Linie wechseln",
   "vendor.reason.fixed": "Version enthält den Fix",
   "vendor.reason.line_none": "Linie laut Hersteller nicht betroffen",
+  "vendor.reason.other_scale": "Version nicht vergleichbar – der Hinweis nennt ein Datum oder einen Build statt einer Version",
   "vendor.reason.newer_line": "Linie neuer als alle im Hinweis genannten",
   "vendor.reason.line_not_listed": "Version nicht eindeutig – die Linie nennt der Hinweis nicht",
   "vendor.reason.panorama_derived": "Version nicht eindeutig – PAN-OS-Hinweis ohne Angabe zu Panorama",
@@ -151,11 +152,12 @@ const vendorDe: Record<string, string> = {
   "vendor.reason.platform": "nur auf: {{value}}",
   "vendor.reason.after": "betroffen bis einschließlich {{value}}",
   "vendor.reason.build_needed": "Version nicht eindeutig – ohne Build-Nummer (z. B. 12.3.2.4934) nicht entscheidbar",
+  "vendor.reason.build_number_needed": "Version nicht eindeutig – ohne Build-Nummer nicht entscheidbar; Version mit Build eintragen (z. B. 14.6 Build 14600)",
   "vendor.reason.older_untested": "älter als die geprüften Versionen – laut Hersteller nicht getestet, als betroffen zu betrachten",
   "vendor.reason.edition_not_named": "Edition im Hinweis nicht genannt – nur andere Editionen betroffen",
   "vendor.reason.ios_train": "Version nicht eindeutig – klassisches IOS: nur innerhalb des Zugs vergleichbar, eure Version ist nicht gelistet",
   "vendor.reason.fix_only": "Daten nicht eindeutig – der Hinweis nennt nur den Fix, keine betroffenen Versionen",
-  // the same reasons when the verdict is not the vendor's own word (Verdict.detail.by: NVD, CISA, BSI, OSV …)
+  // the same reasons when the verdict is not the vendor's own word (Verdict.detail.by: NVD, CISA, BSI, OSV, a CNA that is not the vendor …)
   "vendor.reason.in_list_by": "Version laut {{src}} als betroffen gelistet",
   "vendor.reason.line_none_by": "Linie laut {{src}} nicht betroffen",
   "vendor.reason.default_affected_by": "laut {{src}} alle anderen Versionen betroffen",
@@ -164,6 +166,9 @@ const vendorDe: Record<string, string> = {
   "vendor.reason.vendor_unaffected": "Version nicht eindeutig – laut Hersteller nicht betroffen, laut NVD im betroffenen Bereich",
   "vendor.reason.source": "Quelle: {{src}}",
   "vendor.by.vendor": "Hersteller",
+  // the CNA of a CVE record that is not the product's vendor (GitHub's advisory database, VulDB, MITRE …)
+  "vendor.by.cna": "{{name}} (nicht der Hersteller)",
+  "vendor.by.cna_unnamed": "CNA",
   "vendor.by.nvd": "NVD",
   "vendor.by.adp": "CISA (ADP)",
   "vendor.by.bsi": "BSI",

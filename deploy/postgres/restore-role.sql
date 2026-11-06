@@ -3,6 +3,7 @@
 -- The role cobe_news_restore owns the database cobe_news_restore_test and nothing else: no superuser, no new roles or
 -- databases, no member of cobe_news_app, and no connection to the app's database (REVOKE … FROM PUBLIC in app-role.sql;
 -- checked below). The app's own role gets no right here: a restore test can never touch the real data.
+SET search_path = pg_catalog, pg_temp;  -- as app-role.sql
 \getenv restore_password POSTGRES_RESTORE_PASSWORD
 SELECT NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cobe_news_restore') AS missing \gset
 \if :missing

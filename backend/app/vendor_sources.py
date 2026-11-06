@@ -594,7 +594,8 @@ def _nvd_one(item, rejected: list[str] | None) -> dict | None:
     score, given = _nvd_metrics(_d(c.get("metrics")))
     kev = _s(c.get("cisaExploitAdd"), 10)
     short = re.sub(r"\s+", " ", desc)
-    cna, adp = _split_affected(c.get("affected"), _s(c.get("sourceIdentifier"), 200))
+    source_id = _s(c.get("sourceIdentifier"), 200)
+    cna, adp = _split_affected(c.get("affected"), source_id)
     data = {
         "configs": _trim_configs(c.get("configurations")),
         "cna": _trim_cna(cna),
@@ -605,6 +606,8 @@ def _nvd_one(item, rejected: list[str] | None) -> dict | None:
     }
     if adp_rows := _trim_cna(adp, cpes=True):
         data["adp"] = adp_rows  # only where there is one: a record without stays as it was stored
+    if source_id:
+        data["assigner"] = source_id  # the CNA (an address or its UUID): is its affected data the vendor's? (vendor_match.cna_by)
     return {
         "id": f"nvd:{cid}",
         "source": "nvd",

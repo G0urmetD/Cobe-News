@@ -128,6 +128,8 @@ Das Format wird je Hersteller geprüft, damit Versionen richtig verglichen werde
 | VMware ESXi, vCenter | Version mit Update, auch Version aus der VAMI und Build ([mehr](#vmware-vsphere)) | `8.0 U3c`, `8.0 Update 3c`, `8.0c`, `8.0.3.00400`, `24322831` |
 | Ivanti | R-Releases | `22.7R2.3` |
 | Veeam | ganzer Build | `12.3.2.4934`, `13.1.2 (build 13.1.2.57)` |
+| WAGO PFC100/PFC200 | Firmware mit Index in Klammern – der Index zählt | `04.06.03(28)`, `FW28` |
+| Zoho ManageEngine (ServiceDesk Plus, ADSelfService Plus, Password Manager Pro, PAM360, OpManager) | Version mit Build-Nummer – die Build-Nummer zählt | `14.6 Build 14600`, `14600`, `12.8.329` (OpManager) |
 | Linux-Distributionen | Release | `12`, `9.4`, `24.04` |
 | alles andere | Zahlen und Buchstaben | `8.3.14`, `1.0.2u`, `9.8p1` |
 
@@ -139,6 +141,10 @@ Besonderheiten:
   entschieden wird nur, was für alle gilt, sonst steht „möglicherweise betroffen“. `12.3.2 P4` lässt sich nicht
   vergleichen; welcher Build zu einem Patch gehört, steht im KB-Artikel. Der Veeam Agent hat je Betriebssystem einen
   eigenen Katalog-Eintrag.
+- **Zoho ManageEngine:** Die Produkte zählen nach Build-Nummer (Hilfe → Info: „14.6 Build 14600“). Verglichen wird der
+  Build – mit den Build-Grenzen der Hinweise („vor 10509“) und mit NVD-Grenzen als Versionslinie („< 14.9“ = vor jedem
+  Build von 14.9). Eine Angabe ohne Build (`14.6`) gilt für jeden Build von 14.6; entschieden wird nur, was für alle
+  gilt. Fix und Zielversion stehen als Build da („14.9 Build 14920“).
 - **Linux-Distributionen:** Vendor News zeigt Release-Linie und Support-Ende. Ob eine Lücke geschlossen ist, hängt am
   Paketstand – das sagt nur das Advisory der Distribution.
 - **Cloud-Dienste** haben keine Version auf eurer Seite; Hinweise erscheinen als „Cloud-Dienst betroffen“.
@@ -402,6 +408,11 @@ Typische Gründe für **„möglicherweise“**:
 
 Jeder Grund nennt seine Quelle: „laut Hersteller“ steht nur, wo das Urteil vom Hersteller selbst kommt (sein Hinweis
 oder seine Angaben im CVE-Eintrag); sonst „laut NVD“, „laut CISA (ADP)“, „laut BSI“, „laut OSV“ oder „Quelle: …“.
+Ein CVE-Eintrag zählt nur als Wort des Herstellers, wenn der Hersteller ihn selbst geschrieben hat (er ist die CNA des
+Eintrags). Schreibt ihn jemand anderes – etwa GitHubs Advisory-Datenbank für ein Open-Source-Projekt, VulDB, MITRE oder
+HackerOne –, steht „laut GitHub (nicht der Hersteller)“, „laut VulDB (nicht der Hersteller)“ …; eine CNA, die die NVD
+nur mit einer Kennung nennt, erscheint als „CNA (nicht der Hersteller)“. Solche Angaben wiegen nie schwerer als die
+Analyse der NVD: sagt die NVD „betroffen“, bleibt es dabei.
 
 Nennen mehrere Quellen dieselbe Schwachstelle, entscheidet der Hinweis des Herstellers vor der [NVD](term:nvd), die
 NVD vor der CVE-Liste ([cvelistV5](term:cvelist)) und OSV zuletzt – Einzelheiten:

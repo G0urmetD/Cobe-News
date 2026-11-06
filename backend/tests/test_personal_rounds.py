@@ -115,10 +115,12 @@ async def test_desktop_with_every_browser_pausing_waits_without_taking_a_place(m
 
 
 async def test_the_time_budget_ends_the_round_messages_not_started_go_back_without_a_try(mails, monkeypatch):
-    monkeypatch.setattr(personal, "ROUND_S", 0.3)
+    # a budget of a second, sends of half a second: room for a loaded machine to start the first messages in time (at
+    # 0.3 s a busy CI box sometimes ended the round before any send began – "sent" missing)
+    monkeypatch.setattr(personal, "ROUND_S", 1.0)
     monkeypatch.setattr(personal, "CONCURRENCY", 2)
     monkeypatch.setattr(personal, "BATCH", 10)
-    slow = 0.2
+    slow = 0.5
 
     async def send_mail(cfg, to, subject, text, body):  # noqa: ANN001, ANN202
         await asyncio.sleep(slow)
@@ -133,7 +135,7 @@ async def test_the_time_budget_ends_the_round_messages_not_started_go_back_witho
     # bounded: the deadline plus the messages already started – with room for a slow machine (CI); that the budget ended
     # the round is shown by the messages left pending below, not by the wall clock
     assert wall < personal.ROUND_S + slow + 1.5
-    assert 0 < first["sent"] < 10 and personal.backlog()
+    assert 0 < first.get("sent", 0) < 10 and personal.backlog()
     rows = await _rows()
     assert {r.status for r in rows} == {"sent", "pending"}
     # never started: back in line, no try counted, no claim left behind

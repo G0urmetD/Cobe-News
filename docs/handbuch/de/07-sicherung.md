@@ -83,7 +83,8 @@ In *Einstellungen → Sicherung & Export* steht bei jeder verschlüsselten Siche
    Einspielen braucht es genau diese Passphrase – ohne sie ist die Datei nutzlos, mit ihr kann jeder sie lesen.
 2. Mit **„Herunterladen“** bestätigen, dann die [erneute Bestätigung](/docs/anmeldung#erneut-bestaetigen) eurer
    Identität (Passwort und Code bzw. Entra).
-3. Der Browser speichert die Datei. Sie sicher aufbewahren – nicht im Download-Ordner liegen lassen, nicht weitergeben.
+3. Der Browser lädt die Datei selbst herunter – mit seiner eigenen Fortschrittsanzeige, direkt auf die Festplatte. Sie
+   sicher aufbewahren – nicht im Download-Ordner liegen lassen, nicht weitergeben.
 
 Regeln:
 
@@ -92,10 +93,14 @@ Regeln:
 - Jeder Download steht im [Protokoll](/docs/betrieb#protokoll) („Verschlüsselte Sicherung heruntergeladen“, mit Datei und Größe)
   und zählt zu „Nur Auffälliges“.
 - Höchstens 6 Downloads je Stunde und Admin, und immer nur einer zur Zeit.
-- Der Browser hält die Datei bis zum Speichern ganz im Arbeitsspeicher – sehr große Sicherungen (ab etwa 1 GB) besser
-  per Befehl auf dem Server kopieren (`docker cp`, unten).
+- Die Datei liegt nie ganz im Arbeitsspeicher, weder im Browser noch auf dem Server – auch Sicherungen von mehreren GB
+  lassen sich so herunterladen. Per Befehl auf dem Server kopieren (`docker cp`, unten) geht weiterhin, z. B. für ein
+  Skript.
+- Die Seite holt sich nach der Bestätigung einen Download-Link und startet den Download sofort. Der Link gilt nur
+  einmal, nur eine Minute und nur in eurer Sitzung – weitergeben oder später öffnen geht nicht.
 - Die Datei wird vom Server gestreamt; mit dem mitgelieferten nginx auch große Dateien ohne Zwischenspeicher im Proxy.
-  Ein eigener Reverse Proxy sollte für `/api/admin/backup/files/` ebenso nicht puffern (nginx: `proxy_buffering off`).
+  Ein eigener Reverse Proxy sollte für `/api/admin/backup/download/` ebenso nicht puffern und die Adresse nicht
+  protokollieren (nginx: `proxy_buffering off`, `access_log off`). Bis 0.1.51 war es `/api/admin/backup/files/`.
 
 ### Lokale Installation (docker compose) {#schritte-lokal}
 

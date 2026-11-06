@@ -7,7 +7,8 @@ import type { NewsSeverity } from "@/lib/news-api"
 /** A category key of the catalogue data (backend/app/catalog/categories.yaml) – labels and order: useCatalogTexts */
 export type VendorCategory = string
 
-export type VersionScheme = "panos" | "fortios" | "cisco" | "windows" | "vmware" | "ivanti" | "veeam" | "sfos" | "java" | "sap" | "distro" | "cloud" | "generic"
+export type VersionScheme =
+  "panos" | "fortios" | "cisco" | "windows" | "vmware" | "ivanti" | "veeam" | "sfos" | "java" | "sap" | "build" | "fw_index" | "distro" | "cloud" | "generic"
 
 export interface VendorProduct {
   key: string
@@ -84,8 +85,9 @@ export interface VersionVerdict {
   /** why (vendor.reason.<key>) */
   reason: string
   fixed: string | null
-  /** by: where the verdict comes from (vendor, nvd, adp, bsi, csaf, osv – backend vendor_match.BY_VENDOR …) */
-  detail: { platform?: string; after?: string; lines?: { line: string; affected: string; fixed: string }[]; line?: string; released?: string; by?: string }
+  /** by: where the verdict comes from (vendor, cna, nvd, adp, bsi, csaf, osv – backend vendor_match.BY_VENDOR …);
+   *  cna: the name of the CVE record's CNA when it is not the vendor (by "cna": GitHub, VulDB …) */
+  detail: { platform?: string; after?: string; lines?: { line: string; affected: string; fixed: string }[]; line?: string; released?: string; by?: string; cna?: string }
   /** Dringlichkeit of this version (the value alone) */
   score?: number
 }

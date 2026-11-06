@@ -197,7 +197,8 @@ def parse_record(doc) -> dict | str | None:  # noqa: ANN001
             "adp": _rows([a for c in adp for a in src._l(c.get("affected"))], cpes=True),
             "desc": desc[:1500],
             "cwe": cwe[:5],
-            "assigner": src._s(meta.get("assignerShortName"), 60),
+            # the CNA: is its affected data the vendor's own word? (vendor_match.cna_by)
+            "assigner": src._s(meta.get("assignerShortName"), 60) or src._s(src._d(cna.get("providerMetadata")).get("shortName"), 60),
             "cvss_vector": vector,
             "cvss_from_adp": from_adp,
             "ssvc": ssvc,

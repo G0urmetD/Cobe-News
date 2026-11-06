@@ -1,4 +1,5 @@
 import aboutEn from "./about.en"
+import activityEn from "./activity.en"
 import auditEn from "./audit.en"
 import careEn from "./care.en"
 import deliveryEn from "./delivery.en"
@@ -921,6 +922,67 @@ const en: Record<string, string> = {
     "The account is disabled in AD or Entra ID – so switched off automatically. Enabled there again, the sync switches it on again. To lock it out for good: “More actions → Block permanently”.",
   "users.offGone": "No longer in the directory",
   "users.offGoneHint": "The account no longer exists in AD or Entra ID – so switched off automatically.",
+  // ---- approval of directory accounts (0.1.52)
+  "settings.approval.title": "Automatic sign-in",
+  "settings.approval.desc": "Whether members of the mapped AD and Entra ID groups get in at once – or only after an admin approved them.",
+  "signin.approval.auto": "Allow automatic sign-in via AD/Entra ID",
+  "signin.approval.autoHint": "On: whoever is in a mapped group (or a team group) signs in at once. Off: new accounts and raises to admin wait for approval under Users.",
+  "signin.approval.tip":
+    "Either way, the members of the mapped groups are listed under Users before their first sign-in (“never signed in”). Lowering a role and switching off (deleted, disabled, no group any more) always happen at once.",
+  "signin.approval.offAbout":
+    "Approval required: new accounts are listed under Users as “Waiting for approval”, a raise to admin as “Raise to admin waits for approval”. Approval belongs to the account's directory id, not its name – an account re-created with the same name waits again.",
+  "signin.approval.offTitle": "Require an admin's approval?",
+  "signin.approval.offText_zero": "From now on new accounts from AD/Entra ID and raises to admin wait for approval. No directory account is active right now.",
+  "signin.approval.offText_one":
+    "From now on new accounts from AD/Entra ID and raises to admin wait for approval. The {{count}} directory account that is active already stays active.",
+  "signin.approval.offText_other":
+    "From now on new accounts from AD/Entra ID and raises to admin wait for approval. The {{count}} directory accounts that are active already stay active.",
+  "signin.approval.onTitle": "Allow automatic sign-in again?",
+  "signin.approval.onNone": "Members of the mapped groups sign in at once again. Nothing is waiting for approval right now.",
+  "signin.approval.onWaiting_one":
+    "Members of the mapped groups sign in at once again. What waits already ({{count}} account, {{raises}} raises to admin) keeps waiting – unless you approve it here explicitly.",
+  "signin.approval.onWaiting_other":
+    "Members of the mapped groups sign in at once again. What waits already ({{count}} accounts, {{raises}} raises to admin) keeps waiting – unless you approve it here explicitly.",
+  "signin.approval.approveAll": "Also approve all waiting ones",
+  "signin.approval.approveAllHint": "Each account with the role its groups give now – every approval logged on its own.",
+  "signin.approval.approveAllAdmins_one": "{{count}} account becomes admin.",
+  "signin.approval.approveAllAdmins_other": "{{count}} accounts become admin.",
+  "signin.approval.approvedAll_one": "Saved – {{count}} approval given.",
+  "signin.approval.approvedAll_other": "Saved – {{count}} approvals given.",
+  "signin.approval.staleCounts": "Something else is waiting for approval by now – nothing saved, nothing approved. Please check the new numbers and confirm again.",
+  "users.offPending": "Waiting for approval",
+  "users.offPendingHint":
+    "Member of a mapped group (or a team), but automatic sign-in is off: only an admin switches the account on (“Approve”). Neither the sync nor a sign-in does. Signing in before, the person learns – after the right password – that the account waits.",
+  "users.pendingBadge_one": "{{count}} waits for approval",
+  "users.pendingBadge_other": "{{count}} wait for approval",
+  "users.filter": "Filter",
+  "users.filterAll": "All",
+  "users.filterWaiting": "Waiting for approval",
+  "users.approve": "Approve",
+  "users.approveAsAdmin": "Approve as admin",
+  "users.approveAdminTitle": "Approve as admin?",
+  "users.approveAdminText": "{{name}} is in a group that gives admin and gets all rights with the approval. At the first sign-in the account sets up its second factor.",
+  "users.approveDone": "{{name}} is approved.",
+  "users.decline": "Decline",
+  "users.declineTitle": "Decline the approval?",
+  "users.declineText":
+    "{{name}} stays off – as if blocked: neither the sync nor a sign-in switch the account on. It can be lifted later under “More actions → Lift permanent block”.",
+  "users.raisePending": "Raise to admin waits for approval",
+  "users.raisePendingHint": "The account is new in a group that gives admin. It stays reader until an admin approves the raise.",
+  "users.raiseDeclined": "Raise declined",
+  "users.raiseDeclinedHint": "An admin declined the raise to admin – the account stays reader while it is in the admin group. Leaving the group and coming back asks again.",
+  "users.raiseApprove": "Approve raise",
+  "users.raiseTitle": "Approve the raise to admin?",
+  "users.raiseText": "{{name}} becomes admin. Running sessions end – at the next sign-in Cobe News asks for the second factor.",
+  "users.keepReader": "Stays reader",
+  "users.keepReaderTitle": "Decline the raise?",
+  "users.keepReaderText": "{{name}} stays reader. While the account is in the admin group, it is not asked again.",
+  "errors.approval_pending": "Account is waiting for approval by an admin.",
+  "errors.directory_pending": "Account is waiting for approval by an admin.",
+  "errors.not_pending": "Nothing (left) waits for approval here – please reload.",
+  "errors.no_role": "The account is in no mapped group any more – there is nothing to approve.",
+  "errors.approve_needs_counts": "“Approve all waiting ones” needs the numbers the dialog showed – please reload the page.",
+  "errors.approve_needs_auto": "“Approve all waiting ones” only goes together with switching automatic sign-in on.",
   "users.offUnblocked": "Waiting for the sync",
   "users.offUnblockedHint": "The permanent block is lifted. The account becomes active again as soon as a sign-in or the next sync finds a mapped group or a team.",
   "users.block": "Block permanently",
@@ -1048,13 +1110,13 @@ const en: Record<string, string> = {
   "backup.restoreTestOff": "Not set up yet – it needs POSTGRES_RESTORE_PASSWORD.",
   "backup.restoreTestLink": "Open the restore test",
   "backup.dl.button": "Download",
-  "backup.dl.running": "Downloading …",
+  "backup.dl.running": "Starting …",
   "backup.dl.label": "Download {{name}}",
   "backup.dl.title": "Download the encrypted backup?",
   "backup.dl.text":
     "{{name}} holds the whole database, encrypted with the passphrase. Restoring it needs exactly that passphrase – without it the file is useless, with it anyone can read it. Keep the file safe (do not leave it in the downloads folder, do not pass it on); a restore is done on the server only. The download is noted in the audit log.",
   "backup.dl.confirm": "Download",
-  "backup.dl.done": "{{name}} downloaded – keep it safe",
+  "backup.dl.done": "Download of {{name}} started – the browser shows its progress. Keep the file safe.",
   "backup.dl.serverOnly": "Server only",
   "backup.dl.plainWhy": "Unencrypted backups stay on the server – they hold the whole database. Copy them with docker cp (handbook: step by step).",
   "backup.copyRestore": "Copy the restore commands",
@@ -1853,6 +1915,7 @@ const en: Record<string, string> = {
 
 Object.assign(en, vendorEn)
 Object.assign(en, aboutEn)
+Object.assign(en, activityEn)
 Object.assign(en, healthEn)
 Object.assign(en, docsEn)
 Object.assign(en, deliveryEn)

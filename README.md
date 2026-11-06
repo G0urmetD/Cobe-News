@@ -35,10 +35,12 @@ Requirements: Docker with Docker Compose v2.
 ```bash
 git clone https://github.com/G0urmetD/Cobe-News.git cobe-news
 cd cobe-news
-scripts/setup-env.sh              # creates .env with generated database passwords
+scripts/setup-env.sh              # creates .env with generated database passwords; on Linux hands data/ to the app (UID 10001)
 docker compose up -d --build      # app, PostgreSQL 18 and nginx (HTTPS)
 docker compose logs app | grep -A1 "Setup token"
 ```
+
+On Linux as a user without sudo rights the script prints the one command to run instead (`sudo chown -R 10001:10001 data`).
 
 Open **<https://localhost:8095>** (the self-signed certificate triggers a browser warning on first use), enter the
 one-time setup token from the log (valid for 60 minutes) and create the first admin account with an authenticator app

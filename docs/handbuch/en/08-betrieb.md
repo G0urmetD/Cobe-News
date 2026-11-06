@@ -27,7 +27,7 @@ Everything about the installation itself (address, certificate, network, databas
 | `APP_PORT` | http port of the app, always bound to `127.0.0.1`: for the health check, Prometheus on the same host ([Metrics](/docs/api#prometheus-konfiguration)) and your own reverse proxy on the same host | `8096` |
 | `COMPOSE_FILE` | `docker-compose.yml:docker-compose.http.yml` switches on the redirect from http to https ([HTTPS](#http-umleitung)) | not set |
 | `HTTP_PORT` | http port that only redirects to https (only with `COMPOSE_FILE` as above) | `8094` |
-| `COBE_NEWS_VERSION` | the released, signed images instead of the local build (app, database, proxy), e.g. `0.1.51` – only with `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; verify the signatures with cosign first (docs/BETRIEB.md). Up to 0.1.48 this was `COBE_NEWS_IMAGE` (the app only) | not set (local build) |
+| `COBE_NEWS_VERSION` | the released, signed images instead of the local build (app, database, proxy), e.g. `0.1.52` – only with `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; verify the signatures with cosign first (docs/BETRIEB.md). Up to 0.1.48 this was `COBE_NEWS_IMAGE` (the app only) | not set (local build) |
 
 ### Certificate {#env-zertifikat}
 
@@ -613,6 +613,7 @@ to the outside, no connection to the internet. The data lives in the volume `cob
 |---|---|---|
 | `cobe_news_app` | the app, backup and restore – owner of the database, but without superuser rights | `POSTGRES_APP_PASSWORD` |
 | `cobe_news_restore` | only the [restore test](/docs/sicherung#ruecksicherungs-test) – owner of the throwaway database `cobe_news_restore_test`, no superuser, may not create databases or roles or connect to the app's database | `POSTGRES_RESTORE_PASSWORD` |
+| `cobe_news_audit` | owner of the audit log (from 0.1.52, [database lock](#protokoll-sperre)) – cannot sign in, nobody uses it directly | – |
 | `cobe_news` | the container's superuser – only the database container itself uses it (the app does not know its password) | `POSTGRES_PASSWORD` |
 
 - **Never change** `POSTGRES_PASSWORD`: the database was created with it; a new value in the `.env` does not change
@@ -682,7 +683,8 @@ an entry expands it ([An entry in detail](#protokoll-eintrag)).
 
 An entry is written in the same transaction as the change itself: if the change is refused (for instance because another
 admin saved in between), no entry is made either. Entries can neither be edited nor deleted one by one – not by admins
-either; a change behind the app's back is revealed by the [integrity chain](#protokoll-kette).
+either; a change behind the app's back is revealed by the [integrity chain](#protokoll-kette), and with Cobe News'
+database image the database itself refuses it ([database lock](#protokoll-sperre)).
 
 ### Filtering {#protokoll-filter}
 
@@ -827,8 +829,7 @@ the end of the chain to its log every hour (see below): ship that line to a log 
   marked and does not hold the clean-up.
 - **Witness in the log:** every hour the app log gets a line `audit chain head: seq=… hash=… key=… anchor=…`. Shipping
   it to a log system outside the server lets you show later that the end of the chain was not set back.
-- **In the database:** there is deliberately no trigger refusing changes – it would be in every backup, and for safety
-  the restore only takes tables, indexes and sequences.
+- **In the database:** see [database lock](#protokoll-sperre) – the chain reveals a change, the lock prevents it.
 - **After the update to 0.1.50:** earlier entries are sealed by the first hourly clean-up (50,000 in about 4 s, 2 million
   in about 2.5 min). Sealing rewrites every row – the table grows to about twice its size. PostgreSQL reuses the space
   for new entries afterwards, but the file does not shrink. To get it back with a big audit log, run once afterwards:
@@ -836,6 +837,27 @@ the end of the chain to its log every hour (see below): ship that line to a log 
   completely** meanwhile – measured about 4 s per 450,000 entries (2 million ≈ 15–20 s). During the lock, actions that
   write an audit entry (saving settings, admin sign-ins) wait and the audit log does not load; so pick a quiet time. With
   a few tens of thousands of entries it is not worth it.
+
+### Database lock {#protokoll-sperre}
+
+From 0.1.52 **PostgreSQL itself** refuses changing or deleting an entry – also for the app. It may only add, read and
+seal entries; the audit log belongs to a database role of its own (`cobe_news_audit`) nobody can sign in with. Only the
+[clean-up](#protokoll-aufbewahrung) may delete, and never entries younger than 90 days – that limit holds in the
+database, whatever is set.
+
+- **Shown:** at the top beside the chain, "Database lock: active" – or "not active" with the reason, explained in the
+  hint. "without the database image": with a PostgreSQL of your own there is no lock, nothing else changes. "from the
+  next database start": on a new installation the app makes the audit log at its first start – the lock takes hold after
+  `docker compose restart db` or the next update. Existing installations are locked right after the update to 0.1.52.
+- **Restore:** works as before. The entries that were in the log are not deleted but **set aside** in the database; the
+  page shows how many ("· n set aside"), and so does the entry "Backup restored". Afterwards the lock is still active.
+  Backups never carry the lock – they restore anywhere.
+- **What it protects against:** a taken-over app, a stolen database password of the app and injected SQL – whoever gets
+  that far cannot erase their traces from the audit log. **Not** against the database superuser or anyone with access to
+  Docker on the server: both can lift the lock. Against that, ship the hourly `audit chain head` line to a log system
+  outside the server.
+
+Details (roles, lifting it, migrations): `docs/BETRIEB.md`, section *Datenbank-Sperre*.
 
 ### Retention {#protokoll-aufbewahrung}
 

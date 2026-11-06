@@ -34,6 +34,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
+from app.audit_lock import ddl_skipped
+
 revision: str = "0032"
 down_revision: str | None = "0031"
 branch_labels: str | Sequence[str] | None = None
@@ -58,6 +60,8 @@ NOTABLE_BEFORE = (
 
 
 def upgrade() -> None:
+    if ddl_skipped(op.get_bind(), revision):  # locked (0.1.52): the table has these columns already
+        return
     for name in TEXT_COLUMNS:
         op.add_column("audit_log", sa.Column(name, sa.Text(), nullable=True))
     op.add_column("audit_log", sa.Column("actor_emergency", sa.Boolean(), nullable=True))
@@ -74,6 +78,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if ddl_skipped(op.get_bind(), revision):
+        return
     for name in ("ix_audit_log_unsealed", "ux_audit_log_seq", "ix_audit_log_notable", "ix_audit_log_session", "ix_audit_log_ip", "ix_audit_log_kind"):
         op.drop_index(name, table_name="audit_log")
     for name in (*TEXT_COLUMNS, "actor_emergency", "notable", "seq"):

@@ -113,6 +113,7 @@
   label: Trend Micro Apex One
   vendor: Trend Micro
   cpes: [a:trendmicro:apex_one]
+  cpe_editions: [[a:trendmicro:apex_one, "-"], [a:trendmicro:apex_one, "*"]]  # on-prem 14.0.0.N; "saas" counts 14.0.N
   cna: [["Trend Micro, Inc.", Trend Micro Apex One]]
   kw: [Apex One]
   aliases: [OfficeScan, Trend Micro OfficeScan]

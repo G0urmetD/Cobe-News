@@ -23,6 +23,7 @@ import { Pill } from "@/components/cobe/badges"
 import { PageHeader } from "@/components/cobe/common"
 import { SubTabs } from "@/components/cobe/sub-tabs"
 import { HelpLink } from "@/components/cobe/doc-markdown"
+import { pendingTotal, usePendingCounts } from "@/lib/admin-api"
 import { useAuth } from "@/lib/auth"
 import { deadCount, useSourceHealth } from "@/lib/source-health"
 import { usePersonalNotify } from "@/lib/teams-api"
@@ -38,7 +39,7 @@ import { PersonalVendorCard } from "@/pages/settings-personal"
 import { CalendarCard } from "@/pages/settings-watch"
 import { MutesCard } from "@/pages/settings-mutes"
 import { SettingsCard } from "@/pages/settings-shared"
-import { EntraPane, LdapPane, MappingsPane, PasskeysPane, SecondFactorPane, SessionsPane } from "@/pages/settings-signin"
+import { ApprovalPane, EntraPane, LdapPane, MappingsPane, PasskeysPane, SecondFactorPane, SessionsPane } from "@/pages/settings-signin"
 import { TeamsSettingsPage } from "@/pages/settings-teams"
 import { TlsPane } from "@/pages/settings-tls"
 import { UsersPane } from "@/pages/settings-users"
@@ -91,6 +92,8 @@ export function SettingsPage() {
   const { isAdmin } = useAuth()
   // dead sources: a number on "Integrationen" (the health page's own query – one request for both)
   const dead = deadCount(useSourceHealth(isAdmin).data)
+  // accounts and raises to admin waiting for approval: a number on "Benutzer"
+  const waiting = pendingTotal(usePendingCounts(isAdmin).data)
   // a part of a page (#news): scrolled to once it is drawn
   useEffect(() => {
     if (!hash) return
@@ -112,6 +115,13 @@ export function SettingsPage() {
     teams: <TeamsSettingsPage />,
     auth: (
       <>
+        <SettingsCard
+          title={t("settings.approval.title")}
+          description={t("settings.approval.desc")}
+          actions={<HelpLink chapter="anmeldung" section="freigabe" topic={t("settings.approval.title")} />}
+        >
+          <ApprovalPane />
+        </SettingsCard>
         <SettingsCard
           title={t("settings.ldap.title")}
           description={t("settings.ldap.desc")}
@@ -162,7 +172,18 @@ export function SettingsPage() {
           <NavGroup label={t("settings.personal")} items={PERSONAL} active={active} />
           {GROUPS.map((g) => {
             const items = g.items.filter(allowed)
-            return items.length > 0 && <NavGroup key={g.label} label={t(g.label)} items={items} active={active} badges={{ integrations: dead }} />
+            return (
+              items.length > 0 && (
+                <NavGroup
+                  key={g.label}
+                  label={t(g.label)}
+                  items={items}
+                  active={active}
+                  badges={{ integrations: dead, users: waiting }}
+                  badgeTitles={{ integrations: "health.navBadge", users: "users.pendingBadge" }}
+                />
+              )
+            )
           })}
         </nav>
         <div key={active} className={cn("min-w-0 animate-in space-y-6 duration-200 fade-in-0", active === "integrations" ? "max-w-[100rem]" : "max-w-5xl")}>
@@ -173,7 +194,20 @@ export function SettingsPage() {
   )
 }
 
-function NavGroup({ label, items, active, badges }: { label: string; items: NavEntry[]; active: string; badges?: Record<string, number | null> }) {
+function NavGroup({
+  label,
+  items,
+  active,
+  badges,
+  badgeTitles,
+}: {
+  label: string
+  items: NavEntry[]
+  active: string
+  badges?: Record<string, number | null>
+  /** the i18n key of each badge's text (with {{count}}) */
+  badgeTitles?: Record<string, string>
+}) {
   const { t } = useTranslation()
   return (
     <div className="space-y-1">
@@ -191,11 +225,11 @@ function NavGroup({ label, items, active, badges }: { label: string; items: NavE
           <Icon className="size-4" />
           {t(`settings.nav.${key}`)}
           {!!badges?.[key] && (
-            <Pill color="--sev-critical" className="ml-auto px-1.5" title={t("health.navBadge", { count: badges[key]! })}>
+            <Pill color={key === "users" ? "--warning" : "--sev-critical"} className="ml-auto px-1.5" title={t(badgeTitles?.[key] ?? "health.navBadge", { count: badges[key]! })}>
               <span className="tabular-nums" aria-hidden>
                 {badges[key]}
               </span>
-              <span className="sr-only">{t("health.navBadge", { count: badges[key]! })}</span>
+              <span className="sr-only">{t(badgeTitles?.[key] ?? "health.navBadge", { count: badges[key]! })}</span>
             </Pill>
           )}
         </Link>

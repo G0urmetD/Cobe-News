@@ -23,8 +23,10 @@
   label: ManageEngine ServiceDesk Plus
   vendor: Zoho ManageEngine
   cpes: [a:zohocorp:manageengine_servicedesk_plus]
+  cna: [[ManageEngine, ServiceDesk Plus], [ManageEngine, Service Desk Plus], [ManageEngine, "ServiceDesk Plus, ServiceDesk Plus MSP, SupportCenter Plus"], [Zohocorp, ManageEngine ServiceDesk Plus]]
   kw: [ServiceDesk Plus]
-  example: 14.9 build 14910
+  scheme: build
+  example: 14.9 Build 14910
 
 # ---------------------------------------------------------------- ITSM, ticketing
 - key: servicenow

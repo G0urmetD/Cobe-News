@@ -37,7 +37,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from app import audit, backup, db, passkeys_api, sqlite_import, webpush
+from app import audit, audit_lock, backup, db, passkeys_api, sqlite_import, webpush
 from app.auth import passwords, sessions
 from app.auth_api import issue_setup_token
 from app.config import get_config
@@ -196,7 +196,13 @@ async def _restore(args: list[str]) -> int:
         if not empty:
             before = await backup.create(reason="pre-restore", passphrase=phrase or None, actor=audit.CLI)
             print(f"Current state saved first: {before.path}")
+        async with db.engine().connect() as conn:
+            aside_before = (await audit_lock.state(conn))["set_aside"]
         rows = await backup.restore(plan)
+        async with db.engine().connect() as conn:
+            lock = await audit_lock.state(conn)
+            lock_installed = await audit_lock.installed(conn)
+        aside = lock["set_aside"] - aside_before  # the audit log's lock: the entries before set aside, not deleted
         await backup.record_restored(before, plan.manifest, Path(args[0]).name)
         # in the restored database (its log is the backup's): the restore itself, and the backup made right before it
         async with db.session() as s:
@@ -205,7 +211,15 @@ async def _restore(args: list[str]) -> int:
                 audit.CLI,
                 "backup.restored",
                 audit.target("backup", Path(args[0]).name, Path(args[0]).name),
-                {"backup_created_at": m.get("created_at"), "version": m.get("version"), "revision": m.get("revision"), "auth": plan.auth, "rows": sum(rows.values()), "pre_restore": before.name if before else None},
+                {
+                    "backup_created_at": m.get("created_at"),
+                    "version": m.get("version"),
+                    "revision": m.get("revision"),
+                    "auth": plan.auth,
+                    "rows": sum(rows.values()),
+                    "pre_restore": before.name if before else None,
+                    **({"set_aside": aside} if lock_installed else {}),
+                },
             )
             await s.commit()
         if not plan.key_matches and "--ignore-key" in args:
@@ -213,6 +227,11 @@ async def _restore(args: list[str]) -> int:
             # decision – its chain starts anew here (logged: audit.chain_rekeyed)
             await audit.rekey("restore --ignore-key")
             print("Audit log: chain anchored anew with this installation's key (the older part cannot be checked any more).")
+        if lock_installed:
+            print(
+                f"Audit log: database lock {'still active' if lock['active'] else 'NOT active (' + str(lock['reason']) + ')'} – "
+                f"{aside} {'entry' if aside == 1 else 'entries'} of the log before set aside, not deleted ({audit_lock.ROLE}.audit_log_replaced)."
+            )
         if not plan.key_matches and plan.backup_key and "--use-backup-key" in args:
             print(f"Key written: {backup.write_key(plan.backup_key)}")
         print(f"Restored: {sum(rows.values())} rows, schema now {await db.revision()}. Start the app: docker compose start app.")

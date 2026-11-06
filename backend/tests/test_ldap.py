@@ -100,8 +100,8 @@ async def test_sign_in_by_name_or_upn_with_the_mapped_role(ad, admin_client):
     r, _ = await _login("a.weber@corp.example", "Anna-Pw-2026!")  # UPN
     assert r.json()["next"] == "done"
     async with db.session() as s:
-        users = list(await s.scalars(select(User).where(User.auth_source == "ldap")))
-    assert len(users) == 1 and users[0].external_id == str(ANNA)  # the same account both times
+        users = list(await s.scalars(select(User).where(User.auth_source == "ldap", User.username == "a.weber")))
+    assert len(users) == 1 and users[0].external_id == str(ANNA)  # the same account both times (preloaded or not)
     # an admin from AD sets up TOTP first
     r, me = await _login("o.admin", "Otto-Pw-2026!")
     assert r.json() == {"next": "enroll"} and me.status_code == 401
@@ -115,12 +115,15 @@ async def test_no_group_wrong_password_or_disabled_look_the_same(ad, admin_clien
     # no LDAP injection: the name is escaped before it goes into the filter
     await _login("*)(sAMAccountName=*", "x")
     assert any("\\2a\\29\\28" in f for f in ad.filters)
-    # an AD account never takes over a local one with the same name
-    await add_user("a.weber")
+    # an AD account never takes over a local one with the same name (the preloaded AD accounts removed first)
+    from app import teams
+
+    await teams.wait_idle()
     async with db.session() as s:
         for u in await s.scalars(select(User).where(User.auth_source == "ldap")):
             await s.delete(u)
         await s.commit()
+    await add_user("a.weber")
     r, _ = await _login("a.weber", "Anna-Pw-2026!")
     assert r.status_code == 401
 

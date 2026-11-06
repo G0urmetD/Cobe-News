@@ -3,6 +3,7 @@ master key is SECRET_KEY from the environment or, without it, a random key in
 DATA_DIR/secret.key (created once, mode 0600). Losing the key file means re-entering those secrets."""
 
 import base64
+import errno
 import hashlib
 import hmac
 import os
@@ -57,16 +58,73 @@ def master() -> bytes:
         return _read_key_file(path)
     except FileNotFoundError:
         cfg.data_dir.mkdir(parents=True, exist_ok=True)
-        key = base64.urlsafe_b64encode(secrets.token_bytes(32))
+        return _make_key_file(path)
+
+
+# what link() says on a file system without hard links – only then the fallback (EMLINK: the link count is full)
+NO_LINKS = frozenset({errno.EPERM, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EXDEV, errno.EMLINK, errno.ENOSYS})
+
+
+def _make_key_file(path) -> bytes:  # noqa: ANN001
+    """A new key, written whole before secret.key exists: into a temporary file next to it (fsync), then linked to the
+    name – a hard link never replaces a file, and the name appears complete or not at all. Before 0.1.52 the file was
+    created first and written after: a start killed in between (OOM, a stop, a full disk) left an empty secret.key that
+    every later start refused. Another process that was faster wins; its key is read. A file system without hard links
+    (NO_LINKS: vfat, some FUSE/SMB/NFS mounts) falls back to creating the name exclusively (the old way); any other error
+    (a full disk, an I/O error, a read-only file system) is raised – the temporary file removed, no secret.key made."""
+    key = base64.urlsafe_b64encode(secrets.token_bytes(32))
+    tmp = path.with_name(f".{KEY_FILE}.{os.getpid()}.{secrets.token_hex(4)}")
+    try:
         try:
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        except FileExistsError:  # another process was faster – and may not have written its key yet
-            return _read_key_file(path)
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except PermissionError as exc:
+            raise KeyFileError(
+                f"{path.parent} is not writable for this process (uid {os.getuid()}) – no key can be made. The data folder must"
+                " belong to UID 10001, the app's user: on the host `sudo chown -R 10001:10001 ./data` (docker compose), or use"
+                " a named volume (docs/BETRIEB.md)"
+            ) from exc
         with os.fdopen(fd, "wb") as f:
             f.write(key)
             f.flush()
             os.fsync(f.fileno())
+        try:
+            os.link(tmp, path)
+        except FileExistsError:  # another process was faster
+            return _read_key_file(path)
+        except OSError as exc:
+            if exc.errno not in NO_LINKS:
+                raise
+            return _write_exclusive(path, key)  # no hard links here: the name created exclusively, then written
+        _fsync_dir(path.parent)
         return key
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _write_exclusive(path, key: bytes) -> bytes:  # noqa: ANN001
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:  # another process was faster – and may not have written its key yet
+        return _read_key_file(path)
+    with os.fdopen(fd, "wb") as f:
+        f.write(key)
+        f.flush()
+        os.fsync(f.fileno())
+    return key
+
+
+def _fsync_dir(d) -> None:  # noqa: ANN001
+    """The new name made durable (a crash right after must not lose the file the secrets are now encrypted with)."""
+    try:
+        fd = os.open(d, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 
 
 MIN_STRONG_KEY = 32  # bytes – below that (or with only a few different characters) a warning, never a refusal

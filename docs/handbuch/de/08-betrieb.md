@@ -27,7 +27,7 @@ Alles, was die Installation selbst betrifft (Adresse, Zertifikat, Netz, Datenban
 | `APP_PORT` | http-Port der App, fest an `127.0.0.1` gebunden: für den Health-Check, Prometheus auf demselben Host ([Metriken](/docs/api#prometheus-konfiguration)) und einen eigenen Reverse Proxy auf demselben Host | `8096` |
 | `COMPOSE_FILE` | `docker-compose.yml:docker-compose.http.yml` schaltet die Umleitung von http auf https ein ([HTTPS](#http-umleitung)) | nicht gesetzt |
 | `HTTP_PORT` | http-Port, der nur auf https umleitet (nur mit `COMPOSE_FILE` wie oben) | `8094` |
-| `COBE_NEWS_VERSION` | die veröffentlichten, signierten Images statt des lokalen Builds (App, Datenbank, Proxy), z. B. `0.1.51` – nur mit `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; Signaturen vorher mit cosign prüfen (docs/BETRIEB.md). Bis 0.1.48 hieß das `COBE_NEWS_IMAGE` (nur die App) | nicht gesetzt (lokaler Build) |
+| `COBE_NEWS_VERSION` | die veröffentlichten, signierten Images statt des lokalen Builds (App, Datenbank, Proxy), z. B. `0.1.52` – nur mit `COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml`; Signaturen vorher mit cosign prüfen (docs/BETRIEB.md). Bis 0.1.48 hieß das `COBE_NEWS_IMAGE` (nur die App) | nicht gesetzt (lokaler Build) |
 
 ### Zertifikat {#env-zertifikat}
 
@@ -619,6 +619,7 @@ nach außen, keine Verbindung ins Internet. Die Daten liegen im Volume `cobe-new
 |---|---|---|
 | `cobe_news_app` | die App, Sicherung und Wiederherstellung – Besitzer der Datenbank, aber ohne Superuser-Rechte | `POSTGRES_APP_PASSWORD` |
 | `cobe_news_restore` | nur der [Rücksicherungs-Test](/docs/sicherung#ruecksicherungs-test) – Besitzer der Wegwerf-Datenbank `cobe_news_restore_test`, kein Superuser, darf keine Datenbanken oder Rollen anlegen und sich nicht mit der Datenbank der App verbinden | `POSTGRES_RESTORE_PASSWORD` |
+| `cobe_news_audit` | Besitzer des Protokolls (ab 0.1.52, [Datenbank-Sperre](#protokoll-sperre)) – ohne Anmeldung, niemand nutzt sie direkt | – |
 | `cobe_news` | Superuser des Containers – nur der Datenbank-Container selbst nutzt ihn (die App kennt sein Passwort nicht) | `POSTGRES_PASSWORD` |
 
 - `POSTGRES_PASSWORD` **nie ändern**: die Datenbank wurde damit angelegt; ein neuer Wert in der `.env` ändert das
@@ -690,7 +691,8 @@ auf einen Eintrag klappt ihn auf ([Ein Eintrag im Detail](#protokoll-eintrag)).
 
 Ein Eintrag wird in derselben Transaktion geschrieben wie die Änderung selbst: wird sie abgelehnt (etwa weil ein anderer
 Admin zwischendurch gespeichert hat), entsteht auch kein Eintrag. Einträge lassen sich weder bearbeiten noch einzeln
-löschen – auch nicht von Admins; eine Änderung hinter dem Rücken der App deckt die [Integritätskette](#protokoll-kette) auf.
+löschen – auch nicht von Admins; eine Änderung hinter dem Rücken der App deckt die [Integritätskette](#protokoll-kette) auf,
+und mit dem Datenbank-Image von Cobe News lehnt sie die Datenbank selbst ab ([Datenbank-Sperre](#protokoll-sperre)).
 
 ### Filtern {#protokoll-filter}
 
@@ -849,8 +851,8 @@ stündlich das Ende der Kette in ihr Log (siehe unten): Diese Zeile gehört in e
   Fund. Ein Eintrag mit einer Zeit weit in der Zukunft wird markiert und hält das Aufräumen nicht auf.
 - **Zeuge im Log:** Stündlich steht im App-Log eine Zeile `audit chain head: seq=… hash=… key=… anchor=…`. Wer sie
   in ein Log-System außerhalb des Servers schickt, kann später zeigen, dass das Ende der Kette nicht zurückgesetzt wurde.
-- **In der Datenbank:** Es gibt bewusst keinen Trigger, der Änderungen ablehnt – er stünde in jeder Sicherung, und die
-  Wiederherstellung nimmt aus Sicherheitsgründen nur Tabellen, Indizes und Sequenzen an.
+- **In der Datenbank:** siehe [Datenbank-Sperre](#protokoll-sperre) – die Kette deckt eine Änderung auf, die Sperre
+  verhindert sie.
 - **Nach dem Update auf 0.1.50:** Einträge von vorher werden beim ersten stündlichen Aufräumen versiegelt (50 000 in
   etwa 4 s, 2 Mio. in etwa 2,5 min). Jedes Versiegeln schreibt die Zeile neu – die Tabelle wird dabei etwa doppelt so
   groß. PostgreSQL gibt den Platz danach für neue Einträge wieder frei, die Datei schrumpft aber nicht. Wer ihn bei einem
@@ -859,6 +861,29 @@ stündlich das Ende der Kette in ihr Log (siehe unten): Diese Zeile gehört in e
   sie dabei ganz** – gemessen etwa 4 s je 450 000 Einträge (2 Mio. ≈ 15–20 s). Während der Sperre warten Aktionen, die
   einen Protokolleintrag schreiben (Speichern in den Einstellungen, Anmeldungen von Admins), und das Protokoll lädt
   nicht; also zu einer ruhigen Zeit. Bei einigen zehntausend Einträgen lohnt es nicht.
+
+### Datenbank-Sperre {#protokoll-sperre}
+
+Ab 0.1.52 lehnt **PostgreSQL selbst** ab, dass jemand einen Eintrag ändert oder löscht – auch die App. Sie darf
+Einträge nur hinzufügen, lesen und versiegeln; das Protokoll gehört einer eigenen Rolle der Datenbank
+(`cobe_news_audit`), mit der sich niemand anmelden kann. Löschen darf nur das [Aufräumen](#protokoll-aufbewahrung), und
+auch das nie Einträge, die jünger als 90 Tage sind – diese Grenze gilt in der Datenbank, egal was eingestellt ist.
+
+- **Anzeige:** oben neben der Kette „Datenbank-Sperre: aktiv“ – oder „nicht aktiv“ mit dem Grund, der Hinweis erklärt
+  ihn. „ohne Datenbank-Image“: mit einem eigenen PostgreSQL gibt es die Sperre nicht, sonst ändert sich nichts. „ab dem
+  nächsten Start der Datenbank“: auf einer neuen Installation legt die App das Protokoll erst bei ihrem ersten Start an –
+  die Sperre greift nach `docker compose restart db` oder dem nächsten Update. Bestehende Installationen sind nach dem
+  Update auf 0.1.52 sofort gesperrt.
+- **Wiederherstellung:** funktioniert wie bisher. Die Einträge, die vorher im Protokoll standen, werden nicht gelöscht,
+  sondern in der Datenbank **beiseitegelegt**; die Seite zeigt ihre Zahl („· n beiseitegelegt“), der Eintrag „Sicherung
+  wiederhergestellt“ ebenso. Danach ist die Sperre weiter aktiv. Sicherungen enthalten die Sperre nie – sie lassen sich
+  überall einspielen.
+- **Wogegen sie schützt:** gegen eine übernommene App, ein gestohlenes Datenbank-Passwort der App und eingeschleuste
+  SQL-Befehle – wer so weit kommt, kann seine Spuren nicht aus dem Protokoll tilgen. **Nicht** gegen den Superuser der
+  Datenbank oder jemanden mit Zugriff auf Docker auf dem Server: beide können die Sperre aufheben. Dagegen hilft die
+  stündliche Zeile `audit chain head` in einem Log-System außerhalb des Servers.
+
+Einzelheiten (Rollen, Aufheben, Migrationen): `docs/BETRIEB.md`, Abschnitt *Datenbank-Sperre*.
 
 ### Aufbewahrung {#protokoll-aufbewahrung}
 

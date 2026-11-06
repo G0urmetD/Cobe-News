@@ -166,10 +166,15 @@ def test_rendered_configuration_passes_nginx_t(tmp_path):
 
 
 def test_the_backup_download_is_passed_through_unbuffered():
-    """0.1.51: an encrypted backup as a download – nginx must not spool it into its temp folder (a tmpfs: the proxy's
-    memory); the location matches only the download route."""
+    """0.1.51/0.1.52: an encrypted backup as the browser's own download – nginx must not spool it into its temp folder (a
+    tmpfs: the proxy's memory), must not cut a slow client off after a minute, and keeps the address (it carries the
+    one-time ticket) out of its access log; the location matches only the download route."""
     text = TEMPLATE.read_text()
-    block = re.search(r"location \^~ /api/admin/backup/files/ \{(.*?)\n    \}", text, re.S)
+    block = re.search(r"location \^~ /api/admin/backup/download/ \{(.*?)\n    \}", text, re.S)
     assert block is not None
-    assert "proxy_buffering off;" in block.group(1) and "proxy_pass http://app:8000;" in block.group(1)
+    body = block.group(1)
+    for line in ("proxy_buffering off;", "proxy_max_temp_file_size 0;", "access_log off;", "proxy_pass http://app:8000;", "proxy_read_timeout 300s;", "send_timeout 300s;"):
+        assert line in body, line
+    assert "X-Forwarded-For $remote_addr;" in body and "X-Forwarded-Proto https;" in body
     assert text.count("proxy_buffering off;") == 1  # nowhere else
+    assert "/api/admin/backup/files/" not in text  # the download of 0.1.51 (step 1 is a small JSON answer now)
