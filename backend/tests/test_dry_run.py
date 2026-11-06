@@ -84,7 +84,7 @@ async def test_live_round_and_dry_run_agree(admin_client, hooks):
     assert found == sent and dry["count"] == len(sent)
     assert {str(v1.id), str(v3.id), str(h.id)} <= found and len([x for x in dry["items"] if x["kind"] == "news"]) == 2
     first = next(x for x in dry["items"] if x["kind"] == "news")
-    assert first["match"] == {"kind": "news", "severity": True, "source": True, "topic": False, "teams": False} and first["source"] == "Example Feed"
+    assert first["match"] == {"kind": "news", "severity": True, "source": True, "topic": False, "teams": False, "concern": False} and first["source"] == "Example Feed"
 
 
 async def test_dry_run_sends_nothing_and_writes_nothing(admin_client, hooks):

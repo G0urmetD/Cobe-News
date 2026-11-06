@@ -50,7 +50,7 @@ from app import vendor_titles as titles
 from app import version_input
 from app.config import get_config, tls_verify
 from app.crypto import decrypt_str
-from app.models import NewsItem, NewsItemSource, NewsSource, VendorAdvisory, VendorAdvisoryProduct, VendorAdvisoryState, VendorEvent, VendorFetch, VendorFollow, VendorKev, VendorVersion
+from app.models import Counter, NewsItem, NewsItemSource, NewsSource, VendorAdvisory, VendorAdvisoryProduct, VendorAdvisoryState, VendorEvent, VendorFetch, VendorFollow, VendorKev, VendorVersion
 from app.news import NewsError
 from app.vendor_match import ORDER, THIRD_PARTY, Verdict, evaluate, name_matches, name_words, with_third_party
 from app.vendor_match import _cna_names as cna_names
@@ -176,6 +176,8 @@ def reset() -> None:
     _locks.clear()
     _evaluated.clear()
     _last_full[0] = None
+    _rated_primed.clear()
+    _rated_loaded[0] = False
     _flight.clear()
     _related.clear()
     _pruned[0] = None
@@ -2390,24 +2392,63 @@ def _no_cve(finding_id: str) -> str:
     return f"#{finding_id}"
 
 
-async def _known(db: AsyncSession, scopes: list[str]) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]]]:
-    """The vulnerability events of these scopes (product + version): their keys, the CVEs notified per scope, and the
-    CVEs already said to be exploited per scope – read by the scope's index, not the whole table."""
-    keys: set[str] = set()
-    cves: dict[str, set[str]] = {s: set() for s in scopes}
-    exploited: dict[str, set[str]] = {s: set() for s in scopes}
+RATED = "rated"  # the key prefix of "jetzt höher eingestuft": rated:<severity>:<scope>:<finding id>
+# counters "vendor_rated_primed:<product>": that product's ratings were noted once (its first evaluation by 0.1.53 –
+# silently). Per product: one not ready yet (its sources not answered once, held for a keyword search) is primed when it
+# is evaluated, not taken as primed by the others' first round – its rises of before would come as a flood later
+RATED_PRIMED = "vendor_rated_primed"
+_rated_primed: set[str] = set()  # the primed products – read once per process
+_rated_loaded = [False]
+
+
+async def _primed_products(db: AsyncSession) -> set[str]:
+    if not _rated_loaded[0]:
+        names = await db.scalars(select(Counter.name).where(Counter.name.like(f"{RATED_PRIMED}:%")))
+        _rated_primed.update(n.partition(":")[2] for n in names)
+        _rated_loaded[0] = True
+    return _rated_primed
+
+
+def event_rest(key: str) -> str:
+    """A vulnerability event's key without its marker: <scope>:<finding id> – of the first event, of "now exploited"
+    (exploited:<scope>:<id>) and of "now rated higher" (rated:<severity>:<scope>:<id>)."""
+    if key.startswith("exploited:"):
+        return key[len("exploited:") :]
+    if key.startswith(RATED + ":"):
+        return key[len(RATED) + 1 :].partition(":")[2]
+    return key
+
+
+@dataclass
+class _Said:
+    """What the vulnerability events of a product's scopes said already (_known)."""
+
+    keys: set[str]
+    cves: dict[str, set[str]]  # per scope: the CVEs notified there (once per CVE, whichever record brought it)
+    exploited: dict[str, set[str]]  # per scope: the CVEs said to be exploited
+    rank: dict[str, dict[str, int]]  # per scope and CVE: the highest severity (SEV_RANK) an event of it was stored with
+
+
+async def _known(db: AsyncSession, scopes: list[str]) -> _Said:
+    """The vulnerability events of these scopes (product + version): their keys, the CVEs notified per scope, the CVEs
+    already said to be exploited and the highest severity said of each – read by the scope's index, not the whole
+    table. Baseline events count: what was shown is known, a later rise is news (when it is fresh)."""
+    said = _Said(set(), {s: set() for s in scopes}, {s: set() for s in scopes}, {s: {} for s in scopes})
     if not scopes:
-        return keys, cves, exploited
-    stmt = select(VendorEvent.key, VendorEvent.scope, VendorEvent.data["cves"], VendorEvent.data["exploited"].as_boolean()).where(VendorEvent.scope.in_(scopes))
-    for key, scope, raw, expl in (await db.execute(stmt)).all():
-        keys.add(key)
+        return said
+    stmt = select(VendorEvent.key, VendorEvent.scope, VendorEvent.severity, VendorEvent.data["cves"], VendorEvent.data["exploited"].as_boolean()).where(VendorEvent.scope.in_(scopes))
+    for key, scope, sev, raw, expl in (await db.execute(stmt)).all():
+        said.keys.add(key)
         got = {str(c) for c in raw} if isinstance(raw, list) else set()
-        if not got and scope and (rest := key.removeprefix("exploited:")).startswith(scope + ":"):
+        if not got and scope and (rest := event_rest(key)).startswith(scope + ":"):
             got = {_no_cve(rest[len(scope) + 1 :])}  # a finding without CVE: known by its record
-        cves.setdefault(scope, set()).update(got)
+        said.cves.setdefault(scope, set()).update(got)
         if expl:
-            exploited.setdefault(scope, set()).update(got)
-    return keys, cves, exploited
+            said.exploited.setdefault(scope, set()).update(got)
+        ranks = said.rank.setdefault(scope, {})
+        for c in got:
+            ranks[c] = max(ranks.get(c, -1), SEV_RANK.get(sev, 0))
+    return said
 
 
 def eol_stage(eol_from: str | None, today: date) -> tuple[str, date, int] | None:
@@ -2508,6 +2549,10 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
     fs = await follows(db)
     vers = await versions_of(db, [f.id for f in fs])
     kev, euvd = await kev_index(db), await euvd_cves(db)
+    # "now rated higher" (0.1.53): a product's first evaluation that knows it only notes the ratings of now – a finding
+    # rated higher before the update is no news (and no flood of them at once); a product not primed yet is evaluated
+    # whatever its signature says
+    primed = await _primed_products(db)
     if full or _last_full[0] is None or now - _last_full[0] >= EVAL_FULL:
         full = True
         _last_full[0] = now
@@ -2527,24 +2572,38 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
         vs = vers.get(f.id, [])
         view = await product_view(db, f, vs, kev=kev, euvd=euvd)
         sig = (view["stamp"], f.baseline_at is None, tuple((v.id, v.version, v.baseline_at is None) for v in vs))
-        if not full and _evaluated.get(f.product) == sig:
+        quiet = f.product not in primed
+        if not full and not quiet and _evaluated.get(f.product) == sig:
             continue  # nothing new for this product
         try:
-            n = await _evaluate_product(db, f, p, vs, view, now)
+            n = await _evaluate_product(db, f, p, vs, view, now, rated_quiet=quiet)
         except Exception:  # noqa: BLE001 - logged; this product (not marked evaluated) and the rest come next round
             await db.rollback()  # expires every loaded object – the loop cannot go on with them
             log.exception("vendor: evaluating %s failed", f.product)
             break
         created += n
         _evaluated[f.product] = (view["stamp"], False, tuple((v.id, v.version, False) for v in vs))
+        if quiet:
+            await db.execute(pg_insert(Counter).values(name=f"{RATED_PRIMED}:{f.product}", value=1).on_conflict_do_nothing())
+            await db.commit()
+            primed.add(f.product)
     return created
 
 
-async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list[VendorVersion], view: dict, now: datetime) -> int:
+def _sev_name(rank: int) -> str:
+    return next((k for k, v in SEV_RANK.items() if v == rank), "info")
+
+
+async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list[VendorVersion], view: dict, now: datetime, *, rated_quiet: bool = False) -> int:
+    """One product's events (evaluate_events). `rated_quiet`: "now rated higher" only noted, never sent (the first
+    evaluation that knows it – the ratings of before are no news)."""
     created = 0
     targets = [(v.version, v) for v in vs] or [("*", None)]
     scopes = [f"vuln:{f.product}:{text}" for text, _ in targets]
-    known, known_cves, known_exploited = await _known(db, scopes)
+    said = await _known(db, scopes)
+    known, known_cves, known_exploited, known_rank = said.keys, said.cves, said.exploited, said.rank
+    made: list[VendorEvent] = []  # the events of this evaluation – stamped when they are committed (see below)
+    first: dict[tuple[str, str], VendorEvent] = {}  # (scope, CVE) → the first event of it, made in this evaluation
     other_keys: list[str] = []
     for text, ver in targets:
         if ver is not None:
@@ -2587,13 +2646,20 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                 **({"tlp": fd["tlp"]} if fd.get("tlp") else {}),
             }
             key = f"{scope}:{fd['id']}"[:400]
+            rank = SEV_RANK.get(fd["severity"], 0)
+            ranks = known_rank.setdefault(scope, {})
             if key not in known and not (cves & known_cves[scope]):
                 silent = base or not _fresh(fd, now) or bool(fd.get("quiet"))
-                db.add(VendorEvent(key=key, kind="vuln", product=f.product, severity=fd["severity"], data=data, baseline=silent, created_at=now, scope=scope))
+                ev = VendorEvent(key=key, kind="vuln", product=f.product, severity=fd["severity"], data=data, baseline=silent, created_at=now, scope=scope)
+                db.add(ev)
+                made.append(ev)
                 known.add(key)
                 known_cves[scope] |= cves
                 if fd["exploited"]:
                     known_exploited[scope] |= cves
+                for c in cves:
+                    ranks[c] = max(ranks.get(c, -1), rank)
+                    first.setdefault((scope, c), ev)
                 created += 0 if silent else 1
                 continue
             # notified before (by this record or another one of the same CVE) – but not as exploited: now it is
@@ -2601,10 +2667,42 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
             if fd["exploited"] and cves and not (cves & known_exploited[scope]) and ekey not in known:
                 silent = base or not _fresh_exploit(fd, now)
                 sev = fd["severity"] if SEV_RANK.get(fd["severity"], 0) >= SEV_RANK["high"] else "high"
-                db.add(VendorEvent(key=ekey, kind="vuln", product=f.product, severity=sev, data=data | {"now_exploited": True, "kev": fd.get("kev")}, baseline=silent, created_at=now, scope=scope))
+                ev = VendorEvent(key=ekey, kind="vuln", product=f.product, severity=sev, data=data | {"now_exploited": True, "kev": fd.get("kev")}, baseline=silent, created_at=now, scope=scope)
+                db.add(ev)
+                made.append(ev)
                 known.add(ekey)
                 known_exploited[scope] |= cves
+                for c in cves:
+                    ranks[c] = max(ranks.get(c, -1), SEV_RANK[sev])
                 created += 0 if silent else 1
+            # notified before – rated lower than now (NVD "awaiting analysis" or OSV without a rating first, 9.8 a few
+            # days later; the vendor's "critical" after NVD's "high"): a rule of "critical, high" never got the first
+            # event, it filters by the severity it was stored with. Only upward, once per level and CVE (whichever
+            # record rates it so); silent where a new event would be (a baseline, not fresh, a quiet first fill) – and
+            # in the first evaluation that knows it (rated_quiet: the rises of before are no news, no flood)
+            said_rank = max((ranks.get(c, -1) for c in cves), default=-1)
+            if cves and rank > said_rank >= 0:
+                same = [first[(scope, c)] for c in cves if (scope, c) in first]
+                if same:
+                    # the first event of this CVE is made in this very evaluation (two records of it, the lower one
+                    # first): it says the highest rating itself – no second message a moment later
+                    for ev in same:
+                        if SEV_RANK.get(ev.severity, 0) < rank:
+                            ev.severity = fd["severity"]
+                    for c in cves:
+                        ranks[c] = max(ranks.get(c, -1), rank)
+                    continue
+                rkey = f"{RATED}:{fd['severity']}:{scope}:{fd['id']}"[:400]
+                if rkey not in known:
+                    silent = rated_quiet or base or not _fresh(fd, now) or bool(fd.get("quiet"))
+                    rated = {"rated_higher": {"from": _sev_name(said_rank), "to": fd["severity"]}}
+                    ev = VendorEvent(key=rkey, kind="vuln", product=f.product, severity=fd["severity"], data=data | rated, baseline=silent, created_at=now, scope=scope)
+                    db.add(ev)
+                    made.append(ev)
+                    known.add(rkey)
+                    created += 0 if silent else 1
+                for c in cves:
+                    ranks[c] = max(ranks.get(c, -1), rank)
         if ver is not None:
             info = release_info(p, ver.version)
             if info and info.get("line"):
@@ -2633,7 +2731,9 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                     if key[:400] in known:
                         continue
                     data = {"product": p.get("label"), "product_key": f.product, "version": ver.version, "label": ver.label, "line": line.get("label") or line["name"], **extra}
-                    db.add(VendorEvent(key=key[:400], kind=kind, product=f.product, severity=sev, data=data, baseline=silent, created_at=now, scope=ev_scope))
+                    ev = VendorEvent(key=key[:400], kind=kind, product=f.product, severity=sev, data=data, baseline=silent, created_at=now, scope=ev_scope)
+                    db.add(ev)
+                    made.append(ev)
                     known.add(key[:400])
                     created += 0 if silent else 1
             if ver.baseline_at is None:
@@ -2652,6 +2752,12 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
         res = await db.execute(update(VendorFollow).where(VendorFollow.id == f.id, VendorFollow.baseline_at.is_(None)).values(baseline_at=now).execution_options(synchronize_session=False))
         if res.rowcount:
             set_committed_value(f, "baseline_at", now)
+    # the events' time as close to their commit as it gets – not the round's start: a rule switched on (or a channel
+    # added) while the round evaluated the products before this one would take an event stamped earlier as "before
+    # me" and never send it (notify.vendor_pending: created after the rule). The round's `now` still decides freshness.
+    at = datetime.now(UTC)
+    for ev in made:
+        ev.created_at = at
     await db.commit()
     return created
 

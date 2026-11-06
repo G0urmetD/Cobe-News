@@ -155,6 +155,9 @@ async def fresh_db(tmp_path, monkeypatch):
     delivery_log.reset()
     delivery_log_api.reset()
     notify.reset()  # the last round's marks belong to the previous test's database
+    from app import systems
+
+    systems.reset()  # the stories' systems: the last look belongs to the previous test's database
     push_api._last_test.clear()
     personal_api._last_test.clear()
     watch_api.reset()  # the bulk rate limit

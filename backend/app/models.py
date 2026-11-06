@@ -81,6 +81,8 @@ class NewsItem(Base):
         # "Betrifft unsere Produkte" (products ?| the followed ones) – migration 0026
         Index("ix_news_items_products", "products", postgresql_using="gin"),
         Index("ix_news_items_cves", "cves", postgresql_using="gin"),
+        # the notification rules' "Systeme" (systems ?| the entries a rule's systems stand for) – migration 0039
+        Index("ix_news_items_systems", "systems", postgresql_using="gin"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -122,6 +124,21 @@ class NewsItem(Base):
     # "Betrifft deine Systeme": from the advisory's structured data, never from words. Recomputed when the details arrive
     # and when a follow or its versions change (story_details.products_round); "Betrifft unsere Produkte" on News
     products: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    # what a notification rule matches by, changed loudly after the story arrived – per dimension, so that a rule widened
+    # before judges the story by the dimension that changed, never by an unrelated one (notify._earlier_news, news.touched):
+    # {"sev": [[at, rating before], …] (each rise), "text": [[at, search text before], …] (title or teaser changed, the
+    # last TEXTS_KEPT), "topics": {topic: at}, "systems": {entry: at}} (gained loudly). Empty: unchanged since it arrived
+    changes: Mapped[dict] = mapped_column(Json, default=dict, server_default=text("'{}'::jsonb"))
+    # the catalogue systems the story concerns – for the notification rules' "Systeme" (app/systems.py), from the WHOLE
+    # catalogue, not only the followed products: a catalogue key ("panos") when the details concern that product (the
+    # same matcher as `products`, without versions), "m:<key>" when its title or teaser names the product, "v:<vendor
+    # id>" when they name the vendor. Computed when the story is stored or its title or teaser changes (mentions), when
+    # its details arrive (keys) and for the products whose catalogue entry changed (systems.systems_round)
+    systems: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    # those of its systems the story gained quietly – by a recompute after a catalogue change or the first backfill,
+    # or from details that did not change: matched and shown, never a reason for a rule to send it (systems.loud) –
+    # an older story is no news because the catalogue learned a product name. One lost is no longer quiet.
+    quiet_systems: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
 
 
 class NewsItemSource(Base):
@@ -137,6 +154,13 @@ class NewsItemSource(Base):
     # the order the further sources came in (SQLite's rowid up to 0.1.15): the first of them takes the story over when
     # its own source is deleted (api.forget_source)
     n: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)
+    # the carry was fresh – the further source listed the story within news.BACKLOG_DAYS of its own date (news._backlog,
+    # decided once, when the carry is noted): only a fresh carry counts for the notification rules ("also in" of a source
+    # switched on later lists up to 200 older stories at once – no summary of them). The list counts every carry.
+    fresh: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    # when a fresh carry was noted (empty: before 0.1.53, or no fresh one) – a rule widened by this source judges an older
+    # story by it only when it came after the widening (notify._earlier_news)
+    carried_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class Counter(Base):
@@ -334,6 +358,10 @@ class NotifyRule(Base):
     kinds: Mapped[list] = mapped_column(Json, default=lambda: ["news"])
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     active_since: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # the arrival number (news.last_seq) when it was switched on: stories after it count – a time misses those of a fetch
+    # under way (fetched_at is set when the fetch begins, the story becomes visible when it commits). Empty (rules from
+    # before 0.1.53): active_since decides
+    active_seq: Mapped[int | None] = mapped_column(BigInteger)
     # the filters before each widening (more severities, sources or kinds): [{"seq", "at", "severities", "sources",
     # "kinds"}] – a story up to `seq` (a Vendor News event up to `at`) is sent only when it matched that filter as well,
     # so a wider rule starts from then instead of sending everything older that newly matches (notify.widened)
@@ -341,6 +369,15 @@ class NotifyRule(Base):
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")  # optimistic concurrency, as channels
     # news only: stories with one of these topics (news.TOPICS; empty = any) – AND with severities and sources
     topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    # "Betrifft": catalogue systems – [{"vendor": "Palo Alto Networks"}] (every product of that vendor, also one the
+    # catalogue adds later) or [{"product": "panos"}] – and own words (Schlagwörter, news only); a story matches one of
+    # either (OR), AND with the rest. Both empty: no restriction. Systems apply to Vendor News events as well (their
+    # product); an entry the catalogue no longer knows stands for nothing, never for "all" (app/systems.py)
+    systems: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    keywords: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    # "Nicht senden, wenn enthalten": a story whose title or teaser has one of these words never comes by this rule
+    # (news only)
+    exclude: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
 
 
 class NotifyRuleChannel(Base):
@@ -351,6 +388,7 @@ class NotifyRuleChannel(Base):
     rule_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("notify_rules.id", ondelete="CASCADE"), primary_key=True)
     channel_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("notify_channels.id", ondelete="CASCADE"), primary_key=True, index=True)
     added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    added_seq: Mapped[int | None] = mapped_column(BigInteger)  # the arrival number then (as NotifyRule.active_seq)
 
 
 class NotifyDelivery(Base):

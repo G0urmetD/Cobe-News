@@ -432,7 +432,11 @@ and turn the number on the menu item red – update these first.
 
 **Notification:** the rule kind "Vulnerability affects one of our systems" reports each vulnerability **once per
 product and version**. If a known vulnerability is later actively exploited (e.g. new in the KEV), exactly one
-**"Now actively exploited: …"** follows. Not sent: what is already known when a newly followed product or a new or
+**"Now actively exploited: …"** follows. If it is later **rated higher** – NVD had not analysed it yet ("Awaiting
+Analysis", stored as info) and rates it 9.8 days later, or the vendor rates it higher than NVD –, **"Now rated higher:
+Critical (was Info): …"** follows with the new severity; a rule for "Critical" and "High" only gets it this way even when
+the first message did not match it. Only upwards, and at most once per level; a rule covering both levels (all
+severities, say) gets a second message about the same finding this way. Not sent: what is already known when a newly followed product or a new or
 changed version is checked for the first time (it is on the page), and advisories older than 30 days – unless fresh in
 the KEV. Admins set up the rules, see [Notifications](/docs/benachrichtigungen#regeln).
 
@@ -617,7 +621,7 @@ Good to know:
 Vendor News, too, remembers **per person** what you have seen – the unit is the **finding**: one vulnerability of one
 followed product (the same CVE on two products is two findings, as you check it per product).
 
-- **New** is a finding reported as news – or again, e.g. because it is now actively exploited – that you have not
+- **New** is a finding reported as news – or again, e.g. because it is now actively exploited or rated higher – that you have not
   opened since. What was there at a product's first fetch ([First fetch](#erstabruf)) is not new; what came more than
   30 days ago counts as read.
 - The tile says "3 new", the lines of the worst findings carry a dot. **Opening** the drawer marks the product's

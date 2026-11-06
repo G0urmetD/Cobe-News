@@ -118,6 +118,8 @@ const deliveryOpsEn: Record<string, string> = {
   "dlog.dry.explain":
     "What would this rule – as it is in the form right now, saved or not – have brought in the chosen period? The stored stories are searched with the same logic as the real sending. Nothing is sent and nothing is stored.",
   "dlog.dry.hint": "What would this rule have brought? Nothing is sent, nothing marked as sent.",
+  "dlog.dry.quiet":
+    "The preview shows everything the rule covers – also older stories that gained a system or topic only afterwards (say, at the first matching after an update). Such stories are not sent; new ones are.",
   "dlog.dry.window": "Period of the dry run",
   "dlog.dry.days_one": "Last day",
   "dlog.dry.days_other": "Last {{count}} days",
@@ -134,6 +136,7 @@ const deliveryOpsEn: Record<string, string> = {
   "dlog.dry.bySource": "source {{source}}",
   "dlog.dry.byTopic": "topic {{topics}}",
   "dlog.dry.byTeams": "product of a chosen team",
+  "dlog.dry.byHits": "match: {{names}}",
   "dlog.dry.truncated": "The newest {{shown}} of {{count}} matches are listed.",
 }
 

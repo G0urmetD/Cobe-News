@@ -16,7 +16,7 @@ import { NEWS_SEV_COLOR } from "@/lib/news-api"
  * "Was hätte diese Regel ausgelöst?" – the rule as it is in the form (not saved) against what is stored of the last
  * 1 / 7 / 30 days. Nothing is sent and nothing is written (backend notify.dry_run).
  */
-export function DryRunPanel({ rule }: { rule: Pick<RuleIn, "severities" | "sources" | "topics" | "lang" | "kinds" | "teams"> }) {
+export function DryRunPanel({ rule }: { rule: Pick<RuleIn, "severities" | "sources" | "topics" | "lang" | "kinds" | "teams" | "systems" | "keywords" | "exclude"> }) {
   const { t } = useTranslation()
   const [days, setDays] = useState<DryDays>(7)
   const [busy, setBusy] = useState(false)
@@ -61,6 +61,8 @@ export function DryRunPanel({ rule }: { rule: Pick<RuleIn, "severities" | "sourc
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">{t("dlog.dry.hint")}</p>
+      {/* the server counts what a story gained quietly too (a first matching, a catalogue change) – the live round does not */}
+      <p className="text-xs text-muted-foreground">{t("dlog.dry.quiet")}</p>
       {error && <p className="text-xs text-destructive">{error}</p>}
       {r && (
         <div className={outdated ? "space-y-3 opacity-60" : "space-y-3"}>

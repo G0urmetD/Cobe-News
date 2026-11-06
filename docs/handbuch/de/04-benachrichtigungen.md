@@ -845,6 +845,7 @@ Felder einer Meldung in `stories`:
 | `kind` | `news`, `vendor.vuln`, `vendor.version`, `vendor.eol`, `vendor.change` oder `source.health`. |
 | `topics` | die [Themen](/docs/news-quellen#themen) der Meldung: `zeroday`, `exploited`, `poc` (Exploit veröffentlicht), `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` (seit 0.1.46; bei Vendor News `exploited`, wenn aktiv ausgenutzt). |
 | `product` | das Produkt, wenn sicher bekannt (wie das Feld „Produkt“ der [Karten](#nachrichten-format)), sonst leer (seit 0.1.46). |
+| `match` | warum die Regel die Meldung bringt: die Namen ihrer Systeme und Schlagwörter, die passten (z. B. `["PAN-OS"]`), sonst leer (seit 0.1.53). |
 
 Bei `vendor.*` öffnet `link` das Produkt auf der Seite Vendor News; `source` ist „Vendor News“. Bei `source.health`
 führen `url` und `link` zur Seite *Integrationen → Gesundheit*; die Schwere ist `high` (tot), `medium` (gestört) oder
@@ -1235,7 +1236,8 @@ Reiter „Regeln“. Lege zuerst mindestens einen Kanal an.
 5. **Kanäle** wählen – mindestens einer, mehrere sind möglich. „Neuen Kanal anlegen“ führt zu den Kanälen.
 6. Bei „Was wird gesendet?“ eine oder mehrere Arten einschalten (siehe unten).
 7. **Schweregrade** wählen (ab Werk Kritisch und Hoch; leer = alle) und bei Security-Meldungen die **Quellen**
-   (leer = alle) und die **Themen** (leer = jede Meldung, siehe [Themen in Regeln](#regel-themen)).
+   (leer = alle) und die **Themen** (leer = jede Meldung, siehe [Themen in Regeln](#regel-themen)) – und bei Bedarf
+   **Systeme**, **Schlagwörter** und **Nicht senden, wenn enthalten** (siehe [Systeme, Schlagwörter und Ausschluss](#regel-systeme)).
 8. Speichern.
 
 In der Liste schaltest du eine Regel mit dem Schalter rechts ein und aus; der Stift öffnet sie, der Papierkorb löscht
@@ -1275,10 +1277,14 @@ Meldungen, Vendor-News-Ereignisse und Zustandswechsel der Quellen, mit derselben
 wäre ein Kanal die ganze Zeit verbunden gewesen). Das Ergebnis:
 
 - die Zahl der Treffer und eine Liste der neuesten (Titel, Zeit, Schwere und warum sie passt: Art, Schwere, Quelle,
-  Thema, Team),
+  Thema, Team, Treffer bei Systemen und Schlagwörtern),
 - wie viele **Nachrichten** daraus geworden wären – was in derselben Minute eintrifft, kommt in einer Runde, ab 4
   Meldungen als eine [Sammelnachricht](#einmal-pro-kanal) –, im Schnitt pro Tag und am stärksten Tag,
 - die Warnung **„Dieser Kanal würde geflutet“**, wenn es an einem Tag mehr als 20 Nachrichten gewesen wären.
+
+Der Probelauf zeigt, was die Regel **abdeckt**: Er zählt auch ältere Meldungen, die ein System oder Thema erst
+nachträglich und still bekommen haben – etwa beim ersten Abgleich nach einem Update oder einer Katalog-Änderung. Solche
+Meldungen verschickt die Regel nicht; neue schon.
 
 Der Probelauf sendet nichts und schreibt nichts: keine Markierung „verschickt“, keine Änderung an Regel oder Kanal. Er
 läuft lesend und mit Zeitlimit; dauert er zu lange, wähle einen kürzeren Zeitraum. Ändert sich das Formular danach,
@@ -1308,6 +1314,52 @@ z. B. „Kritisch an SOC“ nur für *Aktiv ausgenutzt* und *Exploit veröffentl
   [Zustellprotokoll](#protokoll-inhalt) zeigt die Themen jeder verschickten Meldung, das
   [Protokoll](/docs/betrieb#protokoll) jede Änderung der Themen einer Regel.
 
+### Systeme, Schlagwörter und Ausschluss {#regel-systeme}
+
+Mit **Systeme** und **Schlagwörter** („Betrifft“) und **Nicht senden, wenn enthalten** wird aus „alles Kritische“
+eine Regel für genau das, was euch angeht. Beispiel „nur Palo Alto, nur Kritisch“:
+
+1. Neue Regel, Art „Security-Meldungen“ (und, wenn gewünscht, „Schwachstelle betrifft eines unserer Systeme“).
+2. **Schweregrade:** nur *Kritisch*.
+3. **Systeme:** „Alle Produkte von Palo Alto Networks“ – oder einzelne Produkte wie *PAN-OS*.
+4. Optional **Nicht senden, wenn enthalten:** *Webinar*.
+5. [Probelauf](#probelauf) starten, speichern.
+
+- **Systeme** kommen aus dem **ganzen Katalog**, nicht nur aus den gefolgten Produkten. Ein Hersteller umfasst alle
+  seine Produkte – auch solche, die der Katalog später dazubekommt. Eine Meldung passt, wenn
+  - ihre [Details aus der Quelle](/docs/news-quellen#details-aus-der-quelle) das Produkt betreffen (CSAF, NVD-CPE,
+    CVE-Eintrag; „nicht betroffen“ zählt nicht), oder
+  - Titel oder Teaser das Produkt oder den Hersteller nennen (ganze Wörter, „PAN-OS“ auch als „PAN OS“, ein Produkt
+    auch ohne den Hersteller davor: „Chrome“ für *Google Chrome*). Namen aus gewöhnlichen Wörtern – *Exchange*,
+    *Panorama*, *Expedition*, *Teams* – zählen nur, wenn auch der Hersteller genannt ist („Microsoft Exchange“), damit
+    „Die Expedition ins Darknet“ nicht als Palo-Alto-Meldung kommt. Einige bekannte (Exchange, Outlook, Teams, Edge,
+    Windows, Zoom, Spring Framework …) zählen auch im Zusammenhang einer Sicherheitsmeldung: „Exchange-Lücke“, „Kritische
+    Lücke in Exchange“, „Zoom fixes flaws“, „Windows 11“, „Edge-Browser“. Ein Herstellername als Ort oder Begriff zählt
+    nicht („Palo Alto city hall“, „PALO ALTO, Calif.“, „Threat Intel“).
+  - Nennt eine Meldung **nur den Hersteller** („Zyxel warnt vor Angriffen“), passt sie auf „Alle Produkte von Zyxel“,
+    nicht auf ein einzelnes Zyxel-Produkt. Ein Name, den mehrere Produkte eines Herstellers teilen, zählt für das
+    Produkt, dessen Name es ist: „PAN-OS“ ist PAN-OS, nicht Panorama; der längere Name gewinnt („NGINX Plus“ ist nicht
+    auch nginx).
+- Ein **Hersteller ist einer**, auch wenn der Katalog ihn verschieden schreibt: „VMware“ und „Broadcom (VMware)“, „Apache“
+  und „Apache Software Foundation“, „LANCOM“ und „LANCOM Systems“ erscheinen als eine Gruppe, „Alle Produkte“ umfasst
+  alle. Ein Eigentümer in Klammern macht keinen: „CyberArk (Palo Alto Networks)“ gehört nicht zu Palo Alto Networks.
+- **Schlagwörter:** eigene Wörter, Enter oder Komma fügt eines hinzu (höchstens 30, je 2–60 Zeichen). Eines genügt,
+  als ganzes Wort in Titel oder Teaser, Groß-/Kleinschreibung und Akzente egal; Leerzeichen und Bindestrich sind
+  gleich („Citrix Bleed“ findet „Citrix-Bleed“). Reiner Text, keine Muster.
+- **Systeme oder Schlagwörter:** eines von beiden genügt – **und** dazu passen Schweregrade, Quellen, Themen und Teams.
+  Beides leer heißt: keine Einschränkung, wie bisher.
+- **Nicht senden, wenn enthalten:** Steht eines dieser Wörter in Titel oder Teaser, kommt die Meldung über diese Regel
+  nie – egal, was sonst passt.
+- **Vendor News:** Systeme gelten auch für Schwachstellen, neue Versionen und geänderte Advisories (über deren Produkt).
+  Schlagwörter und Ausschluss gelten nur für Security-Meldungen, Quellen-Gesundheit kennt keines davon.
+- **Details kommen später:** Eine Meldung, die erst durch nachgelieferte Details passt, kommt dann – einmal. Lernt
+  dagegen der **Katalog** ein Produkt oder einen Namen dazu (Katalog-Update), werden ältere Meldungen dadurch nicht
+  verschickt.
+- Ein Produkt, das der Katalog nicht mehr kennt, steht in der Regel als „nicht mehr im Katalog“ und passt auf nichts –
+  nie auf „alles“. Entferne es.
+- Die Nachricht sagt, warum sie kommt: **„Treffer: PAN-OS“** (bzw. das Schlagwort) in der Mail und in den Karten; der
+  Webhook bekommt das Feld `match`.
+
 ### Auf Teams beschränken {#regel-teams}
 
 Ist [Teams](/docs/anmeldung#teams) eingeschaltet, hat die Regel ein Feld **Teams**. Leer heißt: alle Produkte. Mit
@@ -1322,11 +1374,26 @@ Eine Regel verschickt nur, was **nach** dem Speichern bzw. Einschalten eintrifft
 nachgeschickt.
 
 - **Neue oder wieder eingeschaltete Regel:** zählt ab diesem Moment. Was eintraf, während sie aus war, kommt nicht.
+  Maßgeblich ist die Reihenfolge des Eintreffens: Eine Meldung aus einem Abruf, der gerade lief, als du gespeichert
+  hast, kommt mit.
 - **Kanal, der einer Regel später hinzugefügt wird:** bekommt nur, was danach eintrifft.
-- **Erweiterter Filter** (mehr Schweregrade, Quellen, Themen oder Arten): Was erst dadurch passt, kommt ab der Änderung. Was
-  schon vorher passte und noch offen ist, kommt weiterhin.
+- **Erweiterter Filter** (mehr Schweregrade, Quellen, Themen, Arten, Systeme oder Schlagwörter, ein Ausschluss-Wort
+  weniger): Was erst dadurch passt, kommt ab der Änderung. Was schon vorher passte und noch offen ist, kommt weiterhin.
+  Ändert sich eine ältere Meldung **nach** der Änderung genau in dem, was erweitert wurde, sodass sie erst dadurch
+  passt – sie wird in eine neue Schwere hochgestuft, eine neu gewählte Quelle bringt sie frisch, sie bekommt ein neu
+  gewähltes Thema oder System durch ein eigenes Ereignis, ihr Titel nennt jetzt ein neues Schlagwort –, kommt sie. Eine
+  Änderung von etwas anderem bringt keine alte Meldung: Hast du *Hoch* dazugenommen, kommt eine schon vorher hohe
+  Meldung nicht, nur weil eine weitere Quelle sie bringt oder ihre Details eintreffen.
 - **Neu eingeschaltete Quelle:** Die älteren Meldungen, die sie beim ersten Abruf mitbringt, werden nicht verschickt –
-  nur, was danach frisch dazukommt.
+  nur, was danach frisch dazukommt. Das gilt auch für Meldungen, die andere Quellen schon gespeichert haben und die sie
+  nur mitführt („auch in“): In der Liste stehen sie unter ihrem Namen, eine Regel nur für diese Quelle bekommt sie nicht,
+  und ihre Einstufung hebt sie nicht an.
+- **Höher eingestuft durch eine weitere Quelle:** Bringt eine weitere Quelle dieselbe Meldung (gleiche Adresse oder
+  gleicher Titel) frisch und stuft sie höher ein, übernimmt die Meldung die höhere Schwere – nur nach oben, wie bei
+  einem Update der eigenen Quelle.
+- **Vendor News höher eingestuft:** Wird ein Befund später höher eingestuft, kommt „Jetzt höher eingestuft: …“ (siehe
+  [Vendor News](/docs/vendor-news)) – eine Regel, die beide Stufen abdeckt, bekommt so eine zweite Nachricht zum selben
+  Befund.
 
 ### Einmal pro Kanal, Sammelnachricht und Wiederholung {#einmal-pro-kanal}
 

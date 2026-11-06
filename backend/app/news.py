@@ -13,11 +13,19 @@ added to `also_in` (and news_item_sources: the story counts for it too); between
 well. Within one source a different URL is a different story (CISA posts "… Adds Two Known Exploited Vulnerabilities
 …" every few days). A known URL whose title or text changed ("[UPDATE] …") is updated: re-rated (the severity only
 rises) and its CVEs merged. The severity comes from rules (CVSS in the text, the publisher's rating, "actively
-exploited", ransomware …) with the reasons kept; catalog entries rate themselves (exploited: at least high).
+exploited", ransomware …) with the reasons kept; catalog entries rate themselves (exploited: at least high). A further
+source that rates the same story higher raises it as well – by the same CVE always, by URL or title when its carry is fresh.
 
 What arrives as backlog (older than BACKLOG_DAYS when fetched – a date without a time counts to the end of that day –,
 or without a date in a source's first fetch) is listed but never notified: `backlog` is decided once, when the story is
-stored, and the rules, the tab's desktop notifications and Web Push all go by it.
+stored, and the rules, the tab's desktop notifications and Web Push all go by it. A further source's carry is decided
+the same way (news_item_sources.fresh): a source switched on later that lists older stories others stored meanwhile
+shows them under its name, but a rule limited to it is not sent them – nor does its rating of them (by URL or title)
+raise them.
+
+What a rule matches by can change after a story arrived – rated higher, its title or teaser changed, carried fresh by a
+further source, a topic or system gained by an event of its own: `changes` (and a carry's carried_at) say when and what
+it was before, per dimension (touched); the next notification round looks at every rule.
 """
 
 import asyncio
@@ -1374,8 +1382,9 @@ async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None, explo
     from app import exploits as exploit_lists  # exploits imports this module
 
     keys = dict((await db.execute(select(NewsSource.id, NewsSource.key))).all())
-    cols = (NewsItem.id, NewsItem.source_id, NewsItem.title, NewsItem.summary, NewsItem.cves, NewsItem.reasons, NewsItem.topics, NewsItem.quiet_topics)
+    cols = (NewsItem.id, NewsItem.source_id, NewsItem.title, NewsItem.summary, NewsItem.cves, NewsItem.reasons, NewsItem.topics, NewsItem.quiet_topics, NewsItem.changes)
     changed, last = 0, None
+    now = datetime.now(UTC)
     while True:
         stmt = select(*cols).where(where).order_by(NewsItem.id).limit(RETOPIC_BATCH)
         if last is not None:
@@ -1398,7 +1407,7 @@ async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None, explo
 
         def compute(rows=rows, dets=dets, known=known, ex=ex, loud=loud) -> list[dict]:  # noqa: ANN001
             out = []
-            for iid, sid, title, summary, ids_, reasons, topics, quiet in rows:
+            for iid, sid, title, summary, ids_, reasons, topics, quiet, changes in rows:
                 old, was_quiet = list(topics or []), list(quiet or [])
                 kw = {"details": dets.get(iid), "kev": known, "reasons": reasons}
                 new = topic_list(title, summary or "", keys.get(sid, ""), list(ids_ or []), exploits=ex, **kw)
@@ -1407,7 +1416,10 @@ async def retopic(db: AsyncSession, where, *, kev: set[str] | None = None, explo
                     baseline_poc = "poc" not in topic_list(title, summary or "", keys.get(sid, ""), list(ids_ or []), exploits=loud, **kw)
                 q = quiet_after(old, new, was_quiet, bulk=bulk, baseline_poc=baseline_poc)
                 if new != old or q != was_quiet:
-                    out.append({"id": iid, "topics": new, "quiet_topics": q, "_moved": new != old})
+                    # a topic gained loudly: what a rule matches by changed (touched – when, per topic) – a quiet one
+                    # changes nothing
+                    gained = sorted(set(new) - set(old) - set(q))
+                    out.append({"id": iid, "topics": new, "quiet_topics": q, "changes": noted(changes, now, topics=gained) if gained else (changes or {}), "_moved": new != old})
             return out
 
         upd = await asyncio.to_thread(compute) if len(rows) > 50 else compute()
@@ -1556,10 +1568,13 @@ def _ids(values) -> list[uuid.UUID]:  # noqa: ANN001
     return out
 
 
-def _also(sources: list[uuid.UUID] | None, *, enabled: bool):  # noqa: ANN202
-    """The story is carried by a further source (news_item_sources) – of `sources`, when given; switched on, when asked.
+def _also(sources: list[uuid.UUID] | None, *, enabled: bool, fresh: bool = False):  # noqa: ANN202
+    """The story is carried by a further source (news_item_sources) – of `sources`, when given; switched on, when asked;
+    `fresh`: only a carry that was no backlog (what the notification rules count – news_item_sources.fresh).
     An uncorrelated IN: SQLite builds the list once (through the source index), not a lookup per story."""
     q = select(NewsItemSource.item_id)
+    if fresh:
+        q = q.where(NewsItemSource.fresh.is_(True))
     if enabled:
         other = aliased(NewsSource)
         q = q.join(other, other.id == NewsItemSource.source_id).where(other.enabled.is_(True))
@@ -1568,20 +1583,54 @@ def _also(sources: list[uuid.UUID] | None, *, enabled: bool):  # noqa: ANN202
     return NewsItem.id.in_(q)
 
 
-def visible(sources: list[uuid.UUID] | None = None):  # noqa: ANN201
+def visible(sources: list[uuid.UUID] | None = None, *, fresh: bool = False):  # noqa: ANN201
     """Where-clause: the story is carried by a switched-on source (the one it was first stored for or a further one,
-    news_item_sources) – of `sources`, when given. Expects NewsSource joined as the story's own source."""
+    news_item_sources) – of `sources`, when given. Expects NewsSource joined as the story's own source. `fresh` (the
+    notification rules): a further source counts only by a fresh carry – the list shows every carry."""
     if not sources:
         # correlated: asked only for a story whose own source is off (rare) – one lookup by the primary key
         other = aliased(NewsSource)
         also = select(1).select_from(NewsItemSource).join(other, other.id == NewsItemSource.source_id)
-        return or_(NewsSource.enabled.is_(True), also.where(NewsItemSource.item_id == NewsItem.id, other.enabled.is_(True)).exists())
-    return or_(and_(NewsSource.enabled.is_(True), NewsItem.source_id.in_(sources)), _also(sources, enabled=True))
+        also = also.where(NewsItemSource.item_id == NewsItem.id, other.enabled.is_(True), *([NewsItemSource.fresh.is_(True)] if fresh else []))
+        return or_(NewsSource.enabled.is_(True), also.exists())
+    return or_(and_(NewsSource.enabled.is_(True), NewsItem.source_id.in_(sources)), _also(sources, enabled=True, fresh=fresh))
 
 
-def carried(sources: list[uuid.UUID]):  # noqa: ANN201
-    """Where-clause: one of `sources` carries the story (switched on or not) – no join needed."""
-    return or_(NewsItem.source_id.in_(sources), _also(sources, enabled=False))
+def carried(sources: list[uuid.UUID], *, fresh: bool = False):  # noqa: ANN201
+    """Where-clause: one of `sources` carries the story (switched on or not) – no join needed. `fresh`: as visible."""
+    return or_(NewsItem.source_id.in_(sources), _also(sources, enabled=False, fresh=fresh))
+
+
+TEXTS_KEPT = 5  # earlier search texts a story keeps (news_items.changes "text") – a title changes a few times at most
+
+
+def noted(changes: dict | None, at: datetime, *, rated_from: str | None = None, text_was: str | None = None, topics=(), systems=()) -> dict:  # noqa: ANN001
+    """A story's `changes` (news_items.changes) with what changed loudly at `at`, per dimension a rule matches by: the
+    rating rose (`rated_from`: the one before), the title or teaser changed (`text_was`: the search text before), these
+    topics or systems were gained. A new dict (the ORM sees the change)."""
+    c = {k: (dict(v) if isinstance(v, dict) else list(v)) for k, v in (changes or {}).items() if isinstance(v, (dict, list))}
+    iso = at.astimezone(UTC).isoformat()
+    if rated_from is not None:
+        c["sev"] = [*c.get("sev", []), [iso, rated_from]]
+    if text_was is not None:
+        c["text"] = [*c.get("text", []), [iso, text_was]][-TEXTS_KEPT:]
+    for dim, gained in (("topics", topics), ("systems", systems)):
+        if gained:
+            c[dim] = {**c.get(dim, {}), **{str(x): iso for x in gained}}
+    return c
+
+
+def touched(item: NewsItem, now: datetime | None = None, **what) -> None:  # noqa: ANN003
+    """What a notification rule matches by changed loudly after the story arrived (noted: the rating rose, the title or
+    teaser changed, a topic or system was gained – a fresh carry is kept on its news_item_sources row, carried_at): kept
+    per dimension in `changes`, and the next notification round looks at every rule. A rule widened before that moment
+    judges the story by the dimension that changed (notify._earlier_news) – a story that arrived before the widening to
+    "high" and was rated high an hour later comes; one that was high already and only got its details does not. In the
+    caller's transaction (it commits)."""
+    from app import notify  # notify imports this module
+
+    item.changes = noted(item.changes, now or datetime.now(UTC), **what)
+    notify.changed()
 
 
 def _backlog(published: datetime, now: datetime, *, undated: bool, primed: bool) -> bool:
@@ -1692,13 +1741,32 @@ async def last_seq(db: AsyncSession) -> int:
     return int(await db.scalar(text("SELECT value FROM counters WHERE name = :n"), {"n": SEQ}) or 0)
 
 
-async def _carried_by(db: AsyncSession, known: NewsItem, src: NewsSource) -> None:
-    """`src` carries this story too: named under "also in" and counted for that source (filters, visibility)."""
+async def _carried_by(db: AsyncSession, known: NewsItem, src: NewsSource, *, fresh: bool) -> None:
+    """`src` carries this story too: named under "also in" and counted for that source (filters, visibility). `fresh`
+    (the carry was no backlog – _backlog of the source's own entry): it counts for the notification rules too, and is
+    news for them (touched). Decided once, by the first carry: the same entry listed again (an undated one in every
+    fetch) changes nothing."""
     if known.source_id == src.id:
         return
     if src.name not in (known.also_in or []):
         known.also_in = [*(known.also_in or []), src.name][:10]
-    await db.execute(pg_insert(NewsItemSource).values(item_id=known.id, source_id=src.id).on_conflict_do_nothing())
+    at = datetime.now(UTC) if fresh else None  # when the carry counts from: a rule widened by this source before that judges by it
+    res = await db.execute(pg_insert(NewsItemSource).values(item_id=known.id, source_id=src.id, fresh=fresh, carried_at=at).on_conflict_do_nothing())
+    if fresh and res.rowcount and not known.backlog:
+        from app import notify
+
+        notify.changed()
+
+
+def _rated_higher(known: NewsItem, s: dict) -> str | None:
+    """The rating only rises: `s` (the same story, its own source's later version or a further source's) rates it higher
+    – the story takes that rating with its reasons first. The rating before, when it rose (else None)."""
+    if SEVERITIES.index(s["severity"]) <= SEVERITIES.index(known.severity):
+        return None
+    was = known.severity
+    known.severity = s["severity"]
+    known.reasons = [*s["reasons"], *(r for r in (known.reasons or []) if r not in s["reasons"])][:5]
+    return was
 
 
 def _updated(known: NewsItem, s: dict) -> bool:
@@ -1709,13 +1777,16 @@ def _updated(known: NewsItem, s: dict) -> bool:
         return False
     again = known.title != s["title"]
     known.title, known.title_key, known.summary, known.content_html = s["title"], s["title_key"], s["summary"], s["content_html"]
-    if SEVERITIES.index(s["severity"]) > SEVERITIES.index(known.severity):
-        known.severity = s["severity"]
-        known.reasons = [*s["reasons"], *(r for r in (known.reasons or []) if r not in s["reasons"])][:5]
+    was = _rated_higher(known, s)
     merged = sorted({*(known.cves or []), *s["cves"]})[:30]
     if merged != sorted(known.cves or []):
         known.cves, again = merged, True
+    text_was = known.search
     known.search = search_text(known.title, known.summary, known.cves)
+    # what a rule matches by changed: the rating (severities), the words (keywords, exclusions) – each with its value of
+    # before, so a rule widened before judges the story by what it was then (notify._earlier_news)
+    if was is not None or known.search != text_was:
+        touched(known, rated_from=was, text_was=text_was if known.search != text_was else None)
     return again
 
 
@@ -1786,11 +1857,18 @@ async def _store_one(
     The topics follow what changed: a new story gets them, an updated one (title, teaser, CVEs) or one that took a
     catalogue's rating (the same CVE) has them computed again."""
     known = await db.scalar(select(NewsItem).where(NewsItem.url_key == s["url_key"]))
+    # this source's entry is no backlog (as a new story's backlog): only then does its carry count for the rules, and
+    # only then does its rating raise the story – a source switched on after weeks, listing older stories others
+    # stored meanwhile, would otherwise make a rule send them (as one summary, or one by one when it rates them higher)
+    fresh = not _backlog(s["published_at"], now, undated=undated, primed=primed)
     if known is not None and known.source_id == src.id:
         before = (known.title, known.summary, list(known.cves or []))
         if _updated(known, s):
             await db.execute(update(StoryDetail).where(StoryDetail.item_id == known.id).values(next_try_at=now))
         if (known.title, known.summary, list(known.cves or [])) != before:
+            from app import systems  # systems imports story_details, which imports this module
+
+            systems.remention(known)  # what the new title or teaser names (the notification rules' "Systeme")
             await db.flush()
             await retopic(db, NewsItem.id == known.id)
     if known is not None and undated and known.seen_at is not None:
@@ -1800,22 +1878,33 @@ async def _store_one(
         lo, hi = s["published_at"] - TITLE_WINDOW, s["published_at"] + TITLE_WINDOW
         same_title = and_(NewsItem.title_key == s["title_key"], NewsItem.source_id != src.id, ~_also([src.id], enabled=False), NewsItem.published_at.between(lo, hi))
         known = await db.scalar(select(NewsItem).where(same_title).limit(1))
+    by_cve_peer = False
     if known is None and by_cve and s["cves"]:
         known = _same_cve(by_cve, s)
-        # "CISA: exploited" on a BSI warning rated by its words: the story takes the higher rating and its reason
-        if known is not None and SEVERITIES.index(s["severity"]) > SEVERITIES.index(known.severity):
-            known.severity, known.reasons = s["severity"], [*s["reasons"], *(known.reasons or [])][:5]
-            await db.flush()
-            await retopic(db, NewsItem.id == known.id)  # "CISA: exploited" – the catalogue's reasons count for its topics
+        by_cve_peer = known is not None
+    # the same story from a further source rated higher – "CISA: exploited" on a BSI warning rated by its words (the same
+    # CVE), a vendor's "critical" on a press article's "medium" (the same URL or title): the story takes the higher
+    # rating and its reasons (the only-rises rule of an update by its own source). By URL or title only when this
+    # source's carry is fresh: a source switched on after weeks would otherwise raise – and so send – older stories of
+    # others. A catalogue's rating of the same CVE counts as it always did (the KEV says "exploited", whenever); news
+    # for a widened rule (touched) only when fresh
+    if known is not None and known.source_id != src.id and (fresh or by_cve_peer) and (was := _rated_higher(known, s)) is not None:
+        if fresh:
+            touched(known, rated_from=was)
+        await db.flush()
+        await retopic(db, NewsItem.id == known.id)  # "CISA: exploited" – the catalogue's reasons count for its topics
     if known is not None:
-        await _carried_by(db, known, src)
+        await _carried_by(db, known, src, fresh=fresh)
         return 0
     seq = await next_seq(db)  # a number lost to a clash below leaves a gap – harmless
     row = {"id": uuid.uuid4(), "source_id": src.id, "fetched_at": now, "seq": seq, **s}
     known_kev = kev if kev is not None else await kev_cves(db, s["cves"])
     ex = exploits if exploits is not None else await exploit_cves(db, s["cves"])
     row["topics"] = topic_list(s["title"], s["summary"], src.key, s["cves"], kev=known_kev, reasons=s["reasons"], exploits=ex)
-    row |= {"seen_at": now if undated else None, "backlog": _backlog(s["published_at"], now, undated=undated, primed=primed)}
+    from app import systems
+
+    row["systems"] = systems.mentions(s["title"], s["summary"])  # the catalogue systems its title and teaser name
+    row |= {"seen_at": now if undated else None, "backlog": not fresh}
     res = await db.execute(pg_insert(NewsItem).values(**row).on_conflict_do_nothing(index_elements=["url_key"]))
     return res.rowcount or 0
 

@@ -817,6 +817,7 @@ Fields of a story in `stories`:
 | `kind` | `news`, `vendor.vuln`, `vendor.version`, `vendor.eol`, `vendor.change` or `source.health`. |
 | `topics` | the story's [topics](/docs/news-quellen#themen): `zeroday`, `exploited`, `poc` (exploit published), `ransomware`, `nopatch`, `breach`, `supply`, `phishing`, `ot` (since 0.1.46; for Vendor News `exploited` when actively exploited). |
 | `product` | the product when reliably known (like the field "Product" of the [cards](#nachrichten-format)), else empty (since 0.1.46). |
+| `match` | why the rule brings the story: the names of its systems and keywords that matched (e.g. `["PAN-OS"]`), else empty (since 0.1.53). |
 
 For `vendor.*`, `link` opens the product on the Vendor News page; `source` is "Vendor News". For `source.health`, `url`
 and `link` lead to the page *Integrations → Health*; the severity is `high` (dead), `medium` (disturbed) or `info` (back
@@ -1202,7 +1203,8 @@ Rules decide *what* goes to which channels. You find them under [*Settings → C
 5. Choose the **channels** – at least one, several are possible. "Create a new channel" leads to the channels.
 6. Under "What is sent?", switch on one or more kinds (see below).
 7. Choose the **severities** (critical and high by default; empty = all) and, for security stories, the **sources**
-   (empty = all) and the **topics** (empty = every story, see [Topics in rules](#regel-themen)).
+   (empty = all) and the **topics** (empty = every story, see [Topics in rules](#regel-themen)) – and if needed
+   **systems**, **keywords** and **Do not send if it contains** (see [Systems, keywords and exclusions](#regel-systeme)).
 8. Save.
 
 In the list, the switch on the right turns a rule on and off; the pencil opens it, the bin deletes it. A rule without a
@@ -1243,10 +1245,14 @@ and source state changes, with the same logic as the real sending (as if a chann
 result:
 
 - the number of matches and a list of the newest (title, time, severity and why it matches: kind, severity, source,
-  topic, team),
+  topic, team, the systems and keywords it matched),
 - how many **messages** that would have been – what arrives within the same minute comes in one round, from 4 stories on
   as one [summary](#einmal-pro-kanal) –, on average a day and on the busiest day,
 - the warning **"This channel would be flooded"** when one day would have had more than 20 messages.
+
+The dry run shows what the rule **covers**: it also counts older stories that gained a system or topic only later and
+quietly – at the first matching after an update or a catalogue change, say. The rule does not send those; new ones it
+does.
 
 The dry run sends nothing and writes nothing: no "sent" mark, no change to rule or channel. It runs read-only and with a
 time limit; if it takes too long, choose a shorter period. If the form changes afterwards, the result fades – just run
@@ -1276,6 +1282,50 @@ to SOC" only for *Actively exploited* and *Exploit published*.
   [delivery log](#protokoll-inhalt) shows the topics of every story sent, the [audit log](/docs/betrieb#protokoll) every
   change of a rule's topics.
 
+### Systems, keywords and exclusions {#regel-systeme}
+
+**Systems** and **keywords** ("Concerns") and **Do not send if it contains** turn "everything critical" into a rule for
+exactly what concerns you. Example "only Palo Alto, only critical":
+
+1. New rule, kind "Security stories" (and, if you like, "Vulnerability affects one of our systems").
+2. **Severities:** *Critical* only.
+3. **Systems:** "All products of Palo Alto Networks" – or single products such as *PAN-OS*.
+4. Optionally **Do not send if it contains:** *webinar*.
+5. Start the [dry run](#probelauf), save.
+
+- **Systems** come from the **whole catalogue**, not only from the followed products. A vendor covers all of its
+  products – also those the catalogue gets later. A story matches when
+  - its [source details](/docs/news-quellen#details-aus-der-quelle) concern the product (CSAF, NVD CPE, CVE record;
+    "not affected" does not count), or
+  - its title or teaser names the product or the vendor (whole words, "PAN-OS" also as "PAN OS", a product also
+    without its vendor in front: "Chrome" for *Google Chrome*). Names made of ordinary words – *Exchange*, *Panorama*,
+    *Expedition*, *Teams* – count only when the vendor is named as well ("Microsoft Exchange"), so that "The
+    expedition into the dark web" is no Palo Alto story. A few well-known ones (Exchange, Outlook, Teams, Edge,
+    Windows, Zoom, Spring Framework …) also count in the context of a security story: "Exchange-Lücke", "critical flaw
+    in Exchange", "Zoom fixes flaws", "Windows 11", "Edge browser". A vendor's name as a place or a term does not count
+    ("Palo Alto city hall", "PALO ALTO, Calif.", "Threat Intel").
+  - A story that names **only the vendor** ("Zyxel warns of attacks") matches "All products of Zyxel", not a single
+    Zyxel product. A name several products of a vendor share counts for the product it is the name of: "PAN-OS" is
+    PAN-OS, not Panorama; the longer name wins ("NGINX Plus" is not nginx as well).
+- **One vendor is one**, however the catalogue spells it: "VMware" and "Broadcom (VMware)", "Apache" and "Apache
+  Software Foundation", "LANCOM" and "LANCOM Systems" show as one group, "All products" covers all of them. An owner in
+  parentheses makes none: "CyberArk (Palo Alto Networks)" does not belong to Palo Alto Networks.
+- **Keywords:** your own words, Enter or a comma adds one (at most 30, 2–60 characters each). One is enough, as a whole
+  word in the title or teaser, case and accents ignored; a blank and a hyphen are the same ("Citrix Bleed" finds
+  "Citrix-Bleed"). Plain text, no patterns.
+- **Systems or keywords:** one of them is enough – **and** severities, sources, topics and teams apply as well. Both
+  empty: no restriction, as before.
+- **Do not send if it contains:** if the title or teaser has one of these words, this rule never sends the story –
+  whatever else matches.
+- **Vendor News:** systems apply to vulnerabilities, new versions and revised advisories as well (by their product).
+  Keywords and exclusions apply to security stories only; source health knows none of them.
+- **Details come later:** a story that matches only through details that arrive later comes then – once. When the
+  **catalogue** learns a product or a name (a catalogue update), older stories are not sent because of it.
+- A product the catalogue no longer knows shows as "no longer in the catalogue" in the rule and matches nothing – never
+  "everything". Remove it.
+- The message says why it comes: **"Match: PAN-OS"** (or the keyword) in the mail and the cards; the webhook gets the
+  field `match`.
+
 ### Limiting to teams {#regel-teams}
 
 When [Teams](/docs/anmeldung#teams) is on, a rule has a **Teams** field. Empty means: all products. With teams the rule
@@ -1287,12 +1337,22 @@ events come from then on, not the older ones; removing the team filter works lik
 
 A rule only sends what arrives **after** it was saved or switched on. Older stories are never sent afterwards.
 
-- **New or re-enabled rule:** counts from that moment. What arrived while it was off does not come.
+- **New or re-enabled rule:** counts from that moment. What arrived while it was off does not come. The order of
+  arrival decides: a story from a fetch that was running when you saved comes along.
 - **Channel added to a rule later:** gets only what arrives afterwards.
-- **Widened filter** (more severities, sources, topics or kinds): what only matches because of it comes from the change on.
-  What matched before and is still open keeps coming.
+- **Widened filter** (more severities, sources, topics, kinds, systems or keywords, one exclusion word less): what only
+  matches because of it comes from the change on. What matched before and is still open keeps coming. If an older story
+  changes **after** the change in exactly what was widened, so that only now does it match – it is rated up into a new
+  severity, a newly chosen source brings it fresh, it gains a newly chosen topic or system through an event of its own,
+  its title now names a new keyword –, it comes. A change of anything else brings no old story: if you added *High*, a
+  story that was high before does not come just because a further source brings it or its details arrive.
 - **Newly switched-on source:** the older stories it brings with its first fetch are not sent – only what arrives fresh
-  afterwards.
+  afterwards. This also holds for stories other sources stored already and that it only carries ("also in"): the list
+  shows them under its name, a rule for this source only does not get them, and its rating does not raise them.
+- **Rated higher by a further source:** if a further source brings the same story (same address or same title) fresh
+  and rates it higher, the story takes the higher severity – only upwards, as with an update by its own source.
+- **Vendor News rated higher:** if a finding is rated higher later, "Now rated higher: …" follows (see
+  [Vendor News](/docs/vendor-news)) – a rule covering both levels gets a second message about the same finding this way.
 
 ### Once per channel, summary and retry {#einmal-pro-kanal}
 

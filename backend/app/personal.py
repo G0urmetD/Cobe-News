@@ -446,8 +446,8 @@ def event_path(ev: VendorEvent) -> str:
     if ev.kind == WATCH:
         return "/watch?" + urlencode({"cve": str((ev.data or {}).get("cve") or "")})
     q = {"product": ev.product}
-    if ev.kind == "vuln" and ev.scope and ev.key.startswith(ev.scope + ":"):
-        q["finding"] = ev.key[len(ev.scope) + 1 :]
+    if ev.kind == "vuln" and (finding := reader.finding_of(ev.key, ev.scope)):
+        q["finding"] = finding  # also "now exploited" and "now rated higher": at the finding they are about
     elif ev.kind in ("version", "eol"):
         q["view"] = "versions"
     elif ev.kind == "change":

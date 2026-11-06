@@ -1226,6 +1226,24 @@ Blöcken von 500 Meldungen neu bewertet (abseits der Ereignisschleife). Nach dem
 läuft das einmal für alle gespeicherten Meldungen. Kein zusätzlicher Abruf. Neu berechnen erzwingen:
 `DELETE FROM settings WHERE key = 'news_products';` – die nächste Runde rechnet alles neu.
 
+**Systeme einer Meldung** (`news_items.systems`, für die Regel-Filter „Systeme“, `app/systems.py`): Katalogschlüssel
+der Produkte, die ihre Details betreffen (derselbe Abgleich wie oben, gegen den **ganzen** Katalog, ohne Versionen –
+erst die Wörter der Details wählen Kandidaten, dann entscheidet der Abgleich), dazu `m:<Schlüssel>` / `v:<Hersteller>`
+für das, was Titel oder Teaser nennen (ganze Wörter; Namen aus gewöhnlichen Wörtern nur mit dem Hersteller, einige
+bekannte auch im Zusammenhang einer Sicherheitsmeldung – `systems.CONTEXT`). Hersteller sind Identitäten: die
+Schreibweisen einer Marke („VMware“ / „Broadcom (VMware)“, „Apache“ / „Apache Software Foundation“, „LANCOM“ / „LANCOM
+Systems“ …) sind ein Hersteller (`v:<Gruppe>`, `GET /api/vendor/catalog` liefert je Produkt `vendor_group`); Regeln mit
+jeder Schreibweise gelten weiter. Berechnet
+beim Speichern und bei geändertem Titel/Teaser (Nennungen), beim Eintreffen der Details (Schlüssel) – und im
+Hintergrund (Schritt „systems“ der News-Runde) einmal nach dem Update auf Migration 0039 für alle Meldungen, danach nur
+für Katalogprodukte und Hersteller, deren Katalog-Eintrag sich geändert hat (Fingerabdruck je Produkt über die Felder,
+die der Abgleich liest – nicht Beispiel, Versionsbefehl oder Hinweis –, in der Einstellungszeile `news_systems`), in
+Blöcken von 500; eine neue Abgleich-Version (`SYSTEMS_V`) rechnet alle Meldungen neu. Was so dazukommt, ist **leise** (`news_items.quiet_systems`):
+Regeln verschicken deshalb keine ältere Meldung; der Probelauf zählt sie mit (er zeigt, was eine Regel abdeckt). Neu berechnen erzwingen:
+`DELETE FROM settings WHERE key = 'news_systems';`. Migration 0039 fügt nur Spalten mit festem Standardwert und einen
+GIN-Index hinzu (`notify_rules.systems|keywords|exclude`, `news_items.systems|quiet_systems`); der Downgrade entfernt sie
+und die Einstellungszeile.
+
 **Themen** (`news_items.topics`): Das Thema „Exploit veröffentlicht“ (`poc`) kommt aus der SSVC-Einstufung der CISA in
 den gespeicherten cvelistV5-Einträgen (und dem Wortlaut); ändert sich die Einstufung beim Speichern eines Eintrags,
 werden die Meldungen zu dieser CVE neu berechnet. Dazu kommen die eingeschalteten Exploit-Sammlungen (`exploit_refs`,
@@ -1243,7 +1261,9 @@ Regel-Version (`news_topics_v` 2) berechnet der Themen-Job alle gespeicherten Me
   die Schublade mit den SMTP-Einstellungen und der Testmail). Ein neuer E-Mail-Kanal ohne eingerichteten Server fragt in
   seiner Schublade zuerst nach dem Server; E-Mail-Kanäle ohne Server zeigen „E-Mail-Server fehlt“.
 - **Regeln** – *was*: Name, an/aus, Schweregrade (z. B. nur Kritisch + Hoch), Quellen (leer = alle), bei News Themen
-  (`notify_rules.topics`, eines genügt, leer = jede Meldung), Sprache und
+  (`notify_rules.topics`, eines genügt, leer = jede Meldung), „Betrifft“: Systeme aus dem Katalog
+  (`notify_rules.systems`, Hersteller oder Produkt – auch für Vendor News) oder Schlagwörter (`notify_rules.keywords`),
+  „Nicht senden, wenn enthalten“ (`notify_rules.exclude`, nur News), Sprache und
   **ein oder mehrere Kanäle**. Arten: News, Vendor News (Schwachstellen; neue Versionen und Support-Ende) und
   *Quelle gestört oder tot* ([Quellen-Gesundheit](#quellen-gesundheit) – Schweregrade und Quellen gelten dafür nicht).
 
@@ -1260,7 +1280,27 @@ Regel-Version (`news_topics_v` 2) berechnet der Themen-Job alle gespeicherten Me
   schicken. Eine neue (oder wieder eingeschaltete) Regel und ein Kanal, der einer Regel später hinzugefügt wird, gelten
   nur für Meldungen, die **danach** eintreffen – kein Schwall alter Meldungen. Ebenso eine Regel, deren Filter erweitert
   wird (mehr Schweregrade, Quellen, Themen oder Arten): was erst dadurch passt, kommt ab der Änderung (Eingangsnummer der
-  Meldung, bei Vendor News der Zeitpunkt); was schon vorher passte und noch offen ist, kommt weiterhin.
+  Meldung, bei Vendor News der Zeitpunkt); was schon vorher passte und noch offen ist, kommt weiterhin. Ändert sich eine
+  ältere Meldung danach laut, wird je Merkmal geprüft (`news_items.changes`: Anstieg der Schwere mit der Schwere davor,
+  frühere Suchtexte bei geändertem Titel/Teaser, Zeit je laut gewonnenem Thema und System;
+  `news_item_sources.carried_at`: Zeit eines frischen Mitführens): sie kommt nur, wenn sie in jedem Merkmal, das der
+  Filter davor einschränkte, zu ihm passt – oder in diesem Merkmal zum Zeitpunkt der Erweiterung noch nicht zum
+  erweiterten Filter passte und erst die Änderung danach sie passend machte. Eine Änderung eines anderen Merkmals
+  (frisch mitgeführt, Details eingetroffen, wenn nur Schweregrade erweitert wurden) bringt keine alte Meldung. „Ab jetzt“ zählt bei News nach der Eingangsnummer
+  (`notify_rules.active_seq`, `notify_rule_channels.added_seq` – Regeln und Verknüpfungen von vor 0.1.53: der
+  Zeitpunkt): eine Meldung aus einem Abruf, der beim Speichern lief, kommt mit. Vendor-News-Ereignisse tragen die Zeit,
+  zu der ihr Produkt geschrieben wird (nicht den Beginn der Runde).
+- Eine weitere Quelle, die eine Meldung nur mitführt („auch in“, `news_item_sources`), zählt für eine Regel nur, wenn
+  sie sie **frisch** brachte (`fresh`: nach derselben Regel wie `backlog`) – eine spät eingeschaltete Quelle bringt keine
+  Sammelnachricht alter Meldungen anderer Quellen, und ihre Einstufung hebt sie nicht an. Migration
+  `0038_rule_delivery_fixes`: bestehende Verknüpfungen gelten als frisch nur bei Meldungen des letzten Tages (was eine
+  Runde noch offen haben kann), alle anderen als nicht frisch; die neuen Spalten sind leer.
+- Vendor News: Wird ein bekannter Befund später höher eingestuft (NVD bewertet eine CVE erst nach Tagen), kommt ein
+  Ereignis „Jetzt höher eingestuft“ (`rated:<Schwere>:<Scope>:<Befund>`) – nur nach oben, je Stufe einmal, still wie
+  ein neues (Erstabruf, älter als 30 Tage, Erstbefüllung). Die erste Prüfung nach dem Update auf 0.1.53 merkt sich die
+  Einstufungen nur, ohne zu senden – je Produkt bei dessen erster Prüfung (Zähler `vendor_rated_primed:<Produkt>`; ein
+Produkt, dessen Quellen noch nicht geantwortet haben, wird erst dann vorbereitet). Eine Regel, die beide Stufen abdeckt,
+bekommt so eine zweite Nachricht zum selben Befund.
 - Jede Runde schaut nur nach, wenn sich etwas getan hat: eine neue Meldung oder ein neues Vendor-News-Ereignis, ein
   geänderter Kanal, eine geänderte Regel oder der E-Mail-Server, geänderte Themen einer Meldung (eine Regel mit Themen
   verschickt eine Meldung, die ihr Thema erst später bekommt, dann – einmal), oder die Pause eines Kanals ist um. Sonst kostet sie

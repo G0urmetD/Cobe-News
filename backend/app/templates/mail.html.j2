@@ -71,13 +71,14 @@
         </td></tr>
         {% if s.ours %}<tr><td style="padding:4px 16px 0;">{{ ours(s) }}</td></tr>{% endif %}
         <tr><td class="cn-text" style="padding:6px 16px 2px;font-size:16px;font-weight:600;line-height:1.35;color:#1f2330;">{% if s.url %}<a class="cn-text" href="{{ s.url }}" style="color:#1f2330;text-decoration:none;">{{ s.title }}</a>{% else %}{{ s.title }}{% endif %}</td></tr>
-        {% if s.facts.product or s.facts.cves or s.facts.topics %}
+        {% if s.facts.product or s.facts.cves or s.facts.topics or s.facts.hits %}
         <tr><td class="cn-muted" style="padding:5px 16px 0;font-size:12px;line-height:22px;color:#5b6175;">
           {%- if s.facts.product %}<span class="cn-text" style="color:#1f2330;font-weight:600;">{{ s.facts.product }}</span>{% endif %}
           {%- if s.facts.cves %}{% if s.facts.product %} &nbsp;·&nbsp; {% endif %}{% for c in s.facts.cves %}<span class="cn-muted" style="{{ mono }}font-size:12px;color:#5b6175;white-space:nowrap;">{{ c }}</span>{% if not loop.last %}, {% endif %}{% endfor %}{% if s.facts.cves_more %} {{ s.facts.cves_more }}{% endif %}{% endif %}
           {%- if s.facts.topics %}{% if s.facts.product or s.facts.cves %} &nbsp;·&nbsp;{% endif %}
             {%- for t in s.facts.topics %} <span class="{{ 'cn-hot' if t.hot else 'cn-chip' }}" style="display:inline-block;padding:0 7px;border-radius:4px;background:{{ '#fde8e6' if t.hot else '#eef0f6' }};color:{{ '#a0221b' if t.hot else '#3a4055' }};font-size:11px;font-weight:600;line-height:18px;white-space:nowrap;">{{ t.label }}</span>{% endfor %}
           {%- endif %}
+          {%- if s.facts.hits %}{% if s.facts.product or s.facts.cves or s.facts.topics %} &nbsp;·&nbsp; {% endif %}<span class="cn-muted" style="color:#5b6175;">{{ s.facts.hits }}</span>{% endif %}
         </td></tr>
         {% endif %}
         {% if s.tlp %}<tr><td style="padding:6px 16px 0;"><span class="cn-tlp" style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e6f4ea;color:#1e6b34;font-size:11px;font-weight:700;">{{ s.tlp }}</span></td></tr>{% endif %}

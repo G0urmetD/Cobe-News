@@ -14,6 +14,10 @@ export interface VendorProduct {
   key: string
   label: string
   vendor: string
+  /** the vendor's identity in the catalogue, one for all of its spellings ("broadcomvmware" for "VMware" and "Broadcom
+   *  (VMware)") and its name – catalogue products only (app/systems.py) */
+  vendor_group?: string
+  vendor_group_name?: string
   category: VendorCategory
   scheme: VersionScheme
   example: string

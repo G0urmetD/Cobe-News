@@ -251,8 +251,11 @@ async def news_read_all(db: AsyncSession, user: User, where: list, joins, *, upt
 
 
 def finding_of(key: str, scope: str | None) -> str | None:
-    """The finding (advisory id) an event of kind "vuln" is about: its key is <scope>:<id> or exploited:<scope>:<id>."""
-    rest = key[len("exploited:") :] if key.startswith("exploited:") else key
+    """The finding (advisory id) an event of kind "vuln" is about: its key is <scope>:<id>, exploited:<scope>:<id> or
+    rated:<severity>:<scope>:<id> ("now rated higher" – the finding is unread again, as after "now exploited")."""
+    from app.vendor import event_rest  # vendor imports much – only when asked
+
+    rest = event_rest(key)
     if scope and rest.startswith(scope + ":"):
         return rest[len(scope) + 1 :] or None
     return None

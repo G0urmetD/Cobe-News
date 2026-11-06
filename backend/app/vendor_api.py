@@ -20,6 +20,7 @@ from app import vendor_score as score_svc
 from app import vendor_sources as src
 from app import version_input, vmware_builds
 from app import settings as settings_store
+from app import systems
 from app.crypto import encrypt_str
 from app.deps import Admin, Db, NoNul, Reader, api_error
 from app.models import VendorFetch, VendorFollow, VendorVersion
@@ -75,6 +76,12 @@ async def get_catalog(user: Reader, db: Db) -> dict:
     vers = await svc.versions_of(db, [f.id for f in fs])
     followed = {f.product: {"enabled": f.enabled, "versions": len(vers.get(f.id, []))} for f in fs}
     products = [_product_out(p) for p in cat["products"]]
+    # the vendor as the notification rules' "Systeme" know it: one per brand, whatever the spelling ("VMware",
+    # "Broadcom (VMware)") – the rule editor groups the products by it (app/systems.py)
+    ix = systems.index()
+    for p in products:
+        if (gid := ix.vendor_of.get(p["key"])) is not None:
+            p["vendor_group"], p["vendor_group_name"] = gid, ix.vendors[gid]["name"]
     for f in fs:
         if f.custom:
             products.append(_product_out(catalog.custom_product({**f.custom, "key": f.product})))

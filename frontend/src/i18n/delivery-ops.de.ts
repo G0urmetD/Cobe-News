@@ -122,6 +122,8 @@ const deliveryOpsDe: Record<string, string> = {
   "dlog.dry.explain":
     "Was hätte diese Regel – so wie sie gerade im Formular steht, auch ungespeichert – im gewählten Zeitraum ausgelöst? Gesucht wird in den gespeicherten Meldungen mit derselben Logik wie beim echten Versand. Es wird nichts gesendet und nichts gespeichert.",
   "dlog.dry.hint": "Was hätte diese Regel ausgelöst? Nichts wird gesendet, nichts als „gesendet“ markiert.",
+  "dlog.dry.quiet":
+    "Die Vorschau zeigt alles, was die Regel abdeckt – auch ältere Meldungen, die ein System oder Thema erst nachträglich erhalten haben (etwa beim ersten Abgleich nach einem Update). Gesendet werden solche Meldungen nicht; neue Meldungen schon.",
   "dlog.dry.window": "Zeitraum des Probelaufs",
   "dlog.dry.days_one": "Letzter Tag",
   "dlog.dry.days_other": "Letzte {{count}} Tage",
@@ -138,6 +140,7 @@ const deliveryOpsDe: Record<string, string> = {
   "dlog.dry.bySource": "Quelle {{source}}",
   "dlog.dry.byTopic": "Thema {{topics}}",
   "dlog.dry.byTeams": "Produkt eines gewählten Teams",
+  "dlog.dry.byHits": "Treffer: {{names}}",
   "dlog.dry.truncated": "Die neuesten {{shown}} von {{count}} Treffern sind aufgeführt.",
 }
 

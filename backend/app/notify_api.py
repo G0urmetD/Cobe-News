@@ -13,14 +13,16 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.orm.exc import StaleDataError
 
 from app import audit, delivery_log, netaddr, notify
+from app import keywords as words_svc
 from app import news as news_svc
+from app import systems as systems_svc
 from app import settings as settings_store
 from app.crypto import decrypt_str, encrypt_str
 from app.deps import Admin, Db, NoNul, api_error
@@ -382,6 +384,11 @@ def _rule_out(r: NotifyRule, channel_ids: list[uuid.UUID], team_ids: list[uuid.U
         "severities": list(r.severities or []),
         "sources": list(r.sources or []),
         "topics": notify.rule_topics(r),
+        # "Betrifft" (systems as stored: {"vendor"} | {"product"} – the editor names them from the catalogue) and the
+        # words that keep a story away
+        "systems": notify.rule_systems(r),
+        "keywords": notify.rule_keywords(r),
+        "exclude": notify.rule_exclude(r),
         "lang": r.lang,
         "kinds": notify.rule_kinds(r),
         "created_at": r.created_at.isoformat(),
@@ -389,7 +396,43 @@ def _rule_out(r: NotifyRule, channel_ids: list[uuid.UUID], team_ids: list[uuid.U
     }
 
 
-class RuleIn(_M):
+class SystemIn(_M):
+    """One system of a rule: a catalogue vendor (every product of it, also one added later) or one product."""
+
+    vendor: str | None = Field(default=None, min_length=1, max_length=120, pattern=NAME)
+    product: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9._+-]{0,63}$")
+
+    @model_validator(mode="after")
+    def _one(self) -> "SystemIn":
+        if (self.vendor is None) == (self.product is None):
+            raise ValueError("a vendor or a product")
+        return self
+
+    def entry(self) -> dict:
+        return {"vendor": self.vendor} if self.vendor is not None else {"product": self.product}
+
+
+def _words(v: list[str] | None) -> list[str] | None:
+    return None if v is None else words_svc.clean(v)
+
+
+class _Concerns(_M):
+    """"Betrifft" and "Nicht senden, wenn enthalten" – of a rule and of its dry run. None (not sent – a client from
+    before 0.1.53): an existing rule keeps what it has, a new one has none."""
+
+    systems: list[SystemIn] | None = Field(default=None, max_length=systems_svc.ENTRIES_MAX)
+    keywords: list[str] | None = Field(default=None, max_length=words_svc.WORDS_MAX)
+    exclude: list[str] | None = Field(default=None, max_length=words_svc.WORDS_MAX)
+
+    _kw = field_validator("keywords", "exclude")(_words)
+
+    def system_entries(self) -> list[dict] | None:
+        if self.systems is None:
+            return None
+        return list({systems_svc.text_of(e): e for e in (x.entry() for x in self.systems)}.values())
+
+
+class RuleIn(_Concerns):
     name: str = Field(min_length=2, max_length=100, pattern=NAME)
     enabled: bool = True
     channels: list[uuid.UUID] = Field(default_factory=list, max_length=20)
@@ -438,14 +481,28 @@ async def _apply_rule(db, rule: NotifyRule, body: RuleIn, *, new: bool) -> list[
     if body.topics is not None or new:
         rule.topics = [t for t in news_svc.TOPICS if t in (body.topics or [])]
     rule.kinds = list(dict.fromkeys(body.kinds))
+    if (chosen := body.system_entries()) is not None or new:
+        # a system the catalogue does not know is refused – unless the rule has it already (the catalogue dropped it
+        # since: kept, it stands for nothing; the editor shows it as gone)
+        had = {systems_svc.text_of(e) for e in ([] if new else notify.rule_systems(rule))}
+        if unknown := [e for e in chosen or [] if not systems_svc.known(e) and systems_svc.text_of(e) not in had]:
+            raise api_error(422, "system_not_found", name=str(unknown[0].get("product") or unknown[0].get("vendor"))[:120])
+        rule.systems = chosen or []
+    if body.keywords is not None or new:
+        rule.keywords = list(body.keywords or [])
+    if body.exclude is not None or new:
+        rule.exclude = list(body.exclude or [])
     rule.enabled = body.enabled
     now = datetime.now(UTC)
+    # the arrival number now: "from now on" by arrival – a story of a fetch under way now (its time is earlier, it
+    # becomes visible later) still comes (notify.arrived_after)
+    seq = await news_svc.last_seq(db)
     if body.enabled and not was_on:
-        rule.active_since = now  # switched on (or new): from now on – not the stories that came while it was off
+        rule.active_since, rule.active_seq = now, seq  # switched on (or new): from now on – not the stories that came while it was off
         rule.earlier = []
     elif body.enabled and notify.widens(before, notify.rule_filter(rule, want_teams)):
         # widened: what newly matches counts from now on (the current arrival number) – what matched before still comes
-        notify.widened(rule, before, await news_svc.last_seq(db), now)
+        notify.widened(rule, before, seq, now)
     if new:
         db.add(rule)
         await db.flush()
@@ -457,7 +514,7 @@ async def _apply_rule(db, rule: NotifyRule, body: RuleIn, *, new: bool) -> list[
             await db.execute(delete(NotifyRuleChannel).where(NotifyRuleChannel.rule_id == rule.id, NotifyRuleChannel.channel_id.in_(gone)))
     for cid in wanted:
         if cid not in have:  # a channel added to the rule: from now on, too
-            db.add(NotifyRuleChannel(rule_id=rule.id, channel_id=cid, added_at=now))
+            db.add(NotifyRuleChannel(rule_id=rule.id, channel_id=cid, added_at=now, added_seq=seq))
     if set(want_teams) != set(had_teams):
         await db.execute(delete(NotifyRuleTeam).where(NotifyRuleTeam.rule_id == rule.id))
         for tid in want_teams:
@@ -480,14 +537,18 @@ async def _rule_state(db, r: NotifyRule) -> dict:  # noqa: ANN001
         "severities": list(r.severities or []),
         "sources": sorted(names.get(x, x) for x in r.sources or []),
         "topics": notify.rule_topics(r),
+        "systems": sorted((systems_svc.label(e) for e in notify.rule_systems(r)), key=str.lower),
+        "keywords": notify.rule_keywords(r),
+        "exclude": notify.rule_exclude(r),
         "lang": r.lang,
         "channels": sorted(chans.values(), key=str.lower),
         "teams": sorted(teams.values(), key=str.lower),
     }
 
 
-class DryRunIn(_M):
-    """A rule as it is being edited (not stored) – the fields that decide what it brings – and the window."""
+class DryRunIn(_Concerns):
+    """A rule as it is being edited (not stored) – the fields that decide what it brings – and the window. Its systems
+    are not checked against the catalogue: one it no longer knows stands for nothing, as in the live round."""
 
     severities: list[Severity] = Field(default_factory=list, max_length=5)
     sources: list[uuid.UUID] = Field(default_factory=list, max_length=50)
@@ -521,6 +582,9 @@ async def dry_run(body: DryRunIn, admin: Admin, db: Db) -> dict:
         kinds=list(dict.fromkeys(body.kinds)),
         lang=body.lang,
         earlier=[],
+        systems=body.system_entries() or [],
+        keywords=list(body.keywords or []),
+        exclude=list(body.exclude or []),
     )
     async with _dry_lock:
         try:
