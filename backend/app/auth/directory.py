@@ -180,6 +180,10 @@ async def provision(db: AsyncSession, du: DirectoryUser) -> User:
     approval = await approval_required(db)
     if user is None:
         if not await _name_free(db, du.username):
+            # a sign-in of the same account committed its row between the look-up above and this one (two first sign-ins
+            # at once): that row is this account's, no conflict – again, now finding it (and waiting on its lock)
+            if await db.scalar(select(User.id).where(User.auth_source == du.source, User.external_id == du.external_id)) is not None:
+                return await provision(db, du)
             raise DirectoryError("username_conflict")  # a local account with the same name is never taken over
         user = User(
             username=du.username,

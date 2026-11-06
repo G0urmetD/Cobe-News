@@ -352,6 +352,33 @@ async def test_two_sign_ins_at_once_make_one_waiting_account(ad):
     assert len(rows) == 1 and rows[0].deactivated_reason == "pending"
 
 
+async def test_a_first_sign_in_committed_between_the_two_look_ups_is_no_name_conflict(ad, monkeypatch):
+    """The interleaving behind a rare CI failure of the test above: the second sign-in looked for the account by its id
+    before the first one committed it, and by its name after – the name was taken by this very account, not by another."""
+    await _approval(False)
+    du = person(1)
+    real = directory.resolve_role
+    done = []
+
+    async def first_commits_meanwhile(db_, source, groups, user_id=None):  # noqa: ANN001, ANN202
+        if not done:
+            done.append(1)
+            async with db.session() as other:
+                try:
+                    await directory.provision(other, du)
+                except directory.ApprovalPending:
+                    await other.commit()
+        return await real(db_, source, groups, user_id)
+
+    monkeypatch.setattr(directory, "resolve_role", first_commits_meanwhile)
+    async with db.session() as s:
+        with pytest.raises(directory.ApprovalPending):
+            await directory.provision(s, du)
+    async with db.session() as s:
+        rows = list(await s.scalars(select(User).where(User.external_id == du.external_id)))
+    assert len(rows) == 1 and rows[0].deactivated_reason == "pending"
+
+
 # ---------------------------------------------------------------- bound to the directory id, never to the name
 
 
