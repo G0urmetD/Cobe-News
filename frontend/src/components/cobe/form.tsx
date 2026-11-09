@@ -1,10 +1,10 @@
-import { useId, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Lock } from "lucide-react"
 import { MoreText } from "@/components/cobe/common"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { FieldIdContext } from "@/components/ui/field-context"
+import { FieldIdContext, FieldLabelIdContext, FieldLabelTextContext } from "@/components/ui/field-context"
 import { cn } from "@/lib/utils"
 
 /** A labelled toggle row – the standard replacement for checkboxes throughout the app. */
@@ -71,12 +71,19 @@ export function Field({
   // the label points at the control: its own id (htmlFor) or one given to the first Input/Select/Textarea inside
   const auto = useId()
   const id = htmlFor ?? auto
+  // what names a control that is no input (MultiSelect: aria-labelledby): the label – or only its text, when an
+  // <Explained/> in it carries the text's id (its info button is no part of the name)
+  const labelId = `${auto}-label`
+  const [ownText, setOwnText] = useState(false)
+  const labelText = useMemo(() => ({ id: `${auto}-text`, use: setOwnText }), [auto])
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={id} className="text-[13px] font-medium">
-        {label}
+      <Label htmlFor={id} id={labelId} className="text-[13px] font-medium">
+        <FieldLabelTextContext.Provider value={labelText}>{label}</FieldLabelTextContext.Provider>
       </Label>
-      <FieldIdContext.Provider value={htmlFor ? undefined : auto}>{children}</FieldIdContext.Provider>
+      <FieldIdContext.Provider value={htmlFor ? undefined : auto}>
+        <FieldLabelIdContext.Provider value={ownText ? labelText.id : labelId}>{children}</FieldLabelIdContext.Provider>
+      </FieldIdContext.Provider>
       {hint && (
         <p className="text-xs text-muted-foreground">
           <MoreText>{hint}</MoreText>

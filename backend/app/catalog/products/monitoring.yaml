@@ -23,7 +23,7 @@
 - key: icinga
 - key: nagios-xi
   label: Nagios XI
-  vendor: Nagios
+  vendor: Nagios Enterprises
   cpes: [a:nagios:nagios_xi]
   kw: [Nagios XI]
   example: 2024R1.3
@@ -38,6 +38,7 @@
   version_cmd: nagios --version
 - key: icinga-web
 - key: grafana
+  vendor: Grafana Labs
   cpes: [a:grafana:grafana]
   osv: [[Go, github.com/grafana/grafana]]
 - key: prometheus
@@ -60,7 +61,9 @@
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: centreon
 - key: telegraf
+  vendor: InfluxData
 - key: jaeger
+  vendor: The Linux Foundation
 
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
 - key: manageengine-opmanager

@@ -13,14 +13,13 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter
-from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.orm.exc import StaleDataError
 
-from app import audit, delivery_log, netaddr, notify
-from app import keywords as words_svc
+from app import audit, concerns, delivery_log, netaddr, notify
 from app import news as news_svc
 from app import systems as systems_svc
 from app import settings as settings_store
@@ -396,40 +395,11 @@ def _rule_out(r: NotifyRule, channel_ids: list[uuid.UUID], team_ids: list[uuid.U
     }
 
 
-class SystemIn(_M):
-    """One system of a rule: a catalogue vendor (every product of it, also one added later) or one product."""
-
-    vendor: str | None = Field(default=None, min_length=1, max_length=120, pattern=NAME)
-    product: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9._+-]{0,63}$")
-
-    @model_validator(mode="after")
-    def _one(self) -> "SystemIn":
-        if (self.vendor is None) == (self.product is None):
-            raise ValueError("a vendor or a product")
-        return self
-
-    def entry(self) -> dict:
-        return {"vendor": self.vendor} if self.vendor is not None else {"product": self.product}
-
-
-def _words(v: list[str] | None) -> list[str] | None:
-    return None if v is None else words_svc.clean(v)
-
-
-class _Concerns(_M):
-    """"Betrifft" and "Nicht senden, wenn enthalten" – of a rule and of its dry run. None (not sent – a client from
-    before 0.1.53): an existing rule keeps what it has, a new one has none."""
-
-    systems: list[SystemIn] | None = Field(default=None, max_length=systems_svc.ENTRIES_MAX)
-    keywords: list[str] | None = Field(default=None, max_length=words_svc.WORDS_MAX)
-    exclude: list[str] | None = Field(default=None, max_length=words_svc.WORDS_MAX)
-
-    _kw = field_validator("keywords", "exclude")(_words)
-
-    def system_entries(self) -> list[dict] | None:
-        if self.systems is None:
-            return None
-        return list({systems_svc.text_of(e): e for e in (x.entry() for x in self.systems)}.values())
+# "Betrifft" and "Nicht senden, wenn enthalten" – of a rule and of its dry run (app/concerns.py: the same checks as
+# the News list's filter and a person's own notifications). None (not sent – a client from before 0.1.53): an existing
+# rule keeps what it has, a new one has none.
+SystemIn = concerns.SystemIn
+_Concerns = concerns.Concerns
 
 
 class RuleIn(_Concerns):
@@ -484,9 +454,7 @@ async def _apply_rule(db, rule: NotifyRule, body: RuleIn, *, new: bool) -> list[
     if (chosen := body.system_entries()) is not None or new:
         # a system the catalogue does not know is refused – unless the rule has it already (the catalogue dropped it
         # since: kept, it stands for nothing; the editor shows it as gone)
-        had = {systems_svc.text_of(e) for e in ([] if new else notify.rule_systems(rule))}
-        if unknown := [e for e in chosen or [] if not systems_svc.known(e) and systems_svc.text_of(e) not in had]:
-            raise api_error(422, "system_not_found", name=str(unknown[0].get("product") or unknown[0].get("vendor"))[:120])
+        concerns.check_known(chosen, [] if new else notify.rule_systems(rule))
         rule.systems = chosen or []
     if body.keywords is not None or new:
         rule.keywords = list(body.keywords or [])

@@ -57,7 +57,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app import db as dbm
-from app import delivery_log, netaddr, notify, quiet, reader, teams, webpush
+from app import concerns, delivery_log, netaddr, notify, quiet, reader, teams, webpush
+from app import systems as systems_svc
 from app import settings as settings_store
 from app.config import get_config
 from app.crypto import decrypt_str
@@ -187,14 +188,33 @@ def masked(p: PersonNotify | None) -> str | None:
     return f"{p.teams_host}/…" if p is not None and p.teams_url_enc and p.teams_host else None
 
 
-def wants(p: PersonNotify, ev_kind: str, severity: str) -> bool:
-    """The person's filter: the kind (vulnerabilities | versions & EOL | advisory changed) and, for vulnerabilities and
-    advisory changes, the minimum severity (as the rules: the severity of a version or EOL event is not filtered)."""
+def wants(p: PersonNotify, ev_kind: str, severity: str, product: str | None = None, keys: set[str] | None = None) -> bool:
+    """The person's filter: the kind (vulnerabilities | versions & EOL | advisory changed), for vulnerabilities and
+    advisory changes the minimum severity (as the rules: the severity of a version or EOL event is not filtered), and
+    the systems (0.1.54, app/concerns.py as a rule's for Vendor News: the event's product is one of theirs – a vendor:
+    each of its catalogue products; `keys`: their product keys, when known already)."""
     if ev_kind == WATCH:
         return True  # the person chose this very CVE
     if EVENT_KINDS.get(ev_kind) not in (p.kinds or []):
         return False
-    return ev_kind not in ("vuln", "change") or notify.RANK.get(severity, 0) >= notify.RANK.get(p.min_severity or "info", 0)
+    if ev_kind in ("vuln", "change") and notify.RANK.get(severity, 0) < notify.RANK.get(p.min_severity or "info", 0):
+        return False
+    return concerns.vendor_wants(person_systems(p), product, keys)
+
+
+def person_systems(p: PersonNotify | None) -> list[dict]:
+    """The person's systems as stored ([{"vendor"} | {"product"}]) – empty: every product of their teams."""
+    return systems_svc.entries(getattr(p, "systems", None)) if p is not None else []
+
+
+class _Keys(dict):
+    """Per person, the product keys their systems stand for – computed once per round (systems.product_keys)."""
+
+    def of(self, p: PersonNotify) -> set[str] | None:
+        if p.user_id not in self:
+            chosen = person_systems(p)
+            self[p.user_id] = set(systems_svc.product_keys(chosen)) if chosen else None
+        return self[p.user_id]
 
 
 # ---------------------------------------------------------------- routing
@@ -238,7 +258,7 @@ def _routes(
     fresh: bool = True,
     after: datetime | None = None,
 ):  # noqa: ANN202
-    """SQL: (event id, kind, severity, person, created) – a Vendor News event of a product of a team whose member gets
+    """SQL: (event id, kind, severity, person, created, product) – a Vendor News event of a product of a team whose member gets
     it on `way`: not a baseline, not older than MAX_AGE, the account active, the way switched on before the event, the
     event after the assignment, the joining and the routing. `fresh`: only those not decided for that way yet."""
     on = getattr(PersonNotify, f"{way}_on")
@@ -270,7 +290,7 @@ def _routes(
     if fresh:
         where.append(~exists().where(PersonDelivery.event_id == VendorEvent.id, PersonDelivery.user_id == TeamMember.user_id, PersonDelivery.way == way))
     team = (
-        select(VendorEvent.id, VendorEvent.kind, VendorEvent.severity, TeamMember.user_id, VendorEvent.created_at)
+        select(VendorEvent.id, VendorEvent.kind, VendorEvent.severity, TeamMember.user_id, VendorEvent.created_at, VendorEvent.product)
         .join(VendorFollow, VendorFollow.product == VendorEvent.product)
         .join(TeamProduct, TeamProduct.follow_id == VendorFollow.id)
         .join(TeamMember, TeamMember.team_id == TeamProduct.team_id)
@@ -345,7 +365,7 @@ def _deputy_routes(way: str, on, since, *, user_id, user_ids, event_ids, fresh: 
     if fresh:
         where.append(~exists().where(PersonDelivery.event_id == VendorEvent.id, PersonDelivery.user_id == pa.deputy_id, PersonDelivery.way == way))
     return (
-        select(VendorEvent.id, VendorEvent.kind, VendorEvent.severity, pa.deputy_id, VendorEvent.created_at)
+        select(VendorEvent.id, VendorEvent.kind, VendorEvent.severity, pa.deputy_id, VendorEvent.created_at, VendorEvent.product)
         .join(VendorFollow, VendorFollow.product == VendorEvent.product)
         .join(TeamProduct, TeamProduct.follow_id == VendorFollow.id)
         .join(am, am.team_id == TeamProduct.team_id)
@@ -382,7 +402,7 @@ def _watch_routes(way: str, on, since, *, user_id, user_ids, event_ids, fresh: b
     if fresh:
         where.append(~exists().where(PersonDelivery.event_id == VendorEvent.id, PersonDelivery.user_id == CveWatch.user_id, PersonDelivery.way == way))
     return (
-        select(VendorEvent.id, VendorEvent.kind, VendorEvent.severity, CveWatch.user_id, VendorEvent.created_at)
+        select(VendorEvent.id, VendorEvent.kind, VendorEvent.severity, CveWatch.user_id, VendorEvent.created_at, VendorEvent.product)
         .join(CveWatch, VendorEvent.scope == literal("watch:") + CveWatch.cve)
         .join(User, User.id == CveWatch.user_id)
         .join(PersonNotify, PersonNotify.user_id == CveWatch.user_id)
@@ -408,8 +428,9 @@ async def enqueue(db: AsyncSession, ways: dict[str, bool]) -> int:
         # muted by the person for a while (app/reader.py): decided now, like the filter – not sent later either
         hushed = await reader.muted_events(db, [(r[0], r[3]) for r in rows])
         values = []
-        for ev_id, kind, sev, uid, _at in rows:
-            ok = wants(prefs[uid], kind, sev) and (ev_id, uid) not in hushed
+        chosen = _Keys()
+        for ev_id, kind, sev, uid, _at, product in rows:
+            ok = wants(prefs[uid], kind, sev, product, chosen.of(prefs[uid])) and (ev_id, uid) not in hushed
             why = None if ok else "muted" if (ev_id, uid) in hushed else "filtered"
             values.append({"event_id": ev_id, "user_id": uid, "way": way, "status": "pending" if ok else "skipped", "error": why, "tries": 0, "created_at": now, "marks": marks.get(ev_id, 0)})
             added += ok
@@ -727,6 +748,7 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
         open_.setdefault((uid, way), []).append(ev)
     # still routed and still wanted – one query per way for the whole batch
     still: dict[tuple[uuid.UUID, str], list[tuple]] = {}
+    chosen = _Keys()
     for way in WAYS:
         keys = [k for k in open_ if k[1] == way]
         if not keys:
@@ -735,9 +757,9 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
         mine = {(k[0], e) for k in keys for e in open_[k]}
         who = sorted({k[0] for k in keys})
         for i in range(0, len(evs), IN_CHUNK):
-            for ev, kind, sev, uid, at in await db.execute(_routes(way, user_ids=who, event_ids=evs[i : i + IN_CHUNK], fresh=False)):
+            for ev, kind, sev, uid, at, product in await db.execute(_routes(way, user_ids=who, event_ids=evs[i : i + IN_CHUNK], fresh=False)):
                 entry = people.get(uid)
-                if (uid, ev) in mine and entry is not None and wants(entry[0], kind, sev):
+                if (uid, ev) in mine and entry is not None and wants(entry[0], kind, sev, product, chosen.of(entry[0])):
                     still.setdefault((uid, way), []).append((ev, sev, at))
     # muted since it was queued (app/reader.py): skipped as "muted", never sent after the mute ends either
     hushed = await reader.muted_events(db, [(r[0], uid) for (uid, _way), rows in still.items() for r in rows])

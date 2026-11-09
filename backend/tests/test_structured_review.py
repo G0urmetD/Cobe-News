@@ -541,7 +541,7 @@ def test_cvelist_asks_github_only_when_a_slot_or_the_day_change_is_due():
 
 
 def test_cisco_provider_speaks_for_duo_and_splunk():
-    """csaf.yaml maps the Cisco provider to Cisco, Cisco (Duo) and Splunk (Cisco): its documents judge Duo and Splunk –
+    """csaf.yaml maps the Cisco provider to Cisco (Duo is Cisco's) and Splunk (Cisco): its documents judge Duo and Splunk –
     in a Cisco or a Splunk branch – but never another vendor's branch, and no other provider speaks for them."""
     from app.vendor_match import entries_for
 

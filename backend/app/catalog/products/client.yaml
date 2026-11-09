@@ -71,6 +71,7 @@
   pattern: '16\.0\.\d{4,5}\.\d{4,5}'
   pattern_hint: office_build
 - key: libreoffice
+  vendor: LibreOffice
 - key: notepad-plus-plus
   label: Notepad++
   vendor: Notepad++
@@ -105,7 +106,7 @@
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
 - key: citrix-workspace-app
   label: "Citrix Workspace app (Receiver)"
-  vendor: Cloud Software Group
+  vendor: Cloud Software Group (Citrix)
   cpes: [a:citrix:workspace, a:citrix:workspace_app]
   cna: [[Citrix, Workspace app], [Citrix, Citrix Workspace app]]
   kw: [Citrix Workspace app, Citrix Receiver]
@@ -113,3 +114,60 @@
   example: "2409"
   hint: citrix
   where: client_about
+
+# ---------------------------------------------------------------- endoflife.date products: their vendor
+# (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)
+- key: ansible
+  vendor: Red Hat
+- key: ant
+  vendor: Apache Software Foundation
+- key: apache-hop
+  vendor: Apache Software Foundation
+- key: apache-maven
+  vendor: Apache Software Foundation
+- key: cfengine
+  vendor: Northern.tech
+- key: chef-infra-client
+  vendor: Progress (Chef)
+- key: chef-inspec
+  vendor: Progress (Chef)
+- key: chef-workstation
+  vendor: Progress (Chef)
+- key: cloud-sql-auth-proxy
+  vendor: Google
+- key: cnspec
+  vendor: Mondoo
+- key: composer
+  vendor: Composer
+- key: dbt-core
+  vendor: dbt Labs
+- key: eslint
+  vendor: OpenJS Foundation
+- key: filemaker
+  vendor: Claris
+- key: git
+  vendor: Git
+- key: godot
+  vendor: Godot Engine
+- key: grunt
+  vendor: Grunt
+- key: internet-explorer
+  vendor: Microsoft
+- key: jekyll
+  vendor: Jekyll
+- key: jhipster
+  vendor: JHipster
+- key: nix
+  vendor: NixOS
+- key: pnpm
+  vendor: pnpm
+- key: terraform
+  vendor: HashiCorp
+- key: unity
+  vendor: Unity Technologies
+- key: weechat
+  vendor: WeeChat
+- key: wireshark
+  vendor: Wireshark Foundation
+- key: yarn
+  vendor: Yarn

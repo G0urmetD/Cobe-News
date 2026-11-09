@@ -57,6 +57,7 @@
   excluded_names: [OX Dovecot Pro]
   kw: [Dovecot]
 - key: pigeonhole
+  vendor: Dovecot (Open-Xchange)
 - key: exim
   cpes: [a:exim:exim]
 - key: proxmox-mail-gateway
@@ -150,7 +151,7 @@
   where: web_about
 - key: totemomail
   label: "totemomail Encryption Gateway (Kiteworks)"
-  vendor: "Kiteworks (totemo)"
+  vendor: Kiteworks
   cpes: [a:totemo:totemomail, a:totemo:totemomail_encryption_gateway, a:totemo:encryption_gateway]
   kw: [totemomail, totemo]
   example: "8.0.0"
@@ -181,3 +182,14 @@
   aliases: [SMA, Cisco SMA, Content Security Management Appliance]
   example: "15.0.1"
   where: web_about
+
+# ---------------------------------------------------------------- added 0.1.54
+- key: exchange-online
+  label: Microsoft Exchange Online
+  vendor: Microsoft
+  cpes: [a:microsoft:exchange_online]
+  scheme: cloud
+  cloud: true
+  cna: [[Microsoft, Microsoft Exchange Online]]
+  kw: [Exchange Online]
+  aliases: [EXO, Microsoft 365 Exchange]

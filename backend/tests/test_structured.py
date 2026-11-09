@@ -128,7 +128,7 @@ def _adv(id_: str, source: str, ident: str, data: dict, *, cves: list[str] | Non
 
 def test_catalogue_maps_providers_and_osv_packages():
     keys = {p["key"]: p for p in csaf_providers.providers()}
-    assert {"siemens", "cisco", "schneider"} <= set(keys) and keys["cisco"]["vendors"] == ["Cisco", "Cisco (Duo)", "Splunk (Cisco)"]
+    assert {"siemens", "cisco", "schneider"} <= set(keys) and keys["cisco"]["vendors"] == ["Cisco", "Splunk (Cisco)"]
     assert [p["key"] for p in csaf_providers.providers_for(catalog.product("cisco-asa"))] == ["cisco"]
     assert csaf_providers.providers_for(catalog.product("fortios")) == []  # its own advisory source
     assert csaf_providers.providers_for({"vendor": "cisco"})[0]["key"] == "cisco"  # a product added by CPE ("cisco")

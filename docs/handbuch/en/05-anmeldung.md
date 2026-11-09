@@ -831,6 +831,12 @@ by default**:
   `*.webhook.office.com`, https, port 443) and only a public target. `WEBHOOK_HOSTS` and `WEBHOOK_PRIVATE_NETS` do not
   apply here.
 - The switches need no re-confirmation – they do not change who may read.
+- **Security stories by own choice** (off by default): with the switch on, **every person** – also without a team – can
+  have security stories of their own choice sent by e-mail or to their Teams webhook
+  ([Security stories by e-mail or Teams](/docs/benachrichtigungen#security-meldungen)), on the ways *E-mail* and
+  *Microsoft Teams* above. For the desktop there are the own [desktop notifications](/docs/benachrichtigungen#desktop).
+  While the switch is off nothing comes, and switching it on brings nothing older. The change is in the audit log
+  ("Settings changed").
 
 ### Entering an absence {#teams-abwesenheit}
 

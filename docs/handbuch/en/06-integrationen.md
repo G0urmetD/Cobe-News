@@ -141,7 +141,7 @@ Which providers Cobe News knows and which vendors they speak for is part of the 
 | Provider | Domain | speaks for products of the vendor |
 |---|---|---|
 | Siemens ProductCERT | `cert-portal.siemens.com` | Siemens |
-| Cisco PSIRT | `www.cisco.com` | Cisco, Cisco (Duo), Splunk (Cisco) |
+| Cisco PSIRT | `www.cisco.com` | Cisco (with Duo), Splunk (Cisco) |
 | Schneider Electric CPCERT | `www.se.com` | Schneider Electric |
 | Open-Xchange GmbH (since 0.1.45) | `www.open-xchange.com` | Open-Xchange (OX App Suite) |
 

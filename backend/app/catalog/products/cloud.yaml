@@ -56,3 +56,8 @@
   scheme: cloud
   cloud: true
   kw: [Sophos Central]
+
+# ---------------------------------------------------------------- endoflife.date products: their vendor
+# (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)
+- key: azure-kubernetes-service
+  vendor: Microsoft

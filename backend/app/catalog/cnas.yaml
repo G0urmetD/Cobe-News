@@ -78,12 +78,12 @@ cnas:
   - key: rapid7
     name: Rapid7
     ids: [rapid7, cve@rapid7.com, 9974b330-7714-4307-a722-5648477acda7]
-    vendors: [Rapid7, Rapid7 (Velocidex)]
+    vendors: [Rapid7]
   - key: redhat
     name: Red Hat
     # also writes records for open-source projects (CNA of last resort, redhat-cnalr) – their vendor only for its own products
     ids: [redhat, "*@redhat.com", 53f830b8-0a3f-465b-8143-3b8a9948e749, 74b3a70d-cca6-4d34-9789-e83b222ae3be]
-    vendors: [Red Hat, Redhat]
+    vendors: [Red Hat]
   # coordinators (CERTs, government) – they publish for vendors without a CNA of their own
   - key: incd
     name: INCD (Israel)
@@ -143,7 +143,7 @@ cnas:
   - key: facebook
     name: Meta
     ids: [Meta, facebook, cve-assign@fb.com, 4fc57720-52fe-4431-a0fb-3d2c8747b827]
-    vendors: [Facebook]
+    vendors: [Meta]
   - key: hp
     name: HP Inc.
     ids: [hp, hp-security-alert@hp.com, 74586083-13ce-40fd-b46a-8e5d23cfbcb2]
@@ -167,7 +167,7 @@ cnas:
   - key: netscaler
     name: NetScaler
     ids: [NetScaler, 50a63c94-1ea7-4568-8c11-eb79e7c5a2b5]
-    vendors: [Cloud Software Group, Citrix]
+    vendors: [Cloud Software Group (Citrix)]
   - key: kubernetes
     name: Kubernetes
     ids: [kubernetes, security@kubernetes.io, jordan@liggitt.net, a6081bf6-c852-4425-ad4f-a67919267565]
@@ -210,7 +210,7 @@ cnas:
     name: Linux kernel
     # its short name "Linux" would also begin Linux Mint's and the Linux Foundation's names
     ids: [Linux, 416baaa9-dc9f-4396-8d5f-8c081fb06d67]
-    vendors: [Linux]
+    vendors: [Linux Kernel Organization]
   - key: canon
     name: Canon
     ids: [Canon, Canon_EMEA, f98c90f0-e9bd-4fa7-911b-51993f3571fd, 4586e0a2-224d-4f8a-9cb4-8882b208c0b3]
@@ -252,11 +252,11 @@ cnas:
   - key: postgresql
     name: PostgreSQL
     ids: [f86ef6dc-4d3a-42ad-8f28-e6d5547a5007]
-    vendors: [Postgresql]
+    vendors: [PostgreSQL]
   - key: concretecms
     name: Concrete CMS
     ids: [ff5b8ace-8b95-4078-9743-eac1ca5451de]
-    vendors: [Concretecms]
+    vendors: [Concrete CMS]
   - key: beyondtrust
     name: BeyondTrust
     ids: [BT, 13061848-ea10-403d-bd75-c83a022c2891]
@@ -268,7 +268,7 @@ cnas:
   - key: glibc
     name: GNU C Library
     ids: [3ff69d7a-14f2-4f67-a097-88dee7810d18]
-    vendors: [Gnu]
+    vendors: []   # no catalogue product is glibc (CFEngine's CPE says gnu – its vendor is Northern.tech)
   - key: nable
     name: N-able
     ids: [a5532a13-c4dd-4202-bef1-e0b8f2f8d12b]
@@ -312,7 +312,7 @@ cnas:
   - key: kong
     name: Kong
     ids: [Kong, 02762ae7-200e-4b20-9b2b-a77d5b8fc4cb]
-    vendors: [Konghq]
+    vendors: [KongHQ]
   - key: extreme
     name: Extreme Networks
     ids: [1c053176-eef3-4d6a-ae0b-24728c86587b]
@@ -320,11 +320,11 @@ cnas:
   - key: openjs
     name: OpenJS Foundation
     ids: [openjs, ce714d77-add3-4f53-aff5-83d477b104bb]
-    vendors: [OpenJS Foundation, Openjsf]
+    vendors: [OpenJS Foundation]
   - key: typo3
     name: TYPO3
     ids: [f4fb688c-4412-4426-b4b8-421ecf27b14a]
-    vendors: [Typo3]
+    vendors: [TYPO3]
   - key: commvault
     name: Commvault
     ids: [050066fd-a2f9-4f32-ab5d-4c53f48bc333]
@@ -336,11 +336,11 @@ cnas:
   - key: rust
     name: Rust
     ids: [986d4109-89ea-491f-99fd-a8e4803919bd]
-    vendors: [Rust-lang]
+    vendors: [Rust Project]
   - key: django
     name: Django Software Foundation
     ids: [DSF, 6a34fbeb-21d4-45e7-8e0a-62b95bc12c92]
-    vendors: [Djangoproject]
+    vendors: [Django Software Foundation]
   - key: nutanix
     name: Nutanix
     ids: [2ffdacf6-8681-47df-b023-4f11abd61c1d]

@@ -44,10 +44,12 @@
   kw: [Dell Unity]
   example: 5.4.0
 - key: truenas
+  vendor: iXsystems
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: samba
 - key: openzfs
+  vendor: OpenZFS
 
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
 - key: hpe-storeonce
@@ -81,4 +83,16 @@
   kw: [Purity, Pure Storage, FlashArray]
   aliases: [Purity//FA, FlashArray, FlashBlade]
   example: "6.5.8"
+  where: web_about
+
+# ---------------------------------------------------------------- added 0.1.54
+- key: brocade-fos
+  label: Brocade Fabric OS (SAN Switches)
+  vendor: Broadcom
+  cpes: [o:broadcom:fabric_operating_system]
+  cna: [[Brocade, Fabric OS]]  # Broadcom's Brocade PSIRT is its own CNA ("brocade", sirt@brocade.com)
+  kw: [Brocade Fabric OS, Brocade FOS, Brocade]
+  aliases: [FOS, Brocade FOS, Fabric OS]
+  example: 9.2.2d
+  version_cmd: version
   where: web_about

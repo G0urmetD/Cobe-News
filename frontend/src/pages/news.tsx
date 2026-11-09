@@ -22,6 +22,9 @@ import { confirmAction } from "@/components/cobe/confirm"
 import { MuteButton, MuteItems, type MuteTarget, MuteUntilDialog } from "@/components/cobe/mute-menu"
 import { ViewsMenu, useDefaultView } from "@/components/cobe/views-menu"
 import { FilterChip } from "@/components/cobe/filter-chip"
+import { SystemsPicker } from "@/components/cobe/systems-picker"
+import { WordsFilter } from "@/components/cobe/words-filter"
+import { systemName, systemValue, useCatalogVendors } from "@/lib/rule-filters"
 import { NewsRangeControl } from "@/components/cobe/news-range"
 import { NO_RANGE, rangeActive, rangeChip } from "@/lib/news-range"
 import { IN_PAGE, type NewsUrlFilter, readNewsFilter, writeNewsFilter } from "@/lib/reader-api"
@@ -79,7 +82,7 @@ export function NewsPage() {
   const fallback = useCallback(
     (p: URLSearchParams) => {
       const f = loadNewsFilter(user?.id)
-      return f.sources.length || f.severities.length || f.topics.length || f.ours ? writeNewsFilter(p, f) : null
+      return f.sources.length || f.severities.length || f.topics.length || f.ours || f.systems.length || f.without.length ? writeNewsFilter(p, f) : null
     },
     [user?.id],
   )
@@ -87,13 +90,22 @@ export function NewsPage() {
   const choose = useCallback(
     (next: Partial<NewsUrlFilter>) => {
       setParams((p) => writeNewsFilter(p, next.ids === undefined && p.has("ids") ? { ...next, ids: [] } : next), { replace: true, state: IN_PAGE })
-      if (next.sources !== undefined || next.severities !== undefined || next.topics !== undefined || next.ours !== undefined) {
+      if (
+        next.sources !== undefined ||
+        next.severities !== undefined ||
+        next.topics !== undefined ||
+        next.ours !== undefined ||
+        next.systems !== undefined ||
+        next.without !== undefined
+      ) {
         const cur = readNewsFilter(new URLSearchParams(window.location.search))
         saveNewsFilter(user?.id, {
           sources: next.sources ?? cur.sources,
           severities: next.severities ?? cur.severities,
           topics: next.topics ?? cur.topics,
           ours: next.ours ?? cur.ours,
+          systems: next.systems ?? cur.systems,
+          without: next.without ?? cur.without,
         })
       }
     },
@@ -161,7 +173,19 @@ export function NewsPage() {
   const list = useNews(
     notified
       ? { state, sources: [], severities: [], topics: [], q: "", muted: true, ours: false, ids: filter.ids }
-      : { state, sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope, range: filter.range },
+      : {
+          state,
+          sources: activeSources,
+          severities: filter.severities,
+          topics: filter.topics,
+          q,
+          muted: filter.muted,
+          ours: filter.ours,
+          scope,
+          range: filter.range,
+          systems: filter.systems,
+          without: filter.without,
+        },
     !deciding && !waitScope,
   )
   const mark = useMarkRead()
@@ -196,7 +220,20 @@ export function NewsPage() {
   )
   const quick = filter.topics.filter((x) => QUICK_TOPICS.includes(x))
   const ranged = rangeActive(filter.range) && !notified
-  const anyFilter = activeSources.length > 0 || filter.severities.length > 0 || filter.topics.length > 0 || filter.ours || rangeActive(filter.range) || notified
+  const systemsOn = filter.systems.length > 0 && !notified
+  const withoutOn = filter.without.length > 0 && !notified
+  // the catalogue (for the "Systeme" filter and its chips): asked once the filter is used – not on every visit
+  const [wantCatalog, setWantCatalog] = useState(false)
+  const vendors = useCatalogVendors(wantCatalog || systemsOn)
+  const anyFilter =
+    activeSources.length > 0 ||
+    filter.severities.length > 0 ||
+    filter.topics.length > 0 ||
+    filter.ours ||
+    rangeActive(filter.range) ||
+    filter.systems.length > 0 ||
+    filter.without.length > 0 ||
+    notified
   // what the list shows in all (the chip row's "N Treffer")
   const hits = first?.counts ? (state === "new" ? first.counts.new : first.counts.new + first.counts.read) : null
   const showOurs = !!first?.ours_on || filter.ours
@@ -233,7 +270,18 @@ export function NewsPage() {
     if (!ok) return
     try {
       const body = readAllBody(
-        { sources: activeSources, severities: filter.severities, topics: filter.topics, q, muted: filter.muted, ours: filter.ours, scope, ids: notified ? filter.ids : undefined },
+        {
+          sources: activeSources,
+          severities: filter.severities,
+          topics: filter.topics,
+          q,
+          muted: filter.muted,
+          ours: filter.ours,
+          scope,
+          ids: notified ? filter.ids : undefined,
+          systems: filter.systems,
+          without: filter.without,
+        },
         first,
       )
       const r = await api.post<{ marked: number }>("/api/news/read-all", body)
@@ -325,15 +373,28 @@ export function NewsPage() {
           className="h-9"
           contentClassName="w-80"
         />
+        {/* "Systeme": the catalogue, by vendor – loaded when the pointer or the focus first reaches the filter */}
+        <span className="contents" onPointerOverCapture={() => setWantCatalog(true)} onFocusCapture={() => setWantCatalog(true)}>
+          <SystemsPicker variant="filter" label={t("news.filterSystems")} value={filter.systems} onChange={(v) => choose({ systems: v })} vendors={vendors} className="h-9" />
+        </span>
+        <WordsFilter
+          label={t("news.filterWithout")}
+          title={t("news.withoutTitle")}
+          hint={t("news.withoutHint")}
+          placeholder={t("notify.excludePlaceholder")}
+          value={filter.without}
+          onChange={(v) => choose({ without: v })}
+          className="h-9"
+        />
         <NewsRangeControl value={notified ? NO_RANGE : filter.range} onChange={(range) => choose({ range })} markAt={first?.mark_at} />
         <ViewsMenu page="news" />
         {anyFilter && (
-          <Button variant="ghost" size="sm" onClick={() => choose({ sources: [], severities: [], topics: [], ours: false, range: NO_RANGE, ids: [] })}>
+          <Button variant="ghost" size="sm" onClick={() => choose({ sources: [], severities: [], topics: [], ours: false, range: NO_RANGE, ids: [], systems: [], without: [] })}>
             {t("news.resetFilter")}
           </Button>
         )}
       </div>
-      {(ranged || notified) && (
+      {(ranged || notified || systemsOn || withoutOn) && (
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("newsRange.chips")}>
           {notified ? (
             <FilterChip
@@ -343,13 +404,38 @@ export function NewsPage() {
               onRemove={() => choose({ ids: [] })}
             />
           ) : (
-            <FilterChip
-              label={t("newsRange.title")}
-              value={rangeChip(t, filter.range, { markAt: first?.mark_at, asked: first?.asked })}
-              removeLabel={t("newsRange.remove")}
-              onRemove={() => choose({ range: NO_RANGE })}
-            />
+            ranged && (
+              <FilterChip
+                label={t("newsRange.title")}
+                value={rangeChip(t, filter.range, { markAt: first?.mark_at, asked: first?.asked })}
+                removeLabel={t("newsRange.remove")}
+                onRemove={() => choose({ range: NO_RANGE })}
+              />
+            )
           )}
+          {systemsOn &&
+            filter.systems.map((sys) => {
+              const name = systemName(t, sys, vendors) ?? t("notify.systemGoneName", { name: "vendor" in sys ? sys.vendor : sys.product })
+              return (
+                <FilterChip
+                  key={systemValue(sys)}
+                  label={t("news.filterSystems")}
+                  value={name}
+                  removeLabel={t("news.systemRemove", { name })}
+                  onRemove={() => choose({ systems: filter.systems.filter((x) => systemValue(x) !== systemValue(sys)) })}
+                />
+              )
+            })}
+          {withoutOn &&
+            filter.without.map((w) => (
+              <FilterChip
+                key={w}
+                label={t("news.filterWithout")}
+                value={w}
+                removeLabel={t("news.withoutRemove", { word: w })}
+                onRemove={() => choose({ without: filter.without.filter((x) => x !== w) })}
+              />
+            ))}
           {hits !== null && (
             <span className="text-xs text-muted-foreground tabular-nums" role="status">
               {t("newsRange.hits", { count: hits })}

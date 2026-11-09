@@ -90,9 +90,10 @@ function TeamsSwitchForm({ initial }: { initial: TeamsSettings }) {
     personal_email: initial.personal_email,
     personal_desktop: initial.personal_desktop,
     personal_teams: initial.personal_teams,
+    personal_news: !!initial.personal_news,
   })
   const [busy, setBusy] = useState(false)
-  const dirty = (Object.keys(v) as (keyof typeof v)[]).some((k) => v[k] !== initial[k])
+  const dirty = (Object.keys(v) as (keyof typeof v)[]).some((k) => v[k] !== (k === "personal_news" ? !!initial.personal_news : initial[k]))
   const save = async () => {
     setBusy(true)
     try {
@@ -147,7 +148,17 @@ function TeamsSwitchForm({ initial }: { initial: TeamsSettings }) {
                 checked={v.personal_teams}
                 onCheckedChange={(x) => setV({ ...v, personal_teams: x })}
               />
+              {/* 0.1.54: security stories by each person's own choice, on the e-mail and Teams ways above */}
+              <ToggleRow
+                label={t("teams.personal.news")}
+                description={t("teams.personal.newsHint")}
+                checked={v.personal_news}
+                onCheckedChange={(x) => setV({ ...v, personal_news: x })}
+              />
             </div>
+            {v.personal_news && !v.personal_email && !v.personal_teams && (
+              <p className="mb-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs">{t("teams.personal.newsNoWay")}</p>
+            )}
             {v.personal_email && !initial.smtp_ready && <p className="mb-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs">{t("teams.personal.noSmtp")}</p>}
           </section>
         </LockedFields>

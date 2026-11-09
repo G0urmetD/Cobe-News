@@ -1108,9 +1108,21 @@ Linie; eine Version dazwischen auf keiner davon wird abgelehnt, ältere und neue
 von endoflife.date wird jede Version auf Plausibilität geprüft. Eine Build-Tabelle (`kind: names`) nennt `products`,
 `sources`, `fetched`, optional `strip`, `extract`, `claims`, `hint` und `rows: [{value, names}]` – ein Name, den die
 Tabelle zweimal vergibt, stoppt den Start. Ein Eintrag ohne `label` verschiebt nur ein
-endoflife.date-Produkt in diese Kategorie (erlaubt dann nur `cpes`, `scheme`, `hint`, `osv`, `aliases`, `replaces` und
+endoflife.date-Produkt in diese Kategorie (erlaubt dann nur `vendor`, `cpes`, `scheme`, `hint`, `osv`, `aliases`, `replaces` und
 die Versionsregeln `pattern`, `pattern_hint`, `normalize`, `belongs`, `cpe_editions`, `lines_only`). Ein Produkt ohne CPE in der NVD
 bekommt `cpes: []` und `hint: nocpe`.
+
+**Hersteller** – endoflife.date nennt keinen; ohne `vendor` nimmt der Katalog das erste Wort des Namens („Red Hat
+Satellite“ → „Red“) oder den Hersteller der CPE („a:djangoproject:django“ → „Djangoproject“). Deshalb trägt ein Eintrag
+ohne `label` den Hersteller, wo das falsch wäre (seit Katalog 2026.11.06-3 für alle so entstandenen). Jeder Hersteller hat
+**eine** Schreibweise – die offizielle („IBM“, „Red Hat“, „SUSE“, „Grafana Labs“, „Apache Software Foundation“), in allen
+Dateien gleich (auch `csaf.yaml`, `cnas.yaml`). Eine Marke mit eigenem Namen, die einem anderen gehört, heißt „Eigentümer
+(Marke)“ bzw. „Marke (Eigentümer)“ – „Broadcom (VMware)“, „Broadcom (Symantec)“, „Splunk (Cisco)“, „Datto (Kaseya)“ – und
+ist ein eigener Hersteller („VMware (alle Produkte)“ umfasst kein Symantec); ein bloßes Produkt eines Herstellers hat
+keine Klammer (Dockge ist „Louis Lam“, Velociraptor „Rapid7“, PingCastle „Netwrix“). Ein Hersteller, der nur ein
+gewöhnliches Wort ist, nennt in Meldungen niemanden („Linux“ – der Kernel ist „Linux Kernel Organization“). Wird eine
+Schreibweise geändert, zieht eine Migration die Regeln mit (0041 für Katalog 2026.11.06-3, ein Test vergleicht sie mit
+dem Katalog).
 
 **CPE prüfen** – gibt es sie im CPE-Verzeichnis der NVD? Im Katalog „Nicht im Katalog?“ suchen (dieselbe Abfrage) oder
 `https://services.nvd.nist.gov/rest/json/cpes/2.0?cpeMatchString=cpe:2.3:o:example:firewall_os` (ohne Schlüssel
@@ -1243,6 +1255,43 @@ Regeln verschicken deshalb keine ältere Meldung; der Probelauf zählt sie mit (
 `DELETE FROM settings WHERE key = 'news_systems';`. Migration 0039 fügt nur Spalten mit festem Standardwert und einen
 GIN-Index hinzu (`notify_rules.systems|keywords|exclude`, `news_items.systems|quiet_systems`); der Downgrade entfernt sie
 und die Einstellungszeile.
+
+Dieselben Filter gibt es außerhalb der Regeln – eine Umsetzung (`app/concerns.py`, Prüfung der Eingaben und SQL):
+der Filter „Systeme“ der News-Liste (`GET /api/news?system=v:<Hersteller>&system=p:<Schlüssel>`, höchstens 50, auch
+`POST /api/news/read-all`; zählt auch leise Systeme, über den GIN-Index `ix_news_items_systems`), die eigene Wahl
+der Desktop-Benachrichtigungen (`users.desktop` – `systems`, `keywords`, `exclude`; gefiltert auf dem Server für
+`/api/news/recent?mine=true` und Web Push, nur laute Systeme, mit `hits` für „Treffer“) und „Hersteller-News meiner
+Produkte“ (`person_notify.systems`, Migration 0040 – eine Spalte mit festem Standardwert `'[]'`, der Downgrade entfernt
+sie; nur das Produkt des Ereignisses, beobachtete CVEs nie). Die News-Liste nimmt dazu `without=<Wort>` („Ohne …“,
+höchstens 30 Wörter, geprüft wie bei den Regeln, auch `POST /api/news/read-all`): ein regulärer Ausdruck je Zeile, den
+kein Index trägt – die Liste selbst liest über den Datums-Index nur bis zur vollen Seite (rund 1 ms), die Zahlen der
+ersten Seite lesen jede passende Zeile. Gemessen bei 30 000 Meldungen ohne weitere Filter: ohne „Ohne“ rund 36 ms für
+die erste Seite mit allen Zahlen, mit einem Wort rund 105 ms, mit drei Wörtern rund 180 ms (die Themen-Zahlen prüfen das
+Wort nur bei Meldungen mit Thema).
+
+**Security-Meldungen per E-Mail oder Teams** (`app/personal_news.py`, Tabellen `person_news` und `person_news_sent`,
+Migration 0042 – zwei neue Tabellen, der Downgrade entfernt sie): je Person die Auswahl wie bei einer Regel (derselbe
+Abgleich `notify.news_filter`), je Weg (E-Mail, eigener Teams-Webhook aus `person_notify`) ab welcher Ankunftsnummer
+(`<weg>_on_seq`, beim Einschalten die neueste). Fällig ist eine Meldung, die danach eintraf, höchstens eine Woche alt
+ist, auf diesem Weg noch nicht gesendet wurde (`person_news_sent`) und jetzt passt – wie bei einer Regel auch, wenn sie
+erst später passt (laute Änderung: Schwere, Titel/Teaser, Thema, System in `news_items.changes`, frische weitere Quelle
+`news_item_sources.carried_at`). Nach dem Erweitern der Auswahl (`filter_seq`/`filter_at`) zählt eine ältere Meldung
+nur durch eine Änderung danach. Eine Runde (Schritt „personal news“ nach den persönlichen Benachrichtigungen) schreibt
+die Meldungen einer Nachricht als gesendet und markiert die Inanspruchnahme (`<weg>_claim_at`) in einem Commit vor dem
+Senden: nie doppelt; ein Fehler, bei dem sicher nichts ankam, nimmt sie zurück (wachsende Pause `<weg>_next_at`,
+höchstens 12 Versuche), eine nach einer Stunde verwaiste Inanspruchnahme wird aufgegeben, ihre Meldungen bleiben
+gesendet. Höchstens eine Nachricht je 15 Minuten und Weg (`<weg>_sent_at`), bis zu drei Meldungen einzeln, mehr als eine
+Sammelnachricht (zehn gelistet, höchstens 200 je Nachricht). Fällig (an, erlaubt, keine Pause, außerhalb der 15 Minuten)
+entscheidet SQL; je Runde höchstens 500 Person-Wege und 30 Sekunden, die am längsten nicht angesehenen zuerst
+(`<weg>_seen_at` – auch wer gerade Ruhezeit hat, wird markiert und hält niemanden auf). Gleich weiter (ohne Pause der
+Hintergrundrunde) nur, solange ein fälliger Person-Weg in diesem Durchgang noch nicht angesehen wurde. Neu beurteilt wird
+je Runde nur, was seit der letzten Beurteilung dieses Wegs eintraf oder sich änderte (`<weg>_checked_seq` / `_at`, mit
+zehn Minuten Rückblick für spät festgeschriebene Änderungen) – gemessen bei 30 000 Meldungen in der Woche rund 10 ms je
+Person-Weg (die erste Beurteilung nach dem Einschalten liest, was seitdem eintraf). `person_news_sent`
+wird nach acht Tagen aufgeräumt (stündlich, „personal news“). Admin-Schalter: Einstellung `teams.personal_news` (ab
+Werk aus) plus die Wege `personal_email` / `personal_teams`; solange ein Weg nicht erlaubt, die Person abwesend oder
+ein Konto aus ist, rückt `<weg>_on_seq` mit (kein Nachschub beim Einschalten). API: `GET`/`PUT /api/me/news-notify`
+(nur die eigenen Einstellungen; ausschalten und die Auswahl ändern auch, solange der Admin es aus hat).
 
 **Themen** (`news_items.topics`): Das Thema „Exploit veröffentlicht“ (`poc`) kommt aus der SSVC-Einstufung der CISA in
 den gespeicherten cvelistV5-Einträgen (und dem Wortlaut); ändert sich die Einstufung beim Speichern eines Eintrags,

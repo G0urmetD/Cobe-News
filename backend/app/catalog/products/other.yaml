@@ -7,10 +7,13 @@
 - key: drupal
   osv: [[Packagist, drupal/core]]
 - key: typo3
+  vendor: TYPO3
   osv: [[Packagist, typo3/cms-core]]
 - key: consul
+  vendor: HashiCorp
   osv: [[Go, github.com/hashicorp/consul]]
 - key: nomad
+  vendor: HashiCorp
   osv: [[Go, github.com/hashicorp/nomad]]
 
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
@@ -23,3 +26,94 @@
   aliases: [PaperCut NG, PaperCut MF]
   example: "22.0.5 (Build 63914)"
   where: web_about
+
+# ---------------------------------------------------------------- endoflife.date products: their vendor
+# (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)
+- key: apache-activemq
+  vendor: Apache Software Foundation
+- key: apache-artemis
+  vendor: Apache Software Foundation
+- key: apache-celeborn
+  vendor: Apache Software Foundation
+- key: apache-flink
+  vendor: Apache Software Foundation
+- key: apache-kafka
+  vendor: Apache Software Foundation
+- key: apache-nifi
+  vendor: Apache Software Foundation
+- key: apache-pulsar
+  vendor: Apache Software Foundation
+- key: apache-spark
+  vendor: Apache Software Foundation
+- key: apache-subversion
+  vendor: Apache Software Foundation
+- key: backdrop
+  vendor: Backdrop CMS
+- key: calico
+  vendor: Project Calico
+- key: chef-infra-server
+  vendor: Progress (Chef)
+- key: chef-supermarket
+  vendor: Progress (Chef)
+- key: concrete-cms
+  vendor: Concrete CMS
+- key: controlm
+  vendor: BMC Software
+- key: craft-cms
+  vendor: Craft CMS
+- key: dependency-track
+  vendor: OWASP
+- key: flux
+  vendor: Flux
+- key: foreman
+  vendor: Foreman
+- key: gatekeeper
+  vendor: Open Policy Agent
+- key: hashicorp-packer
+  vendor: HashiCorp
+- key: ibm-mq
+  vendor: IBM
+- key: jfrog-xray
+  vendor: JFrog
+- key: kirby
+  vendor: Kirby
+- key: longhorn
+  vendor: The Linux Foundation
+- key: magento
+  vendor: Adobe
+- key: mastodon
+  vendor: Mastodon
+- key: mediawiki
+  vendor: Wikimedia Foundation
+- key: mulesoft-runtime
+  vendor: MuleSoft
+- key: otobo
+  vendor: Rother OSS
+- key: phpbb
+  vendor: phpBB
+- key: privatebin
+  vendor: PrivateBin
+- key: proftpd
+  vendor: ProFTPD
+- key: rabbitmq
+  vendor: Broadcom (RabbitMQ)
+- key: red-hat-ansible-automation-platform
+  vendor: Red Hat
+- key: redhat-satellite
+  vendor: Red Hat
+- key: rtpengine
+  vendor: Sipwise
+- key: salt
+  vendor: SaltStack
+- key: solr
+  vendor: Apache Software Foundation
+- key: sonarqube-community
+  vendor: SonarSource
+- key: unrealircd
+  vendor: UnrealIRCd
+- key: wordpress
+  vendor: WordPress
+- key: youtrack
+  vendor: JetBrains
+- key: zookeeper
+  vendor: Apache Software Foundation

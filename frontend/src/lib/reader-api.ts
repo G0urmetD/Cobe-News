@@ -3,6 +3,7 @@ import { api } from "@/lib/api"
 import { polled } from "@/lib/poll"
 import { NEWS_SEVERITIES, type NewsSeverity, type NewsTopic, isTopic } from "@/lib/news-api"
 import { type NewsRange, readIds, readRange, writeRange } from "@/lib/news-range"
+import { type RuleSystem, readSystems, readWords, systemValue } from "@/lib/rule-filters"
 import { STATUS_FILTERS, type OverviewFilter, type StatusFilter } from "@/lib/vendor-api"
 import type { VendorScope } from "@/lib/teams-api"
 
@@ -53,6 +54,10 @@ export interface NewsUrlFilter {
   range: NewsRange
   /** a notification's stories ("Aus der Benachrichtigung"): only these – the other filters are set aside meanwhile */
   ids: string[]
+  /** "Systeme" (`system=v:<vendor>` / `system=p:<key>`): stories about one of these catalogue vendors or products */
+  systems: RuleSystem[]
+  /** "Ohne …" (`without`): none of these words in title or teaser – as a rule's "Nicht senden, wenn enthalten" */
+  without: string[]
 }
 
 const on = (v: string | null) => v === "1" || v === "true"
@@ -72,6 +77,8 @@ export function readNewsFilter(p: URLSearchParams): NewsUrlFilter {
     ours: on(p.get("ours")),
     range: readRange(p),
     ids: readIds(p),
+    systems: readSystems(p.getAll("system")),
+    without: readWords(p.getAll("without")),
   }
 }
 
@@ -89,6 +96,14 @@ export function writeNewsFilter(p: URLSearchParams, f: Partial<NewsUrlFilter>): 
   if (f.topics !== undefined) {
     next.delete("topic")
     for (const s of f.topics) next.append("topic", s)
+  }
+  if (f.systems !== undefined) {
+    next.delete("system")
+    for (const s of f.systems) next.append("system", systemValue(s))
+  }
+  if (f.without !== undefined) {
+    next.delete("without")
+    for (const w of f.without) next.append("without", w)
   }
   if (f.q !== undefined) {
     if (f.q.trim()) next.set("q", f.q.trim().slice(0, 100))
@@ -147,7 +162,7 @@ export function writeVendorFilter(p: URLSearchParams, f: Partial<VendorUrlFilter
 
 /** Filters of the News page only: on Vendor News they are no filter (a `topic` or `ours` there is neither a view nor a
  *  reason to skip the default view – readVendorFilter ignores them as well). */
-export const NEWS_ONLY_PARAMS = ["topic", "ours", "range", "since", "until", "time", "ids"] as const
+export const NEWS_ONLY_PARAMS = ["topic", "ours", "range", "since", "until", "time", "ids", "system", "without"] as const
 /** A filter, but never stored in a view: a notification's stories (`ids` – the link of one mail, not a way of looking). */
 export const NOT_IN_VIEW = ["ids"] as const
 

@@ -12,6 +12,7 @@ import {
   KeyRound,
   Lock,
   MonitorSmartphone,
+  Newspaper,
   Plug,
   ScrollText,
   UserRound,
@@ -36,6 +37,8 @@ import { BackupSettings } from "@/pages/settings-backup"
 import { IntegrationsSettings } from "@/pages/settings-health"
 import { DesktopPane, NotifySettings } from "@/pages/settings-notify"
 import { PersonalVendorCard } from "@/pages/settings-personal"
+import { PersonalNewsCard } from "@/pages/settings-personal-news"
+import { usePersonalNews } from "@/lib/personal-news"
 import { CalendarCard } from "@/pages/settings-watch"
 import { MutesCard } from "@/pages/settings-mutes"
 import { SettingsCard } from "@/pages/settings-shared"
@@ -268,7 +271,7 @@ function UsersSettings() {
   )
 }
 
-type NotifyTab = "desktop" | "vendor" | "calendar" | "mutes"
+type NotifyTab = "desktop" | "news" | "vendor" | "calendar" | "mutes"
 
 /** Settings → Benachrichtigungen (everybody): desktop notifications of this browser | the Vendor News of the own
  * products (only while Teams is on and the person is in a team or watches a CVE) | the calendar
@@ -277,10 +280,15 @@ function NotificationsPage() {
   const { t } = useTranslation()
   const [params] = useSearchParams()
   const personal = usePersonalNotify().data
+  // "Security-Meldungen" by e-mail / Teams: only while an admin allows it (app/personal_news.py)
+  const personalNews = usePersonalNews().data
+  // also while an admin has it off, as long as a way of the person's is still on – so it can be switched off
+  const newsTab = !!personalNews && (personalNews.available || personalNews.email.on || personalNews.teams.on)
   const asked = params.get("tab")
-  const tab: NotifyTab = asked === "vendor" && personal?.available ? "vendor" : asked === "calendar" || asked === "mutes" ? asked : "desktop"
+  const tab: NotifyTab = asked === "vendor" && personal?.available ? "vendor" : asked === "news" && newsTab ? "news" : asked === "calendar" || asked === "mutes" ? asked : "desktop"
   const parts = [
     { key: "desktop" as const, icon: MonitorSmartphone, label: t("personal.tab.desktop") },
+    ...(newsTab ? [{ key: "news" as const, icon: Newspaper, label: t("personalNews.tab") }] : []),
     ...(personal?.available ? [{ key: "vendor" as const, icon: Boxes, label: t("personal.title") }] : []),
     { key: "calendar" as const, icon: CalendarDays, label: t("cal.title") },
     { key: "mutes" as const, icon: BellOff, label: t("reader.mutes.tab") },
@@ -292,6 +300,8 @@ function NotificationsPage() {
       <SubTabs parts={parts} active={tab} to={(k) => (k === "desktop" ? "?" : `?tab=${k}`)} label={t("settings.nav.notifications")} />
       {tab === "vendor" ? (
         <PersonalVendorCard />
+      ) : tab === "news" ? (
+        <PersonalNewsCard />
       ) : tab === "mutes" ? (
         <MutesCard />
       ) : tab === "calendar" ? (

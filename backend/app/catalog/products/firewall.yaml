@@ -211,7 +211,7 @@
   where: ivanti
 - key: netscaler-gateway
   label: NetScaler Gateway (Citrix Gateway)
-  vendor: Cloud Software Group
+  vendor: Cloud Software Group (Citrix)
   cpes: [a:citrix:netscaler_gateway, a:citrix:gateway]
   cna: [[Citrix, NetScaler Gateway], [NetScaler, NetScaler Gateway]]
   kw: [NetScaler Gateway, Citrix Gateway]
@@ -284,7 +284,7 @@
   hint: nocpe
 - key: lancom-lcos-fx
   label: LANCOM R&S Unified Firewalls (LCOS FX)
-  vendor: LANCOM
+  vendor: LANCOM Systems
   cpes: [o:lancom-systems:lcos_fx]
   kw: [LCOS FX, Unified Firewall]
   aliases: [R&S Unified Firewalls, Rohde & Schwarz Unified Firewall]
@@ -366,7 +366,7 @@
   example: 2.29 Core 195
 - key: untangle
   label: Arista NG Firewall (Untangle)
-  vendor: Arista (Untangle)
+  vendor: Arista Networks
   cpes: [a:untangle:ng_firewall, a:arista:ng_firewall, a:untangle:untangle_firewall_ng]
   kw: [NG Firewall, Untangle]
   aliases: [Untangle]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { DESKTOP_MAX, isShownMessage, planNotifications, systemOf } from "@/lib/desktop"
+import { DESKTOP_MAX, isShownMessage, planNotifications, storyBody, systemOf } from "@/lib/desktop"
 import type { NewsItem } from "@/lib/news-api"
 
 const item = (id: string): NewsItem => ({
@@ -78,6 +78,16 @@ function server(rounds: { items: NewsItem[]; total: number; cursor: number }[]) 
   })
   return asked
 }
+
+describe("what matched", () => {
+  const t = (k: string, o?: Record<string, unknown>) => (o ? `${k}${JSON.stringify(o)}` : k)
+  const item = { severity: "critical" as const, source: { id: "s", key: "s", name: "heise", logo: false } }
+  it("says why it came when the person chose systems or words – at most three names, one line", () => {
+    expect(storyBody(item, t)).toBe("news.sev.critical · heise")
+    expect(storyBody({ ...item, hits: [] }, t)).toBe("news.sev.critical · heise")
+    expect(storyBody({ ...item, hits: ["PAN-OS", "Palo\nAlto", "C", "D"] }, t)).toBe('news.sev.critical · heise · desktop.hit{"names":"PAN-OS, Palo Alto, C +1"}')
+  })
+})
 
 describe("rounds", () => {
   it("a new browser starts at the cursor, then shows what arrived after it – once", async () => {

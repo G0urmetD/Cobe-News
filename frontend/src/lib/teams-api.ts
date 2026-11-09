@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
+import type { RuleSystem } from "@/lib/rule-filters"
 import { api } from "@/lib/api"
 import { polled } from "@/lib/poll"
 import type { AbsenceView, Covering, Schedule, TeamWeekly, WeeklyMine } from "@/lib/delivery-api"
@@ -13,6 +14,8 @@ export interface TeamsSettings {
   personal_email: boolean
   personal_desktop: boolean
   personal_teams: boolean
+  /** a person's own security stories by e-mail / their Teams webhook (app/personal_news.py) – off by default; older answers lack it */
+  personal_news?: boolean
   /** Web Push on the server (WEB_PUSH) – desktop needs it */
   web_push: boolean
   rev: number
@@ -218,6 +221,8 @@ export interface PersonalNotify {
   lang: "de" | "en"
   kinds: PersonalKind[]
   min_severity: "critical" | "high" | "medium" | "low" | "info"
+  /** only the Vendor News of these systems ([] = every product of my teams; older answers lack it) */
+  systems?: RuleSystem[]
   email: { on: boolean; address: string | null; address_ok: boolean; state: WayState }
   desktop: { on: boolean; devices: number; state: WayState }
   teams: { on: boolean; url_set: boolean; url_hint: string | null; state: WayState }

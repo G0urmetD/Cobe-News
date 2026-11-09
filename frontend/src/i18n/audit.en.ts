@@ -458,6 +458,7 @@ const auditEn: Record<string, string> = {
   "audit.field.personal_desktop": "Personal: desktop",
   "audit.field.personal_email": "Personal: e-mail",
   "audit.field.personal_teams": "Personal: Teams",
+  "audit.field.personal_news": "Personal: security stories by own choice",
   "audit.field.pre_restore": "Backup before",
   "audit.field.product": "Product",
   "audit.field.recheck": "Accounts rechecked",

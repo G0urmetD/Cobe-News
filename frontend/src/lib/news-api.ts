@@ -4,6 +4,7 @@ import { polledPages } from "@/lib/poll"
 import type { Epss, ExploitHint, Ssvc } from "@/lib/vendor-api"
 import type { AdvisoryChange } from "@/lib/advisory-changes"
 import { type AskedRange, type NewsRange, rangeParams, resolveRange } from "@/lib/news-range"
+import { type RuleSystem, readSystems, readWords, systemValue } from "@/lib/rule-filters"
 
 export type NewsSeverity = "critical" | "high" | "medium" | "low" | "info"
 export const NEWS_SEVERITIES: NewsSeverity[] = ["critical", "high", "medium", "low", "info"]
@@ -72,6 +73,8 @@ export interface NewsItem {
   muted?: boolean
   /** from the story's details (CSAF / NVD): CVSS, the first affected product with its range, a followed product affected */
   hint?: { cvss: number | null; product: string | null; exploited: boolean; affects?: boolean } | null
+  /** /news/recent?mine: what it matched the person's desktop systems or words by ("Treffer") – absent when none chosen */
+  hits?: string[]
 }
 
 export interface NewsReason {
@@ -185,7 +188,18 @@ export interface NewsPage {
 /** The body of "Alle als gelesen": the list's filter, and only what had arrived when its first page was loaded (a
  *  story arriving meanwhile was not counted in the dialog and was never seen – it stays new). */
 export function readAllBody(
-  f: { sources: string[]; severities: string[]; topics?: string[]; q: string; muted?: boolean; ours?: boolean; scope?: "all" | "team"; ids?: string[] },
+  f: {
+    sources: string[]
+    severities: string[]
+    topics?: string[]
+    q: string
+    muted?: boolean
+    ours?: boolean
+    scope?: "all" | "team"
+    ids?: string[]
+    systems?: RuleSystem[]
+    without?: string[]
+  },
   first: NewsPage | undefined,
 ) {
   // a notification's stories: those only, nothing else is filtered (as the list asks them)
@@ -196,6 +210,8 @@ export function readAllBody(
     severity: f.severities,
     ...(f.topics?.length ? { topic: f.topics } : {}),
     ...(f.ours ? { ours: true, scope: f.scope ?? "all" } : {}),
+    ...(f.systems?.length ? { system: f.systems.map(systemValue) } : {}),
+    ...(f.without?.length ? { without: f.without } : {}),
     q: f.q,
     ...(f.muted ? { muted: true } : {}),
     ...(first?.upto !== undefined ? { upto: first.upto } : {}),
@@ -219,6 +235,10 @@ export interface NewsFilter {
   range?: NewsRange
   /** a notification's stories: only these (the page sends no other filter with them) */
   ids?: string[]
+  /** "Systeme": stories about one of these catalogue vendors or products (also what they have only quietly) */
+  systems?: RuleSystem[]
+  /** "Ohne …": none of these words in title or teaser */
+  without?: string[]
 }
 
 const PAGE = 60
@@ -245,6 +265,8 @@ export function newsQuery(f: NewsFilter, cursor: NewsCursor | null, asked: Asked
   for (const s of f.sources) p.append("source", s)
   for (const s of f.severities) p.append("severity", s)
   for (const s of f.topics ?? []) p.append("topic", s)
+  for (const s of f.systems ?? []) p.append("system", systemValue(s))
+  for (const w of f.without ?? []) p.append("without", w)
   if (f.q?.trim()) p.set("q", f.q.trim().slice(0, 100))
   if (f.muted) p.set("muted", "true")
   if (f.ours) p.set("ours", "true")
@@ -465,27 +487,51 @@ export const useAdminNews = () => useQuery({ queryKey: ["admin-news"], queryFn: 
 
 const filterKey = (userId: string) => `cobe-news.filter.${userId}`
 
-/** The filter a person chose (sources, severities, topics, "Betrifft unsere Produkte") – kept in this browser for that
- *  person, not asked again each time. */
-export function loadNewsFilter(userId: string | undefined): { sources: string[]; severities: NewsSeverity[]; topics: NewsTopic[]; ours: boolean } {
+export interface KeptNewsFilter {
+  sources: string[]
+  severities: NewsSeverity[]
+  topics: NewsTopic[]
+  ours: boolean
+  systems: RuleSystem[]
+  without: string[]
+}
+
+/** The filter a person chose (sources, severities, topics, "Betrifft unsere Produkte", systems) – kept in this browser
+ *  for that person, not asked again each time; checked as an address's (a stored value is no more trusted). */
+export function loadNewsFilter(userId: string | undefined): KeptNewsFilter {
   try {
     const raw = userId ? localStorage.getItem(filterKey(userId)) : null
-    const v = raw ? (JSON.parse(raw) as { sources?: unknown; severities?: unknown; topics?: unknown; ours?: unknown }) : {}
+    const v = raw ? (JSON.parse(raw) as { sources?: unknown; severities?: unknown; topics?: unknown; ours?: unknown; systems?: unknown; without?: unknown }) : {}
     return {
       sources: Array.isArray(v.sources) ? v.sources.filter((x): x is string => typeof x === "string") : [],
       severities: Array.isArray(v.severities) ? v.severities.filter((x): x is NewsSeverity => NEWS_SEVERITIES.includes(x as NewsSeverity)) : [],
       topics: Array.isArray(v.topics) ? [...new Set(v.topics.filter(isTopic))] : [],
       ours: v.ours === true,
+      systems: Array.isArray(v.systems) ? readSystems(v.systems.filter((x): x is string => typeof x === "string")) : [],
+      without: Array.isArray(v.without) ? readWords(v.without) : [],
     }
   } catch {
-    return { sources: [], severities: [], topics: [], ours: false }
+    return { sources: [], severities: [], topics: [], ours: false, systems: [], without: [] }
   }
 }
 
-export function saveNewsFilter(userId: string | undefined, f: { sources: string[]; severities: NewsSeverity[]; topics?: NewsTopic[]; ours?: boolean }) {
+export function saveNewsFilter(
+  userId: string | undefined,
+  f: { sources: string[]; severities: NewsSeverity[]; topics?: NewsTopic[]; ours?: boolean; systems?: RuleSystem[]; without?: string[] },
+) {
   if (!userId) return
   try {
-    localStorage.setItem(filterKey(userId), JSON.stringify({ sources: f.sources, severities: f.severities, topics: f.topics ?? [], ours: !!f.ours }))
+    localStorage.setItem(
+      filterKey(userId),
+      JSON.stringify({
+        sources: f.sources,
+        severities: f.severities,
+        topics: f.topics ?? [],
+        ours: !!f.ours,
+        systems: (f.systems ?? []).map(systemValue),
+        without: f.without ?? [],
+      }),
+    )
   } catch {
     /* private window: the filter just is not kept */
   }
@@ -504,6 +550,10 @@ export interface DesktopPrefs {
   sources: string[]
   /** only stories with one of these topics ([] = every story); older answers lack it */
   topics?: NewsTopic[]
+  /** "Systeme" or "Schlagwörter" (one is enough) and "Nicht anzeigen, wenn enthalten" – as a channel rule's (0.1.54) */
+  systems?: RuleSystem[]
+  keywords?: string[]
+  exclude?: string[]
 }
 
 export const useDesktopPrefs = (enabled = true) => useQuery({ queryKey: ["me", "desktop"], queryFn: () => api.get<DesktopPrefs>("/api/me/desktop"), enabled, staleTime: 60_000 })

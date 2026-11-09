@@ -189,6 +189,8 @@ def apply_overlay(eol_products: list[dict], releases: dict[str, list[dict]], eol
             if base is None:
                 continue  # not (any more) in endoflife.date – nothing to patch
             base["category"] = o["category"]
+            if o.get("vendor"):  # endoflife.date names no vendor: the label's first word or the CPE's ("Red", "Djangoproject")
+                base["vendor"] = o["vendor"]
             base["cpes"] = list(dict.fromkeys([*base["cpes"], *(_cpe_short(_cpe(c)) or c for c in o.get("cpes", []))]))
             for k in ("scheme", "hint", "depth", "osv", "pattern", "pattern_hint", "normalize", "belongs", "cpe_editions", "replaces", "lines_only"):
                 if o.get(k):

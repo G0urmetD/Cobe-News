@@ -8,13 +8,16 @@ import {
   fold,
   normalizeWord,
   offSources,
+  readSystems,
   ruleSummary,
   splitWords,
   systemName,
   systemOf,
+  systemParam,
   systemValue,
   vendorId,
   vendorOf,
+  vendorsOf,
   wordProblem,
 } from "@/lib/rule-filters"
 
@@ -216,7 +219,32 @@ describe("the dry run with systems and words", () => {
   })
 })
 
+describe("systems beyond the rules (News filter, own notifications)", () => {
+  it("an address's system is a catalogue key or a vendor's name – anything else is dropped", () => {
+    expect(systemParam("p:panos")).toEqual({ product: "panos" })
+    expect(systemParam(" v:Palo Alto Networks ")).toEqual({ vendor: "Palo Alto Networks" })
+    for (const bad of ["p:PAN OS", "p:-x", "p:", "v:", "v: ", "x:panos", "panos", "v:a\u0000b", "v:" + "x".repeat(121)]) expect(systemParam(bad), bad).toBeNull()
+    expect(readSystems(["p:panos", "p:panos", "v:Fortinet", "bad"])).toEqual([{ product: "panos" }, { vendor: "Fortinet" }])
+  })
+  it("a person's picker offers only the vendors and products among their own", () => {
+    const mine = vendorsOf(catalogVendors(products), ["panos", "rhel"])!
+    expect(mine.map((v) => [v.name, v.products.map((p) => p.key)])).toEqual([
+      ["Palo Alto Networks", ["panos"]],
+      ["Red Hat", ["rhel"]],
+    ])
+    expect(vendorsOf(catalogVendors(products), [])).toEqual([])
+    expect(vendorsOf(undefined, ["panos"])).toBeUndefined()
+  })
+})
+
 describe("texts", () => {
+  it("the texts of the News filter and the own notifications in both languages", () => {
+    const keys = Object.keys(de).filter((k) =>
+      /^(news\.(filterSystems|systemRemove|filterWithout|without)|desktop\.(systems|exclude|hit)|personal\.(systems|allSystems|systemGone))/.test(k),
+    )
+    expect(keys.length).toBe(17)
+    for (const k of keys) expect(en, k).toHaveProperty([k])
+  })
   it("every new key in both languages", () => {
     const keys = Object.keys(de).filter((k) => /^notify\.(systems?|allSystems|keywords|exclude|word|concerns|quoted|sourceOff|sourcesOnlyOff|sourcesSomeOff)/.test(k))
     expect(keys.length).toBeGreaterThan(20)

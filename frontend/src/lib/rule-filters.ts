@@ -1,10 +1,12 @@
+import { useMemo } from "react"
 import type { NotifyRule, RuleKind } from "@/lib/admin-api"
 import { isoList } from "@/lib/bidi"
 import type { NewsSeverity, NewsTopic } from "@/lib/news-api"
-import type { VendorProduct } from "@/lib/vendor-api"
+import { type VendorProduct, useVendorCatalog } from "@/lib/vendor-api"
 
-// The rules' "Betrifft" (systems of the catalogue and own words) and "Nicht senden, wenn enthalten" – the pure helpers
-// of the rule editor and the rules list (backend app/systems.py, app/keywords.py; tested in rule-filters.test.ts).
+// "Betrifft" (systems of the catalogue and own words) and "Nicht senden, wenn enthalten" – the helpers of the rule
+// editor and the rules list, the News page's "Systeme" filter and a person's own notifications (backend app/concerns.py,
+// app/systems.py, app/keywords.py; tested in rule-filters.test.ts).
 
 /** A system of a rule: a catalogue vendor (all of its products, also those added later) or one product. */
 export type RuleSystem = { vendor: string } | { product: string }
@@ -45,6 +47,31 @@ export function systemOf(value: string): RuleSystem | null {
   if (value.startsWith("v:") && value.length > 2) return { vendor: value.slice(2) }
   if (value.startsWith("p:") && value.length > 2) return { product: value.slice(2) }
   return null
+}
+
+// as the server takes them (app/concerns.py): a catalogue key, a vendor's name without control characters
+const PRODUCT_KEY = /^[a-z0-9][a-z0-9._+-]{0,63}$/
+// eslint-disable-next-line no-control-regex -- control characters are what it refuses
+const CONTROL = /[\u0000-\u001f\u007f\u2028\u2029]/
+export const VENDOR_MAX = 120
+
+/** A system of an address (`system=v:Palo Alto Networks`, `system=p:panos`) – null: malformed (a crafted link). */
+export function systemParam(value: string): RuleSystem | null {
+  const s = systemOf(value.trim())
+  if (!s) return null
+  if ("product" in s) return PRODUCT_KEY.test(s.product) ? s : null
+  const v = s.vendor.trim()
+  return v && v.length <= VENDOR_MAX && !CONTROL.test(v) ? { vendor: v } : null
+}
+
+/** The systems of an address: each valid one once, at most SYSTEMS_MAX. */
+export function readSystems(values: string[]): RuleSystem[] {
+  const out = new Map<string, RuleSystem>()
+  for (const v of values) {
+    const s = systemParam(v)
+    if (s && out.size < SYSTEMS_MAX) out.set(systemValue(s), s)
+  }
+  return [...out.values()]
 }
 
 export interface CatalogVendor {
@@ -90,6 +117,20 @@ export function catalogVendors(products: Pick<VendorProduct, "key" | "label" | "
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/** The catalogue by vendor (GET /api/vendor/catalog) – undefined while it loads (or while not `enabled`: the News page
+ *  asks for it only once its "Systeme" filter is used). */
+export function useCatalogVendors(enabled = true): CatalogVendor[] | undefined {
+  const products = useVendorCatalog(enabled).data?.products
+  return useMemo(() => (products ? catalogVendors(products) : undefined), [products])
+}
+
+/** The vendors limited to these products (a person's own: the picker of "Hersteller-News meiner Produkte"). */
+export function vendorsOf(vendors: CatalogVendor[] | undefined, keys: string[]): CatalogVendor[] | undefined {
+  if (!vendors) return undefined
+  const mine = new Set(keys)
+  return vendors.map((v) => ({ ...v, products: v.products.filter((p) => mine.has(p.key)) })).filter((v) => v.products.length > 0)
+}
+
 /** The catalogue vendor a stored rule's vendor stands for – under any of its spellings; undefined: no longer known. */
 export const vendorOf = (vendors: CatalogVendor[], name: string) => {
   const id = vendorId(name)
@@ -123,6 +164,18 @@ export function wordProblem(word: string, list: string[]): string | null {
   if (list.some((x) => fold(x) === fold(w))) return "notify.wordTwice"
   if (list.length >= WORDS_MAX) return "notify.wordsMax"
   return null
+}
+
+/** Words of an address or a stored filter ("Ohne …" of the News page): each valid one once (as the server takes them),
+ *  at most WORDS_MAX – a crafted link cannot break the page. */
+export function readWords(values: unknown[]): string[] {
+  const out: string[] = []
+  for (const v of values) {
+    if (typeof v !== "string") continue
+    const w = normalizeWord(v)
+    if (!wordProblem(w, out)) out.push(w)
+  }
+  return out
 }
 
 /** The words typed into a chip field: a comma ends one ("Bleed, Ransomware" → two). */

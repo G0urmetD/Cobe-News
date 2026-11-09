@@ -18,7 +18,7 @@
 # ---------------------------------------------------------------- other firewalls / VPN
 - key: netscaler-adc
   label: NetScaler ADC (Citrix ADC)
-  vendor: Cloud Software Group
+  vendor: Cloud Software Group (Citrix)
   cpes: [a:citrix:netscaler_application_delivery_controller, a:citrix:application_delivery_controller]
   cna: [[Citrix, NetScaler ADC], [NetScaler, NetScaler ADC]]
   kw: [NetScaler, Citrix ADC]
@@ -54,6 +54,7 @@
   normalize: [nginx_plus]  # nginx -v: "nginx/1.27.2 (nginx-plus-r33)" → R33
   belongs: [{pattern: '^\s*v?1\.\d+\.\d+\s*$', to: nginx}]  # 1.27.2 alone: nginx open source
 - key: haproxy
+  vendor: HAProxy
   cpes: [a:haproxy:haproxy]
 
 # ---------------------------------------------------------------- load balancers, reverse proxies
@@ -62,12 +63,14 @@
   osv: [[Go, github.com/traefik/traefik/v2], [Go, github.com/traefik/traefik/v3]]
 - key: kemp-loadmaster
   label: Progress Kemp LoadMaster
-  vendor: Progress (Kemp)
+  vendor: Progress
   cpes: [a:kemptechnologies:loadmaster, a:progress:loadmaster, o:progress:loadmaster]
   kw: [LoadMaster, Kemp]
   example: 7.2.61.0
 - key: envoy
+  vendor: Envoy Proxy
   cpes: [a:envoyproxy:envoy]
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: squid
+  vendor: Squid

@@ -82,7 +82,9 @@
   kw: [OpenJDK]
   example: 21.0.5
 - key: eclipse-temurin
+  vendor: Eclipse Foundation
 - key: redhat-jboss-eap
+  vendor: Red Hat
   cpes: [a:redhat:jboss_enterprise_application_platform]
 # endoflife.date no longer lists WildFly (only JBoss EAP) – a product of its own since catalogue 2026.10.29-2
 - key: wildfly
@@ -109,15 +111,55 @@
   example: 9.0.5.22
 - key: coldfusion
 - key: log4j
+  vendor: Apache Software Foundation
   cpes: [a:apache:log4j]
   osv: [[Maven, org.apache.logging.log4j:log4j-core]]
 - key: spring-framework
+  vendor: Broadcom (Spring)
   cpes: [a:vmware:spring_framework]
   osv: [[Maven, org.springframework:spring-core], [Maven, org.springframework:spring-web], [Maven, org.springframework:spring-webmvc]]
 - key: ruby
+  vendor: Ruby
 - key: go
   cpes: [a:golang:go]
   osv: [[Go, stdlib]]
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: dotnetfx
+
+# ---------------------------------------------------------------- endoflife.date products: their vendor
+# (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)
+- key: apache-apisix
+  vendor: Apache Software Foundation
+- key: apache-groovy
+  vendor: Apache Software Foundation
+- key: bellsoft-liberica
+  vendor: BellSoft
+- key: caddy
+  vendor: Caddy
+- key: eclipse-jetty
+  vendor: Eclipse Foundation
+- key: ghc
+  vendor: Haskell.org
+- key: idl
+  vendor: NV5 Geospatial
+- key: julia
+  vendor: Julia
+- key: kong-gateway
+  vendor: KongHQ
+- key: mandrel
+  vendor: Red Hat
+- key: redhat-build-of-openjdk
+  vendor: Red Hat
+- key: rust
+  vendor: Rust Project
+- key: sapmachine
+  vendor: SAP
+- key: scala
+  vendor: Scala
+- key: vinyl-cache
+  vendor: Varnish Cache Project
+- key: visual-cobol
+  vendor: Rocket Software
+- key: weakforced
+  vendor: PowerDNS
