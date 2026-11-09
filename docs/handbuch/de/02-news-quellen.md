@@ -57,8 +57,20 @@ markieren“, „Artikel öffnen“ (der Originalartikel in einem neuen Tab) und
 - **Schnellfilter** unter der Filterzeile: „Aktiv ausgenutzt“, „Zero-Day“ und „Ohne Patch“ mit einem Klick – derselbe
   Filter wie *Thema*, mit der Zahl der Meldungen. Daneben **„Betrifft unsere Produkte“**, sobald ihr in Vendor News
   einem Produkt folgt ([mehr](#unsere-produkte)) – er gilt zusätzlich zu allen anderen Filtern.
-- Quelle, Schwere, Thema und „Betrifft unsere Produkte“ merkt sich zusätzlich der Browser für dein Konto (wenn du keine
-  Standard-Ansicht hast).
+- **Systeme**: nur Meldungen zu bestimmten Herstellern oder Produkten aus dem ganzen Katalog – dieselbe Auswahl wie bei
+  den [Systemen einer Regel](/docs/benachrichtigungen#regel-systeme): nach Hersteller gruppiert, mit Suche, „Alle
+  Produkte von Palo Alto Networks“ (auch später hinzugekommene) oder einzelne Produkte („PAN-OS“). Eine Meldung passt,
+  wenn ihre [Details aus der Quelle](#details-aus-der-quelle) das Produkt betreffen oder Titel bzw. Teaser Produkt oder
+  Hersteller nennen. Anders als bei einer Regel zählt hier auch, was eine Meldung erst durch eine Neuberechnung bekommen
+  hat (etwa nach einem Katalog-Update) – die Liste zeigt, was ein System betrifft, und verschickt nichts. Jedes gewählte
+  System steht als Chip unter der Filterzeile („Systeme: PAN-OS ×“). Zusammen mit „Schwere: Kritisch“ ist das „nur Palo
+  Alto, nur Kritisch“.
+- **Ohne**: Meldungen mit bestimmten Wörtern ausblenden – wie „Nicht senden, wenn enthalten“ einer Regel. Der Knopf
+  öffnet ein Feld für Wörter (Enter oder Komma fügt eines hinzu; ganze Wörter in Titel oder Teaser, Groß-/Kleinschreibung
+  egal, reiner Text, höchstens 30, je 2–60 Zeichen). Jedes Wort steht als Chip unter der Filterzeile („Ohne: Webinar ×“).
+  Anders als die Suche sucht es ganze Wörter: „Webinar“ blendet „Webinars“ nicht aus.
+- Quelle, Schwere, Thema, „Betrifft unsere Produkte“, Systeme und „Ohne“ merkt sich zusätzlich der Browser für dein Konto
+  (wenn du keine Standard-Ansicht hast).
 - **Zeitraum**: nur Meldungen aus einer Zeitspanne. Schnellauswahl: *Letzte Stunde*, *Heute* (ab 00:00), *Gestern*,
   *24 Stunden*, *7 Tage*, *30 Tage* und *Seit meinem letzten Besuch*. Oder ein **eigener Zeitraum** mit *Von* und *Bis*
   (Datum und Uhrzeit in der Ortszeit deines Browsers, z. B. MEZ); ein leeres Feld ist ein offenes Ende, ein Datum ohne
@@ -72,7 +84,7 @@ markieren“, „Artikel öffnen“ (der Originalartikel in einem neuen Tab) und
   nach Eingang; anders als „Nur ungelesene“ bleibt eine Meldung in der Liste, wenn du sie öffnest.
 - Im Link und in einer gespeicherten Ansicht steht die Schnellauswahl als Name, nicht als feste Uhrzeit: eine Ansicht
   „Heute“ zeigt auch morgen den dann aktuellen Tag. Ein eigener Zeitraum steht mit seinen Zeitpunkten darin.
-- „Filter zurücksetzen“ hebt Quelle, Schwere, Thema, „Betrifft unsere Produkte“ und den Zeitraum auf.
+- „Filter zurücksetzen“ hebt Quelle, Schwere, Thema, „Betrifft unsere Produkte“, Systeme, „Ohne“ und den Zeitraum auf.
 - **Nur ungelesene**: blendet Gelesenes aus. **Stummgeschaltete zeigen**: zeigt auch die Meldungen, deren CVEs du alle
   stummgeschaltet hast (blass) – sonst fehlen sie.
 - **Ansichten**: die Filter unter einem Namen speichern, als Standard setzen, als Link teilen

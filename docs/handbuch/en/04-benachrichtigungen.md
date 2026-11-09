@@ -15,8 +15,9 @@ Cobe News reports new stories in two ways:
 | Where to | system notification of this browser | Teams, Slack, Discord, Telegram, Mattermost, ntfy, Gotify, email or an own webhook |
 | What | new security stories of the news feed | security stories, Vendor News and the state of the sources |
 
-- **Desktop:** you choose severities and sources. The browser shows new stories as system notifications – in the open
-  tab and, if you like, also with the tab closed (Web Push).
+- **Desktop:** you choose severities, sources, topics and, if you like, systems and keywords – "only Palo Alto, only
+  critical" works without an admin too. The browser shows new stories as system notifications – in the open tab and,
+  if you like, also with the tab closed (Web Push).
 - **Channels** say *where* a message goes. **Rules** say *what* goes to which channels. A rule can send to several
   channels, and several rules can use the same channel.
 
@@ -27,6 +28,7 @@ On top of that there are ways that concern only you:
 | What | For whom | Where | More |
 |---|---|---|---|
 | Vendor news of your products – by e-mail, desktop push or Microsoft Teams, with quiet hours, absence and weekly review | members of a team, once an admin has allowed the ways | *Settings → Notifications*, tab *Vendor news of my products* | [Vendor news of my products](#meine-produkte) |
+| Security stories of your own choice – by e-mail or Microsoft Teams | everybody, once an admin allows it | *Settings → Notifications*, tab *Security stories* | [Security stories by e-mail or Teams](#security-meldungen) |
 | News about single CVEs (fix, KEV, EPSS, withdrawn) | everybody | star next to a CVE, sidebar *Watched CVEs* | [Watching CVEs](#cves-beobachten) |
 | End of support as a calendar subscription | everybody (readers: the products from their team) | *Settings → Notifications*, tab *Calendar* | [Calendar (iCal)](#kalender-ical) |
 | Send a story with a comment to your team | members of a team with a forward channel | "Forward to team" in a story and a finding | [Forward to my team](#weiterleiten) |
@@ -48,6 +50,19 @@ source – "Actively exploited, Exploit published" with all severities reports e
 What counts is the topic a story has **when it arrives** (from title, teaser, source and the KEV catalogue). A topic
 that is added only later – e.g. from the details from the source – triggers no desktop notification any more; for that
 there are [rules](#regel-themen), which send such a story then. The open tab and push with the tab closed filter alike.
+
+**Systems, keywords and "Don't show if it contains"** – as in the [rules](#regel-systeme), just for you:
+
+- **Systems**: vendors ("All products of Palo Alto Networks") or single products from the whole catalogue.
+- **Keywords**: your own words as chips (Enter or comma), whole words in the title or teaser, case ignored, plain text
+  (at most 30, 2–60 characters each).
+- Systems **or** keywords – one is enough, together with severity, source and topic.
+- **Don't show if it contains**: if such a word is in the title or teaser, no notification comes.
+- The notification then says why it comes: "Critical · heise online · Match: PAN-OS".
+- What the story has **when it arrives** counts – above all what its title and teaser name. A system that comes only
+  later from the details from the source triggers no desktop notification any more (as a topic); a
+  [rule](#regel-systeme) sends such a story then.
+- The filtering is done on the server: the open tab and push with the tab closed only get what matches.
 
 Below, the card "State in this browser" shows:
 
@@ -171,7 +186,13 @@ Teams takes the messages through a **workflow** you create yourself. It posts in
 
 - **Only what is new.** You get what comes after a way was switched on and after the product was assigned. Older news
   and anything from the first check of a product do not come.
-- **Filter.** What your filter (kind, severity) left out once does not come later after the filter is changed either.
+- **Only these systems.** Below the severity you can pick vendors or products among your products – then only their
+  vendor news comes ("All products of Palo Alto Networks" also covers products assigned to you later). Empty means: all
+  your products. As with a rule's systems for Vendor News, the event's product counts – it is in every message anyway.
+  There are no keywords here; they apply to security stories ([desktop notifications](#desktop-einschalten)). Watched
+  CVEs always come.
+- **Filter.** What your filter (kind, severity, systems) left out once does not come later after the filter is changed
+  either.
 - **Muted.** What you [muted](#stummschalten) does not come – also not when the mute ends.
 - **Collected.** Several stories of one round come together: one mail, one card, one push with "N new vendor news". At
   most 100 per round, the most severe first; the rest comes with the next round.
@@ -245,6 +266,46 @@ team's products:
 
 It comes exactly once per team and week, also after a restart. After an outage at most the last missed week comes,
 never several old ones. Without a mail server set up nothing is attempted.
+
+## Security stories by e-mail or Teams {#security-meldungen}
+
+Security stories of **your own choice** to your e-mail address or your own Teams webhook – like a
+[rule](#regel-systeme), just for you, without an admin. The tab *Security stories* under
+[*Settings → Notifications*](/settings/notifications?tab=news) is there once an admin allows it
+([Settings → Teams](/docs/anmeldung#teams-persoenlich), off by default) – for every person, also without a team.
+
+1. Switch on **E-mail** (to the address of your account) and/or **Microsoft Teams**. For Teams enter the address of
+   your [Workflows webhook](#meine-produkte-teams) – the same as for vendor news of my products.
+2. As for the [desktop notifications](#desktop-einschalten), choose **severities**, **sources**, **topics**, **systems**,
+   **keywords** and **Don't show if it contains**. Empty means: all. "Only Palo Alto, only critical": severity
+   *Critical*, system "All products of Palo Alto Networks".
+3. Click "Save".
+
+- **Like a rule**: systems or keywords – one is enough –, together with severity, source and topic; an exclusion word
+  keeps the story away. The backlog of a source switched on later never comes, nor what a story gets only by a
+  recompute.
+- **Later too, as a rule**: when a story matches only later – it is rated higher, its details from the source name
+  PAN-OS, it gets the topic "Actively exploited", a new title, a further source carries it fresh –, it comes then; at
+  most a week after it arrived. What a story gets only by a recompute (after a catalogue update, say) does not bring it.
+- **Only what is new, each story once**: what arrives after a way is switched on – at most once per way, also after a
+  restart. **When you widen your choice** (another severity, source, topic, system or word, an exclusion word less),
+  older stories come only through a change of their own after that – no flood of old stories.
+- **No flood**: at most one message every 15 minutes per way. Up to three stories come on their own, more as one summary
+  ("12 new security stories") with the ten most urgent (actively exploited or critical first).
+- **Why**: with systems or keywords the message says "Match: PAN-OS".
+- **Quiet hours and collecting time** of [vendor news of my products](#ruhezeiten) apply here too: in the quiet hours
+  the message waits and comes collected afterwards; with "collected at HH:MM" what arrived up to then comes. There is no
+  exception for urgent stories here – that is what the desktop notifications are for.
+- **Absence**: while you are [away](#abwesenheit) (without "Also to me"), nothing comes and nothing waits for your
+  return – the news list has everything. There is no deputy here.
+- **Muted**: stories whose CVEs you all [muted](#stummschalten) do not come.
+- **Errors**: if the mail server or Teams refuses, Cobe News tries again later with a growing pause; after an error the
+  message may have arrived with (a timeout, say), not. Below the way stands the last delivery or the last error.
+- While an admin switches the way off or your account is deactivated, nothing comes – not later either. The tab stays
+  as long as a way of yours is on: switching off and changing the choice always works, switching on again only once the
+  admin allows it.
+- **The Teams address** is one for both – security stories and vendor news of my products. Removing it in either
+  switches Teams off in both.
 
 ## Watching CVEs {#cves-beobachten}
 
@@ -1325,6 +1386,9 @@ exactly what concerns you. Example "only Palo Alto, only critical":
   "everything". Remove it.
 - The message says why it comes: **"Match: PAN-OS"** (or the keyword) in the mail and the cards; the webhook gets the
   field `match`.
+- **Without an admin too:** the same systems are a filter of the [news list](/docs/news-quellen#suchen-filtern), part of
+  your own [desktop notifications](#desktop-einschalten) (with keywords and exclusions) and of
+  [vendor news of my products](#meine-produkte-was) – for every person themselves.
 
 ### Limiting to teams {#regel-teams}
 

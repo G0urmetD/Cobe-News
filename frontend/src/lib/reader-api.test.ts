@@ -66,6 +66,8 @@ describe("news filter in the address", () => {
       ours: false,
       range: NO_RANGE,
       ids: [],
+      systems: [],
+      without: [],
     })
     const cleared = writeNewsFilter(next, { sources: [], severities: [], q: "", unread: false })
     expect([...cleared.keys()].sort()).toEqual(["future", "story"])
@@ -106,6 +108,43 @@ describe("topics in the address", () => {
     expect(hasFilter(new URLSearchParams("topic=exploited&status=ok"), "vendor")).toBe(true)
     expect(readVendorFilter(new URLSearchParams("topic=exploited"))).toEqual({ status: null, filter: null, q: "", unread: false, muted: false })
     expect(writeVendorFilter(new URLSearchParams("topic=zeroday"), { status: "check" }).get("status")).toBe("check")
+  })
+})
+
+describe("systems in the address", () => {
+  it("keeps valid systems only, once each, at most 50 – a crafted link cannot break the page", () => {
+    const p = new URLSearchParams()
+    for (const v of ["v:Palo Alto Networks", "p:panos", "p:panos", "p:Bad Key", "x:y", "v:", "v:" + "a".repeat(121), "v:Evil\u2028Name", "panos"]) p.append("system", v)
+    expect(readNewsFilter(p).systems).toEqual([{ vendor: "Palo Alto Networks" }, { product: "panos" }])
+    const many = new URLSearchParams(Array.from({ length: 70 }, (_, i) => ["system", `p:k${i}`]))
+    expect(readNewsFilter(many).systems).toHaveLength(50)
+  })
+  it("writes them as repeated parameters, keeps the rest, clears them – and a view carries them", () => {
+    const next = writeNewsFilter(new URLSearchParams("story=abc&severity=critical"), { systems: [{ vendor: "Palo Alto Networks" }, { product: "panos" }] })
+    expect(next.getAll("system")).toEqual(["v:Palo Alto Networks", "p:panos"])
+    expect(next.get("severity")).toBe("critical")
+    expect(readNewsFilter(next).systems).toEqual([{ vendor: "Palo Alto Networks" }, { product: "panos" }])
+    expect(viewQuery(next, "news")).toBe("severity=critical&system=v%3APalo+Alto+Networks&system=p%3Apanos")
+    expect(readNewsFilter(applyView(new URLSearchParams("story=x"), viewQuery(next, "news"))).systems).toHaveLength(2)
+    expect(hasFilter(new URLSearchParams("system=p:panos"), "news")).toBe(true)
+    // on Vendor News no filter: not stored in its views, no reason to skip its default view
+    expect(hasFilter(new URLSearchParams("system=p:panos"), "vendor")).toBe(false)
+    expect(viewQuery(new URLSearchParams("system=p:panos&q=x"), "vendor")).toBe("q=x")
+    expect(writeNewsFilter(next, { systems: [] }).has("system")).toBe(false)
+  })
+})
+
+describe("excluded words in the address", () => {
+  it("keeps only words the server takes, once each, at most 30 – and a view carries them", () => {
+    const p = new URLSearchParams()
+    for (const w of ["Webinar", "webinar", "x", "(.*)+$", "a".repeat(61), " Citrix   Bleed "]) p.append("without", w)
+    expect(readNewsFilter(p).without).toEqual(["Webinar", "Citrix Bleed"])
+    expect(readNewsFilter(new URLSearchParams(Array.from({ length: 40 }, (_, i) => ["without", `wort${i}`]))).without).toHaveLength(30)
+    const next = writeNewsFilter(new URLSearchParams("story=x"), { without: ["Webinar"] })
+    expect(next.getAll("without")).toEqual(["Webinar"])
+    expect(viewQuery(next, "news")).toBe("without=Webinar")
+    expect(hasFilter(new URLSearchParams("without=Webinar"), "vendor")).toBe(false)
+    expect(writeNewsFilter(next, { without: [] }).has("without")).toBe(false)
   })
 })
 

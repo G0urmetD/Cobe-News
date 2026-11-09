@@ -114,7 +114,7 @@ async def _setup(c, **rule) -> tuple[NewsSource, dict]:  # noqa: ANN001
         ("Edge 130 update", "", {"m:edge"}, set()),
         ("On the edge of ransomware", "", set(), {"m:edge"}),
         ("Spring Framework RCE", "", {"m:spring-framework"}, set()),
-        ("Spring attacks on hospitals rise", "", set(), {"m:spring-framework", "v:spring"}),
+        ("Spring attacks on hospitals rise", "", set(), {"m:spring-framework", "v:spring", "v:broadcomspring"}),
         # a product by its label without its vendor in front; vendors of three letters or fewer that are no abbreviation
         ("Chrome 130 schließt Lücken", "", {"m:chrome"}, set()),
         ("SAP-Patchday: 20 Lücken", "", {"v:sap"}, set()),
@@ -127,7 +127,7 @@ async def _setup(c, **rule) -> tuple[NewsSource, dict]:  # noqa: ANN001
         ("Palo Alto warnt vor Zero-Day", "", {"v:paloaltonetworks"}, set()),
         ("Threat Intel: neue Kampagne", "", set(), {"v:intel"}),
         ("Intel-Prozessoren: Lücke", "", {"v:intel"}, set()),
-        ("BSI-Chef warnt", "Signal-Chef äußert sich", set(), {"v:chef", "v:progress"}),
+        ("BSI-Chef warnt", "Signal-Chef äußert sich", set(), {"v:chef", "v:progress", "v:progresschef"}),
         # one name, one product: PAN-OS is PAN-OS (Panorama runs it, but a story naming PAN-OS is not about Panorama);
         # a vendor's own name in one product's keywords is the vendor ("Zyxel warnt" is no switch story)
         ("PAN-OS: kritische Lücke", "", {"m:panos"}, {"m:panorama"}),
@@ -137,7 +137,7 @@ async def _setup(c, **rule) -> tuple[NewsSource, dict]:  # noqa: ANN001
         ("SonicWall SMA 100", "", {"m:sonicwall-sma"}, {"m:sonicwall-sonicos"}),
         ("MikroTik routers hijacked", "", {"v:mikrotik"}, {"m:routeros"}),
         ("Jenkins fixes RCE", "", {"v:jenkinsproject"}, {"m:jenkins", "m:jenkins-weekly"}),  # "Jenkins (weekly)" is no more Jenkins
-        ("Grafana fix", "", {"m:grafana", "v:grafana"}, set()),  # the product that is called so
+        ("Grafana fix", "", {"m:grafana", "v:grafanalabs"}, set()),  # the product that is called so (and the vendor's short name)
         # the longest name wins
         ("NGINX Plus", "", {"m:nginx-plus"}, {"m:nginx"}),
         ("Grafana Loki flaw", "", {"m:grafana-loki"}, {"m:grafana"}),
@@ -153,7 +153,8 @@ async def _setup(c, **rule) -> tuple[NewsSource, dict]:  # noqa: ANN001
         ("Firefox 145 schließt Sicherheitslücken", "", {"m:firefox"}, set()),
         ("FortiGate devices under attack", "", {"m:fortios"}, set()),
         ("Red Hat Enterprise Linux 10 update", "", {"m:rhel", "v:redhat"}, set()),
-        ("Linux-Kernel: Lücke", "", set(), {"v:linux"}),
+        ("Linux-Kernel: Lücke", "", {"m:linux"}, {"v:linux", "v:thelinuxfoundation", "v:linuxkernelorganization"}),
+        ("Linux Foundation startet neues Projekt", "Linux-Server betroffen?", set(), {"m:linux", "v:linuxkernelorganization"}),
         # a brand of another vendor is named by its products, not by its parent's name
         ("Cisco ASA: Zero-Day", "", {"m:cisco-asa", "v:cisco"}, {"m:duo"}),
         # no name across the end of the title
@@ -164,6 +165,8 @@ async def _setup(c, **rule) -> tuple[NewsSource, dict]:  # noqa: ANN001
         # the US authority is no vendor in the news – its tool is named by its own name
         ("CISA warns of exploited Cisco flaw", "", {"v:cisco"}, {"v:cisa"}),
         ("CISA ScubaGear 2.0 released", "", {"m:scubagear"}, set()),
+        # AMD is a vendor name, no abbreviation of the news
+        ("AMD warnt vor Lücken in Prozessoren", "", {"v:amd"}, set()),
     ],
 )
 def test_mentions_name_systems_without_the_obvious_false_positives(title, teaser, found, absent):
@@ -283,12 +286,14 @@ async def test_vendor_news_events_by_system(admin_client, hooks):
     assert "PAN-OS" in body and "FortiOS" not in body
 
 
-@pytest.mark.parametrize("spelling", ["VMware", "Broadcom (VMware)", "vmware"])
-async def test_one_vendor_of_several_spellings_is_one_choice(admin_client, hooks, spelling):
-    """The catalogue has VMware as "VMware" (Photon, Site Recovery Manager) and as "Broadcom (VMware)" (ESXi, vCenter …):
-    a rule "VMware (alle Produkte)" in either spelling is all of them – news and Vendor News events."""
+@pytest.mark.parametrize("spelling", ["Broadcom (VMware)", "broadcom (vmware)", "BROADCOM (VMWARE)"])
+async def test_one_vendor_is_one_choice_whatever_its_case(admin_client, hooks, spelling):
+    """VMware is "Broadcom (VMware)" in the catalogue (ESXi, vCenter … and, since catalogue 2026.11.06-3, Photon and Site
+    Recovery Manager, which endoflife.date spelled "VMware"/"Vmware"): a rule "VMware (alle Produkte)" in any case is
+    all of them – news and Vendor News events – and never Broadcom's other brands (Symantec, Spring, Brocade)."""
     want = set(systems.product_keys([{"vendor": spelling}]))
-    assert {"esxi", "vcenter", "vmware-srm", "photon"} <= want and "symantec-endpoint" not in want  # Broadcom's own: not VMware
+    assert {"esxi", "vcenter", "vmware-srm", "photon"} <= want
+    assert not {"symantec-endpoint", "spring-boot", "rabbitmq", "brocade-fos"} & want  # Broadcom's other brands: not VMware
     assert systems.known({"vendor": spelling}) and systems.text_of({"vendor": spelling}) == "v:broadcomvmware"
     assert systems.label({"vendor": spelling}) == "Broadcom (VMware) (alle Produkte)"
     src, _ = await _setup(admin_client, systems=[{"vendor": spelling}], kinds=["news", "vendor_vuln"])
@@ -296,38 +301,66 @@ async def test_one_vendor_of_several_spellings_is_one_choice(admin_client, hooks
         for k in ("esxi", "vcenter", "symantec-endpoint"):
             s.add(VendorEvent(key=f"vuln:{k}:*:x", kind="vuln", product=k, severity="critical", data={"product": k, "status": "affected", "title": f"Lücke in {k}"}))
         await s.commit()
-    await _news(src, "VMware warnt vor Lücke")  # the vendor alone, as stories of an older matching kept it ("v:vmware")
-    async with db.session() as s:
-        old = await _news(src, "Ältere Meldung zu VMware")
-        await s.execute(update(NewsItem).where(NewsItem.id == old).values(systems=["v:vmware"]))
-        await s.commit()
+    await _news(src, "VMware warnt vor Lücke")  # the brand in the parenthesis names the vendor
     await _dispatch()
     body = "\n".join(_slack_texts(hooks))
     assert "vendor?product=esxi" in body and "vendor?product=vcenter" in body and "symantec" not in body
-    assert "VMware warnt vor Lücke" in body and "Ältere Meldung zu VMware" in body
+    assert "VMware warnt vor Lücke" in body
 
 
 def test_the_vendor_identities_of_the_catalogue():
+    """Catalogue 2026.11.06-3: one spelling per vendor – the identity groups (systems._groups) are single spellings,
+    except one brand with several owners (Veritas: NetBackup at Cohesity, Backup Exec at Arctera)."""
     ix = systems.index()
-    same = [("Apache", "Apache Software Foundation"), ("LANCOM", "LANCOM Systems"), ("Nagios", "Nagios Enterprises"), ("VMware", "Broadcom (VMware)"), ("Arista Networks", "Arista (Untangle)")]
-    for a, b in same:
-        assert systems.group_of(a) == systems.group_of(b) is not None, (a, b)
+    several = {gid: v["names"] for gid, v in ix.vendors.items() if len(v["names"]) > 1}
+    assert several == {"veritas": ["Arctera (Veritas)", "Cohesity (Veritas)"]}, several
     # an owner in parentheses is no brand: CyberArk stays CyberArk, Splunk Splunk – "Palo Alto Networks (alle)" is
-    # Palo Alto's own products
-    apart = [("CyberArk (Palo Alto Networks)", "Palo Alto Networks"), ("Splunk (Cisco)", "Cisco"), ("Broadcom", "Broadcom (VMware)"), ("Cloud", "Cloud Software Group"), ("Kaseya", "Datto (Kaseya)")]
+    # Palo Alto's own products; Broadcom's brands are each their own (and "Broadcom" itself is Brocade)
+    apart = [
+        ("CyberArk (Palo Alto Networks)", "Palo Alto Networks"), ("Splunk (Cisco)", "Cisco"), ("Broadcom", "Broadcom (VMware)"),
+        ("Broadcom (Symantec)", "Broadcom (VMware)"), ("Broadcom (Spring)", "Broadcom (VMware)"), ("Kaseya", "Datto (Kaseya)"),
+        ("ownCloud (Kiteworks)", "Kiteworks"), ("Progress (Chef)", "Progress"), ("Linux Kernel Organization", "The Linux Foundation"),
+    ]  # fmt: skip
     for a, b in apart:
-        assert systems.group_of(a) != systems.group_of(b), (a, b)
+        assert systems.group_of(a) != systems.group_of(b) and systems.group_of(a) and systems.group_of(b), (a, b)
     assert not {"cyberark-pam", "cyberark-privilege-cloud"} & set(systems.product_keys([PAN]))
-    # every product in one group; the group's name and every spelling
+    assert set(systems.product_keys([{"vendor": "Broadcom (Symantec)"}])) == {"symantec-endpoint"}
+    assert set(systems.product_keys([{"vendor": "Broadcom"}])) == {"brocade-fos"}
+    assert {"linux", "kvm"} == set(systems.product_keys([{"vendor": "Linux Kernel Organization"}]))
+    # every product in one group
     assert len(ix.vendor_of) == sum(1 for p in catalog.load()["products"] if str(p.get("vendor") or "").strip())
-    v = ix.vendors[systems.group_of("VMware")]
-    assert v["name"] == "Broadcom (VMware)" and {"VMware", "Broadcom (VMware)"} <= set(v["names"])
+
+
+def test_the_vendor_identities_of_several_spellings():
+    """The groups still join what one vendor's spellings would be – catalogue data of later (an endoflife.date product
+    with a CPE's spelling) or of a custom catalogue: "VMware" (Photon) and "Broadcom (VMware)" (ESXi), "Apache" and
+    "Apache Software Foundation", "LANCOM" and "LANCOM Systems" are one vendor; an owner in parentheses makes none."""
+    def p(key, label, vendor, source="overlay"):
+        return {"key": key, "label": label, "vendor": vendor, "source": source, "cpes": []}
+
+    cat = {"products": [
+        p("esxi", "VMware ESXi", "Broadcom (VMware)"), p("photon", "VMware Photon", "Vmware", "eol"), p("srm", "VMware SRM", "VMware", "eol"),
+        p("symantec", "Symantec Endpoint Protection", "Broadcom (Symantec)"), p("fos", "Brocade Fabric OS", "Broadcom"),
+        p("tomcat", "Apache Tomcat", "Apache Software Foundation"), p("kafka", "Apache Kafka", "Apache", "eol"),
+        p("lcos", "LANCOM LCOS", "LANCOM Systems"), p("lcos-fx", "LANCOM LCOS FX", "LANCOM"),
+        p("cyberark", "CyberArk PAM", "CyberArk (Palo Alto Networks)"), p("panos", "PAN-OS", "Palo Alto Networks"),
+        p("netbackup", "Veritas NetBackup", "Cohesity (Veritas)"), p("backup-exec", "Veritas Backup Exec", "Arctera (Veritas)"),
+    ]}  # fmt: skip
+    alias, groups = systems._groups(cat)
+    by = {gid: set(g["keys"]) for gid, g in groups.items()}
+    assert by[alias["vmware"]] == {"esxi", "photon", "srm"} and groups[alias["vmware"]]["name"] == "Broadcom (VMware)"
+    assert by[alias["apache"]] == {"tomcat", "kafka"} and by[alias["lancom"]] == {"lcos", "lcos-fx"}
+    assert by[alias["broadcomsymantec"]] == {"symantec"} and by[alias["broadcom"]] == {"fos"}
+    assert by[alias["cyberarkpaloaltonetworks"]] == {"cyberark"} and by[alias["paloaltonetworks"]] == {"panos"}
+    assert by[alias["cohesityveritas"]] == {"netbackup", "backup-exec"} and groups[alias["cohesityveritas"]]["name"] == "Veritas"
 
 
 async def test_the_catalogue_names_each_product_s_vendor_identity(reader_client):
     got = {p["key"]: p for p in (await reader_client.get("/api/vendor/catalog")).json()["products"]}
     assert got["esxi"]["vendor_group"] == got["photon"]["vendor_group"] == "broadcomvmware"
-    assert got["photon"]["vendor_group_name"] == "Broadcom (VMware)" and got["photon"]["vendor"] != "Broadcom (VMware)"
+    assert got["photon"]["vendor_group_name"] == got["photon"]["vendor"] == "Broadcom (VMware)"
+    assert got["veritas-netbackup"]["vendor_group"] == got["backup-exec"]["vendor_group"] == "veritas"
+    assert got["veritas-netbackup"]["vendor_group_name"] == "Veritas" and got["veritas-netbackup"]["vendor"] == "Cohesity (Veritas)"
 
 
 def test_the_signature_follows_what_the_matching_reads_only(monkeypatch):

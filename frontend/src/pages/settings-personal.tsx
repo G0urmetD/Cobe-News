@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 import { useQueryClient } from "@tanstack/react-query"
@@ -21,6 +21,8 @@ import { PERSONAL_KINDS, type PersonalKind, type PersonalNotify, type WayState, 
 import { SaveBar, SettingsCard, SheetActions, SheetBody, SheetLoading } from "@/pages/settings-shared"
 import { AbsencePart, QuietPart, WeeklyPart } from "@/pages/settings-delivery"
 import { isoList } from "@/lib/bidi"
+import { type RuleSystem, useCatalogVendors, vendorsOf } from "@/lib/rule-filters"
+import { SystemsPicker } from "@/components/cobe/systems-picker"
 
 const SEVERITIES = ["critical", "high", "medium", "low", "info"] as const
 
@@ -81,12 +83,29 @@ export function PersonalVendorCard() {
   )
 }
 
-type Form = { email_on: boolean; desktop_on: boolean; teams_on: boolean; kinds: PersonalKind[]; min_severity: PersonalNotify["min_severity"] }
+type Form = { email_on: boolean; desktop_on: boolean; teams_on: boolean; kinds: PersonalKind[]; min_severity: PersonalNotify["min_severity"]; systems: RuleSystem[] }
 
 function PersonalForm({ initial }: { initial: PersonalNotify }) {
   const { t, i18n } = useTranslation()
   const qc = useQueryClient()
-  const first: Form = { email_on: initial.email.on, desktop_on: initial.desktop.on, teams_on: initial.teams.on, kinds: initial.kinds, min_severity: initial.min_severity }
+  const first: Form = {
+    email_on: initial.email.on,
+    desktop_on: initial.desktop.on,
+    teams_on: initial.teams.on,
+    kinds: initial.kinds,
+    min_severity: initial.min_severity,
+    systems: initial.systems ?? [],
+  }
+  // "Nur diese Systeme": the vendors and products among my own (a vendor also covers its products assigned later)
+  const allVendors = useCatalogVendors(initial.products.length > 0 || (initial.systems ?? []).length > 0)
+  const vendors = useMemo(
+    () =>
+      vendorsOf(
+        allVendors,
+        initial.products.map((p) => p.key),
+      ),
+    [allVendors, initial.products],
+  )
   const [v, setV] = useState<Form>(first)
   const [url, setUrl] = useState("")
   const [busy, setBusy] = useState(false)
@@ -106,6 +125,7 @@ function PersonalForm({ initial }: { initial: PersonalNotify }) {
       toast.success(t("common.saved"))
       setUrl("")
       void qc.invalidateQueries({ queryKey: ["me", "vendor-notify"] })
+      void qc.invalidateQueries({ queryKey: ["me", "news-notify"] }) // the one Teams URL: removed, Teams is off there too
     } catch (e) {
       toast.error(errorText(t, e))
     } finally {
@@ -206,7 +226,14 @@ function PersonalForm({ initial }: { initial: PersonalNotify }) {
                     <Button size="sm" variant="outline" disabled={testing || busy || dirty} onClick={() => void test()} title={dirty ? t("personal.teams.saveFirst") : undefined}>
                       {testing ? <Loader2 className="animate-spin" /> : <Send />} {t("personal.teams.test")}
                     </Button>
-                    <Button size="sm" variant="ghost" className="text-destructive" disabled={busy} onClick={() => void put({ teams_on: false, teams_url: "" })}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      disabled={busy}
+                      title={t("personal.teams.removeShared")}
+                      onClick={() => void put({ teams_on: false, teams_url: "" })}
+                    >
                       <Trash2 /> {t("personal.teams.remove")}
                     </Button>
                   </div>
@@ -258,6 +285,20 @@ function PersonalForm({ initial }: { initial: PersonalNotify }) {
               </Select>
             </Field>
           </div>
+          {(initial.products.length > 0 || v.systems.length > 0) && (
+            <div className="pb-3.5">
+              <Field label={<Explained label={t("personal.systems")} text={t("personal.systemsExplain")} />} hint={t("personal.systemsHint")}>
+                <SystemsPicker
+                  value={v.systems}
+                  onChange={(x) => setV({ ...v, systems: x })}
+                  vendors={vendors}
+                  label={vendors ? t("personal.allSystems") : undefined}
+                  goneLabel={t("personal.systemGone")}
+                  goneName={(name) => t("personal.systemGoneName", { name })}
+                />
+              </Field>
+            </div>
+          )}
         </section>
         <p className="rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">{t("personal.onlyNew")}</p>
       </SheetBody>
@@ -269,7 +310,7 @@ function PersonalForm({ initial }: { initial: PersonalNotify }) {
   )
 }
 
-function WayLabel({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
+export function WayLabel({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
   return (
     <span className="flex items-center gap-2">
       <Icon className="size-4 text-muted-foreground" /> {text}
@@ -316,7 +357,7 @@ function Way({
   )
 }
 
-function StateLine({ state }: { state: WayState }) {
+export function StateLine({ state }: { state: WayState }) {
   const { t } = useTranslation()
   const s = wayState(state)
   if (s.tone === "none") return <p className="-mt-1.5 pb-3 text-xs text-muted-foreground">{t("personal.state.none")}</p>

@@ -867,6 +867,12 @@ Benachrichtigungen**. Jeder Weg ist **standardmäßig aus**:
   `*.webhook.office.com`, https, Port 443) und nur öffentliche Ziele. `WEBHOOK_HOSTS` und `WEBHOOK_PRIVATE_NETS` gelten
   hier nicht.
 - Die Schalter brauchen keine erneute Bestätigung – sie ändern nicht, wer lesen darf.
+- **Security-Meldungen nach eigener Auswahl** (ab Werk aus): Ist der Schalter an, kann sich **jede Person** – auch ohne
+  Team – Security-Meldungen nach eigener Auswahl per E-Mail oder an ihren Teams-Webhook schicken lassen
+  ([Security-Meldungen per E-Mail oder Teams](/docs/benachrichtigungen#security-meldungen)), auf den Wegen *E-Mail*
+  und *Microsoft Teams* oben. Desktop hat dafür die eigenen [Desktop-Benachrichtigungen](/docs/benachrichtigungen#desktop).
+  Solange der Schalter aus ist, kommt nichts, und beim Einschalten kommt nichts Älteres nach. Die Änderung steht im
+  Protokoll („Einstellungen geändert“).
 
 ### Abwesenheit eintragen {#teams-abwesenheit}
 

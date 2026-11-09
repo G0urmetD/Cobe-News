@@ -69,7 +69,9 @@ jobs:
         run: |
           set -euo pipefail
           sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          # the signing key from the repository, checked like in the Dockerfile – no download from www.postgresql.org
+          echo "0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76  keys/pgdg-ACCC4CF8.asc" | sha256sum -c -
+          sudo install -m 644 keys/pgdg-ACCC4CF8.asc /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
           . /etc/os-release
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null

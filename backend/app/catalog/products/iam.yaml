@@ -14,6 +14,7 @@
 
 # ---------------------------------------------------------------- security, endpoint
 - key: keycloak
+  vendor: Red Hat
   osv: [[Maven, org.keycloak:keycloak-services], [Maven, org.keycloak:keycloak-core]]
 
 # ---------------------------------------------------------------- remote access, IT management
@@ -41,7 +42,7 @@
   where: windows_build
   filter: Federation Services
 - key: okta
-  label: Okta (Workforce Identity)
+  label: Okta Workforce Identity Cloud
   vendor: Okta
   cpes: []
   scheme: cloud
@@ -54,6 +55,7 @@
   kw: [Okta Verify]
   example: 9.40.0
 - key: authentik
+  vendor: Authentik Security
   cpes: [a:goauthentik:authentik]
 - key: pingfederate
   label: PingFederate
@@ -63,7 +65,7 @@
   example: 12.2.2
 - key: duo
   label: Cisco Duo (Authentication Proxy, Windows Logon)
-  vendor: Cisco (Duo)
+  vendor: Cisco
   cpes: [a:duo:authentication_proxy, a:cisco:duo_authentication_for_windows_logon_and_rdp, a:cisco:duo]
   kw: [Duo]
   aliases: [Duo Security, Duo MFA]
@@ -102,6 +104,7 @@
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: ldap-account-manager
+  vendor: LDAP Account Manager
 
 # ---------------------------------------------------------------- Windows Server roles (0.1.45) – the Windows Server CPEs, a filter word picks the role
 - key: windows-ad-ds
@@ -175,3 +178,15 @@
   aliases: [vIDM, VMware Identity Manager, WS1 Access]
   example: "22.09.1.0"
   where: web_about
+
+# ---------------------------------------------------------------- added 0.1.54
+- key: entra-id
+  label: Microsoft Entra ID (Azure AD)
+  vendor: Microsoft
+  cpes: [a:microsoft:entra_id, a:microsoft:azure_active_directory]
+  scheme: cloud
+  cloud: true
+  # Microsoft's records name it "Microsoft Entra" (2026), "Azure Entra ID" or "Azure Active Directory" – not Entra Connect
+  cna: [[Microsoft, Microsoft Entra], [Microsoft, Microsoft Entra ID], [Microsoft, Azure Entra ID], [Microsoft, Azure Active Directory]]
+  kw: [Entra ID, Azure AD, Azure Active Directory]
+  aliases: [Azure AD, AAD, Azure Active Directory, Microsoft Entra ID]

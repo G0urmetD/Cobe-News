@@ -78,6 +78,7 @@
   normalize: [horizon_yymm]  # "2412" → 8.2412, the form of endoflife.date's lines and NVD's 8.x versions
   replaces: [vmware-horizon]  # the curated entry had its own key next to endoflife.date's horizon (migration 0025)
 - key: vmware-srm
+  vendor: Broadcom (VMware)
   cpes: [a:vmware:site_recovery_manager]
 - key: hyper-v
   label: Hyper-V (Windows Server)
@@ -106,11 +107,12 @@
   cpes: [a:nutanix:prism_central]
 - key: citrix-hypervisor
   label: Citrix Hypervisor (XenServer)
-  vendor: Cloud Software Group
+  vendor: Cloud Software Group (Citrix)
   cpes: [a:citrix:hypervisor, a:xenserver:xenserver]
   kw: [Citrix Hypervisor, XenServer]
   example: 8.2 CU1
 - key: xcp-ng
+  vendor: Vates
 - key: virtualbox
   label: Oracle VirtualBox
   vendor: Oracle
@@ -119,6 +121,7 @@
   kw: [VirtualBox]
   example: 7.1.4
 - key: citrix-vad
+  vendor: Cloud Software Group (Citrix)
   cpes: [a:citrix:virtual_apps_and_desktops]
   aliases: [XenApp, XenDesktop, Citrix Virtual Apps, Citrix Virtual Desktops, CVAD]
   hint: citrix
@@ -203,9 +206,9 @@
   version_cmd: virsh version
 - key: kvm
   label: KVM (Linux kernel)
-  vendor: Linux
+  vendor: Linux Kernel Organization
   cpes: [o:linux:linux_kernel]
-  kw: [KVM]
+  kw: [KVM, Linux KVM, KVM hypervisor]  # "KVM" alone is three letters: it counts with the kernel named
   example: 6.12.38
   version_cmd: uname -r
   hint: kernel
@@ -260,7 +263,7 @@
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
 - key: citrix-storefront
   label: Citrix StoreFront
-  vendor: Cloud Software Group
+  vendor: Cloud Software Group (Citrix)
   cpes: [a:citrix:storefront_server, a:cloud:citrix_storefront]
   cna: [[Citrix, StoreFront], [Citrix, Citrix StoreFront]]
   kw: [StoreFront]

@@ -133,11 +133,21 @@ function inPage(title: string, opts: NotificationOptions, onClick: () => void, t
  * handed it to the push service). */
 export const TRACK_MS = 20_000
 
-export function showStory(item: Pick<NewsItem, "id" | "title" | "severity" | "source">, open: (id: string) => void, track = false) {
+/** The notification's line under the title: severity, source and – when the person chose systems or words – what it
+ *  matched by ("Treffer: PAN-OS", at most three names, as the server's messages). */
+export function storyBody(item: Pick<NewsItem, "severity" | "source" | "hits">, t: (k: string, o?: Record<string, unknown>) => string = i18n.t.bind(i18n)): string {
+  const base = `${t(`news.sev.${item.severity}`)} · ${item.source.name}`
+  const names = (item.hits ?? []).map((x) => x.replace(/\s+/g, " ").trim().slice(0, 60)).filter(Boolean)
+  if (!names.length) return base
+  const shown = names.slice(0, 3).join(", ") + (names.length > 3 ? ` +${names.length - 3}` : "")
+  return `${base} · ${t("desktop.hit", { names: shown })}`
+}
+
+export function showStory(item: Pick<NewsItem, "id" | "title" | "severity" | "source" | "hits">, open: (id: string) => void, track = false) {
   return notify(
     item.title,
     {
-      body: `${i18n.t(`news.sev.${item.severity}`)} · ${item.source.name}`,
+      body: storyBody(item),
       tag: item.id, // the system shows one notification per story, even if two tabs fire
       critical: item.severity === "critical",
       path: `/?story=${encodeURIComponent(item.id)}`,
@@ -238,7 +248,7 @@ function showSummary(count: number, open: () => void) {
 export async function poll(userId: string, open: (id: string | null) => void): Promise<void> {
   const raw = read(cursorKey(userId))
   const after = raw !== null && /^\d+$/.test(raw) ? raw : null
-  // the person's choice (severities, sources, topics) is applied by the server – the count then is exactly what is new for them
+  // the person's choice (severities, sources, topics, systems, words) is applied by the server – the count then is exactly what is new for them
   // a background request: the rounds of an open tab do not keep the session alive (lib/poll.ts)
   const res = await api.get<{ items: NewsItem[]; total: number; cursor: number }>(`/api/news/recent?mine=true${after !== null ? `&after=${after}` : ""}`, {
     background: true,
@@ -291,7 +301,7 @@ export function useDesktopNotifications(userId: string | undefined, prefs: Deskt
   useEffect(() => {
     openRef.current = open
   }, [open])
-  const choice = prefs ? `${prefs.severities.join(",")}|${prefs.sources.join(",")}|${(prefs.topics ?? []).join(",")}` : ""
+  const choice = prefs ? JSON.stringify([prefs.severities, prefs.sources, prefs.topics ?? [], prefs.systems ?? [], prefs.keywords ?? [], prefs.exclude ?? []]) : ""
   useEffect(() => {
     if (!on || !userId) return
     let stopped = false

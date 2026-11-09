@@ -39,6 +39,7 @@ from app.docs import router as docs_router
 from app.delivery_log_api import router as delivery_log_router
 from app.notify_api import router as notify_router
 from app.personal_api import router as personal_router
+from app.personal_news_api import router as personal_news_router
 from app.push_api import router as push_router
 from app.reader_api import router as reader_router
 from app.source_health_api import router as health_router
@@ -163,6 +164,7 @@ class FetchLoop:
                 await _step("source health", self._health)
             await _step("notify", self._notify)
             await _step("personal", self._personal)
+            await _step("personal news", self._personal_news)
             await _step("push", self._push)
             await _step("welcome", self._welcome)
             await _step("weekly", self._weekly)
@@ -228,6 +230,17 @@ class FetchLoop:
         if personal.backlog():
             self.wake()  # a large team: the rest with the next round, right after this one (each round is bounded)
 
+    async def _personal_news(self) -> None:
+        """A person's own security stories by e-mail or their Teams webhook (app/personal_news.py)."""
+        from app import personal_news
+
+        async with db.session() as s:
+            sent = await personal_news.dispatch(s)
+        if sent:
+            log.info("personal news: %s", sent)
+        if personal_news.backlog():
+            self.wake()
+
     async def _push(self) -> None:
         async with db.session() as s:
             sent = await webpush.dispatch(s)
@@ -237,12 +250,13 @@ class FetchLoop:
     @staticmethod
     def _prunes() -> list[tuple[str, object]]:
         """The hourly prunes in their order – looked up each time (a test replaces one)."""
-        from app import weekly
+        from app import personal_news, weekly
 
         return [
             ("news", news_svc.prune),
             ("source health", source_health.prune),
             ("personal deliveries", personal.prune),
+            ("personal news", personal_news.prune),
             ("cve watch", cve_watch.prune),
             ("weekly", weekly.prune),
             ("api tokens", api_tokens.prune),
@@ -456,6 +470,7 @@ def create_app() -> FastAPI:
     app.include_router(teams_router)
     app.include_router(forward_router)
     app.include_router(personal_router)
+    app.include_router(personal_news_router)
     app.include_router(watch_router)
     app.include_router(reader_router)
     app.include_router(calendar_feed.api)

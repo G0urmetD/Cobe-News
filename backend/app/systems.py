@@ -50,7 +50,7 @@ from app.models import NewsItem, StoryDetail
 
 log = logging.getLogger("cobe_news.systems")
 
-SYSTEMS_V = 3  # raised when the matching changes: every stored story is computed again (quietly) – 2: vendor identities, context; 3: tag lists, CISA
+SYSTEMS_V = 5  # raised when the matching changes: every stored story is computed again (quietly) – 2: vendor identities, context; 3: tag lists, CISA; 4: catalogue 2026.11.06-3 (one spelling per vendor); 5: ordinary words of new names (weekly, valve, meta …), a second name after one preposition
 STATE = "news_systems"  # settings row: {"v": SYSTEMS_V, "sig": {"p": {key: hash}, "v": {vendor id: hash}}}
 BATCH = 500
 MENTION, VENDOR = "m:", "v:"
@@ -78,6 +78,7 @@ COMMON = frozenset(
     small solutions spark spectrum spring squid storage studio suite support surface switch switches sync system tails teams
     teleport terraform tools twig unbound unified unify unity universal unleashed vault vigor virtual vision visual vue
     watch web webmail workflows workplace workspace workstation yarn zoom
+    weekly satellite valve meta symantec eclipse bcdr
     cisa
     vpn waf edr xdr mdr siem soar sase ztna sdwan wan lan mfa sso api ssl tls nas san ups iot ot ics plc hmi scada rdp
     ssh ftp smb dns dhcp ldap ngfw utm ids ips
@@ -85,7 +86,7 @@ COMMON = frozenset(
 )
 # names of three letters or fewer that are the product or the vendor – no abbreviation of the news ("SAP-Patchday",
 # "IBM warnt", "HPE iLO"); not BMC (the baseboard management controller), RSA, ISC (SANS ISC), SEP, GNU
-SHORT_OK = frozenset({"php", "git", "vlc", "xen", "3cx", "h3c", "sap", "ibm", "hpe", "hp", "avm", "aws", "f5"})
+SHORT_OK = frozenset({"php", "git", "vlc", "xen", "3cx", "h3c", "sap", "ibm", "hpe", "hp", "avm", "aws", "f5", "amd"})
 # words that are no name alone, though a name of more words with them is ("Linux Kernel", "Spring Boot", "Windows
 # Server", "Grafana Loki" – the label without its vendor's name in front: "Heroku Postgres" is no "Postgres")
 ALONE_NOT = frozenset(
@@ -117,8 +118,19 @@ CONTEXT = {
     ("spring", "framework"): True,
     ("spring", "security"): True,
     ("spring", "cloud"): True,
+    # vendor names that are ordinary words too – "valve controls", "Meta-Studie", "Symantec researchers uncover …" (a
+    # research team's findings are no story about its products): only in a security context or as their own product
+    ("valve",): False,
+    ("meta",): False,
+    ("symantec",): False,
 }
-CONTEXT_AFTER = {("edge",): frozenset({"browser"}), ("windows",): frozenset({"kernel"})}  # a word after the name that says which one it is ("Edge-Browser")
+CONTEXT_AFTER = {
+    ("edge",): frozenset({"browser"}),
+    ("windows",): frozenset({"kernel"}),
+    ("valve",): frozenset({"steam", "steamos"}),
+    ("meta",): frozenset({"llama", "whatsapp", "instagram", "facebook", "platforms", "quest"}),
+    ("symantec",): frozenset({"endpoint", "sep", "dlp", "messaging", "web"}),
+}  # a word after the name that says which one it is ("Edge-Browser")
 SECURITY = frozenset(
     """
     lucke lucken sicherheitslucke sicherheitslucken schwachstelle schwachstellen sicherheitsproblem sicherheitsprobleme
@@ -129,6 +141,7 @@ SECURITY = frozenset(
     """.split()
 )
 _PREP = frozenset("in im bei fur for of on auf gegen affecting betrifft".split())
+_AND = frozenset("und and oder or sowie".split())
 _VERSION = re.compile(r"\d{1,4}[a-z0-9]*")
 # a vendor's name as a place ("PALO ALTO, Calif. – PRNewswire", "Ransomware gang hits Palo Alto city hall", "The city of
 # Palo Alto") or as a term ("Threat Intel") is no mention of the vendor
@@ -471,6 +484,13 @@ def _in_context(words: list[str], i: int, j: int, phrase: tuple[str, ...]) -> bo
         return True
     if i >= 2 and words[i - 1] in _PREP:
         return words[i - 2] in SECURITY or (i >= 3 and words[i - 3 : i - 1] == ["zero", "day"])
+    # the second of two names after one preposition: "Lücke in Exchange Online und Exchange Server"
+    if i >= 4 and words[i - 1] in _AND:
+        for k in range(i - 2, max(0, i - 6), -1):
+            if words[k] in _PREP:
+                return k >= 1 and (words[k - 1] in SECURITY or (k >= 2 and words[k - 2 : k] == ["zero", "day"]))
+            if not words[k] or words[k] in SECURITY:
+                break
     return False
 
 

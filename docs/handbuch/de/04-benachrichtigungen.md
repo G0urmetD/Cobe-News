@@ -15,8 +15,9 @@ Cobe News meldet neue Meldungen auf zwei Wegen:
 | Wohin | Systembenachrichtigung dieses Browsers | Teams, Slack, Discord, Telegram, Mattermost, ntfy, Gotify, E-Mail oder ein eigener Webhook |
 | Was | neue Security-Meldungen aus dem News-Feed | Security-Meldungen, Vendor News und Zustand der Quellen |
 
-- **Desktop:** Du wählst Schweregrade und Quellen. Der Browser zeigt neue Meldungen als Systembenachrichtigung – im
-  offenen Tab und auf Wunsch auch bei geschlossenem Tab (Web Push).
+- **Desktop:** Du wählst Schweregrade, Quellen, Themen und auf Wunsch Systeme und Schlagwörter – „nur Palo Alto, nur
+  Kritisch“ geht auch ohne Admin. Der Browser zeigt neue Meldungen als Systembenachrichtigung – im offenen Tab und auf
+  Wunsch auch bei geschlossenem Tab (Web Push).
 - **Kanäle** sagen, *wohin* eine Nachricht geht. **Regeln** sagen, *was* an welche Kanäle geht. Eine Regel kann an
   mehrere Kanäle schicken, ein Kanal kann von mehreren Regeln genutzt werden.
 
@@ -27,6 +28,7 @@ Dazu kommen Wege, die nur dich betreffen:
 | Was | Für wen | Wo | Mehr |
 |---|---|---|---|
 | Hersteller-News deiner Produkte – per E-Mail, Desktop-Push oder Microsoft Teams, mit Ruhezeiten, Abwesenheit und Wochenrückblick | Mitglieder eines Teams, wenn ein Admin die Wege freigegeben hat | *Einstellungen → Benachrichtigungen*, Reiter *Hersteller-News meiner Produkte* | [Hersteller-News meiner Produkte](#meine-produkte) |
+| Security-Meldungen nach eigener Auswahl – per E-Mail oder Microsoft Teams | jede Person, wenn ein Admin es erlaubt hat | *Einstellungen → Benachrichtigungen*, Reiter *Security-Meldungen* | [Security-Meldungen per E-Mail oder Teams](#security-meldungen) |
 | Neues zu einzelnen CVEs (Fix, KEV, EPSS, zurückgezogen) | jede Person | Stern an einer CVE, Seitenleiste *Beobachtete CVEs* | [CVEs beobachten](#cves-beobachten) |
 | Support-Ende als Kalender-Abo | jede Person (Leser: die Produkte aus dem Team) | *Einstellungen → Benachrichtigungen*, Reiter *Kalender* | [Kalender (iCal)](#kalender-ical) |
 | Eine Meldung mit Kommentar an dein Team schicken | Mitglieder eines Teams mit Weiterleitungs-Kanal | „Ans Team weiterleiten“ in Meldung und Befund | [An mein Team weiterleiten](#weiterleiten) |
@@ -49,6 +51,19 @@ Themen. Es zählt das Thema, das die Meldung **beim Eintreffen** hat (aus Titel,
 KEV-Katalog). Ein Thema, das erst später dazukommt – etwa aus den Details aus der Quelle –, löst keine
 Desktop-Benachrichtigung mehr aus; dafür gibt es [Regeln](#regel-themen), die so eine Meldung dann nachreichen. Der
 offene Tab und Push bei geschlossenem Tab filtern gleich.
+
+**Systeme, Schlagwörter und „Nicht anzeigen, wenn enthalten“** – wie bei den [Regeln](#regel-systeme), nur für dich:
+
+- **Systeme**: Hersteller („Alle Produkte von Palo Alto Networks“) oder einzelne Produkte aus dem ganzen Katalog.
+- **Schlagwörter**: eigene Wörter als Chips (Enter oder Komma), ganze Wörter in Titel oder Teaser, Groß-/Kleinschreibung
+  egal, reiner Text (höchstens 30, je 2–60 Zeichen).
+- Systeme **oder** Schlagwörter – eines genügt, zusammen mit Schwere, Quelle und Thema.
+- **Nicht anzeigen, wenn enthalten**: Steht ein solches Wort in Titel oder Teaser, kommt keine Benachrichtigung.
+- Die Benachrichtigung sagt dann, warum sie kommt: „Kritisch · heise online · Treffer: PAN-OS“.
+- Es zählt, was die Meldung **beim Eintreffen** hat – vor allem, was Titel und Teaser nennen. Ein System, das erst
+  später aus den Details aus der Quelle dazukommt, löst keine Desktop-Benachrichtigung mehr aus (wie ein Thema); eine
+  [Regel](#regel-systeme) reicht so eine Meldung nach.
+- Gefiltert wird auf dem Server: der offene Tab und Push bei geschlossenem Tab bekommen nur, was passt.
 
 Darunter zeigt die Karte „Zustand in diesem Browser“:
 
@@ -179,7 +194,13 @@ Teams nimmt die Nachrichten über einen **Workflow** an, den du selbst anlegst. 
 
 - **Nur Neues.** Du bekommst, was nach dem Einschalten eines Wegs und nach der Zuteilung des Produkts dazukommt. Ältere
   Meldungen und alles aus dem ersten Prüfen eines Produkts kommen nicht.
-- **Filter.** Was dein Filter (Art, Schwere) einmal ausgelassen hat, kommt auch nach einer Änderung des Filters nicht nach.
+- **Nur diese Systeme.** Unter der Schwere wählst du auf Wunsch Hersteller oder Produkte aus deinen Produkten – dann
+  kommen nur deren Hersteller-News („Alle Produkte von Palo Alto Networks“ umfasst auch Produkte, die dir später
+  zugeordnet werden). Leer heißt: alle deine Produkte. Wie bei den Systemen einer Regel für Vendor News zählt das
+  Produkt der Meldung – es steht ohnehin in jeder Nachricht. Schlagwörter gibt es hier nicht; sie gelten für
+  Security-Meldungen ([Desktop-Benachrichtigungen](#desktop-einschalten)). Beobachtete CVEs kommen immer.
+- **Filter.** Was dein Filter (Art, Schwere, Systeme) einmal ausgelassen hat, kommt auch nach einer Änderung des Filters
+  nicht nach.
 - **Stumm.** Was du [stummgeschaltet](#stummschalten) hast, kommt nicht – auch nicht, wenn die Stummschaltung endet.
 - **Gesammelt.** Mehrere Meldungen einer Runde kommen zusammen: eine Mail, eine Karte, ein Push mit „N neue
   Hersteller-News“. Höchstens 100 pro Runde, die schwersten zuerst; der Rest kommt in der nächsten Runde.
@@ -253,6 +274,48 @@ Woche – und fasst die letzten 7 Tage der Produkte des Teams zusammen:
 
 Pro Team und Woche kommt er genau einmal, auch nach einem Neustart. Nach einem Ausfall kommt höchstens die letzte
 verpasste Woche, nie mehrere alte. Ohne eingerichteten E-Mail-Server wird nichts versucht.
+
+## Security-Meldungen per E-Mail oder Teams {#security-meldungen}
+
+Security-Meldungen nach **deiner eigenen Auswahl** an deine E-Mail-Adresse oder deinen eigenen Teams-Webhook – wie eine
+[Regel](#regel-systeme), nur für dich, ohne Admin. Den Reiter *Security-Meldungen* unter
+[*Einstellungen → Benachrichtigungen*](/settings/notifications?tab=news) gibt es, sobald ein Admin es erlaubt
+([Einstellungen → Teams](/docs/anmeldung#teams-persoenlich), ab Werk aus) – für jede Person, auch ohne Team.
+
+1. Schalte **E-Mail** (an die Adresse aus deinem Konto) und/oder **Microsoft Teams** ein. Für Teams trägst du die
+   Adresse deines [Workflows-Webhooks](#meine-produkte-teams) ein – dieselbe wie bei Hersteller-News meiner Produkte.
+2. Wähle wie bei den [Desktop-Benachrichtigungen](#desktop-einschalten) **Schweregrade**, **Quellen**, **Themen**,
+   **Systeme**, **Schlagwörter** und **Nicht anzeigen, wenn enthalten**. Leer heißt: alle. „Nur Palo Alto, nur Kritisch“:
+   Schwere *Kritisch*, System „Alle Produkte von Palo Alto Networks“.
+3. Klicke „Speichern“.
+
+- **Wie eine Regel**: Systeme oder Schlagwörter – eines genügt –, zusammen mit Schwere, Quelle und Thema; ein
+  Ausschluss-Wort verhindert die Meldung. Der Rückstand einer später eingeschalteten Quelle kommt nie, ebenso wenig, was
+  eine Meldung erst durch eine Neuberechnung bekommt.
+- **Auch später, wie eine Regel**: Passt eine Meldung erst später – sie wird höher eingestuft, ihre Details aus der
+  Quelle nennen PAN-OS, sie bekommt das Thema „Aktiv ausgenutzt“, ein neuer Titel, eine weitere Quelle bringt sie frisch –,
+  kommt sie dann; höchstens eine Woche nach ihrem Eintreffen. Was eine Meldung nur durch eine Neuberechnung bekommt
+  (etwa nach einem Katalog-Update), bringt sie nicht.
+- **Nur Neues, jede Meldung einmal**: Es kommt, was nach dem Einschalten eines Wegs eintrifft – pro Weg höchstens einmal,
+  auch nach einem Neustart. **Erweiterst du die Auswahl** (eine weitere Schwere, Quelle, ein Thema, System oder Wort, ein
+  Ausschluss-Wort weniger), kommt Älteres nur durch eine eigene Änderung danach – kein Schwall alter Meldungen.
+- **Kein Schwall**: Höchstens eine Nachricht alle 15 Minuten pro Weg. Bis zu drei Meldungen kommen einzeln, mehr als
+  eine Sammelnachricht („12 neue Security-Meldungen“) mit den zehn dringendsten (aktiv ausgenutzt oder kritisch zuerst).
+- **Warum**: Mit Systemen oder Schlagwörtern sagt die Nachricht „Treffer: PAN-OS“.
+- **Ruhezeiten und Sammelzeit** aus [Hersteller-News meiner Produkte](#ruhezeiten) gelten auch hier: In der Ruhezeit
+  wartet die Nachricht und kommt danach gesammelt; mit „gesammelt um HH:MM“ kommt, was bis dahin eintraf. Eine
+  Ausnahme für Dringendes gibt es hier nicht – dafür sind die Desktop-Benachrichtigungen da.
+- **Abwesenheit**: Bist du [abwesend](#abwesenheit) (ohne „Trotzdem auch an mich“), kommt nichts, und nichts wartet auf
+  deine Rückkehr – die News-Liste hat alles. Eine Vertretung gibt es hier nicht.
+- **Stummgeschaltet**: Meldungen, deren CVEs du alle [stummgeschaltet](#stummschalten) hast, kommen nicht.
+- **Fehler**: Lehnt der E-Mail-Server oder Teams ab, versucht Cobe News es später mit wachsender Pause erneut; nach einem
+  Fehler, bei dem die Nachricht angekommen sein könnte (z. B. Zeitüberschreitung), nicht. Unter dem Weg steht die
+  letzte Zustellung oder der letzte Fehler.
+- Schaltet ein Admin den Weg aus oder wird dein Konto deaktiviert, kommt in dieser Zeit nichts – auch nicht später. Den
+  Reiter siehst du dann weiter, solange ein Weg von dir an ist: ausschalten und die Auswahl ändern geht immer, einschalten
+  erst wieder, wenn der Admin es erlaubt.
+- **Die Teams-Adresse** ist eine für beide – Security-Meldungen und Hersteller-News meiner Produkte. Entfernst du sie in
+  einem der beiden, ist Teams in beiden aus.
 
 ## CVEs beobachten {#cves-beobachten}
 
@@ -1359,6 +1422,9 @@ eine Regel für genau das, was euch angeht. Beispiel „nur Palo Alto, nur Kriti
   nie auf „alles“. Entferne es.
 - Die Nachricht sagt, warum sie kommt: **„Treffer: PAN-OS“** (bzw. das Schlagwort) in der Mail und in den Karten; der
   Webhook bekommt das Feld `match`.
+- **Auch ohne Admin:** Dieselben Systeme gibt es als Filter der [News-Liste](/docs/news-quellen#suchen-filtern), in den
+  eigenen [Desktop-Benachrichtigungen](#desktop-einschalten) (mit Schlagwörtern und Ausschluss) und in
+  [Hersteller-News meiner Produkte](#meine-produkte-was) – für jede Person selbst.
 
 ### Auf Teams beschränken {#regel-teams}
 

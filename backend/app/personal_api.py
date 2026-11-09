@@ -11,15 +11,16 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Query
 from pydantic import ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
-from app import absence, notify, personal, quiet, teams, weekly
+from app import absence, concerns, notify, personal, quiet, teams, weekly
+from app import systems as systems_svc
 from app import settings as settings_store
 from app.quiet import DEFAULT_TZ, DEFAULT_URGENT
 from app.config import get_config
 from app.crypto import encrypt_str
 from app.deps import Db, NoNul, Reader, api_error
-from app.models import CveWatch, PersonNotify, PushSubscription
+from app.models import CveWatch, PersonNews, PersonNotify, PushSubscription
 
 router = APIRouter(prefix="/api/me/vendor-notify", tags=["personal"])
 TEST_EVERY = 10.0  # as the push test
@@ -56,6 +57,7 @@ async def _out(db: Db, user, p: PersonNotify | None) -> dict:  # noqa: ANN001
         "lang": p.lang if p else "de",
         "kinds": list(p.kinds) if p else list(personal.DEFAULT_KINDS),
         "min_severity": p.min_severity if p else "info",
+        "systems": personal.person_systems(p),
         "email": {"on": bool(p and p.email_on), "address": address or None, "address_ok": bool(address and teams.MAIL.fullmatch(address)), "state": personal.state_out(p, "email")},
         "desktop": {"on": bool(p and p.desktop_on), "devices": int(devices), "state": personal.state_out(p, "desktop")},
         "teams": {"on": bool(p and p.teams_on), "url_set": bool(p and p.teams_url_enc), "url_hint": personal.masked(p), "state": personal.state_out(p, "teams")},
@@ -84,6 +86,9 @@ class MineIn(_M):
     teams_on: bool = False
     kinds: list[Literal["vendor_vuln", "vendor_version", "vendor_change"]] = Field(min_length=1, max_length=3)
     min_severity: Literal["critical", "high", "medium", "low", "info"] = "info"
+    # 0.1.54: only the Vendor News of these systems (a catalogue vendor – each of its products – or a product, as a
+    # channel rule's; app/concerns.py) – empty: every product of my teams; None (not sent – an older page): kept
+    systems: list[concerns.SystemIn] | None = Field(default=None, max_length=systems_svc.ENTRIES_MAX)
     lang: Literal["de", "en"] = "de"
     # None: the stored URL stays; "": removed (and the way off); otherwise a new one (checked)
     teams_url: str | None = Field(default=None, max_length=personal.URL_MAX)
@@ -108,6 +113,8 @@ async def put_mine(body: MineIn, user: Reader, db: Db) -> dict:
     if body.teams_url is not None:
         if body.teams_url == "":
             p.teams_url_enc, p.teams_host = None, None
+            # the person's one Teams URL: its way is off for the security stories as well (app/personal_news.py)
+            await db.execute(update(PersonNews).where(PersonNews.user_id == user.id).values(teams_on=False).execution_options(synchronize_session=False))
         else:
             try:
                 url = personal.check_teams_url(body.teams_url)
@@ -130,6 +137,10 @@ async def put_mine(body: MineIn, user: Reader, db: Db) -> dict:
         setattr(p, f"{way}_on", on)
     p.kinds = [k for k in personal.KINDS if k in body.kinds]
     p.min_severity = body.min_severity
+    if body.systems is not None:
+        chosen = concerns.dedupe([x.entry() for x in body.systems])
+        concerns.check_known(chosen, personal.person_systems(p))
+        p.systems = chosen
     p.lang = body.lang
     p.updated_at = now
     await db.commit()

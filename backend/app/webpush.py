@@ -214,14 +214,17 @@ def _lang(lang: str) -> str:
 
 
 def story_payload(story: dict, lang: str) -> dict:
-    """One story: its headline, severity and source – news from public feeds, nothing confidential; the text stays in Cobe News."""
+    """One story: its headline, severity and source – news from public feeds, nothing confidential; the text stays in
+    Cobe News. `hits` (the person chose systems or words): "· Treffer: PAN-OS" – why it came, as a rule's message."""
     lb = notify.LABELS[_lang(lang)]
+    names = neutral(notify.names_text([str(x) for x in story.get("hits") or []]))
+    why = f" · {lb['hit']}: {names}" if names else ""
     return {
         "v": 1,
         "kind": "story",
         "id": story["id"],
         "title": neutral(story["title"])[:200],
-        "body": f"{lb['sev'].get(story['severity'], story['severity'])} · {neutral(story['source'])[:80]}",
+        "body": f"{lb['sev'].get(story['severity'], story['severity'])} · {neutral(story['source'])[:80]}{why}",
         "severity": story["severity"],
         "url": f"/?story={story['id']}",
     }
@@ -362,8 +365,9 @@ async def dispatch(db: AsyncSession) -> dict[str, int]:
         if not rows:
             skip.append(sub)
             continue
-        single = [api._item_out(i, s, None) for i, s in rows[:SINGLE]][::-1]  # the oldest of the newest first, as the tab
-        payloads = [story_payload({"id": x["id"], "title": x["title"], "severity": x["severity"], "source": x["source"]["name"]}, sub.lang) for x in single]
+        hit = api.desktop_hits(user.desktop)  # "Treffer" when the person chose systems or words
+        single = [api._item_out(i, s, None) | ({"hits": hit(i)} if hit else {}) for i, s in rows[:SINGLE]][::-1]  # the oldest of the newest first, as the tab
+        payloads = [story_payload({"id": x["id"], "title": x["title"], "severity": x["severity"], "source": x["source"]["name"], "hits": x.get("hits") or []}, sub.lang) for x in single]
         if total > len(single):
             # the rest by id when the round knows them all (rows holds the newest RECENT_MAX)
             rest = [str(i.id) for i, _s in rows[SINGLE:]] if total == len(rows) else None

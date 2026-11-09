@@ -114,7 +114,7 @@ async def _user(name: str) -> User | None:
 
 async def test_off_by_default_and_without_effect(directory_fake, admin_client, reader_client):
     async with db.session() as s:
-        assert (await teams.config(s)) == {"enabled": False, "welcome_mail": False, "personal_email": False, "personal_desktop": False, "personal_teams": False}
+        assert (await teams.config(s)) == {"enabled": False, "welcome_mail": False, "personal_email": False, "personal_desktop": False, "personal_teams": False, "personal_news": False}
         await settings_store.put(s, "ldap", LDAP_CFG)
         await s.commit()
     tid = await _team("Security", ("ldap", SEC))

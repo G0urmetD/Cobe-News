@@ -18,10 +18,12 @@ from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import __version__, advisory_changes, audit, epss, exploits, netaddr, reader, story_details
+from app import __version__, advisory_changes, audit, concerns, epss, exploits, netaddr, reader, story_details
 from app import db as dbm
 from app import settings as settings_store
+from app import keywords as words_svc
 from app import news as news_svc
+from app import systems as systems_svc
 from app.config import get_config, tls_verify
 from app.db import contains, fold
 from app.deps import Admin, Db, NoNul, Reader, api_error
@@ -198,6 +200,22 @@ def short_search(q: str) -> bool:
     return 0 < len(term) < SEARCH_MIN
 
 
+def system_filter(values: list[str]) -> list[dict]:
+    """The list's "Systeme" (`system`) as entries – 422 for a malformed one (never a 500)."""
+    try:
+        return concerns.from_query(list(values))
+    except ValueError as exc:
+        raise api_error(422, "invalid", errors=str(exc)) from exc
+
+
+def words_filter(values: list[str]) -> list[str]:
+    """The list's "Ohne …" (`without`) checked as a rule's words – 422 otherwise."""
+    try:
+        return words_svc.clean(list(values))
+    except ValueError as exc:
+        raise api_error(422, "invalid", errors=str(exc)) from exc
+
+
 @router.get("/news")
 async def list_news(
     user: Reader,
@@ -218,6 +236,8 @@ async def list_news(
     time_field: TimeField = "published",
     since_mark: bool = False,
     ids: Annotated[str | None, Query(max_length=IDS_MAX * 40)] = None,
+    system: Annotated[list[str], Query(max_length=systems_svc.ENTRIES_MAX)] = [],  # noqa: B006 - FastAPI query list ("v:<vendor>" | "p:<key>")
+    without: Annotated[list[str], Query(max_length=words_svc.WORDS_MAX)] = [],  # noqa: B006 - FastAPI query list ("ohne …")
 ) -> dict:
     """Stories newest first – "all", "new" (unread by me) or "read" (read by me); app/reader.py decides what is read
     (the watermark, the marks, the age). `muted`: also the stories whose CVEs I all muted (flagged, dimmed by the page) –
@@ -232,10 +252,16 @@ async def list_news(
 
     "Zeitraum": `since` (inclusive) / `until` (exclusive) – times with a zone – on `time_field` (published: the story's
     date, fetched: its arrival); `since_mark`: what arrived after my read watermark ("Seit meinem letzten Besuch" – its
-    time is `mark_at`). `ids`: only these stories (a notification's, "a,b,c", at most 50). Each is one more filter: the
-    list, every count and the cursor alike (the order stays by date)."""
+    time is `mark_at`). `ids`: only these stories (a notification's, "a,b,c", at most 50). `system` ("Systeme",
+    app/concerns.py): stories about one of these catalogue vendors ("v:Palo Alto Networks" – each of its products) or
+    products ("p:panos") – by their details or named in title or teaser, also what a story has only quietly (a list
+    shows what concerns a system; only notifications ask for loud ones). `without` ("Ohne …"): none of these words, whole,
+    in title or teaser – as a rule's "Nicht senden, wenn enthalten" (checked as there: plain text, at most 30). Each is
+    one more filter: the list, every count and the cursor alike (the order stays by date)."""
     me = user.id
     wanted = story_ids(ids)
+    chosen = system_filter(system)
+    unwanted = words_filter(without)
     now = datetime.now(UTC)
     # the arrival number of the newest story stored before this list was read ("Alle gelesen" marks up to it, not
     # what arrived after the page was loaded) – read first: a story stored meanwhile has a higher number
@@ -247,6 +273,10 @@ async def list_news(
     where += time_range(since, until, time_field, m if since_mark else None)
     if wanted is not None:
         where.append(NewsItem.id.in_(wanted))
+    if chosen:
+        where.append(concerns.systems_clause(chosen, quiet_too=True))
+    if (no := words_svc.none_of(unwanted)) is not None:
+        where.append(no)  # last: the database applies it after the cheaper conditions (a regex per remaining row)
     hush = reader.news_muted(mutes)
     if hush is not None and not muted:
         where.append(~hush)
@@ -298,7 +328,9 @@ async def _topic_counts(db: AsyncSession, where: list, r, on, unread, state: str
     inner = _with_source(select(func.jsonb_array_elements_text(NewsItem.topics).label("t")).select_from(NewsItem))
     if state != "all":
         inner = inner.outerjoin(r, on).where(unread if state == "new" else ~unread)
-    sub = inner.where(*where, NewsItem.topics != cast(literal("[]"), JSONB)).subquery()
+    # the cheap test first: the database keeps the order of conditions of equal cost – "Ohne …" (a regex) only for the
+    # stories that have a topic at all
+    sub = inner.where(NewsItem.topics != cast(literal("[]"), JSONB), *where).subquery()
     rows = (await db.execute(select(sub.c.t, func.count()).group_by(sub.c.t))).all()
     got = {str(t): int(n) for t, n in rows}
     return {t: got.get(t, 0) for t in news_svc.TOPICS}
@@ -356,7 +388,28 @@ def desktop_filter(user_prefs: dict | None) -> list:
         where.append(news_svc.has_topic(topics))
     if ids := news_svc._ids(prefs.get("sources")):
         where.append(news_svc.visible(ids))  # also a story first stored for another source that this one carries too
+    # "Systeme" or "Schlagwörter" (one of them is enough) and "Nicht anzeigen, wenn enthalten" – the channel rules'
+    # clauses (app/concerns.py), loud systems only: what a story names when it arrives, and its details if they came
+    # with it – a system its details bring later does not pop up afterwards (as a topic)
+    where += concerns.news_where(*desktop_concerns(prefs), quiet_too=False)
     return where
+
+
+def desktop_concerns(prefs: dict | None) -> tuple[list[dict], list[str], list[str]]:
+    """A person's desktop systems, words and exclusions as stored (empty: none)."""
+    prefs = prefs or {}
+    words = lambda k: [str(x) for x in prefs.get(k) or [] if str(x).strip()]  # noqa: E731
+    return systems_svc.entries(prefs.get("systems")), words("keywords"), words("exclude")
+
+
+def desktop_hits(prefs: dict | None):  # noqa: ANN201
+    """What a story matched the person's desktop systems and words by ("Treffer") – a function of the story; None when
+    neither is chosen (the notification says nothing then, as a rule's)."""
+    chosen, words, _ = desktop_concerns(prefs)
+    if not chosen and not words:
+        return None
+    want = systems_svc.wanted(chosen)
+    return lambda i: concerns.story_hits(i, chosen, words, want)
 
 
 def fresh_filter() -> list:
@@ -378,7 +431,8 @@ async def arrived(db: AsyncSession, where: list) -> tuple[list[tuple[NewsItem, N
 async def recent(user: Reader, db: Db, after: Annotated[int | None, Query(ge=0)] = None, since: datetime | None = None, mine: bool = False) -> dict:
     """For desktop notifications in an open tab: stories that arrived after the cursor `after` (the arrival number the
     tab got last time – `cursor` is the next one). Without a cursor nothing, only `cursor`: a new tab shows no backlog.
-    `mine`: only what this person chose for desktop notifications (severities, sources). `total` counts all of them –
+    `mine`: only what this person chose for desktop notifications (severities, sources, topics, systems, words – each
+    story then with its `hits`, "Treffer", when systems or words are chosen). `total` counts all of them –
     the tab shows the newest few and one summary for the rest, nothing gets lost however many arrived.
 
     The cursor is read first and the stories up to it after: a story stored meanwhile has a higher number and comes the
@@ -399,7 +453,9 @@ async def recent(user: Reader, db: Db, after: Annotated[int | None, Query(ge=0)]
     if mine:
         where += desktop_filter(user.desktop)
     rows, total = await arrived(db, where)
-    return {"items": [_item_out(i, s, None) for i, s in rows], "total": total, "now": now.isoformat(), "cursor": top}
+    hit = desktop_hits(user.desktop) if mine else None
+    items = [_item_out(i, s, None) | ({"hits": hit(i)} if hit else {}) for i, s in rows]
+    return {"items": items, "total": total, "now": now.isoformat(), "cursor": top}
 
 
 @router.get("/news/sources/{sid}/logo")
@@ -520,6 +576,8 @@ class ReadAllIn(_M):
     time_field: TimeField = "published"
     since_mark: bool = False
     ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=IDS_MAX)
+    system: list[Annotated[str, Field(max_length=concerns.QUERY_MAX)]] = Field(default_factory=list, max_length=50)  # the list's "Systeme"
+    without: list[Annotated[str, Field(max_length=200)]] = Field(default_factory=list, max_length=words_svc.WORDS_MAX)  # the list's "Ohne …"
 
 
 @router.post("/news/read-all")
@@ -532,6 +590,10 @@ async def read_all(body: ReadAllIn, user: Reader, db: Db) -> dict:
     where += time_range(body.since, body.until, body.time_field, await reader.marks(db, user) if body.since_mark else None)
     if body.ids is not None:
         where.append(NewsItem.id.in_(list(dict.fromkeys(body.ids))))
+    if chosen := system_filter(body.system):
+        where.append(concerns.systems_clause(chosen, quiet_too=True))
+    if (no := words_svc.none_of(words_filter(body.without))) is not None:
+        where.append(no)
     hush = reader.news_muted(mutes)
     if hush is not None and not body.muted:
         where.append(~hush)
@@ -539,7 +601,7 @@ async def read_all(body: ReadAllIn, user: Reader, db: Db) -> dict:
         where.append(_ours_filter(await ours_keys(db, user, body.scope)))
     # a topic (or our products) is a filter: marks for its unread stories, the watermark stays
     ranged = body.since is not None or body.until is not None or body.since_mark or body.ids is not None
-    everything = not body.source and not body.severity and not body.topic and not body.ours and not body.q.strip() and not ranged and (hush is None or body.muted)
+    everything = not body.source and not body.severity and not body.topic and not body.ours and not chosen and no is None and not body.q.strip() and not ranged and (hush is None or body.muted)
     top = await news_svc.last_seq(db)
     upto = min(body.upto, top) if body.upto is not None else top
     marked = await reader.news_read_all(db, user, where, _with_source, upto=upto, everything=everything)

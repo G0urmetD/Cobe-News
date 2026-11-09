@@ -20,7 +20,8 @@ A product entry on top of endoflife.date's product list: display name, vendor, C
 dictionary), the version scheme (app/vendor_versions.py), the vendor's own advisory source (adv), the names products
 have in vendor advisories (names) and in the CNA data of CVE records (cna), words that find related news (kw), a hint, …
 An entry whose key is an endoflife.date product patches that product (its CPEs are added to the ones endoflife.date
-names); an entry without a label only moves such a product into its category (and may add CPEs, a scheme or a hint).
+names); an entry without a label only moves such a product into its category (and may add CPEs, a scheme, a hint or its
+vendor – endoflife.date names none, the catalogue would take the first word of the label or the CPE's vendor).
 
 Everything is checked when the app starts (and in the tests): the schema of each file, unique keys over all files, known
 categories, CPEs in the short form, known schemes and advisory sources, and that every hint, "where" text and category has
@@ -101,7 +102,10 @@ class Product(_Strict):
 
     key: Key = Field(description="Unique over all files; for an endoflife.date product its key there (e.g. 'nginx').")
     label: Text | None = Field(None, description="Display name. Without a label the entry only patches the endoflife.date product of this key.")
-    vendor: Text | None = Field(None, description="Vendor shown with the product (required with a label).")
+    vendor: Text | None = Field(
+        None,
+        description="Vendor shown with the product (required with a label). Without a label: the vendor of the endoflife.date product, which names none (else the first word of its label or its CPE's vendor: 'Red', 'Djangoproject').",
+    )
     cpes: list[Cpe] = Field([], max_length=8, description="NVD CPE short form part:vendor:product, e.g. o:fortinet:fortios.")
     eol: Key | None = Field(None, description="endoflife.date key for release lines and support dates, if it differs from key.")
     scheme: Literal[SCHEMES] | None = Field(None, description="Version scheme (app/vendor_versions.py); default generic.")  # type: ignore[valid-type]
@@ -427,7 +431,7 @@ def load(directory: Path | None = None) -> Catalog:
     )
 
 
-LABELLESS = {"key", "cpes", "scheme", "hint", "osv", "pattern", "pattern_hint", "normalize", "belongs", "cpe_editions", "aliases", "replaces", "lines_only"}
+LABELLESS = {"key", "vendor", "cpes", "scheme", "hint", "osv", "pattern", "pattern_hint", "normalize", "belongs", "cpe_editions", "aliases", "replaces", "lines_only"}
 
 
 def _check_rules(p: Product, where: str, texts: TextsFile) -> None:

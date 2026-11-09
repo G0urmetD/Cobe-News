@@ -165,7 +165,7 @@
   example: 11.1.2039.2
 - key: symantec-endpoint
   label: Symantec Endpoint Protection
-  vendor: Broadcom
+  vendor: Broadcom (Symantec)
   cpes: [a:broadcom:symantec_endpoint_protection, a:symantec:endpoint_protection]
   kw: [Symantec Endpoint]
   aliases: [SEP, Symantec Endpoint Security]
@@ -210,6 +210,7 @@
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: clamav
+  vendor: ClamAV
 
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
 - key: trellix-epo
@@ -281,7 +282,7 @@
   example: "9.9.0"
 - key: velociraptor
   label: Velociraptor
-  vendor: Rapid7 (Velocidex)
+  vendor: Rapid7
   cpes: [a:rapid7:velociraptor]
   cna: [[Rapid7, Velociraptor], [Velocidex, velociraptor]]  # Rapid7 is the CNA and names it both ways (checked 2026-11-03)
   # no osv: Go's vulndb (www.velocidex.com/golang/velociraptor) has GO-2026-5078/-5174/-5438 with "introduced 0" and no

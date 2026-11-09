@@ -55,6 +55,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import advisory_changes, audit, bounded, delivery_log
 from app import db as dbm
+from app import concerns
 from app import keywords as words_svc
 from app import netaddr
 from app import news as news_svc
@@ -593,7 +594,12 @@ HITS_SHOWN = 3  # names in a story's "Treffer"
 
 def hits_text(s: Story) -> str:
     """The names a story matched by, one line: "PAN-OS, Palo Alto Networks" (HITS_SHOWN, then "+N")."""
-    h = [one_line(x)[:60] for x in s.hits or [] if x]
+    return names_text(s.hits)
+
+
+def names_text(hits: list[str] | None) -> str:
+    """hits_text of a list of names – also the Web Push of a person's desktop choice (webpush.story_payload)."""
+    h = [one_line(x)[:60] for x in hits or [] if x]
     return ", ".join(h[:HITS_SHOWN]) + (f" +{len(h) - HITS_SHOWN}" if len(h) > HITS_SHOWN else "")
 
 
@@ -1764,26 +1770,16 @@ def news_filter(rule: NotifyRule, *, quiet_too: bool = False) -> list:
     ids = news_svc._ids(rule.sources)
     where.append(news_svc.visible(ids, fresh=True) if ids or not rule.sources else false())  # only unreadable ids: nothing, not "all"
     # "Betrifft": one of the rule's systems (exact or named – not only quietly: a catalogue change sends no older story)
-    # or one of its words; a story that becomes a match only later (its details arrive) is sent then, once
-    if (b := _concerns(rule_systems(rule) or None, rule_keywords(rule) or None, quiet_too=quiet_too)) is not None:
-        where.append(b)
-    # "Nicht senden, wenn enthalten": before everything else – such a story never comes by this rule
-    if (x := words_svc.none_of(rule_exclude(rule))) is not None:
-        where.append(x)
+    # or one of its words; a story that becomes a match only later (its details arrive) is sent then, once.
+    # "Nicht senden, wenn enthalten": before everything else – such a story never comes by this rule (app/concerns.py:
+    # the same clauses as the News list's filter and a person's own notifications)
+    where += concerns.news_where(rule_systems(rule), rule_keywords(rule), rule_exclude(rule), quiet_too=quiet_too)
     return where
 
 
 def _concerns(systems: list[dict] | None, words: list[str] | None, *, quiet_too: bool = False) -> ColumnElement | None:
-    """SQL "Betrifft" of news: one of the systems (systems.loud – entries the catalogue no longer knows stand for no
-    story; `quiet_too`: also one it has only quietly – the dry run) or one of the words – None: neither chosen (no
-    restriction)."""
-    if systems is None and words is None:
-        return None
-    want = systems_svc.wanted(systems or [])
-    parts = [systems_svc.has(want) if quiet_too else systems_svc.loud(want)]
-    if (w := words_svc.clause(words or [])) is not None:
-        parts.append(w)
-    return or_(*parts)
+    """SQL "Betrifft" of news (concerns.news_clause) – None: neither chosen (no restriction)."""
+    return concerns.news_clause(systems, words, quiet_too=quiet_too)
 
 
 def rule_topics(rule: NotifyRule) -> list[str]:
@@ -1807,8 +1803,7 @@ def rule_exclude(rule: NotifyRule) -> list[str]:
 def rule_hits(i: NewsItem, rule: NotifyRule, want: list[str] | None = None) -> list[str]:
     """What a story matched `rule` by: the names of its systems (systems.hits – `want`: systems.wanted of the rule's,
     when known already) and the rule's words in its title or teaser – [] when the rule chose neither."""
-    out = systems_svc.hits(list(i.systems or []), list(i.quiet_systems or []), want if want is not None else systems_svc.wanted(rule_systems(rule)), f"{i.title} {i.summary or ''}") if rule_systems(rule) else []
-    return out + [w for w in words_svc.hits(i.search or "", rule_keywords(rule)) if w not in out]
+    return concerns.story_hits(i, rule_systems(rule), rule_keywords(rule), want)
 
 
 def _teams_clause(teams) -> ColumnElement:  # noqa: ANN001
@@ -1830,8 +1825,8 @@ def vendor_filter(rule: NotifyRule, teams) -> list | None:  # noqa: ANN001
     where.append(_teams_clause(teams))
     # the rule's systems: the event's product (a vendor: each of its catalogue products); its words and exclusions are
     # for news only
-    if chosen := rule_systems(rule):
-        where.append(_of_systems(systems_svc.product_keys(chosen)))
+    if (c := concerns.vendor_clause(rule_systems(rule))) is not None:
+        where.append(c)
     return where
 
 

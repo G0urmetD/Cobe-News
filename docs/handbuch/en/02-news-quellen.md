@@ -56,8 +56,19 @@ tab) and "Close".
 - **Quick filters** below the filter row: "Actively exploited", "Zero-day" and "No patch" in one click – the same filter
   as *Topic*, with the number of stories. Next to them **"Concerns our products"** as soon as you follow a product in
   Vendor News ([more](#unsere-produkte)) – it applies on top of all other filters.
-- The browser also remembers source, severity, topic and "Concerns our products" for your account (when you have no
-  default view).
+- **Systems**: only stories about certain vendors or products from the whole catalogue – the same picker as a
+  [rule's systems](/docs/benachrichtigungen#regel-systeme): grouped by vendor, with search, "All products of Palo Alto
+  Networks" (also ones added later) or single products ("PAN-OS"). A story matches when its
+  [details from the source](#details-aus-der-quelle) concern the product or its title or teaser names the product or
+  the vendor. Unlike in a rule, what a story got only by a recompute (after a catalogue update, say) counts here too –
+  the list shows what concerns a system and sends nothing. Each chosen system shows as a chip below the filter bar
+  ("Systems: PAN-OS ×"). Together with "Severity: Critical" that is "only Palo Alto, only critical".
+- **Without**: hide stories with certain words – like a rule's "Do not send if it contains". The button opens a field for
+  words (Enter or a comma adds one; whole words in the title or teaser, case ignored, plain text, at most 30, 2–60
+  characters each). Each word shows as a chip below the filter bar ("Without: webinar ×"). Unlike the search it looks
+  for whole words: "webinar" does not hide "webinars".
+- The browser also remembers source, severity, topic, "Concerns our products", systems and "Without" for your account
+  (when you have no default view).
 - **Time range**: only stories from a span of time. Quick picks: *Last hour*, *Today* (from 00:00), *Yesterday*,
   *24 hours*, *7 days*, *30 days* and *Since my last visit*. Or a **custom range** with *From* and *To* (date and time
   in your browser's local time, e.g. CET); an empty field is an open end, a date without a time in *To* includes the
@@ -71,7 +82,7 @@ tab) and "Close".
   "Unread only", a story stays in the list when you open it.
 - In the link and in a saved view a quick pick is kept by its name, not as a fixed time: a view "Today" shows the then
   current day tomorrow too. A custom range is stored with its points in time.
-- "Reset filter" clears source, severity, topic, "Concerns our products" and the time range.
+- "Reset filter" clears source, severity, topic, "Concerns our products", systems, "Without" and the time range.
 - **Unread only**: hides what is read. **Show muted**: also shows the stories whose CVEs you all muted (pale) – otherwise
   they are left out.
 - **Views**: save the filters under a name, make one the default, share it as a link ([Views](/docs/erste-schritte#ansichten)).

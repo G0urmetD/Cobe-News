@@ -24,7 +24,8 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import set_committed_value
 
-from app import audit, netaddr
+from app import audit, concerns, netaddr
+from app import systems as systems_svc
 from app import db as dbm
 from app import settings as settings_store
 from app.auth import bruteforce, directory, entra, ldap_dir, lock_store, passwords, sessions, totp, webauthn
@@ -899,25 +900,50 @@ async def my_totp_remove(body: ReauthIn, user: Reader, sess: ActiveSession, requ
     return user_out(user)
 
 
-class DesktopIn(_M):
+class DesktopIn(concerns.Concerns):
     enabled: bool = False
     severities: list[Literal["critical", "high", "medium", "low", "info"]] = Field(default_factory=lambda: ["critical", "high"], max_length=5)
     # source ids (UUIDs): each one short – the choice is stored on the account and read by every push round
     sources: list[Annotated[str, Field(max_length=64)]] = Field(default_factory=list, max_length=50)
     # topics (news.TOPICS): only stories with one of them – empty: every story (as before)
     topics: list[Literal["zeroday", "exploited", "poc", "ransomware", "nopatch", "breach", "supply", "phishing", "ot"]] = Field(default_factory=list, max_length=9)
+    # 0.1.54 (concerns.Concerns): "Systeme" and "Schlagwörter" (one of them is enough, AND with the rest) and "Nicht
+    # anzeigen, wenn enthalten" – as the channel rules; None (not sent – a tab of an older build): what is stored stays
+
+
+_DESKTOP_PLAIN = ("enabled", "severities", "sources", "topics")
+
+
+def desktop_out(prefs: dict | None) -> dict:
+    """The stored desktop choice as the page reads it – every field, the defaults for what is missing (a choice of
+    before topics or systems), the systems as stored ({"vendor"} | {"product"})."""
+    prefs = prefs or {}
+    base = DesktopIn.model_validate({k: prefs[k] for k in _DESKTOP_PLAIN if k in prefs}).model_dump(include=set(_DESKTOP_PLAIN))
+    words = lambda k: [str(x) for x in prefs.get(k) or [] if str(x).strip()]  # noqa: E731
+    return {**base, "systems": systems_svc.entries(prefs.get("systems")), "keywords": words("keywords"), "exclude": words("exclude")}
 
 
 @router.get("/me/desktop")
 async def my_desktop(user: Reader) -> dict:
-    return DesktopIn.model_validate({**DesktopIn().model_dump(), **(user.desktop or {})}).model_dump()
+    return desktop_out(user.desktop)
 
 
 @router.put("/me/desktop")
 async def put_my_desktop(body: DesktopIn, user: Reader, db: Db) -> dict:
-    user.desktop = body.model_dump()
+    """The signed-in person's own choice – no id in the path, nobody else's. A system the catalogue does not know is
+    refused (unless it was chosen already: it stays, standing for nothing)."""
+    had = desktop_out(user.desktop)
+    chosen = body.system_entries()
+    if chosen is not None:
+        concerns.check_known(chosen, had["systems"])
+    user.desktop = {
+        **body.model_dump(include=set(_DESKTOP_PLAIN)),
+        "systems": had["systems"] if chosen is None else chosen,
+        "keywords": had["keywords"] if body.keywords is None else list(body.keywords),
+        "exclude": had["exclude"] if body.exclude is None else list(body.exclude),
+    }
     await db.commit()
-    return user.desktop
+    return desktop_out(user.desktop)
 
 
 async def admins_count(db) -> int:

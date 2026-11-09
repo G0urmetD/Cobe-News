@@ -13,12 +13,16 @@
   example: "19.25"
   depth: 2  # a Release Update (19.25) is how versions are named; endoflife.date gives no latest release
 - key: postgresql
+  vendor: PostgreSQL
 - key: mysql
   cpes: [a:oracle:mysql_server]
 - key: mariadb
+  vendor: MariaDB
 - key: mongodb
+  vendor: MongoDB
 - key: redis
 - key: sqlite
+  vendor: SQLite
 - key: ibm-db2
   label: IBM Db2
   vendor: IBM
@@ -32,7 +36,9 @@
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: pgadmin
+  vendor: pgAdmin
 - key: phpmyadmin
+  vendor: phpMyAdmin
   osv: [[Packagist, phpmyadmin/phpmyadmin]]
 
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
@@ -45,3 +51,30 @@
   example: "2.00.079.00"
   hint: sap
   where: sap_kernel
+
+# ---------------------------------------------------------------- endoflife.date products: their vendor
+# (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)
+- key: apache-cassandra
+  vendor: Apache Software Foundation
+- key: apache-couchdb
+  vendor: Apache Software Foundation
+- key: apache-hadoop
+  vendor: Apache Software Foundation
+- key: arangodb
+  vendor: ArangoDB
+- key: azure-database-for-mysql
+  vendor: Microsoft
+- key: azure-database-for-postgresql
+  vendor: Microsoft
+- key: cockroachdb
+  vendor: Cockroach Labs
+- key: duckdb
+  vendor: DuckDB
+- key: hbase
+  vendor: Apache Software Foundation
+- key: influxdb
+  vendor: InfluxData
+- key: valkey
+  vendor: The Linux Foundation
+- key: vitess
+  vendor: The Linux Foundation

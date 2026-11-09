@@ -38,7 +38,9 @@ def test_bundled_catalogue_loads():
         "aliases": ["Palo Alto Firewall", "NGFW", "PA-Series"], "example": "11.2.4-h23", "where": "panos",
     }  # fmt: skip
     # an entry without label only patches an endoflife.date product
-    assert by["rhel"] == {"key": "rhel", "label": None, "vendor": None, "category": "os", "cpes": [], "scheme": "distro", "hint": "distro"}
+    assert by["rhel"] == {"key": "rhel", "label": None, "vendor": "Red Hat", "category": "os", "cpes": [], "scheme": "distro", "hint": "distro"}
+    # … and may name its vendor (endoflife.date names none: the catalogue would take the label's first word or the CPE's)
+    assert by["redhat-satellite"] == {"key": "redhat-satellite", "label": None, "vendor": "Red Hat", "category": by["redhat-satellite"]["category"], "cpes": []}
     # NVD's escaped characters survive YAML
     assert "a:veeam:veeam_backup_\\&_replication" in by["veeam-backup-and-replication"]["cpes"]
     for c in cat.categories:
@@ -64,7 +66,7 @@ def test_check_command(capsys):
         ("products/backup.yaml", "where: veeam_br", "where: nowhere", "where 'nowhere' has no text"),
         ("products/firewall.yaml", "- key: panorama", "- key: panos", "product 'panos' (entry 2): key already used in products/firewall.yaml"),
         ("products/firewall.yaml", "- key: panorama\n  label: Panorama\n  vendor: Palo Alto Networks", "- key: panorama\n  label: Panorama", "vendor is missing"),
-        ("products/os.yaml", "- key: rhel\n  scheme: distro", "- key: rhel\n  kw: [RHEL]\n  scheme: distro", "without a label only aliases, belongs, cpe_editions, cpes, hint"),
+        ("products/os.yaml", "- key: rhel\n  vendor: Red Hat\n  scheme: distro", "- key: rhel\n  kw: [RHEL]\n  scheme: distro", "without a label only aliases, belongs, cpe_editions, cpes, hint"),
         ("products/cloud.yaml", "cloud: true", 'cloud: "true"', "cloud: Input should be a valid boolean"),
         ("categories.yaml", "    en: Firewalls & VPN\n", "", "categories.yaml: categories.0.en: Field required"),
         ("categories.yaml", "icon: brick-wall", "icon: no-such-icon", "categories.yaml"),

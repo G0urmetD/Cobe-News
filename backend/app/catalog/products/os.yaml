@@ -29,13 +29,14 @@
 - key: macos
 - key: linux
   label: Linux Kernel
-  vendor: The Linux Foundation
+  vendor: Linux Kernel Organization
   cpes: []
   cna: [[Linux, Linux]]
   kw: [Linux kernel, Linux-Kernel]
   example: 6.6.63
   hint: kernel
 - key: rhel
+  vendor: Red Hat
   scheme: distro
   hint: distro
 - key: debian
@@ -45,39 +46,49 @@
   scheme: distro
   hint: distro
 - key: sles
+  vendor: SUSE
   scheme: distro
   hint: distro
 - key: almalinux
+  vendor: AlmaLinux
   scheme: distro
   hint: distro
 - key: rocky-linux
+  vendor: Rocky Linux
   scheme: distro
   hint: distro
 - key: oracle-linux
   scheme: distro
   hint: distro
 - key: centos
+  vendor: CentOS
   scheme: distro
   hint: distro
 - key: centos-stream
+  vendor: CentOS
   scheme: distro
   hint: distro
 - key: fedora
+  vendor: Fedora Project
   scheme: distro
   hint: distro
 - key: alpine-linux
+  vendor: Alpine Linux
   scheme: distro
   hint: distro
 - key: amazon-linux
   scheme: distro
   hint: distro
 - key: opensuse
+  vendor: openSUSE
   scheme: distro
   hint: distro
 - key: suse-linux-micro
+  vendor: SUSE
   scheme: distro
   hint: distro
 - key: photon
+  vendor: Broadcom (VMware)
   scheme: distro
   hint: distro
 
@@ -90,3 +101,36 @@
   aliases: [IGEL]
   example: "12.5.0"
   where: client_about
+
+# ---------------------------------------------------------------- endoflife.date products: their vendor
+# (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)
+- key: antix
+  vendor: antiX Linux
+- key: eurolinux
+  vendor: EuroLinux
+- key: freebsd
+  vendor: FreeBSD
+- key: ibm-aix
+  vendor: IBM
+- key: kde-plasma
+  vendor: KDE
+- key: lineageos
+  vendor: LineageOS
+- key: linuxmint
+  vendor: Linux Mint
+- key: mxlinux
+  vendor: MX Linux
+- key: netbsd
+  vendor: NetBSD
+- key: nixos
+  vendor: NixOS
+- key: openbsd
+  vendor: OpenBSD
+- key: pop-os
+  vendor: System76
+- key: steamos
+  vendor: Valve
+- key: tails
+  vendor: Tor Project
+- key: yocto
+  vendor: The Linux Foundation

@@ -35,7 +35,7 @@
 # ---------------------------------------------------------------- added 0.1.47 – AD/M365 assessment tools: no CPE and no CVE in NVD (checked 2026-11-03), news only
 - key: pingcastle
   label: PingCastle
-  vendor: Netwrix (PingCastle)
+  vendor: Netwrix
   cpes: []
   kw: [PingCastle]
   example: "4.0.0.33"

@@ -924,6 +924,67 @@ class PersonNotify(Base):
     weekly_since: Mapped[datetime | None] = mapped_column(UTCDateTime)
     # the person's last visit of their watched CVEs (/watch, app/watch_api.py): what happened after it is "new" there
     watch_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # only the Vendor News of these systems ([{"vendor"} | {"product"}], app/concerns.py) – empty: every product of the
+    # person's teams; never the watched CVEs (migration 0040)
+    systems: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+
+
+class PersonNews(Base):
+    """A person's own security stories by e-mail or their Microsoft Teams Workflows webhook (app/personal_news.py):
+    the filter (as a channel rule's: severities, sources, topics, systems, words, exclusions – empty: all) and when it
+    was last saved (`filter_seq` / `filter_at`: an older story counts only through a change after it – no flood after
+    widening); per way on/off and from which arrival on (`<way>_on_seq`: the newest when switched on), the message
+    being sent (`<way>_claim_at`, committed before sending), the last message (`<way>_sent_at` – one per GAP), the
+    pause after a failure (`<way>_next_at`), when a round last looked (`<way>_seen_at` – the fair order), up to which
+    arrival and time it judged the stories (`<way>_checked_seq` / `_at` – only what arrived or changed since is judged
+    again) and the last delivery for the UI (`state_<way>`). What went out: person_news_sent. The Teams URL is the person's one of
+    person_notify. Migration 0042."""
+
+    __tablename__ = "person_news"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    lang: Mapped[str] = mapped_column(Text, default="de", server_default="de")
+    severities: Mapped[list] = mapped_column(Json, default=lambda: ["critical", "high"], server_default=text("'[\"critical\", \"high\"]'::jsonb"))
+    sources: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    topics: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    systems: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    keywords: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    exclude: Mapped[list] = mapped_column(Json, default=list, server_default=text("'[]'::jsonb"))
+    filter_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    filter_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    email_on: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    email_on_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    email_claim_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    email_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    email_next_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    email_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    email_checked_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    email_checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    state_email: Mapped[dict] = mapped_column(Json, default=dict, server_default=text("'{}'::jsonb"))
+    teams_on: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    teams_on_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    teams_claim_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    teams_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    teams_next_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    teams_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    teams_checked_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    teams_checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    state_teams: Mapped[dict] = mapped_column(Json, default=dict, server_default=text("'{}'::jsonb"))
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, server_default=text("now()"))
+
+
+class PersonNewsSent(Base):
+    """A story that went to a person on a way (app/personal_news.py) – at most once; written with the claim, before
+    anything is sent (taken back only after a failure that certainly delivered nothing). Kept personal.MAX_AGE plus a
+    day: an older story is never sent."""
+
+    __tablename__ = "person_news_sent"
+    __table_args__ = (Index("ix_person_news_sent_at", "sent_at"), Index("ix_person_news_sent_item", "item_id"))
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    way: Mapped[str] = mapped_column(Text, primary_key=True)
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("news_items.id", ondelete="CASCADE"), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
 class PersonDelivery(Base):

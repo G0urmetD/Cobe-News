@@ -49,6 +49,7 @@
 - key: bitbucket
   cpes: [a:atlassian:bitbucket_data_center]
 - key: gitlab
+  vendor: GitLab
 - key: nextcloud
 - key: mattermost
   cpes: [a:mattermost:mattermost_server]
@@ -65,7 +66,7 @@
   belongs: [{pattern: '^\s*v?2\.\d+\s*$', to: jenkins-weekly}]  # 2.499: a weekly release
   lines_only: lts  # only the LTS lines (endoflife.date: 2.568, 2.555 …) – 2.500.1 is no LTS release
 - key: jenkins-weekly
-  label: Jenkins (weekly)
+  label: Jenkins Weekly
   vendor: Jenkins Project
   cpes: [a:jenkins:jenkins]
   eol: jenkins
@@ -77,6 +78,7 @@
   depth: 2  # 2.499 is a whole weekly release
   belongs: [{pattern: '^\s*v?2\.\d+\.\d+\s*$', to: jenkins}]  # 2.492.2: an LTS release
 - key: sonarqube-server
+  vendor: SonarSource
 - key: teams
   label: Microsoft Teams
   vendor: Microsoft
@@ -92,7 +94,9 @@
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: bigbluebutton
+  vendor: BigBlueButton
 - key: greenlight
+  vendor: BigBlueButton
 - key: rocket-chat
 
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
@@ -135,7 +139,7 @@
   where: firmware_dashboard
 - key: unify-openscape
   label: "Unify OpenScape (Voice, Branch, SBC)"
-  vendor: "Mitel (Unify)"
+  vendor: Mitel
   cpes: [a:unify:openscape_voice, a:atos:unify_openscape_session_border_controller, a:atos:unify_openscape_branch, a:atos:unify_openscape_bcf, a:atos:unify_openscape_4000, a:siemens:openscape_session_border_controller]
   kw: [OpenScape, Unify]
   aliases: [Atos Unify, OpenScape Voice, OpenScape SBC]
@@ -192,4 +196,16 @@
   kw: [Wiki.js]
   aliases: [WikiJS]
   example: "2.5.315"
+  where: web_about
+
+# ---------------------------------------------------------------- added 0.1.54
+- key: n8n
+  label: n8n (self-hosted)
+  vendor: n8n
+  cpes: [a:n8n:n8n]
+  cna: [[n8n-io, n8n]]  # the advisories come from GitHub's database (GHSA): a third party's word
+  osv: [[npm, n8n]]
+  kw: [n8n]
+  example: 1.123.76
+  version_cmd: n8n --version
   where: web_about

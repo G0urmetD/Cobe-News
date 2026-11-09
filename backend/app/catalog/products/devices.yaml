@@ -104,3 +104,31 @@
   aliases: [bizhub]
   hint: mfp
   where: firmware_dashboard
+
+# ---------------------------------------------------------------- added 0.1.54
+# AMD processors: NVD lists them per model (hundreds of CPEs, newer records often none) – AMD is a CNA and names the
+# series ("AMD EPYC™ 9004 Series", "AMD Ryzen™ 7000 Series Desktop Processors"); the fixes are platform firmware
+# (AGESA PI "GenoaPI 1.0.0.E", SEV firmware) shipped in the BIOS of the server or board vendor (checked 2026-11-06)
+- key: amd-epyc
+  label: AMD EPYC Processors (Firmware, SEV)
+  vendor: AMD
+  cpes: []
+  cna: [[AMD, AMD EPYC], [AMD, AMD EPYC Embedded], [AMD, 1st Gen AMD EPYC Processors], [AMD, 2nd Gen AMD EPYC Processors], [AMD, 3rd Gen AMD EPYC Processors], [AMD, 4th Gen AMD EPYC Processors], [AMD, 5th Gen AMD EPYC Processors]]
+  kw: [AMD EPYC, EPYC, SEV-SNP]
+  aliases: [EPYC, AMD SEV, AMD SEV-SNP]
+  hint: amd_firmware
+  where: amd_firmware
+- key: amd-ryzen
+  label: AMD Ryzen Processors (Firmware)
+  vendor: AMD
+  cpes: []
+  cna: [[AMD, AMD Ryzen], [AMD, Ryzen], [AMD, AMD Ryzen Threadripper], [AMD, AMD Ryzen Threadripper PRO], [AMD, AMD Ryzen Embedded], [AMD, AMD Ryzen AI], [AMD, AMD Ryzen AI Max]]
+  kw: [AMD Ryzen, Ryzen, Threadripper]
+  aliases: [Ryzen, Threadripper, Ryzen Embedded]
+  hint: amd_firmware
+  where: amd_firmware
+
+# ---------------------------------------------------------------- endoflife.date products: their vendor
+# (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)
+- key: raspberry-pi
+  vendor: Raspberry Pi

@@ -4,7 +4,7 @@ import { ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useFieldId } from "@/components/ui/field-context"
+import { useFieldId, useFieldLabelId } from "@/components/ui/field-context"
 import { cn } from "@/lib/utils"
 
 export interface Option {
@@ -63,6 +63,8 @@ export function MultiSelect({
 }) {
   const { t } = useTranslation()
   const fieldId = useFieldId() // inside a <Field/>: its label names this button
+  // … by the label's text (aria-labelledby): a <label> with an info button (<Explained/>) left the button without a name
+  const labelId = useFieldLabelId()
   const toggle = (v: string) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v])
   const selected = options.filter((o) => value.includes(o.value))
   // without a search field nothing in the list could take the focus: the list itself does (arrow keys move, Enter or
@@ -86,6 +88,7 @@ export function MultiSelect({
           <button
             type="button"
             id={fieldId}
+            aria-labelledby={labelId}
             className={cn(
               "flex min-h-9 w-full flex-wrap items-center gap-1 rounded-lg border border-input bg-transparent px-2 py-1 text-left text-sm transition-colors outline-none hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30",
               className,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 import { type QueryClient, useQueryClient } from "@tanstack/react-query"
@@ -16,7 +16,7 @@ import { HelpLink } from "@/components/cobe/doc-markdown"
 import { Explained } from "@/components/cobe/explained"
 import { EnableCard, Field, LockedFields, ToggleRow } from "@/components/cobe/form"
 import { ChipInput } from "@/components/cobe/chip-input"
-import { MultiSelect, type Option, type OptionGroup } from "@/components/cobe/multi-select"
+import { MultiSelect } from "@/components/cobe/multi-select"
 import { api } from "@/lib/api"
 import { type NotifyChannel, type NotifyRule, RULE_KINDS, type RuleIn, type RuleKind, useChannels, useRules, useSmtp } from "@/lib/admin-api"
 import { errorCategoryText, mailServerMissing, uiLang } from "@/lib/channels"
@@ -32,20 +32,8 @@ import { ChannelIcon, ChannelsPane } from "@/pages/settings-channels"
 import { DeliveryLogPane } from "@/pages/settings-delivery-log"
 import { DryRunPanel } from "@/pages/settings-dry-run"
 import { Loading, SaveBar, SettingsCard, SheetActions, SheetBody, SheetLoading, StaleNotice } from "@/pages/settings-shared"
-import {
-  SEVERITY_KINDS,
-  SYSTEM_KINDS,
-  SYSTEMS_MAX,
-  type CatalogVendor,
-  applicable,
-  catalogVendors,
-  offSources,
-  ruleSummary,
-  systemOf,
-  systemValue,
-  vendorOf,
-} from "@/lib/rule-filters"
-import { useVendorCatalog } from "@/lib/vendor-api"
+import { type RuleSystem, SEVERITY_KINDS, SYSTEM_KINDS, applicable, offSources, ruleSummary, useCatalogVendors } from "@/lib/rule-filters"
+import { SystemsPicker } from "@/components/cobe/systems-picker"
 
 function SeverityPicker({ value, onChange }: { value: NewsSeverity[]; onChange: (v: NewsSeverity[]) => void }) {
   const { t } = useTranslation()
@@ -87,70 +75,6 @@ function SourcePicker({ value, onChange, options }: { value: string[]; onChange:
       options={options.map((s) => ({ value: s.id, label: s.enabled === false ? t("notify.sourceOff", { name: s.name }) : s.name }))}
       value={value.filter((id) => options.some((s) => s.id === id))}
       onChange={onChange}
-    />
-  )
-}
-
-/** The catalogue by vendor (GET /api/vendor/catalog) – null while it loads. */
-function useCatalogVendors(): CatalogVendor[] | undefined {
-  const products = useVendorCatalog().data?.products
-  return useMemo(() => (products ? catalogVendors(products) : undefined), [products])
-}
-
-/**
- * "Systeme": the whole catalogue, by vendor – first "Alle Produkte von <Hersteller>" (also those added later), then
- * its products; searched by product and vendor (any of its spellings). A system the catalogue no longer knows stays as
- * a chip until removed.
- */
-function SystemsPicker({ value, onChange, vendors }: { value: RuleIn["systems"]; onChange: (v: RuleIn["systems"]) => void; vendors: CatalogVendor[] | undefined }) {
-  const { t } = useTranslation()
-  const groups: OptionGroup[] = []
-  const options: Option[] = []
-  for (const v of vendors ?? []) {
-    groups.push({ key: v.id, label: v.name })
-    options.push({
-      value: systemValue({ vendor: v.name }),
-      label: t("notify.systemsAllOf", { vendor: v.name }),
-      chip: t("notify.systemsVendorChip", { vendor: v.name }),
-      group: v.id,
-      keywords: v.names,
-    })
-    for (const p of v.products) options.push({ value: systemValue({ product: p.key }), label: p.label, group: v.id, keywords: v.names })
-  }
-  // a vendor chosen under another of its spellings ("VMware" for "Broadcom (VMware)") is its one option; one no longer
-  // in the catalogue is shown (and removable) as it is
-  const shown = [
-    ...new Set(
-      value.map((s) => {
-        const v = "vendor" in s && vendors ? vendorOf(vendors, s.vendor) : undefined
-        return v ? systemValue({ vendor: v.name }) : systemValue(s)
-      }),
-    ),
-  ]
-  if (vendors) {
-    for (const c of shown) {
-      if (options.some((o) => o.value === c)) continue
-      const s = systemOf(c)
-      if (s) options.push({ value: c, label: t("notify.systemGoneName", { name: "vendor" in s ? s.vendor : s.product }), group: "gone" })
-    }
-    if (options.some((o) => o.group === "gone")) groups.unshift({ key: "gone", label: t("notify.systemGone") })
-  }
-  return (
-    <MultiSelect
-      variant="field"
-      label={vendors ? t("notify.allSystems") : t("news.loading")}
-      options={options}
-      groups={groups}
-      value={shown}
-      onChange={(x) =>
-        onChange(
-          x
-            .slice(0, SYSTEMS_MAX)
-            .map(systemOf)
-            .filter((y): y is NonNullable<typeof y> => !!y),
-        )
-      }
-      contentClassName="w-80"
     />
   )
 }
@@ -580,10 +504,58 @@ export function DesktopPane() {
   return <DesktopForm key={JSON.stringify(q.data)} initial={q.data} />
 }
 
+/** A person's own choice of security stories – as a channel rule's: severities, sources, topics, systems or words (one
+ *  is enough) and the words that keep a story away (app/concerns.py). The desktop notifications and "Security-Meldungen
+ *  per E-Mail/Teams" (two columns of a grid). */
+export interface NewsChoice {
+  severities: NewsSeverity[]
+  sources: string[]
+  topics?: NewsTopic[]
+  systems?: RuleSystem[]
+  keywords?: string[]
+  exclude?: string[]
+}
+
+export function NewsChoiceFields({
+  value: v,
+  onChange,
+  laterHint = "desktop",
+}: {
+  value: NewsChoice
+  onChange: (v: Partial<NewsChoice>) => void
+  laterHint?: "desktop" | "personalNews"
+}) {
+  const { t } = useTranslation()
+  const sources = useNewsSources().data ?? []
+  const vendors = useCatalogVendors()
+  return (
+    <>
+      <Field label={t("notify.severities")} hint={t("notify.severitiesHint")}>
+        <SeverityPicker value={v.severities} onChange={(x) => onChange({ severities: x })} />
+      </Field>
+      <Field label={t("notify.sources")} hint={t("notify.sourcesHint")}>
+        <SourcePicker value={v.sources} onChange={(x) => onChange({ sources: x })} options={sources} />
+      </Field>
+      <Field label={<Explained label={t("notify.topics")} text={t(`${laterHint}.topicsExplain`)} />} hint={t("desktop.topicsHint")} className="sm:col-span-2">
+        <TopicPicker value={v.topics ?? []} onChange={(x) => onChange({ topics: x })} />
+      </Field>
+      {/* as a channel rule's (app/concerns.py): systems or words – one is enough – and the words that keep a story away */}
+      <Field label={<Explained label={t("notify.systems")} text={t(`${laterHint}.systemsExplain`)} />} hint={t("desktop.systemsHint")} className="sm:col-span-2">
+        <SystemsPicker value={v.systems ?? []} onChange={(x) => onChange({ systems: x })} vendors={vendors} />
+      </Field>
+      <Field label={t("notify.keywords")} hint={t("notify.keywordsHint")}>
+        <ChipInput value={v.keywords ?? []} onChange={(x) => onChange({ keywords: x })} placeholder={t("notify.keywordsPlaceholder")} />
+      </Field>
+      <Field label={t("desktop.exclude")} hint={t(`${laterHint}.excludeHint`)}>
+        <ChipInput value={v.exclude ?? []} onChange={(x) => onChange({ exclude: x })} placeholder={t("notify.excludePlaceholder")} />
+      </Field>
+    </>
+  )
+}
+
 function DesktopForm({ initial }: { initial: DesktopPrefs }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const sources = useNewsSources().data ?? []
   const [v, setV] = useState(initial)
   const perm = useNotificationPermission()
   const [busy, setBusy] = useState(false)
@@ -614,15 +586,7 @@ function DesktopForm({ initial }: { initial: DesktopPrefs }) {
         {supported && <DesktopStatus perm={perm} saved={initial.enabled} wanted={v.enabled} />}
         {test && <TestOutcome test={test} />}
         <LockedFields locked={!v.enabled} className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("notify.severities")} hint={t("notify.severitiesHint")}>
-            <SeverityPicker value={v.severities} onChange={(x) => setV({ ...v, severities: x })} />
-          </Field>
-          <Field label={t("notify.sources")} hint={t("notify.sourcesHint")}>
-            <SourcePicker value={v.sources} onChange={(x) => setV({ ...v, sources: x })} options={sources} />
-          </Field>
-          <Field label={<Explained label={t("notify.topics")} text={t("desktop.topicsExplain")} />} hint={t("desktop.topicsHint")} className="sm:col-span-2">
-            <TopicPicker value={v.topics ?? []} onChange={(x) => setV({ ...v, topics: x })} />
-          </Field>
+          <NewsChoiceFields value={v} onChange={(x) => setV({ ...v, ...x })} />
         </LockedFields>
         <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("desktop.about")}</p>
       </SheetBody>

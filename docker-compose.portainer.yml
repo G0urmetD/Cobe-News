@@ -51,7 +51,7 @@ x-logging: &logging
 
 services:
   app:
-    image: ${COBE_NEWS_IMAGE:-ghcr.io/g0urmetd/cobe-news:${COBE_NEWS_VERSION:-0.1.53}}
+    image: ${COBE_NEWS_IMAGE:-ghcr.io/g0urmetd/cobe-news:${COBE_NEWS_VERSION:-0.1.54}}
     logging: *logging
     restart: unless-stopped
     mem_limit: ${APP_MEM:-512m}
@@ -122,7 +122,7 @@ services:
   # cobe_news_app (no superuser) and its ownership of the database (the image's cobe-news-db.sh, db-init.sh). Only
   # this container knows the superuser's password.
   db:
-    image: ${COBE_NEWS_DB_IMAGE:-ghcr.io/g0urmetd/cobe-news-db:${COBE_NEWS_VERSION:-0.1.53}}
+    image: ${COBE_NEWS_DB_IMAGE:-ghcr.io/g0urmetd/cobe-news-db:${COBE_NEWS_VERSION:-0.1.54}}
     logging: *logging
     restart: unless-stopped
     mem_limit: ${DB_MEM:-512m}
@@ -168,7 +168,7 @@ services:
 
   # nginx with Cobe News' configuration in the image (the template, the names, the certificate watch)
   proxy:
-    image: ${COBE_NEWS_PROXY_IMAGE:-ghcr.io/g0urmetd/cobe-news-proxy:${COBE_NEWS_VERSION:-0.1.53}}
+    image: ${COBE_NEWS_PROXY_IMAGE:-ghcr.io/g0urmetd/cobe-news-proxy:${COBE_NEWS_VERSION:-0.1.54}}
     logging: *logging
     restart: unless-stopped
     scale: ${PROXY_ENABLED:-1}

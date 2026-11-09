@@ -119,6 +119,19 @@ describe("all read", () => {
     expect(readAllBody(f, page(["a"]))).toEqual({ source: ["x"], severity: ["critical"], q: "lücke" })
     expect(readAllBody(f, undefined)).not.toHaveProperty("upto")
   })
+  it("asks and marks by the systems of the list", () => {
+    const systems = [{ vendor: "Palo Alto Networks" }, { product: "panos" }]
+    const q = new URL(newsQuery({ state: "all", sources: [], severities: [], systems }, null), "https://n.example.com").searchParams
+    expect(q.getAll("system")).toEqual(["v:Palo Alto Networks", "p:panos"])
+    expect(readAllBody({ sources: [], severities: [], q: "", systems }, undefined)).toEqual({ source: [], severity: [], system: ["v:Palo Alto Networks", "p:panos"], q: "" })
+    expect(readAllBody({ sources: [], severities: [], q: "" }, undefined)).not.toHaveProperty("system")
+  })
+  it("asks and marks without the excluded words", () => {
+    const q = new URL(newsQuery({ state: "all", sources: [], severities: [], without: ["Webinar", "Citrix Bleed"] }, null), "https://n.example.com").searchParams
+    expect(q.getAll("without")).toEqual(["Webinar", "Citrix Bleed"])
+    expect(readAllBody({ sources: [], severities: [], q: "", without: ["Webinar"] }, undefined)).toEqual({ source: [], severity: [], without: ["Webinar"], q: "" })
+    expect(readAllBody({ sources: [], severities: [], q: "" }, undefined)).not.toHaveProperty("without")
+  })
 })
 
 describe("topics", () => {
@@ -154,14 +167,28 @@ describe("topics", () => {
     const m = new Map<string, string>()
     globalThis.localStorage = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) } as unknown as Storage
     saveNewsFilter("u1", { sources: [], severities: ["critical"], topics: ["nopatch"] })
-    expect(loadNewsFilter("u1")).toEqual({ sources: [], severities: ["critical"], topics: ["nopatch"], ours: false })
+    expect(loadNewsFilter("u1")).toEqual({ sources: [], severities: ["critical"], topics: ["nopatch"], ours: false, systems: [], without: [] })
     saveNewsFilter("u1", { sources: [], severities: [], topics: ["poc"], ours: true })
-    expect(loadNewsFilter("u1")).toEqual({ sources: [], severities: [], topics: ["poc"], ours: true })
+    expect(loadNewsFilter("u1")).toEqual({ sources: [], severities: [], topics: ["poc"], ours: true, systems: [], without: [] })
     localStorage.setItem("cobe-news.filter.u2", JSON.stringify({ sources: [], severities: [], topics: ["ot", "x", "ot"] }))
     expect(loadNewsFilter("u2").topics).toEqual(["ot"])
     // an older entry without topics
     localStorage.setItem("cobe-news.filter.u3", JSON.stringify({ sources: ["a"], severities: [] }))
-    expect(loadNewsFilter("u3")).toEqual({ sources: ["a"], severities: [], topics: [], ours: false })
+    expect(loadNewsFilter("u3")).toEqual({ sources: ["a"], severities: [], topics: [], ours: false, systems: [], without: [] })
+    globalThis.localStorage = before
+  })
+  it("the browser's fallback filter keeps the systems – checked as an address's", () => {
+    const before = globalThis.localStorage
+    const m = new Map<string, string>()
+    globalThis.localStorage = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) } as unknown as Storage
+    saveNewsFilter("u1", { sources: [], severities: [], systems: [{ vendor: "Palo Alto Networks" }, { product: "panos" }] })
+    expect(loadNewsFilter("u1").systems).toEqual([{ vendor: "Palo Alto Networks" }, { product: "panos" }])
+    localStorage.setItem("cobe-news.filter.u2", JSON.stringify({ sources: [], severities: [], systems: ["p:Bad Key", "x:y", 7, "v:Fortinet", "v:Fortinet"] }))
+    expect(loadNewsFilter("u2").systems).toEqual([{ vendor: "Fortinet" }])
+    saveNewsFilter("u3", { sources: [], severities: [], without: ["Webinar"] })
+    expect(loadNewsFilter("u3").without).toEqual(["Webinar"])
+    localStorage.setItem("cobe-news.filter.u4", JSON.stringify({ sources: [], severities: [], without: ["a", "(.*)+$", 7, "Webinar", "webinar", "Citrix  Bleed"] }))
+    expect(loadNewsFilter("u4").without).toEqual(["Webinar", "Citrix Bleed"])
     globalThis.localStorage = before
   })
   it("the source filter is grouped by the kind of source, authorities first", () => {

@@ -14,9 +14,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data STATIC_DIR=/srv/
 WORKDIR /srv
 # pg_dump / pg_restore / psql of PostgreSQL 18 for backups (app/backup.py) – a pg_dump older than the server refuses to
 # dump it, and Debian trixie ships 17: from the PostgreSQL project's own repository (apt.postgresql.org), its signing
-# key pinned by checksum (fingerprint B97B 0AFC AA1A 47F0 44F2 44A0 7FCC 7D46 ACCC 4CF8)
-ADD --checksum=sha256:0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76 https://www.postgresql.org/media/keys/ACCC4CF8.asc /usr/share/keyrings/pgdg.asc
-RUN chmod 644 /usr/share/keyrings/pgdg.asc \
+# key pinned by checksum (fingerprint B97B 0AFC AA1A 47F0 44F2 44A0 7FCC 7D46 ACCC 4CF8). Kept in the repository
+# (keys/), not downloaded: a reset connection to www.postgresql.org once failed a release build (0.1.53)
+COPY keys/pgdg-ACCC4CF8.asc /usr/share/keyrings/pgdg.asc
+RUN echo "0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76  /usr/share/keyrings/pgdg.asc" | sha256sum -c - \
+ && chmod 644 /usr/share/keyrings/pgdg.asc \
  && echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt trixie-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends postgresql-client-18 \

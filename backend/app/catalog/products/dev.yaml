@@ -5,22 +5,28 @@
 
 # ---------------------------------------------------------------- open-source frameworks: their packages in OSV
 - key: django
+  vendor: Django Software Foundation
   osv: [[PyPI, django]]
 - key: apache-struts
+  vendor: Apache Software Foundation
   osv: [[Maven, org.apache.struts:struts2-core]]
 - key: symfony
+  vendor: Symfony
   osv: [[Packagist, symfony/http-kernel], [Packagist, symfony/symfony]]
 - key: laravel
   osv: [[Packagist, laravel/framework]]
 - key: rails
+  vendor: Ruby on Rails
   osv: [[RubyGems, actionpack], [RubyGems, activerecord], [RubyGems, rails]]
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: artifactory
+  vendor: JFrog
 - key: nexus
 - key: gerrit
 - key: forgejo
 - key: gitlab-runner
+  vendor: GitLab
 
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
 - key: teamcity
@@ -39,3 +45,70 @@
   example: "1.23.1"
   version_cmd: gitea --version
   where: web_about
+
+# ---------------------------------------------------------------- endoflife.date products: their vendor
+# (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)
+- key: ansible-core
+  vendor: Red Hat
+- key: apache-airflow
+  vendor: Apache Software Foundation
+- key: apache-camel
+  vendor: Apache Software Foundation
+- key: apache-lucene
+  vendor: Apache Software Foundation
+- key: api-platform
+  vendor: API Platform
+- key: cakephp
+  vendor: CakePHP
+- key: ckeditor
+  vendor: CKEditor
+- key: electron
+  vendor: Electron
+- key: emberjs
+  vendor: Ember.js
+- key: express
+  vendor: OpenJS Foundation
+- key: ffmpeg
+  vendor: FFmpeg
+- key: font-awesome
+  vendor: Font Awesome
+- key: freedesktop-sdk
+  vendor: freedesktop.org
+- key: grails
+  vendor: Apache Software Foundation
+- key: gstreamer
+  vendor: GStreamer
+- key: guzzle
+  vendor: Guzzle
+- key: jquery
+  vendor: jQuery
+- key: jquery-ui
+  vendor: jQuery
+- key: nextjs
+  vendor: Vercel
+- key: numpy
+  vendor: NumPy
+- key: oniguruma
+  vendor: Oniguruma
+- key: phoenix-framework
+  vendor: Phoenix Framework
+- key: react
+  vendor: Meta
+- key: react-native
+  vendor: Meta
+- key: ros
+  vendor: Open Robotics
+- key: ros-2
+  vendor: Open Robotics
+- key: spring-boot
+  vendor: Broadcom (Spring)
+- key: spring-cloud
+  vendor: Broadcom (Spring)
+- key: spring-security
+  vendor: Broadcom (Spring)
+- key: tailwind-css
+  vendor: Tailwind Labs
+- key: twig
+  vendor: Symfony
+- key: vuetify
+  vendor: Vuetify

@@ -459,6 +459,7 @@ const auditDe: Record<string, string> = {
   "audit.field.personal_desktop": "Persönlich: Desktop",
   "audit.field.personal_email": "Persönlich: E-Mail",
   "audit.field.personal_teams": "Persönlich: Teams",
+  "audit.field.personal_news": "Persönlich: Security-Meldungen nach eigener Auswahl",
   "audit.field.pre_restore": "Sicherung davor",
   "audit.field.product": "Produkt",
   "audit.field.recheck": "Konten neu prüfen",

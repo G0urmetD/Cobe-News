@@ -204,7 +204,7 @@ Products with two version lines under one name are split, because their advisori
 |---|---|
 | pfSense | **pfSense CE** (`2.8.0`) and **pfSense Plus** (`24.11`) |
 | Firefox | **Mozilla Firefox** and **Mozilla Firefox ESR** (`140.4.0esr`) – NVD tells them apart by the edition `esr` |
-| Jenkins | **Jenkins LTS** (`2.492.2`) and **Jenkins (weekly)** (`2.499`) – NVD tells them apart by the edition `lts` |
+| Jenkins | **Jenkins LTS** (`2.492.2`) and **Jenkins Weekly** (`2.499`) – NVD tells them apart by the edition `lts` |
 | nginx | **nginx (Open Source)** (`1.27.2`) and **NGINX Plus** (`R33`) |
 
 Whoever already follows the former product keeps following it. A version that belongs to the other product (`24.11`

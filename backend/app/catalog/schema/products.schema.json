@@ -549,7 +549,7 @@
             }
           ],
           "default": null,
-          "description": "Vendor shown with the product (required with a label).",
+          "description": "Vendor shown with the product (required with a label). Without a label: the vendor of the endoflife.date product, which names none (else the first word of its label or its CPE's vendor: 'Red', 'Djangoproject').",
           "title": "Vendor"
         },
         "version_cmd": {

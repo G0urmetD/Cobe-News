@@ -87,7 +87,9 @@
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: teleport
+  vendor: Teleport
 - key: boundary
+  vendor: HashiCorp
 
 # ---------------------------------------------------------------- Windows Server roles (0.1.45) – the Windows Server CPEs, a filter word picks the role
 - key: windows-rds
@@ -207,7 +209,7 @@
   where: client_about
 - key: datto-rmm  # no CPE in NVD (checked 2026-11-02)
   label: "Datto RMM (Kaseya)"
-  vendor: "Kaseya (Datto)"
+  vendor: "Datto (Kaseya)"
   cpes: []
   kw: [Datto RMM]
   aliases: [Autotask Endpoint Management, CentraStage]
@@ -225,3 +227,28 @@
   aliases: [Guacamole]
   example: "1.6.0"
   where: linux_package
+
+# ---------------------------------------------------------------- added 0.1.54 (file transfer: often exploited)
+- key: crushftp
+  label: CrushFTP
+  vendor: CrushFTP
+  cpes: [a:crushftp:crushftp]
+  kw: [CrushFTP]
+  example: 11.3.4_26
+  where: web_about
+- key: cleo-mft
+  label: Cleo Harmony / VLTrader / LexiCom
+  vendor: Cleo
+  cpes: [a:cleo:harmony, a:cleo:vltrader, a:cleo:lexicom]  # one code base, the same versions
+  kw: [Cleo Harmony, Cleo VLTrader, Cleo LexiCom, VLTrader, LexiCom]
+  aliases: [Cleo, Harmony, VLTrader, LexiCom]
+  example: 5.8.0.24
+  where: web_about
+- key: gladinet-centrestack
+  label: Gladinet CentreStack / Triofox
+  vendor: Gladinet
+  cpes: [a:gladinet:centrestack, a:gladinet:triofox]  # one code base, the same builds
+  kw: [CentreStack, Triofox, Gladinet]
+  aliases: [Triofox, CentreStack]
+  example: 16.12.10420.56791
+  where: web_about

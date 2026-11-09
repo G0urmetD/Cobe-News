@@ -8,34 +8,43 @@
   osv: [[Go, k8s.io/kubernetes]]
 - key: docker-engine
 - key: containerd
+  vendor: The Linux Foundation
   osv: [[Go, github.com/containerd/containerd], [Go, github.com/containerd/containerd/v2]]
 - key: podman
+  vendor: Podman
 - key: red-hat-openshift
+  vendor: Red Hat
 - key: rancher
+  vendor: SUSE
 - key: harbor
+  vendor: The Linux Foundation
   osv: [[Go, github.com/goharbor/harbor]]
   aliases: [Harbor Registry, VMware Harbor Registry]
   replaces: [vmware-harbor-registry]  # VMware's build of Harbor – the same CVEs (migration 0025 moved follows)
 
 # ---------------------------------------------------------------- containers, Kubernetes
 - key: contour
+  vendor: Project Contour
 - key: dce
 - key: external-dns
 - key: haproxy-ingress
+  vendor: HAProxy
 - key: karpenter
 - key: kubernetes-csi-node-driver-registrar
 - key: kubernetes-node-feature-discovery
 - key: kyverno
 - key: metallb
 - key: argo-cd
+  vendor: Argo Project
   osv: [[Go, github.com/argoproj/argo-cd/v2], [Go, github.com/argoproj/argo-cd/v3]]
 - key: argo-workflows
+  vendor: Argo Project
 - key: istio
 - key: helm
   label: Helm
-  vendor: CNCF (Helm)
+  vendor: Helm Project
   cpes: [a:helm:helm]
-  kw: [Helm]
+  kw: [Helm, Helm chart, Helm charts]  # "Helm" alone is an ordinary word
   example: 3.18.4
   version_cmd: helm version
 - key: portainer
@@ -46,7 +55,7 @@
   example: 2.27.9
 - key: k3s
   label: K3s
-  vendor: SUSE (Rancher)
+  vendor: SUSE
   cpes: [a:k3s:k3s]
   kw: [K3s]
   example: 1.33.2+k3s1
@@ -58,7 +67,7 @@
 # ---------------------------------------------------------------- added 0.1.47
 - key: dockge
   label: Dockge
-  vendor: Louis Lam (Dockge)
+  vendor: Louis Lam
   cpes: [a:dockge.kuma:dockge]
   cna: [[louislam, dockge]]  # VulnCheck (checked 2026-11-03); NVD's two CVEs of 2023 are Uptime Kuma's, with Dockge < 1.3.3 in the configuration
   kw: [Dockge]

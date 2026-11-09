@@ -49,6 +49,7 @@
   kw: [NetBackup]
   example: 10.4.0.1
 - key: netbackup-appliance-os
+  vendor: Cohesity (Veritas)
 - key: zerto
 
 # ---------------------------------------------------------------- backup, recovery
@@ -231,7 +232,7 @@
   kw: [Druva]
   aliases: [Druva inSync]
 - key: datto
-  label: Datto (SIRIS, ALTO, BCDR)
+  label: Datto BCDR (SIRIS, ALTO)
   vendor: Datto (Kaseya)
   cpes: [a:datto:windows_agent, a:datto:backup_agent]
   kw: [Datto]
@@ -251,7 +252,7 @@
   hint: nocpe
 - key: altaro
   label: Hornetsecurity VM Backup (Altaro)
-  vendor: Hornetsecurity
+  vendor: Hornetsecurity (Proofpoint)
   cpes: []
   kw: [Altaro, VM Backup]
   aliases: [Altaro VM Backup]

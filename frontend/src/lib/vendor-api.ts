@@ -407,7 +407,8 @@ export interface VendorAdmin {
   sources: { key: string; last_ok_at: string | null; last_fetch_at: string | null; next_fetch_at: string | null; error: string | null; items: number }[]
 }
 
-export const useVendorCatalog = () => useQuery({ queryKey: ["vendor", "catalog"], queryFn: () => api.get<VendorCatalog>("/api/vendor/catalog"), staleTime: 60_000 })
+export const useVendorCatalog = (enabled = true) =>
+  useQuery({ queryKey: ["vendor", "catalog"], queryFn: () => api.get<VendorCatalog>("/api/vendor/catalog"), staleTime: 60_000, enabled })
 /**
  * `team`: "Mein Team" – only the products of the viewer's teams (Teams on); its own cache entry below the usual one.
  * `null`: not known yet (the viewer's teams are loading) – nothing is asked until it is.

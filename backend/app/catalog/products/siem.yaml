@@ -110,7 +110,7 @@
   aliases: [Azure Sentinel]
 - key: logrhythm
   label: LogRhythm SIEM
-  vendor: Exabeam (LogRhythm)
+  vendor: Exabeam
   cpes: [a:logrhythm:logrhythm]
   kw: [LogRhythm]
   example: "7.20"
@@ -155,15 +155,17 @@
   kw: [Insight Agent]
   example: 4.0.13.32
 - key: grafana-loki
+  vendor: Grafana Labs
   cpes: [a:grafana:loki]
 - key: fluentd
   label: Fluentd
-  vendor: Fluentd Project (CNCF)
+  vendor: Fluentd Project
   cpes: [a:fluentd:fluentd]
   kw: [Fluentd]
   example: 1.18.0
   version_cmd: fluentd --version
 - key: fluent-bit
+  vendor: Fluentd Project
   cpes: [a:treasuredata:fluent_bit]
 - key: security-onion
   label: Security Onion

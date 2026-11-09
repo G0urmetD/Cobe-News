@@ -11,6 +11,7 @@
   kw: [Infoblox, NIOS]
   example: 9.0.6
 - key: bind-9
+  vendor: ISC
   cpes: [a:isc:bind]
 - key: unbound
   label: Unbound

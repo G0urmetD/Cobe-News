@@ -81,6 +81,9 @@ hints:
   meraki:
     de: "Meraki-Geräte werden aus der Cloud verwaltet: die Firmware steht im Dashboard (z. B. MX 18.211.5) und wird dort geplant. Der Hinweis nennt die Version, die die Lücke schließt."
     en: "Meraki devices are managed from the cloud: the firmware is shown in the dashboard (e.g. MX 18.211.5) and scheduled there. The advisory names the version that fixes it."
+  amd_firmware:
+    de: "AMD behebt Lücken in Prozessoren mit Plattform-Firmware (AGESA PI, z. B. „GenoaPI 1.0.0.E“ oder „ComboAM5PI 1.2.0.3“, dazu SEV-Firmware), die der Hersteller des Servers bzw. Mainboards als BIOS-Update ausliefert. Die NVD führt die Prozessoren je Modell, der Katalog vergleicht keine Version: Es erscheinen News und die CVE-Einträge von AMD (Baureihen wie „EPYC 9004“); welches BIOS den Fix enthält, steht im Bulletin von AMD und beim Hersteller des Systems."
+    en: "AMD fixes processor flaws with platform firmware (AGESA PI, e.g. “GenoaPI 1.0.0.E” or “ComboAM5PI 1.2.0.3”, plus SEV firmware) that the server or mainboard vendor ships as a BIOS update. NVD lists the processors per model and the catalogue compares no version: stories and AMD's CVE records (series such as “EPYC 9004”) are shown; which BIOS contains the fix is in AMD's bulletin and at the system vendor."
   per_model:
     de: "Die NVD führt die Firmware je Gerätemodell. Der Katalog nennt die verbreiteten Modelle – fehlt eures, erscheinen News und die CVEs, deren Hersteller-Daten das Produkt nennen; Modell und Firmware-Stand im Hinweis prüfen."
     en: "NVD lists the firmware per device model. The catalogue names the common models – if yours is missing, stories and the CVEs whose vendor data names the product are shown; check model and firmware level in the advisory."
@@ -193,6 +196,9 @@ where:
   firmware_dashboard:
     de: "Weboberfläche des Geräts: Startseite/Dashboard bzw. System → Status oder Systeminformation – dort steht die Firmware-Version. Nur die Versionsnummer eintragen, ohne Modellname."
     en: "The device's web interface: home page/dashboard or System → Status or system information – the firmware version is shown there. Enter the version number only, without the model name."
+  amd_firmware:
+    de: "Im BIOS-Setup bzw. in der Weboberfläche des BMC (iDRAC, iLO, XCC …): die BIOS-Version des Systemherstellers; dessen Release Notes nennen den AGESA-Stand (z. B. „GenoaPI 1.0.0.E“). Linux: dmidecode -s bios-version."
+    en: "In the BIOS setup or the BMC web interface (iDRAC, iLO, XCC …): the system vendor's BIOS version; its release notes name the AGESA level (e.g. “GenoaPI 1.0.0.E”). Linux: dmidecode -s bios-version."
   bmc:
     de: "Weboberfläche des Management-Controllers (Startseite bzw. Systeminformation → Firmware), oder per Redfish: GET /redfish/v1/Managers/<Id> – Feld FirmwareVersion. Die BMC-Firmware eintragen, nicht das BIOS."
     en: "The management controller's web interface (home page or system information → firmware), or via Redfish: GET /redfish/v1/Managers/<Id> – field FirmwareVersion. Enter the BMC firmware, not the BIOS."

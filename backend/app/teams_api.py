@@ -53,6 +53,8 @@ async def _settings_out(db, cfg: dict) -> dict:
         "personal_email": bool(cfg.get("personal_email")),
         "personal_desktop": bool(cfg.get("personal_desktop")),
         "personal_teams": bool(cfg.get("personal_teams")),
+        # 0.1.54: a person's own security stories by e-mail / their Teams webhook (app/personal_news.py) – off by default
+        "personal_news": bool(cfg.get("personal_news")),
         "web_push": get_config().web_push,
         "rev": int(cfg.get("rev") or 0),
         "smtp_ready": bool(smtp.get("host") and smtp.get("from_addr")),
@@ -74,6 +76,7 @@ class SettingsIn(_M):
     personal_email: bool | None = None
     personal_desktop: bool | None = None
     personal_teams: bool | None = None
+    personal_news: bool | None = None
     rev: int | None = None
 
 
@@ -92,6 +95,9 @@ async def put_settings(body: SettingsIn, admin: Admin, sess: ActiveSession, db: 
         # a way allowed (again) from now on: what came while it was not is never sent (no burst)
         on_before, on_now = was and bool(cur.get(k)), body.enabled and value[k]
         value[f"{k}_since"] = now if on_now and not on_before else cur.get(f"{k}_since")
+    # the security stories by e-mail / Teams: no "since" needed – while off, every person's cursor moves on
+    # (personal_news.dispatch), so switching it on (again) brings nothing older
+    value["personal_news"] = bool(cur.get("personal_news")) if body.personal_news is None else body.personal_news
     if changes := audit.diff(cur, value, [k for k in value if not k.endswith("_since")]):
         audit.record(db, admin, "settings.changed", audit.target("settings", teams.SECTION, teams.SECTION), {"changes": changes})
     out = await settings_store.put_rev(db, teams.SECTION, value, body.rev)
