@@ -298,8 +298,9 @@ def test_the_release_builds_signs_and_only_then_tags():
 def test_the_release_scans_the_pushed_digests_before_signing():
     """Trivy (a pinned version, its archive checked by checksum, no third-party action) scans the three digests as
     pushed, both platforms, with scripts/scan-images.sh – before anything is signed; a fixable high or critical finding
-    fails the step, so nothing is signed or tagged. The full reports are kept also when the scan fails and attached to
-    the GitHub release; the script's Trivy image is the same version, pinned by digest."""
+    fails the step, so nothing is signed or tagged. The full reports are kept as a workflow artifact also when the scan
+    fails – never in the GitHub release, whose notes stay German and scan-free; the script's Trivy image is the same
+    version, pinned by digest."""
     wf = _load(RELEASE)
     steps = wf["jobs"]["image"]["steps"]
     by_name = {s.get("name") or s.get("id") or s.get("uses"): s for s in steps}
@@ -320,12 +321,12 @@ def test_the_release_scans_the_pushed_digests_before_signing():
     assert steps.index(scan) < steps.index(keep) < steps.index(sign) and "!cancelled()" in keep["if"]
     assert keep["with"]["name"] == "trivy-reports" and keep["with"]["path"] == "trivy-reports/" and keep["with"]["overwrite"] is True
     release = wf["jobs"]["release"]["steps"]
-    fetch = next(s for s in release if str(s.get("uses", "")).startswith("actions/download-artifact@"))
-    assert fetch["with"]["name"] == "trivy-reports"
+    assert not any(str(s.get("uses", "")).startswith("actions/download-artifact@") for s in release)
     notes = next(s for s in release if s.get("name") == "Release notes from CHANGELOG.md")
     create = next(s for s in release if s.get("name") == "Create the release")
-    assert release.index(fetch) < release.index(notes) and "trivy-reports/summary.md" in notes["run"]
-    assert create["run"].endswith("--verify-tag trivy-reports/trivy-*")
+    assert "trivy" not in notes["run"].lower() and "trivy" not in create["run"].lower()
+    assert "Alle drei mit cosign signiert" in notes["run"] and "signed with cosign" not in notes["run"]
+    assert create["run"].endswith("--notes-file notes.md --verify-tag")
     # the gate of the script: Trivy's own flags, high and critical with a fixed version – and nothing that weakens it:
     # no trivy.yaml / .trivyignore (loading switched off for every Trivy run), no TRIVY_* from outside
     script = (ROOT / "scripts" / "scan-images.sh").read_text(encoding="utf-8")

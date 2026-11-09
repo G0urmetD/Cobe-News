@@ -2214,8 +2214,8 @@ wie sie in der Registry liegen, für amd64 und arm64 – mit Trivy ([`scripts/sc
 korrigierte Version gibt, lässt den Schritt scheitern: nichts wird signiert, kein Tag, `latest` bleibt (wie bei jedem
 Fehler bleiben nur Digests ohne Tag). Befunde ohne Korrektur stoppen den Release nicht. Die vollständigen Berichte – alle
 Schweregrade, auch ohne Korrektur, je Image und Plattform als Tabelle (`trivy-<image-referenz>-<plattform>.txt`) und JSON – hebt
-die Pipeline auch bei einem Fehlschlag als Artefakt `trivy-reports` auf und hängt sie an den GitHub-Release; die
-Release-Notes zeigen die Zahlen je Image. Was der Release damit zusichert und warum Befunde ohne Korrektur bleiben:
+die Pipeline auch bei einem Fehlschlag als Artefakt `trivy-reports` des Workflow-Laufs auf (Actions → der Lauf → Artifacts); in den
+GitHub-Release kommen sie nicht. Was der Release damit zusichert und warum Befunde ohne Korrektur bleiben:
 [`SICHERHEIT-SCANS.md`](SICHERHEIT-SCANS.md). Die Pipeline nimmt Trivy ohne fremde Action: das Archiv einer festen
 Version (`TRIVY_VERSION`) von Trivys GitHub-Release, geprüft mit seiner Prüfsumme (`TRIVY_SHA256`). Eine neue Version
 eintragen: die Prüfsummenliste des Releases und ihre Signatur holen und prüfen, dann beide Werte und im Skript das Image
