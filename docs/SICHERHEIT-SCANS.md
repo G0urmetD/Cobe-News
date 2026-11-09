@@ -32,8 +32,9 @@ Dazu trägt der Build selbst bei:
   Alpine statt über das `gosu` des offiziellen PostgreSQL-Images (gebaut mit einer alten Go-Version, deren
   Standardbibliothek hohe und kritische CVEs hat).
 
-Die vollständigen Berichte jedes Releases hängen am GitHub-Release: `trivy-<image-referenz>-<plattform>.txt` (Tabelle) und
-`.json`, mit allen Schweregraden, auch den Befunden ohne Korrektur; die Release-Notes zeigen die Zahlen je Image.
+Die vollständigen Berichte jedes Releases – `trivy-<image-referenz>-<plattform>.txt` (Tabelle) und `.json`, mit allen
+Schweregraden, auch den Befunden ohne Korrektur – liegen als Artefakt `trivy-reports` am Workflow-Lauf des Releases
+(Actions → der Lauf → Artifacts), nicht im GitHub-Release. Selbst nachprüfen geht jederzeit mit dem Skript (unten).
 
 ## Warum Befunde übrig bleiben
 

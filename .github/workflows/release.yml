@@ -3,8 +3,9 @@
 # built and pushed to ghcr.io by digest only (no tag yet) and signed; only when all three are built and signed, and the
 # signatures and attestations check out, the job "publish" puts the version tag on the three signed digests – and
 # `latest`, only when this tag is the highest release so far (a backport never moves it back) – without a rebuild;
-# then the GitHub release is written from the matching CHANGELOG.md section, with the reports of the image scan (Trivy,
-# before signing: a high or critical finding with a fixed version stops the release – docs/SICHERHEIT-SCANS.md).
+# then the GitHub release is written from the matching CHANGELOG.md section (in German, like the rest of the docs). The
+# image scan (Trivy, before signing: a high or critical finding with a fixed version stops the release –
+# docs/SICHERHEIT-SCANS.md) keeps its reports as a workflow artifact only – nothing of it goes into the release.
 name: release
 
 on:
@@ -373,12 +374,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # the reports of the scan in the job "image" (the digests of this release)
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: trivy-reports
-          path: trivy-reports
-
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
@@ -410,22 +405,17 @@ jobs:
             echo "| \`${DB_IMAGE}:${v}\` | \`${DB_DIGEST}\` |"
             echo "| \`${PROXY_IMAGE}:${v}\` | \`${PROXY_DIGEST}\` |"
             echo
-            echo "All three signed with cosign (keyless, GitHub OIDC) – the signature covers the digest, every tag on it verifies."
+            echo "Alle drei mit cosign signiert (keyless, GitHub OIDC) – die Signatur gilt für den Digest, jeder Tag darauf lässt sich prüfen."
             if [ "$LATEST" = true ]; then
-              echo "\`latest\` points to this release."
+              echo "\`latest\` zeigt auf dieses Release."
             else
-              echo "\`latest\` stays on a higher release (this one is a backport)."
+              echo "\`latest\` bleibt auf einem höheren Release (dieses ist ein Backport)."
             fi
-            echo "Portainer: docker-compose.portainer.yml of this tag (COBE_NEWS_VERSION=${v})."
-            echo
-            # the scan's summary (counts per image and platform, the gate) – one heading level down
-            sed '1s/^# /## /' trivy-reports/summary.md
-            echo
-            echo "Full reports attached: \`trivy-<image reference>-<platform>.txt\` (table) and \`.json\`. Why findings without a fix remain: docs/SICHERHEIT-SCANS.md."
+            echo "Portainer: \`docker-compose.portainer.yml\` dieses Tags (\`COBE_NEWS_VERSION=${v}\`)."
           } >> notes.md
 
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" --title "Cobe News ${TAG#v}" --notes-file notes.md --verify-tag trivy-reports/trivy-*
+        run: gh release create "$TAG" --title "Cobe News ${TAG#v}" --notes-file notes.md --verify-tag
