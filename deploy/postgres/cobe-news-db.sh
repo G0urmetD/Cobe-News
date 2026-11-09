@@ -8,7 +8,7 @@
 # every start, removed here as well), so the app never starts against a database without its role. Up to 0.1.48 the
 # one-shot service db-init did this; the superuser's password stays in this container, the app never gets it.
 # Root only for a moment: as root it prepares the data folder exactly as the official entrypoint does (its own functions,
-# sourced: docker_setup_env, docker_create_db_directories) and then runs itself again as the user postgres (gosu) – PID 1
+# sourced: docker_setup_env, docker_create_db_directories) and then runs itself again as the user postgres (su-exec) – PID 1
 # is postgres from then on, without any capability; PostgreSQL, the role set-up and the signals all run as that user.
 # Signals: `docker stop` (SIGINT, the image's STOPSIGNAL) or SIGTERM → PostgreSQL's fast shutdown (SIGINT): open
 # transactions rolled back, a checkpoint, exit 0; SIGHUP → reload of the configuration (as with the official image;
@@ -36,7 +36,7 @@ if [ "$(id -u)" = 0 ] && [ "${1:-}" = postgres ]; then
         docker_setup_env
         docker_create_db_directories
     )
-    exec gosu postgres "$0" "$@"
+    exec su-exec postgres "$0" "$@"
 fi
 
 ready=/var/run/postgresql/.cobe-news-ready

@@ -4,7 +4,10 @@
 # before it) and the certificate watch (40-cert-watch.sh). nginx's own entrypoint scripts stay as they are. Build
 # context: this folder only (.dockerignore – never deploy/certs). docs/BETRIEB.md: HTTPS.
 # base image pinned by digest (the tag for the reader; update with the others – docs/BETRIEB.md: Entwicklung, Basis-Images)
-FROM nginx:1.30-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
+FROM nginx:1.30-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311
+# the Alpine security updates published since the pinned base image (the release pipeline's scan fails on a fixable
+# high or critical finding – docs/SICHERHEIT-SCANS.md)
+RUN apk upgrade --no-cache
 # nginx's entrypoint sources/runs only executable files there
 COPY --chmod=0755 16-server-names.envsh 40-cert-watch.sh /docker-entrypoint.d/
 # without --chmod: it would also be the mode of the new folder /etc/nginx/templates (0644: closed); the file is 0644 in Git

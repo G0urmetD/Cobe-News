@@ -16,3 +16,6 @@ __pycache__/
 # own certificates (TLS_MODE=own)
 /deploy/certs/
 /backend/data/
+
+# image scan reports (scripts/scan-images.sh)
+/trivy-reports/

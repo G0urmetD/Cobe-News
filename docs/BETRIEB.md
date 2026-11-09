@@ -1,7 +1,8 @@
 # Cobe News – Betrieb
 
 Betriebs-Referenz (Deutsch): Installation, Konfiguration, Anmeldung, HTTPS, Quellen, Vendor News, Benachrichtigungen,
-PostgreSQL, Sicherung und Entwicklung. Überblick und Schnellstart: [README](../README.md).
+PostgreSQL, Sicherung und Entwicklung. Überblick und Schnellstart: [README](../README.md). Befunde von Image-Scannern:
+[`SICHERHEIT-SCANS.md`](SICHERHEIT-SCANS.md).
 
 Cobe News sammelt Security-Nachrichten aus öffentlichen RSS-/Atom-Feeds von Presse, Behörden/CERTs, Herstellern (PSIRT)
 und Research sowie aus den Katalogen ausgenutzter Schwachstellen (CISA KEV, ENISA EUVD, Microsoft Patchday) – 46
@@ -71,20 +72,20 @@ der Release-Pipeline, siehe [Release](#release)), schaltet die Datei `docker-com
 
 ```bash
 COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml   # mit http-Umleitung: …:docker-compose.http.yml:docker-compose.image.yml
-COBE_NEWS_VERSION=0.1.52                                   # eine Version, nicht latest – gilt für alle drei Images
+COBE_NEWS_VERSION=0.1.55                                   # eine Version, nicht latest – gilt für alle drei Images
 ```
 
 Die Datei ersetzt bei `app`, `db` und `proxy` nur das Image (der `build`-Teil fällt weg); alles andere – Volumes, Netze,
 `.env` – bleibt, wie es ist. Ohne `COBE_NEWS_VERSION` bricht `docker compose` mit einem Hinweis ab, statt still etwas
 anderes zu starten. Einzelne Images lassen sich per Digest festnageln: `COBE_NEWS_IMAGE`, `COBE_NEWS_DB_IMAGE`,
-`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.52@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
+`COBE_NEWS_PROXY_IMAGE` (z. B. `ghcr.io/g0urmetd/cobe-news-db:0.1.55@sha256:<digest>`) gehen `COBE_NEWS_VERSION` vor.
 **Bis 0.1.48** nahm die Datei nur `COBE_NEWS_IMAGE` (die App) – wer sie so nutzt, setzt jetzt `COBE_NEWS_VERSION` und
 nimmt `COBE_NEWS_IMAGE` heraus (sonst bliebe die App auf der alten Version). Vor dem Start die Signaturen prüfen
 (cosign ≥ 2, keyless – die Identität ist der Release-Workflow dieses Repositorys):
 
 ```bash
 for i in cobe-news cobe-news-db cobe-news-proxy; do
-  cosign verify ghcr.io/g0urmetd/$i:0.1.52 \
+  cosign verify ghcr.io/g0urmetd/$i:0.1.55 \
     --certificate-identity-regexp '^https://github\.com/G0urmetD/Cobe-News/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -93,7 +94,7 @@ docker compose up -d --remove-orphans   # ohne --build
 docker compose config --images          # zeigt, welche Images Compose nimmt
 ```
 
-`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.52@sha256:<digest>` in der
+`cosign verify` gibt den Digest aus, den die Signatur abdeckt; wer ihn übernimmt (`…:0.1.55@sha256:<digest>` in der
 jeweiligen Image-Variable), startet genau das geprüfte Image, auch wenn der Tag später anders zeigen sollte. Ein Update:
 `COBE_NEWS_VERSION` auf die neue Version setzen, Signaturen prüfen, `docker compose pull && docker compose up -d
 --remove-orphans` (die Migrationen laufen beim Start wie beim lokalen Build). Zurück zum lokalen Build: die beiden Zeilen
@@ -2104,9 +2105,15 @@ cd frontend && BASE_URL=http://localhost:5611 CREDS=/tmp/cn-e2e/creds.json \
 **Basis-Images** sind mit ihrem Digest festgeschrieben (`Dockerfile`: `node:24-slim@sha256:…`, `python:3.13-slim@sha256:…`;
 `deploy/postgres/Dockerfile`: `postgres:18-alpine@sha256:…`; `deploy/nginx/Dockerfile`: `nginx:1.30-alpine@sha256:…`;
 die Release-Pipeline baut daraus auch die Images `cobe-news-db` und `cobe-news-proxy`) – ein Build nimmt genau
-diese Images, auch wenn unter dem Tag inzwischen ein anderes liegt. Aktualisieren (z. B. monatlich oder nach einer
-Sicherheitsmeldung): `docker buildx imagetools inspect <image:tag>` zeigt den aktuellen Digest („Digest:“ des Index), ihn
-an allen Stellen eintragen, bauen, Tests und ein Wegwerf-Stack wie bei jedem Update. Beim nginx
+diese Images, auch wenn unter dem Tag inzwischen ein anderes liegt. Aktualisieren – **zu jedem Release**, dazwischen
+nach einer Sicherheitsmeldung: `docker buildx imagetools inspect <image:tag>` zeigt den aktuellen Digest („Digest:“ des
+Index, nicht der einer Plattform), ihn an allen Stellen eintragen (Tag bleibt, Kommentare bleiben), bauen, Tests und ein
+Wegwerf-Stack wie bei jedem Update, dann `scripts/scan-images.sh <die drei Wegwerf-Images>` (siehe [Release](#release)).
+Was Debian bzw. Alpine nach dem Basis-Image korrigiert hat, holt der Build ohnehin: `apt-get upgrade` im App-Image,
+`apk upgrade` in Datenbank und Proxy – der Digest bestimmt nur den Ausgangspunkt. Das App-Image enthält kein pip
+(nach dem Installieren der Abhängigkeiten entfernt, ebenso das Wheel von `ensurepip`); das Datenbank-Image wechselt zum
+Benutzer `postgres` mit `su-exec` aus Alpine statt mit dem `gosu` des Basis-Images (mit einer alten Go-Version gebaut).
+Warum ein Scan trotzdem Befunde zeigt: [`SICHERHEIT-SCANS.md`](SICHERHEIT-SCANS.md). Beim nginx
 zählt auch der Zweig: nur der aktuelle *stable*-Zweig (gerade Minor-Nummer, jedes Frühjahr ein neuer – 1.30 seit April 2026)
 bekommt Sicherheitskorrekturen, der vorige keine mehr; dann den Tag wechseln (`nginx:1.30-alpine` → `nginx:1.32-alpine`).
 Der Datenbank-Container läuft schreibgeschützt (nur sein Volume und tmpfs), ohne Capabilities außer denen, mit denen
@@ -2178,14 +2185,15 @@ allen Versionsangaben passt (`backend/app/__init__.py`, `backend/pyproject.toml`
 Backend-Tests (mit PostgreSQL 18), die Frontend-Prüfungen, Tests und den Build laufen und prüft die Abhängigkeiten auf
 bekannte Schwachstellen. Erst wenn alles grün ist, baut sie die drei Images für amd64 und arm64 – die App (`Dockerfile`),
 die Datenbank (`deploy/postgres`) und den Proxy (`deploy/nginx`) – mit Provenance und SBOM und legt sie **nur unter ihrem
-Digest** ab, ohne Tag; dann signiert sie alle drei Digests (cosign, ohne gespeicherten Schlüssel). Erst wenn alle drei
-gebaut und signiert sind, prüft der Job `publish` Signaturen und Attestierungen und setzt die Tags auf genau diese
+Digest** ab, ohne Tag; dann scannt sie die drei Digests (Trivy, siehe unten – ein behebbarer hoher oder kritischer
+Befund stoppt hier) und signiert sie erst danach (cosign, ohne gespeicherten Schlüssel). Erst wenn alle drei gebaut,
+gescannt und signiert sind, prüft der Job `publish` Signaturen und Attestierungen und setzt die Tags auf genau diese
 Digests – ohne Neubau: `ghcr.io/g0urmetd/cobe-news:<Version>`, `ghcr.io/g0urmetd/cobe-news-db:<Version>`,
 `ghcr.io/g0urmetd/cobe-news-proxy:<Version>`, und `:latest` nur, wenn der Tag das höchste Release ist (ein Backport auf
 eine ältere Linie schiebt `latest` nie zurück; nie zwei Releases gleichzeitig). Scheitert vorher etwas, bleibt kein Tag
 zurück – nur Digests ohne Tag –, `latest` zeigt weiter auf das vorige vollständige Release. Weil die Signatur den Digest
-abdeckt, gilt sie für jeden Tag darauf. Zuletzt schreibt sie den GitHub-Release mit dem Text aus dem Changelog und den
-drei Digests. Neue Pakete auf ghcr.io sind zuerst privat: nach dem ersten Release mit
+abdeckt, gilt sie für jeden Tag darauf. Zuletzt schreibt sie den GitHub-Release mit dem Text aus dem Changelog, den
+drei Digests und den Berichten des Scans. Neue Pakete auf ghcr.io sind zuerst privat: nach dem ersten Release mit
 `cobe-news-db` und `cobe-news-proxy` beide unter *Packages → Package settings* auf *Public* stellen (wie `cobe-news`),
 sonst scheitert das Holen ohne Anmeldung (Portainer: „unauthorized“).
 
@@ -2199,6 +2207,50 @@ for i in cobe-news cobe-news-db cobe-news-proxy; do
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
 ```
+
+**Scan vor dem Signieren**: Nach dem Build und vor dem Signieren scannt der Job `image` die drei Digests – genau so,
+wie sie in der Registry liegen, für amd64 und arm64 – mit Trivy ([`scripts/scan-images.sh`](../scripts/scan-images.sh),
+`--severity HIGH,CRITICAL --ignore-unfixed --exit-code 1`). Ein hoher oder kritischer Befund, für den es eine
+korrigierte Version gibt, lässt den Schritt scheitern: nichts wird signiert, kein Tag, `latest` bleibt (wie bei jedem
+Fehler bleiben nur Digests ohne Tag). Befunde ohne Korrektur stoppen den Release nicht. Die vollständigen Berichte – alle
+Schweregrade, auch ohne Korrektur, je Image und Plattform als Tabelle (`trivy-<image-referenz>-<plattform>.txt`) und JSON – hebt
+die Pipeline auch bei einem Fehlschlag als Artefakt `trivy-reports` auf und hängt sie an den GitHub-Release; die
+Release-Notes zeigen die Zahlen je Image. Was der Release damit zusichert und warum Befunde ohne Korrektur bleiben:
+[`SICHERHEIT-SCANS.md`](SICHERHEIT-SCANS.md). Die Pipeline nimmt Trivy ohne fremde Action: das Archiv einer festen
+Version (`TRIVY_VERSION`) von Trivys GitHub-Release, geprüft mit seiner Prüfsumme (`TRIVY_SHA256`). Eine neue Version
+eintragen: die Prüfsummenliste des Releases und ihre Signatur holen und prüfen, dann beide Werte und im Skript das Image
+`TRIVY_IMAGE` (dieselbe Version, Digest des Index) ändern:
+
+```bash
+t=0.76.2
+gh release download v$t -R aquasecurity/trivy -p "trivy_${t}_checksums.txt*"
+cosign verify-blob trivy_${t}_checksums.txt --bundle trivy_${t}_checksums.txt.sigstore.json \
+  --certificate-identity "https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v$t" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+grep "_Linux-64bit.tar.gz$" trivy_${t}_checksums.txt   # → TRIVY_SHA256 in release.yml
+docker buildx imagetools inspect aquasec/trivy:$t       # „Digest:“ → TRIVY_IMAGE in scripts/scan-images.sh
+```
+
+**Derselbe Scan lokal**, vor einem Release auf den Wegwerf-Build oder jederzeit auf eine Installation:
+
+```bash
+scripts/scan-images.sh                    # der lokale Build: cobe-news:latest, cobe-news-db:latest, cobe-news-proxy:latest
+scripts/scan-images.sh 0.1.55             # die veröffentlichten Images einer Version (von ghcr.io, ohne docker pull)
+scripts/scan-images.sh img/app:test img/db:test img/proxy:test   # beliebige Images, z. B. ein Wegwerf-Build
+PLATFORMS="linux/amd64 linux/arm64" scripts/scan-images.sh 0.1.55   # jede Plattform einzeln
+```
+
+Die geprüften Images werden nur gelesen – nie nach Docker geholt, nie getaggt; kein Compose, kein Container der App.
+Ohne installiertes Trivy holt das Skript Trivys offizielles Image (`aquasec/trivy`, dieselbe Version, per Digest
+festgeschrieben; `TRIVY=docker` erzwingt das) und legt für dessen Schwachstellen-Datenbank das Volume
+`cobe-news-trivy-cache` an (`TRIVY_CACHE_VOLUME`); für lokale Images bekommt der Container den Docker-Socket. Die
+Prüfung gehört dem Skript allein: `--config "" --ignorefile ""` (keine `trivy.yaml`, keine `.trivyignore`), und von
+`TRIVY_*` aus der Umgebung gelten nur `TRIVY_IMAGE_SRC`, `TRIVY_DB_REPOSITORY`, `TRIVY_CACHE_DIR`. Hat das gelesene Image
+nicht die verlangte Plattform, gilt der Scan als gescheitert; ebenso, wenn die Prüfung „bestanden“ sagt, der volle
+Bericht aber einen behebbaren hohen oder kritischen Befund enthält. Berichte in `trivy-reports/<Zeit>/` (in
+`.gitignore`; anderer Ordner: `OUT=…`): `summary.md` und je Image und Plattform `.txt` und `.json`, benannt nach der
+ganzen Image-Referenz (ein Digest auf 12 Stellen gekürzt). Exit-Code 0: bestanden, 1: behebbarer hoher oder kritischer
+Befund (aufgelistet), 2: falscher Aufruf oder Scan gescheitert.
 
 Die Images statt eines lokalen Builds betreiben: [Veröffentlichtes Image statt lokalem Build](#veröffentlichtes-image-statt-lokalem-build).
 

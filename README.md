@@ -1,80 +1,95 @@
 # Cobe News
 
-**Self-hosted security news and vendor advisories – matched to the products and versions you actually run.**
+**Security-Nachrichten und Hersteller-Advisories, selbst betrieben – abgeglichen mit den Produkten und Versionen, die
+ihr wirklich einsetzt.**
 
 [![Container image](https://img.shields.io/badge/ghcr.io-g0urmetd%2Fcobe--news-2496ED?logo=docker&logoColor=white)](https://github.com/G0urmetD/Cobe-News/pkgs/container/cobe-news)
 
-Cobe News is a self-hosted tool for security teams. It collects security news from BSI, CISA, vendors and the trade
-press, checks vendor advisories against your exact products and versions, rates urgency with CISA KEV and EPSS, and
-notifies teams and people by e-mail, Microsoft Teams, push or webhook.
+> **English:** Cobe News is a self-hosted tool for security teams: it collects security news from CERTs, vendors and
+> the trade press, checks vendor advisories against the exact products and versions you run, and notifies the people
+> responsible. The user interface and the built-in handbook are available in German and English; this README and the
+> operations reference [`docs/BETRIEB.md`](docs/BETRIEB.md) are in German. The English handbook lives in
+> [`docs/handbuch/en/`](docs/handbuch/en/) and in the app under *Documentation*.
 
-![Vendor News: followed products with the version that fixes all known vulnerabilities, ordered by urgency](docs/images/vendor-news.png)
+Cobe News ist ein selbst betriebenes Werkzeug für Security-Teams. Es sammelt Security-Nachrichten von BSI, CISA,
+Herstellern und Fachpresse, prüft Hersteller-Advisories gegen eure genauen Produkte und Versionen, bewertet die
+Dringlichkeit mit CISA KEV und EPSS und benachrichtigt Teams und Personen per E-Mail, Microsoft Teams, Push oder Webhook.
 
-## Features
+![Vendor News: gefolgte Produkte mit der Version, die alle bekannten Schwachstellen behebt, nach Dringlichkeit sortiert](docs/images/vendor-news.png)
 
-- **News** – 46 built-in feeds (CERTs and authorities, vendor PSIRTs, trade press, research, KEV/EUVD catalogues),
-  each story once, with severity, topics (exploited, zero-day, ransomware …) and CVEs; your own feeds can be added.
-- **Vendor News** – follow products from a curated catalogue or by CPE, enter your installed versions and see exactly
-  which vulnerabilities affect them, the version that fixes them and when support ends.
-- **Urgency** – findings ranked by CVSS, CISA KEV and FIRST EPSS, so actively exploited issues come first.
-- **Watched CVEs** – follow single CVEs and get notified when a fix appears, they land in CISA KEV or their EPSS jumps.
-- **Teams and routing** – teams from AD or Entra ID groups, products per team, notifications to the people responsible.
-- **Notifications** – e-mail, Microsoft Teams, Slack, Discord, Mattermost, Telegram, ntfy, Gotify, signed generic
-  webhooks and desktop push, with rules per severity, source and team.
-- **Sign-in** – local accounts, Active Directory (LDAP) and Entra ID (OIDC), with TOTP and passkeys.
-- **Operations** – audit log, read-only REST API and Prometheus metrics, encrypted backups with an automatic restore
-  test, HTTPS out of the box.
-- **German and English** UI, light and dark theme, built-in handbook.
+## Funktionen
 
-![News: stories from all sources with severity, topics and CVEs](docs/images/news.png)
+- **News** – 46 eingebaute Feeds (CERTs und Behörden, Hersteller-PSIRTs, Fachpresse, Research, KEV-/EUVD-Kataloge),
+  jede Meldung nur einmal, mit Schwere, Themen (ausgenutzt, Zero-Day, Ransomware …) und CVEs; eigene Feeds lassen sich
+  ergänzen.
+- **Vendor News** – Produkten aus einem kuratierten Katalog oder per CPE folgen, die installierten Versionen eintragen
+  und genau sehen, welche Schwachstellen sie betreffen, welche Version sie behebt und wann der Support endet.
+- **Dringlichkeit** – Befunde nach CVSS, CISA KEV und FIRST EPSS geordnet, aktiv ausgenutzte Lücken zuerst.
+- **Beobachtete CVEs** – einzelnen CVEs folgen und benachrichtigt werden, wenn ein Fix erscheint, sie in CISA KEV
+  landen oder ihr EPSS-Wert springt.
+- **Teams und Zuständigkeit** – Teams aus AD- oder Entra-ID-Gruppen, Produkte je Team, Benachrichtigungen an die
+  Zuständigen.
+- **Benachrichtigungen** – E-Mail, Microsoft Teams, Slack, Discord, Mattermost, Telegram, ntfy, Gotify, signierte
+  generische Webhooks und Desktop-Push, mit Regeln nach Schwere, Quelle und Team.
+- **Anmeldung** – lokale Konten, Active Directory (LDAP) und Entra ID (OIDC), mit TOTP und Passkeys.
+- **Betrieb** – Protokoll (Audit-Log), lesende REST-API und Prometheus-Metriken, verschlüsselte Sicherungen mit
+  automatischem Rücksicherungs-Test, HTTPS ab Werk.
+- Oberfläche auf **Deutsch und Englisch**, helles und dunkles Design, eingebautes Handbuch.
 
-## Quick start
+![News: Meldungen aller Quellen mit Schwere, Themen und CVEs](docs/images/news.png)
 
-Requirements: Docker with Docker Compose v2.
+## Schnellstart
+
+Voraussetzung: Docker mit Docker Compose v2.
 
 ```bash
 git clone https://github.com/G0urmetD/Cobe-News.git cobe-news
 cd cobe-news
-scripts/setup-env.sh              # creates .env with generated database passwords; on Linux hands data/ to the app (UID 10001)
-docker compose up -d --build      # app, PostgreSQL 18 and nginx (HTTPS)
+scripts/setup-env.sh              # legt .env mit erzeugten Datenbank-Passwörtern an; unter Linux bekommt die App data/ (UID 10001)
+docker compose up -d --build      # App, PostgreSQL 18 und nginx (HTTPS)
 docker compose logs app | grep -A1 "Setup token"
 ```
 
-On Linux as a user without sudo rights the script prints the one command to run instead (`sudo chown -R 10001:10001 data`).
+Unter Linux als Benutzer ohne sudo-Rechte gibt das Skript stattdessen den einen nötigen Befehl aus
+(`sudo chown -R 10001:10001 data`).
 
-Open **<https://localhost:8095>** (the self-signed certificate triggers a browser warning on first use), enter the
-one-time setup token from the log (valid for 60 minutes) and create the first admin account with an authenticator app
-(TOTP). Then switch on the sources under *Settings → Integrations → News* and follow your products under *Vendor News*.
+**<https://localhost:8095>** öffnen (das selbstsignierte Zertifikat löst beim ersten Aufruf eine Browser-Warnung aus),
+das einmalige Setup-Token aus dem Log eingeben (60 Minuten gültig) und das erste Admin-Konto mit einer
+Authenticator-App (TOTP) anlegen. Danach die Quellen unter *Einstellungen → Integrationen → News* einschalten und unter
+*Vendor News* den eigenen Produkten folgen.
 
-By default the app listens on this machine only. Address, port, certificate, reverse proxy and outbound proxy are set
-in `.env` – see [`.env.example`](.env.example). Behind a reverse proxy of your own on the same host (nginx, Traefik …):
-`PROXY_ENABLED=0` is the only switch – point the proxy at `http://127.0.0.1:8096`
-([`docs/BETRIEB.md`](docs/BETRIEB.md#https), section 3).
+Ab Werk lauscht die App nur auf diesem Rechner. Adresse, Port, Zertifikat, Reverse Proxy und ausgehender Proxy werden in
+`.env` gesetzt – siehe [`.env.example`](.env.example). Hinter einem eigenen Reverse Proxy auf demselben Host (nginx,
+Traefik …) ist `PROXY_ENABLED=0` der einzige Schalter – den Proxy auf `http://127.0.0.1:8096` zeigen lassen
+([`docs/BETRIEB.md`](docs/BETRIEB.md#https), Abschnitt 3).
 
-Three containers, all built locally: the app, the database (PostgreSQL 18 that sets up the app's own role at every
-start) and the proxy (nginx). Instead of building you can run the released, signed images
-`ghcr.io/g0urmetd/cobe-news`, `…/cobe-news-db` and `…/cobe-news-proxy`: set
-`COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml` and `COBE_NEWS_VERSION=<version>` in `.env`, then
-`docker compose pull && docker compose up -d` – how to verify the signatures with cosign:
-[`docs/BETRIEB.md`](docs/BETRIEB.md#veröffentlichtes-image-statt-lokalem-build). Without these two lines nothing changes.
+Drei Container, alle lokal gebaut: die App, die Datenbank (PostgreSQL 18, das bei jedem Start die eigene Rolle der App
+einrichtet) und der Proxy (nginx). Statt zu bauen, lassen sich die veröffentlichten, signierten Images
+`ghcr.io/g0urmetd/cobe-news`, `…/cobe-news-db` und `…/cobe-news-proxy` betreiben: in `.env`
+`COMPOSE_FILE=docker-compose.yml:docker-compose.image.yml` und `COBE_NEWS_VERSION=<Version>` setzen, dann
+`docker compose pull && docker compose up -d` – wie man die Signaturen mit cosign prüft:
+[`docs/BETRIEB.md`](docs/BETRIEB.md#veröffentlichtes-image-statt-lokalem-build). Ohne diese beiden Zeilen ändert sich
+nichts.
 
-With Portainer (no checkout): paste [`docker-compose.portainer.yml`](docker-compose.portainer.yml) into the stack web
-editor and enter one of the two blocks of environment variables at its top (with or without your own reverse proxy:
-passwords, `BASE_URL` and one switch) – see [`docs/BETRIEB.md`](docs/BETRIEB.md#portainer-stack-editor).
+Mit Portainer (ohne Checkout): [`docker-compose.portainer.yml`](docker-compose.portainer.yml) in den Web-Editor des
+Stacks einfügen und einen der beiden Blöcke mit Umgebungsvariablen oben in der Datei eintragen (mit oder ohne eigenen
+Reverse Proxy: Passwörter, `BASE_URL` und ein Schalter) – siehe [`docs/BETRIEB.md`](docs/BETRIEB.md#portainer-stack-editor).
 
-## Documentation
+## Dokumentation
 
-- **Handbook in the app** – user menu → *Documentation* (`/docs`), German and English: setup, sign-in, channels and
-  rules, Vendor News, backups, API and FAQ. The source lives in [`docs/handbuch/`](docs/handbuch/README.md).
-- **Operations reference** – [`docs/BETRIEB.md`](docs/BETRIEB.md) (German): configuration, HTTPS, network, PostgreSQL,
-  backup and restore, catalogue maintenance, development and tests.
-- **Changes** – [`CHANGELOG.md`](CHANGELOG.md).
+- **Handbuch in der App** – Benutzermenü → *Dokumentation* (`/docs`), Deutsch und Englisch: Einrichtung, Anmeldung,
+  Kanäle und Regeln, Vendor News, Sicherungen, API und FAQ. Die Quelle liegt in [`docs/handbuch/`](docs/handbuch/README.md).
+- **Betriebs-Referenz** – [`docs/BETRIEB.md`](docs/BETRIEB.md): Konfiguration, HTTPS, Netz, PostgreSQL, Sicherung und
+  Wiederherstellung, Katalogpflege, Entwicklung und Tests.
+- **Befunde von Image-Scannern** – [`docs/SICHERHEIT-SCANS.md`](docs/SICHERHEIT-SCANS.md): was die Prüfung im Release
+  zusichert, warum Befunde ohne Korrektur bleiben, wie man selbst scannt (`scripts/scan-images.sh`).
+- **Änderungen** – [`CHANGELOG.md`](CHANGELOG.md).
 
-## Security
+## Sicherheit
 
-Please do not report vulnerabilities in public issues. Report them privately through
-[GitHub Security Advisories](https://github.com/G0urmetD/Cobe-News/security/advisories/new) of this repository.
+Schwachstellen bitte nicht in öffentlichen Issues melden, sondern vertraulich über
+[GitHub Security Advisories](https://github.com/G0urmetD/Cobe-News/security/advisories/new) dieses Repositorys.
 
-## License
+## Lizenz
 
 [MIT](LICENSE)
