@@ -2,6 +2,24 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.55 – Images ohne behebbare Scanner-Befunde, Scan im Release
+
+### Neu
+- **Scan im Release**: Die Release-Pipeline scannt die drei Images (App, Datenbank, Proxy) für amd64 und arm64 mit Trivy – nach dem Build, vor dem Signieren, genau die Digests, die danach getaggt werden. Ein hoher oder kritischer Befund, für den es eine korrigierte Version gibt, stoppt den Release (nichts signiert, kein Tag). Die vollständigen Berichte (alle Schweregrade, auch ohne Korrektur, als Tabelle und JSON) hängen am GitHub-Release, die Release-Notes zeigen die Zahlen je Image. Trivy in fester Version, das Archiv per Prüfsumme geprüft, ohne fremde Action.
+- **`scripts/scan-images.sh`**: derselbe Scan lokal – der lokale Build (`cobe-news:latest`, `-db`, `-proxy`), die veröffentlichten Images einer Version (`scripts/scan-images.sh 0.1.55`) oder beliebige Images. Ohne installiertes Trivy holt es Trivys offizielles Image (gleiche Version, per Digest festgeschrieben), die Schwachstellen-Datenbank bleibt in einem Volume. Die geprüften Images werden nur gelesen, nie nach Docker geholt oder getaggt; `trivy.yaml`, `.trivyignore` und `TRIVY_*`-Einstellungen schwächen die Prüfung nicht. Bericht in `trivy-reports/`, Exit-Code 1 bei einem behebbaren hohen oder kritischen Befund.
+- **`docs/SICHERHEIT-SCANS.md`**: Was der Release zusichert, warum Befunde ohne Korrektur im Debian-Basis-Image bleiben (mit Debians Einstufung je CVE), wie man selbst scannt – auf den Digest, den cosign geprüft hat.
+
+### Fixes
+- **App-Image ohne pip**: pip wird nach dem Installieren der Abhängigkeiten entfernt – mit ihm seine mitgelieferten Bibliotheken, die Scanner als verwundbar meldeten (msgpack 1.1.2: CVE-2026-114613, GHSA-6v7p-g79w-8964; urllib3 2.7.0: CVE-2026-97687, CVE-2026-97688, CVE-2026-97689; setuptools 70.3.0: CVE-2025-47273, CVE-2026-59890, GHSA-xmj3-9gf7-h52w). Die App nutzte keine davon; zur Laufzeit braucht sie kein pip.
+- **Sicherheits-Updates beim Bauen**: `apt-get upgrade` im App-Image (u. a. apt/libapt-pkg7.0 3.0.4: CVE-2026-109518; zlib1g 1:1.3.dfsg+really1.3.1-1+deb13u1: CVE-2026-76844, CVE-2026-85091, CVE-2026-27171), `apk upgrade` in Datenbank und Proxy (u. a. brotli, curl, libexpat).
+- **Datenbank-Image ohne gosu**: Der Wechsel zum Benutzer `postgres` beim Start läuft über `su-exec` aus Alpine – das `gosu` des PostgreSQL-Images ist mit Go 1.24.6 gebaut, dessen Standardbibliothek 1 kritische und 25 hohe CVEs mitbrachte. Ablauf, Rechte und Signale bleiben gleich.
+- **Basis-Images aktuell**: `python:3.13-slim`, `node:24-slim`, `postgres:18-alpine` und `nginx:1.30-alpine` auf den Digest vom 9. November 2026 (weiter per Digest festgeschrieben).
+
+### Betrieb
+- **Scan-Ergebnis** (Trivy 0.76.2, Datenbank vom 9. November 2026): App 0 kritisch, 50 hoch, 90 mittel, 89 niedrig – alle ohne Korrektur in Debian 13 (trixie), Debian stuft sie als geringes Risiko ohne Sicherheitsmeldung ein, die Korrektur kommt mit einer späteren Zwischenversion; davor (0.1.54) 0 / 59 / 93 / 90, davon 13 mit Korrektur. Datenbank 0 Befunde (davor 2 kritisch, 26 hoch, alle behebbar), Proxy 0 (davor 1 kritisch, 6 hoch). Einzelheiten: `docs/SICHERHEIT-SCANS.md`.
+- **Basis-Images zu jedem Release** auf den aktuellen Digest ihres Tags (`docs/BETRIEB.md`, Entwicklung, Basis-Images); eine neue Trivy-Version wird mit der signierten Prüfsummenliste ihres Releases eingetragen (`docs/BETRIEB.md`, Release).
+- Keine Migration, keine neue Einstellung. **Zurück auf 0.1.54** wie bei jedem Update (Images der Vorversion).
+
 ## 0.1.54 – Systeme und Schlagwörter für alle, Security-Meldungen per E-Mail oder Teams, aufgeräumter Katalog
 
 ### Neu

@@ -148,9 +148,13 @@ def test_the_database_is_healthy_only_after_the_role_setup(local):
     # the marker only after a successful db-init; a failed one stops PostgreSQL and exits 1
     assert re.search(r'db-init\.sh"; then\n\s+: >"\$ready"', script) and "finish 1" in script
     assert "trap stop INT TERM" in script and 'kill -INT "$pg"' in script and "trap 'kill -HUP \"$pg\"" in script
-    # root only to prepare the data folder, then PID 1 is postgres without capabilities (no gosu for anything after)
+    # root only to prepare the data folder, then PID 1 is postgres without capabilities (no su-exec for anything after;
+    # su-exec from Alpine instead of the base image's gosu, built with an old Go – deploy/postgres/Dockerfile)
     code = [x.strip() for x in script.splitlines() if x.strip() and not x.strip().startswith("#")]
-    assert [x for x in code if "gosu" in x] == ['exec gosu postgres "$0" "$@"']
+    assert [x for x in code if "su-exec" in x or "gosu" in x] == ['exec su-exec postgres "$0" "$@"']
+    dockerfile = (ROOT / "deploy" / "postgres" / "Dockerfile").read_text(encoding="utf-8")
+    assert "apk add --no-cache su-exec" in dockerfile and "rm /usr/local/bin/gosu" in dockerfile
+    assert 'test "$(su-exec postgres id -u)" = "$(id -u postgres)"' in dockerfile and 'test "$(gosu nobody id -un)" = nobody' in dockerfile
     assert "docker_create_db_directories" in script and "source docker-entrypoint.sh" in script
     # the app's role and the restore role: the db container has their passwords, the app never the superuser's
     env = db["environment"]
@@ -289,6 +293,57 @@ def test_the_release_builds_signs_and_only_then_tags():
     assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), uses
     assert wf[True] == {"push": {"tags": ["v[0-9]+.[0-9]+.[0-9]+"]}}  # PyYAML reads the key "on" as True
     assert sorted(p.name for p in RELEASE.parent.iterdir()) == ["release.yml"]
+
+
+def test_the_release_scans_the_pushed_digests_before_signing():
+    """Trivy (a pinned version, its archive checked by checksum, no third-party action) scans the three digests as
+    pushed, both platforms, with scripts/scan-images.sh – before anything is signed; a fixable high or critical finding
+    fails the step, so nothing is signed or tagged. The full reports are kept also when the scan fails and attached to
+    the GitHub release; the script's Trivy image is the same version, pinned by digest."""
+    wf = _load(RELEASE)
+    steps = wf["jobs"]["image"]["steps"]
+    by_name = {s.get("name") or s.get("id") or s.get("uses"): s for s in steps}
+    install = by_name["Trivy (pinned version, checksum checked)"]
+    version = install["env"]["TRIVY_VERSION"]
+    assert re.fullmatch(r"\d+\.\d+\.\d+", version) and re.fullmatch(r"[0-9a-f]{64}", install["env"]["TRIVY_SHA256"])
+    assert 'sha256sum -c -' in install["run"] and "releases/download/v${TRIVY_VERSION}/" in install["run"]
+    scan = next(s for s in steps if s.get("id") == "scan")
+    assert scan["run"] == 'scripts/scan-images.sh "${IMAGE}@${DIGEST}" "${DB_IMAGE}@${DB_DIGEST}" "${PROXY_IMAGE}@${PROXY_DIGEST}"'
+    assert scan["env"]["PLATFORMS"] == "linux/amd64 linux/arm64" and scan["env"]["OUT"] == "trivy-reports"
+    for var, step in (("DIGEST", "build"), ("DB_DIGEST", "build-db"), ("PROXY_DIGEST", "build-proxy")):
+        assert scan["env"][var] == f"${{{{ steps.{step}.outputs.digest }}}}"
+    sign = next(s for s in steps if s.get("name", "").startswith("Sign"))
+    builds = [i for i, s in enumerate(steps) if s.get("id") in ("build", "build-db", "build-proxy")]
+    assert max(builds) < steps.index(install) < steps.index(scan) < steps.index(sign)
+    assert "if" not in scan and "continue-on-error" not in scan and "if" not in sign  # a failed scan stops the signing
+    keep = next(s for s in steps if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
+    assert steps.index(scan) < steps.index(keep) < steps.index(sign) and "!cancelled()" in keep["if"]
+    assert keep["with"]["name"] == "trivy-reports" and keep["with"]["path"] == "trivy-reports/" and keep["with"]["overwrite"] is True
+    release = wf["jobs"]["release"]["steps"]
+    fetch = next(s for s in release if str(s.get("uses", "")).startswith("actions/download-artifact@"))
+    assert fetch["with"]["name"] == "trivy-reports"
+    notes = next(s for s in release if s.get("name") == "Release notes from CHANGELOG.md")
+    create = next(s for s in release if s.get("name") == "Create the release")
+    assert release.index(fetch) < release.index(notes) and "trivy-reports/summary.md" in notes["run"]
+    assert create["run"].endswith("--verify-tag trivy-reports/trivy-*")
+    # the gate of the script: Trivy's own flags, high and critical with a fixed version – and nothing that weakens it:
+    # no trivy.yaml / .trivyignore (loading switched off for every Trivy run), no TRIVY_* from outside
+    script = (ROOT / "scripts" / "scan-images.sh").read_text(encoding="utf-8")
+    assert "--severity HIGH,CRITICAL --ignore-unfixed --exit-code 1" in script
+    assert 'NOCONFIG=(--config "" --ignorefile "")' in script
+    runs = [x for x in script.splitlines() if re.search(r"trivy_run (image|convert) ", x)]
+    assert len(runs) == 4 and all('"${NOCONFIG[@]}"' in x for x in runs), runs
+    assert "TRIVY_IMAGE_SRC | TRIVY_DB_REPOSITORY | TRIVY_CACHE_DIR | TRIVY_CACHE_VOLUME) ;;" in script and '*) unset "$v" ;;' in script
+    found = []
+    for d, dirs, files in os.walk(ROOT):
+        dirs[:] = [x for x in dirs if x not in {".git", "node_modules", ".venv", "dist", "trivy-reports"}]
+        found += [Path(d, f) for f in files if f in {"trivy.yaml", "trivy.yml", ".trivyignore", ".trivyignore.yaml"}]
+    assert not found, found  # the release runs the script from the checkout's root
+    assert re.search(rf'^TRIVY_IMAGE="aquasec/trivy:{re.escape(version)}@sha256:[0-9a-f]{{64}}"$', script, re.M)
+    assert os.access(ROOT / "scripts" / "scan-images.sh", os.X_OK)
+    # it only reads images: no tag, no pull into Docker, no compose
+    code = "\n".join(x for x in script.splitlines() if not x.lstrip().startswith("#"))
+    assert not re.search(r"docker (tag|pull|push|compose|rmi|image rm)|docker-compose", code)
 
 
 @pytest.mark.skipif(not (shutil.which("git") and shutil.which("bash")), reason="needs git and bash")
