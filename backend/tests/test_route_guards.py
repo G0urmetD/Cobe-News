@@ -79,7 +79,7 @@ def test_every_route_has_the_intended_guard(method, path, guard):
     elif path.startswith("/api/v1/") or path == "/metrics":
         assert guard == "token", (method, path, guard)
     elif path.startswith("/api/auth/") and guard == "stage":
-        assert method == "POST" and re.fullmatch(r"/api/auth/(mfa|password|enroll/start|enroll/confirm|enroll/passkey/options|enroll/passkey)", path), path
+        assert method == "POST" and re.fullmatch(r"/api/auth/(mfa|mfa/device|password|enroll/start|enroll/confirm|enroll/passkey/options|enroll/passkey)", path), path
     else:
         assert guard == "reader", (method, path, guard)
 
