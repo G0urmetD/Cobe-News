@@ -469,7 +469,7 @@ async def confirm_finding(body: ConfirmIn, user: Reader, db: Db) -> dict:
     before = await db.get(VendorConfirm, (f.product, x["id"]))
     was = {"status": before.status, "note": before.note} if before is not None and before.ended_at is None else None
     c = await finding_confirm.confirm(db, user, f.product, x, body.status, note)
-    details = {"finding": x["id"], "ident": x["ident"], "status": body.status, "note": note} | ({"before": was} if was else {})
+    details = {"finding": x["id"], "ident": x["ident"], "status": body.status, "note": note} | ({"was": was} if was else {})
     audit.record(db, user, "vendor.finding_confirmed", _follow_target(f), details)
     await db.commit()
     return {"product": f.product, "finding": x["id"], "confirmed": finding_confirm.out(c)}

@@ -290,8 +290,7 @@ def _version(v, p: dict) -> dict:  # noqa: ANN001
     return {"id": v.id, "version": v.version, "label": v.label, "valid": ok}
 
 
-def _finding(x: dict, st: finding_confirm.Standing | None = None, product: str = "") -> dict:
-    c = st.of(product, x) if st else None
+def _finding(x: dict) -> dict:
     return {
         **{k: x.get(k) for k in ("id", "source", "ident", "title", "headline", "url", "cvss", "severity", "kev", "epss", "status", "published_at")},
         "cves": list(x.get("cves") or []),
@@ -299,8 +298,13 @@ def _finding(x: dict, st: finding_confirm.Standing | None = None, product: str =
         "exploits": list(x.get("exploit") or []),
         "versions": [{"version": r.get("version"), "status": r.get("status"), "fixed": r.get("fixed")} for r in x.get("versions") or []],
         "tlp": x.get("tlp") or None,
-        "confirmed": finding_confirm.out(c) if c else None,
     }
+
+
+def _confirmed(st: finding_confirm.Standing, product: str, x: dict) -> dict | None:
+    """The finding's confirmation for everybody (app/finding_confirm.py) – None: none stands."""
+    c = st.of(product, x) if st else None
+    return finding_confirm.out(c) if c else None
 
 
 async def _views(db) -> list[tuple]:  # noqa: ANN001
@@ -378,7 +382,7 @@ async def product(
         **_product(p),
         "tags": list(f.tags or []),
         "versions": [_version(v, p) for v in vs],
-        "findings": [_finding(x, st, key) for x in shown[offset : offset + limit]],
+        "findings": [_finding(x) | {"confirmed": _confirmed(st, key, x)} for x in shown[offset : offset + limit]],
         "offset": offset,
         "limit": limit,
         "shown": len(shown),
@@ -411,7 +415,7 @@ async def findings(
             for x in view["findings"]:
                 if x["status"] not in want or (severity and x["severity"] not in severity) or (exploited is not None and bool(x["exploited"]) != exploited):
                     continue
-                row = {**_finding(x, st, f.product), "product": f.product}
+                row = {**_finding(x), "confirmed": _confirmed(st, f.product, x), "product": f.product}
                 if confirmed is not None and (row["confirmed"] is not None) != confirmed:
                     continue
                 rows.append(row)

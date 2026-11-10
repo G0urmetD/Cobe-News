@@ -101,7 +101,7 @@ async def test_admins_and_the_products_team_confirm_everybody_else_reads(admin_c
     # the audit: who, what, why – and the change says what it was before
     made = await _entries("vendor.finding_confirmed")
     assert [e.details["status"] for e in made] == ["not_affected", "mitigated", "accepted"]
-    assert made[-1].details["before"] == {"status": "mitigated", "note": "WAF-Regel"} and made[-1].target_id == "panos" and made[-1].details["finding"] == FID
+    assert made[-1].details["was"] == {"status": "mitigated", "note": "WAF-Regel"} and made[-1].target_id == "panos" and made[-1].details["finding"] == FID
     [undone] = await _entries("vendor.finding_unconfirmed")
     assert undone.actor_name == "rudi" and undone.details["status"] == "not_affected" and undone.details["ident"] == CVE
 
