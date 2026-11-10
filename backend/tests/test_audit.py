@@ -319,6 +319,8 @@ def test_every_action_has_a_case_or_a_reason():
         "role.approval_pending",  # test_approval.py: test_raise_to_admin_waits_lowering_does_not
         "login.pending_refused",  # test_approval.py: test_signin_creates_a_waiting_account_and_says_so
         "directory.preloaded",  # test_approval.py: test_preload_creates_accounts_on_and_waiting
+        "device.remembered",
+        "device.forgotten",  # test_remembered_devices.py: test_audit_entries
     }
     covered = {a for a, _, act in CASES if act is not None} | elsewhere | {"team.member_added"}
     assert set(audit.ACTIONS) == covered, set(audit.ACTIONS) ^ covered
