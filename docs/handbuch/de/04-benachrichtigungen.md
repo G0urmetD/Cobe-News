@@ -52,6 +52,11 @@ KEV-Katalog). Ein Thema, das erst später dazukommt – etwa aus den Details aus
 Desktop-Benachrichtigung mehr aus; dafür gibt es [Regeln](#regel-themen), die so eine Meldung dann nachreichen. Der
 offene Tab und Push bei geschlossenem Tab filtern gleich.
 
+**Was die Benachrichtigung zeigt**: Unter dem Titel stehen die Schwere (mit CVSS, wenn die Meldung einen nennt),
+„ausgenutzt“, wenn die Lücke angegriffen wird, die Produkte, um die es geht, und die Quelle – etwa „Kritisch (CVSS 9.2)
+· ausgenutzt · PAN-OS, Prisma Cloud · BSI“. Hat die Meldung keine eigene Schwere, fehlt sie. Kommen mehr Meldungen auf
+einmal, nennt die Sammel-Benachrichtigung die höchste Schwere und die Produkte.
+
 **Systeme, Schlagwörter und „Nicht anzeigen, wenn enthalten“** – wie bei den [Regeln](#regel-systeme), nur für dich:
 
 - **Systeme**: Hersteller („Alle Produkte von Palo Alto Networks“) oder einzelne Produkte aus dem ganzen Katalog.
@@ -59,7 +64,7 @@ offene Tab und Push bei geschlossenem Tab filtern gleich.
   egal, reiner Text (höchstens 30, je 2–60 Zeichen).
 - Systeme **oder** Schlagwörter – eines genügt, zusammen mit Schwere, Quelle und Thema.
 - **Nicht anzeigen, wenn enthalten**: Steht ein solches Wort in Titel oder Teaser, kommt keine Benachrichtigung.
-- Die Benachrichtigung sagt dann, warum sie kommt: „Kritisch · heise online · Treffer: PAN-OS“.
+- Die Benachrichtigung sagt dann, warum sie kommt: „Kritisch · Treffer: PAN-OS · heise online“.
 - Es zählt, was die Meldung **beim Eintreffen** hat – vor allem, was Titel und Teaser nennen. Ein System, das erst
   später aus den Details aus der Quelle dazukommt, löst keine Desktop-Benachrichtigung mehr aus (wie ein Thema); eine
   [Regel](#regel-systeme) reicht so eine Meldung nach.

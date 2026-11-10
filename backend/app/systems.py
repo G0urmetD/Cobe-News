@@ -694,6 +694,11 @@ def label(entry: dict, lang: str = "de") -> str:
     return f"{v['name'] if v else entry.get('vendor', '')} ({'all products' if lang == 'en' else 'alle Produkte'})"
 
 
+def short_label(p: dict) -> str:
+    """A product's label without the parenthesis: "PAN-OS (Firewalls)" → "PAN-OS"."""
+    return _PAREN.sub("", str(p.get("label") or p["key"])).strip()
+
+
 def _within(words: tuple[str, ...], text: list[str]) -> bool:
     n = len(words)
     return any(tuple(text[i : i + n]) == words for i in range(len(text) - n + 1)) if n else False
@@ -713,7 +718,7 @@ def hits(story_systems: list[str], quiet: list[str], want: list[str], text: str 
         if e.startswith(VENDOR):
             return str((ix.vendors.get(ix.alias.get(e[2:], e[2:])) or {}).get("name") or "")
         p = ix.products.get(e.removeprefix(MENTION))
-        return _PAREN.sub("", str(p.get("label") or p["key"])) if p else ""
+        return short_label(p) if p else ""
 
     named = [e for e in got if e.startswith(MENTION)]
     if text and named:

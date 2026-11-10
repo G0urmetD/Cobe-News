@@ -412,6 +412,21 @@ def desktop_hits(prefs: dict | None):  # noqa: ANN201
     return lambda i: concerns.story_hits(i, chosen, words, want)
 
 
+def notice_facts(i: NewsItem) -> dict:
+    """What a notification of one story says besides its title (the tab's and the Web Push's line, webpush.notice_line):
+    `rated` – the severity comes from the story (a reason: CVSS, BSI, the vendor's rating …); an unrated story ("info"
+    without a reason) shows none –, its CVSS when one was read, `exploited` (KEV, EUVD, the text says so) and `products`:
+    the products it is about (concerns.story_names)."""
+    reasons = [r for r in i.reasons or [] if isinstance(r, dict)]
+    cvss = next((str(r.get("value") or "") for r in reasons if r.get("kind") == "cvss" and r.get("value")), None)
+    return {
+        "rated": bool(reasons) or i.severity != "info",
+        "cvss": cvss,
+        "exploited": any(r.get("kind") in ("kev", "euvd", "exploited", "ransomware") for r in reasons),
+        "products": concerns.story_names(i)[:10],
+    }
+
+
 def fresh_filter() -> list:
     """No backlog, as for the notification rules: the first fetch of a catalog (CISA KEV: ~100 entries of the last 90
     days) or of a source switched on later pops up nothing – only what was fresh when it arrived (news._backlog, decided
@@ -454,7 +469,7 @@ async def recent(user: Reader, db: Db, after: Annotated[int | None, Query(ge=0)]
         where += desktop_filter(user.desktop)
     rows, total = await arrived(db, where)
     hit = desktop_hits(user.desktop) if mine else None
-    items = [_item_out(i, s, None) | ({"hits": hit(i)} if hit else {}) for i, s in rows]
+    items = [_item_out(i, s, None) | {"notice": notice_facts(i)} | ({"hits": hit(i)} if hit else {}) for i, s in rows]
     return {"items": items, "total": total, "now": now.isoformat(), "cursor": top}
 
 

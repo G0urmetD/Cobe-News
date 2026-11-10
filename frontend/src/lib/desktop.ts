@@ -133,17 +133,49 @@ function inPage(title: string, opts: NotificationOptions, onClick: () => void, t
  * handed it to the push service). */
 export const TRACK_MS = 20_000
 
-/** The notification's line under the title: severity, source and – when the person chose systems or words – what it
- *  matched by ("Treffer: PAN-OS", at most three names, as the server's messages). */
-export function storyBody(item: Pick<NewsItem, "severity" | "source" | "hits">, t: (k: string, o?: Record<string, unknown>) => string = i18n.t.bind(i18n)): string {
-  const base = `${t(`news.sev.${item.severity}`)} · ${item.source.name}`
-  const names = (item.hits ?? []).map((x) => x.replace(/\s+/g, " ").trim().slice(0, 60)).filter(Boolean)
-  if (!names.length) return base
-  const shown = names.slice(0, 3).join(", ") + (names.length > 3 ? ` +${names.length - 3}` : "")
-  return `${base} · ${t("desktop.hit", { names: shown })}`
+/** Names in one line, as the server's messages (notify.names_text): at most three, then "+N". */
+function namesText(names: string[]): string {
+  const clean = names.map((x) => x.replace(/\s+/g, " ").trim().slice(0, 60)).filter(Boolean)
+  return clean.slice(0, 3).join(", ") + (clean.length > 3 ? ` +${clean.length - 3}` : "")
 }
 
-export function showStory(item: Pick<NewsItem, "id" | "title" | "severity" | "source" | "hits">, open: (id: string) => void, track = false) {
+/** The notification's line under the title – the same as the Web Push's (app/webpush.py notice_line): the severity
+ *  when the story has one (with its CVSS), "ausgenutzt", the products it is about – or, when the person chose systems
+ *  or words, what it matched by ("Treffer: PAN-OS") – and the source last. */
+export function storyBody(item: Pick<NewsItem, "severity" | "source" | "hits" | "notice">, t: (k: string, o?: Record<string, unknown>) => string = i18n.t.bind(i18n)): string {
+  const n = item.notice
+  const parts: string[] = []
+  if (n?.rated ?? true) {
+    const sev = t(`news.sev.${item.severity}`)
+    parts.push(n?.cvss ? `${sev} (CVSS ${n.cvss})` : sev)
+  }
+  if (n?.exploited) parts.push(t("desktop.exploited"))
+  const hits = namesText(item.hits ?? [])
+  const products = namesText(n?.products ?? [])
+  if (hits) parts.push(t("desktop.hit", { names: hits }))
+  else if (products) parts.push(products)
+  parts.push(item.source.name)
+  return parts.filter(Boolean).join(" · ")
+}
+
+/** The summary's line: the highest severity of the stories it stands for and their products – "Ein Klick öffnet die
+ *  News." when nothing is known of them (the server listed only the newest few). */
+export function summaryBody(items: Pick<NewsItem, "severity" | "hits" | "notice">[], t: (k: string, o?: Record<string, unknown>) => string = i18n.t.bind(i18n)): string {
+  const rank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 }
+  const rated = items.filter((i) => i.notice?.rated ?? true)
+  const parts: string[] = []
+  if (rated.length) {
+    const top = rated.reduce((a, b) => ((rank[b.severity] ?? 0) > (rank[a.severity] ?? 0) ? b : a)).severity
+    parts.push(t("desktop.summaryTop", { sev: t(`news.sev.${top}`) }))
+  }
+  const names: string[] = []
+  for (const i of items) for (const x of [...(i.hits ?? []), ...(i.notice?.products ?? [])]) if (!names.includes(x)) names.push(x)
+  const text = namesText(names)
+  if (text) parts.push(text)
+  return parts.length ? parts.join(" · ") : t("desktop.summaryText")
+}
+
+export function showStory(item: Pick<NewsItem, "id" | "title" | "severity" | "source" | "hits" | "notice">, open: (id: string) => void, track = false) {
   return notify(
     item.title,
     {
@@ -231,16 +263,17 @@ export const DESKTOP_MAX = 3
  * Which stories of one round get a notification of their own (oldest of them first), and how many more there are for
  * the summary. `claim` marks one as shown (false: another tab showed it already). Pure – desktop.test.ts checks it.
  */
-export function planNotifications(items: NewsItem[], total: number, claim: (id: string) => boolean): { single: NewsItem[]; more: number } {
+export function planNotifications(items: NewsItem[], total: number, claim: (id: string) => boolean): { single: NewsItem[]; more: number; rest: NewsItem[] } {
   const fresh = items.filter((i) => claim(i.id))
   const single = fresh.slice(0, DESKTOP_MAX).reverse()
   // the server counts everything that arrived (it lists only the newest few) – minus what another tab showed already
   const more = Math.max(0, total - (items.length - fresh.length) - single.length)
-  return { single, more }
+  // the listed ones of the summary – its line names their severity and products
+  return { single, more, rest: fresh.slice(DESKTOP_MAX) }
 }
 
-function showSummary(count: number, open: () => void) {
-  return notify(i18n.t("desktop.summaryTitle", { count }), { body: i18n.t("desktop.summaryText"), tag: `cobe-news-summary-${Date.now()}`, critical: false, path: "/" }, open)
+function showSummary(count: number, rest: NewsItem[], open: () => void) {
+  return notify(i18n.t("desktop.summaryTitle", { count }), { body: summaryBody(rest), tag: `cobe-news-summary-${Date.now()}`, critical: false, path: "/" }, open)
 }
 
 /** One round: what arrived since the cursor. With push working in this browser the push messages show it – the round
@@ -255,9 +288,9 @@ export async function poll(userId: string, open: (id: string | null) => void): P
   })
   write(cursorKey(userId), String(res.cursor))
   if (after === null || pushActiveHere(userId)) return
-  const { single, more } = planNotifications(res.items, res.total ?? res.items.length, (id) => claim(userId, id))
+  const { single, more, rest } = planNotifications(res.items, res.total ?? res.items.length, (id) => claim(userId, id))
   for (const item of single) await showStory(item, open)
-  if (more > 0) await showSummary(more, () => open(null))
+  if (more > 0) await showSummary(more, rest, () => open(null))
 }
 
 type Locks = { request: (name: string, options: { ifAvailable?: boolean; steal?: boolean }, cb: (lock: unknown) => Promise<void> | void) => Promise<void> }

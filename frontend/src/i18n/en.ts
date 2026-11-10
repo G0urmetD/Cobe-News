@@ -188,6 +188,8 @@ const en: Record<string, string> = {
   "desktop.exclude": "Don't show if it contains",
   "desktop.excludeHint": "If one of these words is in the title or teaser, no notification comes.",
   "desktop.hit": "Match: {{names}}",
+  "desktop.exploited": "exploited",
+  "desktop.summaryTop": "Highest severity: {{sev}}",
   "desktop.askPending": "The browser asks for permission – please allow.",
   "desktop.askPermission": "Allow in the browser",
   "desktop.denied": "The browser blocked notifications for this site – allow them in the browser's site settings.",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { DESKTOP_MAX, isShownMessage, planNotifications, storyBody, systemOf } from "@/lib/desktop"
+import { DESKTOP_MAX, isShownMessage, planNotifications, storyBody, summaryBody, systemOf } from "@/lib/desktop"
 import type { NewsItem } from "@/lib/news-api"
 
 const item = (id: string): NewsItem => ({
@@ -33,7 +33,7 @@ describe("desktop notifications", () => {
   })
 
   it("does nothing on a quiet round", () => {
-    expect(planNotifications([], 0, () => true)).toEqual({ single: [], more: 0 })
+    expect(planNotifications([], 0, () => true)).toEqual({ single: [], more: 0, rest: [] })
   })
 })
 
@@ -85,7 +85,28 @@ describe("what matched", () => {
   it("says why it came when the person chose systems or words – at most three names, one line", () => {
     expect(storyBody(item, t)).toBe("news.sev.critical · heise")
     expect(storyBody({ ...item, hits: [] }, t)).toBe("news.sev.critical · heise")
-    expect(storyBody({ ...item, hits: ["PAN-OS", "Palo\nAlto", "C", "D"] }, t)).toBe('news.sev.critical · heise · desktop.hit{"names":"PAN-OS, Palo Alto, C +1"}')
+    expect(storyBody({ ...item, hits: ["PAN-OS", "Palo\nAlto", "C", "D"] }, t)).toBe('news.sev.critical · desktop.hit{"names":"PAN-OS, Palo Alto, C +1"} · heise')
+  })
+  it("names the products, the CVSS and an exploitation – and no severity when the story has none", () => {
+    const notice = { rated: true, cvss: "9.2", exploited: true, products: ["PAN-OS", "Prisma Cloud"] }
+    expect(storyBody({ ...item, notice }, t)).toBe("news.sev.critical (CVSS 9.2) · desktop.exploited · PAN-OS, Prisma Cloud · heise")
+    // what matched the person's choice stands for the products
+    expect(storyBody({ ...item, notice, hits: ["PAN-OS"] }, t)).toBe('news.sev.critical (CVSS 9.2) · desktop.exploited · desktop.hit{"names":"PAN-OS"} · heise')
+    expect(storyBody({ ...item, severity: "info", notice: { rated: false, cvss: null, exploited: false, products: [] } }, t)).toBe("heise")
+  })
+  it("the summary names the highest severity and the products of the rest", () => {
+    const n = (products: string[], rated = true) => ({ rated, cvss: null, exploited: false, products })
+    expect(
+      summaryBody(
+        [
+          { severity: "high", notice: n(["FortiOS"]) },
+          { severity: "critical", notice: n(["PAN-OS", "FortiOS"]) },
+          { severity: "info", notice: n([], false) },
+        ],
+        t,
+      ),
+    ).toBe('desktop.summaryTop{"sev":"news.sev.critical"} · FortiOS, PAN-OS')
+    expect(summaryBody([], t)).toBe("desktop.summaryText")
   })
 })
 

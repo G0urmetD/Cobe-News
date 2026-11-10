@@ -192,6 +192,8 @@ const de: Record<string, string> = {
   "desktop.exclude": "Nicht anzeigen, wenn enthalten",
   "desktop.excludeHint": "Steht eines dieser Wörter in Titel oder Teaser, kommt keine Benachrichtigung.",
   "desktop.hit": "Treffer: {{names}}",
+  "desktop.exploited": "ausgenutzt",
+  "desktop.summaryTop": "Höchste Schwere: {{sev}}",
   "desktop.askPending": "Der Browser fragt nach der Erlaubnis – bitte zustimmen.",
   "desktop.askPermission": "Im Browser erlauben",
   "desktop.denied": "Der Browser hat Benachrichtigungen für diese Seite blockiert – in den Website-Einstellungen des Browsers erlauben.",

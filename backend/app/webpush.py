@@ -204,8 +204,22 @@ def vapid_headers(endpoint: str, key: Vapid, *, now: float | None = None) -> dic
 
 SEV_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 TEXTS = {
-    "de": {"summary": "{n} neue Security-Meldungen", "summary_text": "In Cobe News öffnen", "test": "Test-Benachrichtigung von Cobe News", "test_text": "Push bei geschlossenem Tab funktioniert."},
-    "en": {"summary": "{n} new security stories", "summary_text": "Open Cobe News", "test": "Test notification from Cobe News", "test_text": "Push with the tab closed works."},
+    "de": {
+        "summary": "{n} neue Security-Meldungen",
+        "summary_text": "In Cobe News öffnen",
+        "summary_top": "Höchste Schwere: {sev}",
+        "exploited": "ausgenutzt",
+        "test": "Test-Benachrichtigung von Cobe News",
+        "test_text": "Push bei geschlossenem Tab funktioniert.",
+    },
+    "en": {
+        "summary": "{n} new security stories",
+        "summary_text": "Open Cobe News",
+        "summary_top": "Highest severity: {sev}",
+        "exploited": "exploited",
+        "test": "Test notification from Cobe News",
+        "test_text": "Push with the tab closed works.",
+    },
 }
 
 
@@ -213,18 +227,38 @@ def _lang(lang: str) -> str:
     return lang if lang in TEXTS else "de"
 
 
+def notice_line(story: dict, lang: str) -> str:
+    """The line under a story's title – the same in the tab (frontend lib/desktop.ts storyBody) and by Web Push:
+    "Kritisch (CVSS 9.8) · ausgenutzt · PAN-OS, Prisma Cloud · BSI". The severity only when the story has one (an
+    unrated story says none), the CVSS and "ausgenutzt" when known, the products it is about – or, when the person chose
+    systems or words, what it matched by ("Treffer: …", api.desktop_hits) – and the source last."""
+    lang = _lang(lang)
+    lb = notify.LABELS[lang]
+    facts = story.get("notice") or {}
+    parts: list[str] = []
+    if facts.get("rated", True):
+        sev = str(lb["sev"].get(story["severity"], story["severity"]))
+        parts.append(f"{sev} (CVSS {facts['cvss']})" if facts.get("cvss") else sev)
+    if facts.get("exploited"):
+        parts.append(TEXTS[lang]["exploited"])
+    hits = [str(x) for x in story.get("hits") or []]
+    if hits:
+        parts.append(f"{lb['hit']}: {notify.names_text(hits)}")
+    elif names := notify.names_text([str(x) for x in facts.get("products") or []]):
+        parts.append(names)
+    parts.append(str(story["source"])[:80])
+    return neutral(" · ".join(p for p in parts if p))
+
+
 def story_payload(story: dict, lang: str) -> dict:
-    """One story: its headline, severity and source – news from public feeds, nothing confidential; the text stays in
-    Cobe News. `hits` (the person chose systems or words): "· Treffer: PAN-OS" – why it came, as a rule's message."""
-    lb = notify.LABELS[_lang(lang)]
-    names = neutral(notify.names_text([str(x) for x in story.get("hits") or []]))
-    why = f" · {lb['hit']}: {names}" if names else ""
+    """One story: its headline and notice_line (severity, products, source) – news from public feeds, nothing
+    confidential; the text stays in Cobe News."""
     return {
         "v": 1,
         "kind": "story",
         "id": story["id"],
         "title": neutral(story["title"])[:200],
-        "body": f"{lb['sev'].get(story['severity'], story['severity'])} · {neutral(story['source'])[:80]}{why}",
+        "body": notice_line(story, lang)[:240],
         "severity": story["severity"],
         "url": f"/?story={story['id']}",
     }
@@ -245,12 +279,33 @@ def vendor_payload(event_id: str, title: str, product: str, severity: str, path:
     }
 
 
-def summary_payload(count: int, lang: str, ids: list[str] | None = None) -> dict:
+def summary_payload(count: int, lang: str, ids: list[str] | None = None, stories: list[dict] | None = None) -> dict:
     """The rest of a round in one notification: a click opens the news list filtered to exactly these stories
-    (notify.overview_path – at most notify.NEWS_IDS_MAX, else the news list); `ids` unknown or incomplete: the news list."""
+    (notify.overview_path – at most notify.NEWS_IDS_MAX, else the news list); `ids` unknown or incomplete: the news list.
+    `stories` (those of the rest the round read): the line names their highest severity and their products."""
     t = TEXTS[_lang(lang)]
     url = notify.overview_path([], count, [("news", i) for i in ids]) if ids and len(ids) == count else notify.NEWS_PATH
-    return {"v": 1, "kind": "summary", "id": f"summary-{int(time.time())}", "title": t["summary"].format(n=count), "body": t["summary_text"], "severity": "info", "url": url}
+    return {"v": 1, "kind": "summary", "id": f"summary-{int(time.time())}", "title": t["summary"].format(n=count), "body": summary_line(stories or [], lang), "severity": "info", "url": url}
+
+
+def summary_line(stories: list[dict], lang: str) -> str:
+    """ "Höchste Schwere: Kritisch · PAN-OS, FortiOS, Exchange +2" – what a summary is about; "In Cobe News öffnen"
+    when nothing is known of them."""
+    lang = _lang(lang)
+    t, lb = TEXTS[lang], notify.LABELS[lang]
+    rated = [s for s in stories if (s.get("notice") or {}).get("rated", True)]
+    parts: list[str] = []
+    if rated:
+        top = max(rated, key=lambda s: SEV_RANK.get(s["severity"], 0))["severity"]
+        parts.append(t["summary_top"].format(sev=lb["sev"].get(top, top)))
+    names: list[str] = []
+    for s in stories:
+        for n in [*(s.get("hits") or []), *((s.get("notice") or {}).get("products") or [])]:
+            if n not in names:
+                names.append(str(n))
+    if text := notify.names_text(names):
+        parts.append(text)
+    return neutral(" · ".join(parts))[:240] if parts else t["summary_text"]
 
 
 def test_payload(lang: str) -> dict:
@@ -366,12 +421,13 @@ async def dispatch(db: AsyncSession) -> dict[str, int]:
             skip.append(sub)
             continue
         hit = api.desktop_hits(user.desktop)  # "Treffer" when the person chose systems or words
-        single = [api._item_out(i, s, None) | ({"hits": hit(i)} if hit else {}) for i, s in rows[:SINGLE]][::-1]  # the oldest of the newest first, as the tab
-        payloads = [story_payload({"id": x["id"], "title": x["title"], "severity": x["severity"], "source": x["source"]["name"], "hits": x.get("hits") or []}, sub.lang) for x in single]
+        single = [(api._item_out(i, s, None) | ({"hits": hit(i)} if hit else {}), i) for i, s in rows[:SINGLE]][::-1]  # the oldest of the newest first, as the tab
+        payloads = [story_payload({"id": x["id"], "title": x["title"], "severity": x["severity"], "source": x["source"]["name"], "hits": x.get("hits") or [], "notice": api.notice_facts(i)}, sub.lang) for x, i in single]
         if total > len(single):
             # the rest by id when the round knows them all (rows holds the newest RECENT_MAX)
             rest = [str(i.id) for i, _s in rows[SINGLE:]] if total == len(rows) else None
-            payloads.append(summary_payload(total - len(single), sub.lang, rest))
+            others = [{"severity": i.severity, "hits": hit(i) if hit else [], "notice": api.notice_facts(i)} for i, _s in rows[SINGLE:]]
+            payloads.append(summary_payload(total - len(single), sub.lang, rest, others))
         jobs.append((sub, payloads))
     gate = asyncio.Semaphore(CONCURRENCY)
 

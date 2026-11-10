@@ -51,6 +51,11 @@ What counts is the topic a story has **when it arrives** (from title, teaser, so
 that is added only later – e.g. from the details from the source – triggers no desktop notification any more; for that
 there are [rules](#regel-themen), which send such a story then. The open tab and push with the tab closed filter alike.
 
+**What the notification shows**: under the title come the severity (with the CVSS when the story names one),
+"exploited" when the vulnerability is attacked, the products it is about and the source – e.g. "Critical (CVSS 9.2) ·
+exploited · PAN-OS, Prisma Cloud · BSI". A story without a severity of its own shows none. When several stories come at
+once, the summary names the highest severity and the products.
+
 **Systems, keywords and "Don't show if it contains"** – as in the [rules](#regel-systeme), just for you:
 
 - **Systems**: vendors ("All products of Palo Alto Networks") or single products from the whole catalogue.
@@ -58,7 +63,7 @@ there are [rules](#regel-themen), which send such a story then. The open tab and
   (at most 30, 2–60 characters each).
 - Systems **or** keywords – one is enough, together with severity, source and topic.
 - **Don't show if it contains**: if such a word is in the title or teaser, no notification comes.
-- The notification then says why it comes: "Critical · heise online · Match: PAN-OS".
+- The notification then says why it comes: "Critical · Match: PAN-OS · heise online".
 - What the story has **when it arrives** counts – above all what its title and teaser name. A system that comes only
   later from the details from the source triggers no desktop notification any more (as a topic); a
   [rule](#regel-systeme) sends such a story then.

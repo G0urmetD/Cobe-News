@@ -157,6 +157,23 @@ def vendor_wants(systems: list[dict] | None, product: str | None, keys: set[str]
     return (product or "") in (keys if keys is not None else set(systems_svc.product_keys(systems)))
 
 
+def story_names(i: NewsItem) -> list[str]:
+    """The products a story is about, as names – for a notification that names no "Treffer" (the person chose no
+    systems or words): the followed products its details concern first (news_items.products), then the catalogue
+    systems it concerns or names (systems.hits over all of them – exact, named, vendors). Custom products (no catalogue
+    entry) are left out: their key says nothing."""
+    out: list[str] = []
+    for key in i.products or []:
+        p = systems_svc.catalog.product(systems_svc.catalog.REPLACED.get(key, key))
+        if p and (name := systems_svc.short_label(p)) and name not in out:
+            out.append(name)
+    every = list(i.systems or [])
+    for name in systems_svc.hits(every, list(i.quiet_systems or []), every, f"{i.title} {i.summary or ''}") if every else []:
+        if name not in out:
+            out.append(name)
+    return out
+
+
 def story_hits(i: NewsItem, systems: list[dict] | None, words: list[str] | None, want: list[str] | None = None) -> list[str]:
     """What a story matched by: the names of its systems (systems.hits – `want`: systems.wanted of them, when known
     already) and the words in its title or teaser – [] when neither was chosen. The messages' "Treffer"."""

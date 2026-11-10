@@ -75,6 +75,16 @@ export interface NewsItem {
   hint?: { cvss: number | null; product: string | null; exploited: boolean; affects?: boolean } | null
   /** /news/recent?mine: what it matched the person's desktop systems or words by ("Treffer") – absent when none chosen */
   hits?: string[]
+  /** /news/recent: what a notification says besides the title (app/api.py notice_facts) – absent elsewhere */
+  notice?: NewsNotice
+}
+
+/** rated: the story has a severity of its own (an unrated one shows none); products: what it is about, by name */
+export interface NewsNotice {
+  rated: boolean
+  cvss: string | null
+  exploited: boolean
+  products: string[]
 }
 
 export interface NewsReason {

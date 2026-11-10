@@ -114,7 +114,7 @@ LABELS = {
             "Ein- und ausschalten: Einstellungen › Benachrichtigungen › Hersteller-News meiner Produkte (Beobachtete CVEs: Einstellungen › Benachrichtigungen › Beobachtete CVEs).",
         ],
         "summary": "{n} neue Hersteller-News",
-        "summary_text": "Höchste Schwere: {sev} · {first}",
+        "summary_text": "Höchste Schwere: {sev} · {products} · {first}",
     },
     "en": {
         "label": "Vendor news of my products",
@@ -123,7 +123,7 @@ LABELS = {
             "Switch on or off: Settings › Notifications › Vendor news of my products (watched CVEs: Settings › Notifications › Watched CVEs).",
         ],
         "summary": "{n} new vendor news",
-        "summary_text": "Highest severity: {sev} · {first}",
+        "summary_text": "Highest severity: {sev} · {products} · {first}",
     },
 }
 
@@ -520,13 +520,20 @@ def push_payloads(events: list[VendorEvent], lang: str) -> list[dict]:
     first = pairs[0][1]
     sev = notify.LABELS[lang]["sev"].get(top[0].severity, top[0].severity)
     lb = LABELS[lang]
+    names: list[str] = []
+    for e in top:  # the products, the most severe first (as _ordered): "PAN-OS, FortiOS +2"
+        d = e.data or {}
+        n = notify.label_now(e.product, str(d["product"])) if d.get("product") else str(d.get("cve") or e.product)
+        if n not in names:
+            names.append(n)
+    products = notify.names_text(names)
     return [
         {
             "v": 1,
             "kind": "vendor-summary",
             "id": f"vendor-summary-{int(time.time())}",
             "title": lb["summary"].format(n=len(top)),
-            "body": lb["summary_text"].format(sev=sev, first=first.title[:120]),
+            "body": lb["summary_text"].format(sev=sev, products=products, first=first.title[:120]),
             "severity": top[0].severity,
             # all of them in Vendor News: their product when they are of one, else the overview (as the mail's button)
             "url": notify.overview_path([s for _, s in pairs], len(pairs)),
