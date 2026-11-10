@@ -24,7 +24,8 @@ The page shows the followed products and how they stand. From top to bottom:
 - **Active filters** as chips below it – a click on × removes one. On their right **"Mark all N read"** for exactly the
   products shown (see [Read, muted and views](#vendor-lesen)).
 
-**Filters** holds the switches "Unread only" (with the number of unread findings), "Show muted", "Versions to review"
+**Filters** holds the switches "Unread only" (with the number of unread findings), "Show muted", "Show confirmed"
+([confirming a finding](#treffer-bestaetigen)), "Versions to review"
 (with their number, when [reviewing versions](#versionen-pruefen) is on) and "My team | All" (see [My team](#mein-team)).
 
 The **catalogue** – every product you can follow (more than 900, in categories) – opens with **⋯ → Add product**
@@ -640,6 +641,33 @@ followed product (the same CVE on two products is two findings, as you check it 
   "Custom" for filters that are not a saved view). Older links and views keep working: "Now", "actively exploited" and
   "support ending / ended" of the former summary show as a chip, `?tab=catalog` and `?tab=suggestions` open the
   catalogue and the suggestions.
+
+## Confirming a finding {#treffer-bestaetigen}
+
+Some findings do not concern your installation although the version is in the affected range – a PAN-OS advisory, say,
+that only counts when a certain feature (e.g. Brotli) is switched on. For this, a finding in the drawer has
+**Confirm …**: an assessment for **everybody**, with a reason.
+
+- **Assessments:** *Not affected* (feature or configuration not in use), *Mitigation in place* (workaround or
+  mitigation) and *Risk accepted* – this one only with a reason. The reason is short (up to 500 characters).
+- **Effect:** a confirmed finding counts as handled – not in the tile's numbers, its state, the number on "Vendor
+  News", the unread ones, the [weekly review](/docs/benachrichtigungen#wochenrueckblick) and the numbers of the
+  [API](/docs/api) – and sends nothing more: neither through the rules nor on the personal ways. What arises meanwhile
+  does not come later either.
+- **It stays visible:** pale in the drawer with "Confirmed · Not affected", who, when and why below it and on hover.
+  The tile says "2 confirmed"; under *Filters*, **Show confirmed** (chip "With confirmed") lists them in the tile's lines
+  too.
+- **Lifted by itself** when the finding changes materially: now actively exploited, rated higher, new CVEs, a version
+  entered now (more surely) affected – also one entered later – or the advisory withdrawn. Then it counts and notifies
+  again; the message says "Confirmation lifted: now exploited", so does the drawer. A new fixed version alone does not
+  lift it.
+- **Who may:** admins always; with Teams on also the members of a team the product is assigned to (the same people who
+  [review its versions](#versionen-pruefen)). Everybody else only sees the confirmation. **Undo confirmation** takes it
+  back. Confirming, undoing and the lapse by itself are in the audit log.
+
+**Confirm or mute?** [Muting](/docs/benachrichtigungen#stummschalten) is yours and for a while: only your messages and
+numbers, up to a date. Confirming applies to everybody and lasts until somebody undoes it or the finding changes – it is
+the installation's assessment.
 
 ## My team {#mein-team}
 

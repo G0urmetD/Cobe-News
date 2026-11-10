@@ -438,6 +438,9 @@ for **7 days**, **30 days** or **until a date** (at most a year).
 **Where:** in the **⋯** menu of a story or a product tile, at the bottom of a story or product drawer, on a finding and
 in the list of [watched CVEs](#cves-liste) (an opened row).
 
+**Confirm instead of mute?** When a finding is settled for everybody (e.g. the affected feature is not in use),
+[confirm](/docs/vendor-news#treffer-bestaetigen) it – that applies to everybody and lasts.
+
 **What it does – only for you:**
 
 - **No personal notifications** about it on your ways (e-mail, desktop push, your own Teams webhook): vendor news of a

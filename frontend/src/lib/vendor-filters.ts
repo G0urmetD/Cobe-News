@@ -34,14 +34,15 @@ export function placeLink(current: URLSearchParams, place: VendorPlace): string 
 
 /** One chip under the tool row. `now`, `exploited` and `support` are the old summary line's filters – an older link or
  *  view still sets them; they show as a chip (removable) but are no longer offered. */
-export type FilterChip = "unread" | "muted" | "review" | "team" | "now" | "exploited" | "support"
+export type FilterChip = "unread" | "muted" | "confirmed" | "review" | "team" | "now" | "exploited" | "support"
 
 /** The filters that are on, in the order of the chips. `team`: "Mein Team" is chosen (and offered at all). */
-export function activeFilters(f: Pick<VendorUrlFilter, "unread" | "muted" | "filter">, o: { team: boolean }): FilterChip[] {
+export function activeFilters(f: Pick<VendorUrlFilter, "unread" | "muted" | "filter"> & { confirmed?: boolean }, o: { team: boolean }): FilterChip[] {
   const out: FilterChip[] = []
   if (o.team) out.push("team")
   if (f.unread) out.push("unread")
   if (f.muted) out.push("muted")
+  if (f.confirmed) out.push("confirmed")
   if (f.filter === "review") out.push("review")
   else if (f.filter === "now" || f.filter === "exploited" || f.filter === "support") out.push(f.filter)
   return out
@@ -52,6 +53,7 @@ export function withoutChip(chip: FilterChip): { url?: Partial<VendorUrlFilter>;
   if (chip === "team") return { scope: "all" }
   if (chip === "unread") return { url: { unread: false } }
   if (chip === "muted") return { url: { muted: false } }
+  if (chip === "confirmed") return { url: { confirmed: false } }
   return { url: { filter: null } }
 }
 

@@ -28,6 +28,10 @@ stays when one of them is muted). A watched CVE that is muted is silent too – 
 newer one wins until it ends. A muted product's KEV ("now exploited") is not delivered either, but the list shows it
 with a badge even while muted ones are hidden – an exploited vulnerability never disappears from sight.
 
+**Confirmed** (app/finding_confirm.py, vendor_confirms) is not a person's: a finding confirmed for everybody counts as
+handled – left out of everybody's unread numbers (VendorReading.confirms), shown in the lists with its badge. A mute
+stays the person's own and ends by itself; the two never change each other.
+
 **Saved views** (saved_views): the raw query string of News or Vendor News under a name, per person – unknown
 parameters are kept (a parameter renamed later must not break a view); the page validates what it reads.
 """
