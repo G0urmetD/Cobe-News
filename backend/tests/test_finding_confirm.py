@@ -10,15 +10,30 @@ from datetime import UTC, datetime, timedelta
 
 from conftest import add_user, make_client, sign_in
 from sqlalchemy import select
-
-from app import db, finding_confirm, notify, personal, reader, vendor, weekly
-from app.models import AuditEntry, PersonDelivery, VendorConfirm, VendorDelivery, VendorEvent
 from test_api_tokens import get, make_token
 from test_catalog_care import _team as _care_team
 from test_catalog_care import _teams_on
 from test_personal import _event, _person, _switch, _ways, mails  # noqa: F401 - fixture
 from test_personal import _team as _personal_team
-from test_vendor_service import _dispatch, _follow, _fresh_pan, _round, _webhook_rule, hooks, sites, vendor_reset  # noqa: F401 - fixtures
+from test_vendor_service import (  # noqa: F401 - fixtures
+    _dispatch,
+    _follow,
+    _fresh_pan,
+    _round,
+    _webhook_rule,
+    hooks,
+    sites,
+    vendor_reset,
+)
+
+from app import db, finding_confirm, notify, personal, reader, vendor, weekly
+from app.models import (
+    AuditEntry,
+    PersonDelivery,
+    VendorConfirm,
+    VendorDelivery,
+    VendorEvent,
+)
 
 CVE = "CVE-2026-8301"
 FID = f"paloalto:{CVE}"
