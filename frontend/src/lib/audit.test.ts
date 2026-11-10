@@ -211,6 +211,8 @@ describe("who and from where in words", () => {
     expect(methodText(t, "ldap_totp")).toBe("AD-Passwort + TOTP · AD/LDAP")
     expect(methodText(tEn, "entra")).toBe("Entra ID · Microsoft Entra")
     expect(methodText(t, "passkey")).toBe("Passkey · lokal")
+    expect(methodText(t, "password_device")).toBe("Passwort + gemerktes Gerät · lokal")
+    expect(methodText(tEn, "entra_device")).toBe("Entra ID + remembered device · Microsoft Entra")
     expect(methodText(t, null)).toBe("—")
   })
   it("names the browser coarse", () => {

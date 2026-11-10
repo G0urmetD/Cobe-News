@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Pill } from "@/components/cobe/badges"
 import { EmptyState } from "@/components/cobe/common"
+import { confirmAction } from "@/components/cobe/confirm"
 import { Explained } from "@/components/cobe/explained"
 import { EnableCard, Field, LockedFields, ToggleRow } from "@/components/cobe/form"
 import { copyWithToast } from "@/lib/clipboard"
@@ -34,6 +35,7 @@ import {
   useSessionSettings,
 } from "@/lib/admin-api"
 import { errorText } from "@/lib/errors"
+import { REMEMBER_DAYS, type RememberDays } from "@/lib/remember-device"
 import { withReauth } from "@/lib/reauth"
 import { type DirectoryKind, type DirectoryTestResult as TestResult, directoryTestError, directoryTestToast } from "@/lib/directory-test"
 import { type PasskeySettings, usePasskeySettings } from "@/lib/security-api"
@@ -628,12 +630,17 @@ export function SecondFactorPane() {
 function SecondFactorForm({ initial }: { initial: MfaSettings }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const [on, setOn] = useState(initial.required_all)
+  const start = { required_all: initial.required_all, remember: initial.remember, remember_days: initial.remember_days, remember_admins: initial.remember_admins }
+  const [v, setV] = useState(start)
   const [busy, setBusy] = useState(false)
+  const dirty = (Object.keys(start) as (keyof typeof start)[]).some((k) => v[k] !== start[k])
   const save = async () => {
+    // switching it off forgets every remembered device – said before it happens
+    if (initial.remember && !v.remember && !(await confirmAction({ title: t("signin.mfa.rememberOffTitle"), text: t("signin.mfa.rememberOffText"), confirm: t("common.save") })))
+      return
     setBusy(true)
     try {
-      await withReauth(() => api.put("/api/admin/auth/mfa", { required_all: on, rev: initial.rev }))
+      await withReauth(() => api.put("/api/admin/auth/mfa", { ...v, rev: initial.rev }))
       toast.success(t("common.saved"))
       void qc.invalidateQueries({ queryKey: ["admin", "mfa"] })
     } catch (e) {
@@ -643,21 +650,54 @@ function SecondFactorForm({ initial }: { initial: MfaSettings }) {
       setBusy(false)
     }
   }
+  const dayText = (d: RememberDays) => (d === 0 ? t("signin.mfa.rememberSession", { count: initial.session_h }) : t("signin.mfa.rememberDays", { count: d }))
   return (
     <>
       <SheetBody>
         <ToggleRow
           label={t("signin.mfa.requiredAll")}
           description={<Explained label={t("signin.mfa.requiredAllHint")} text={t("signin.mfa.tip")} />}
-          checked={on}
-          onCheckedChange={setOn}
+          checked={v.required_all}
+          onCheckedChange={(x) => setV({ ...v, required_all: x })}
           className="py-0"
         />
         <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">{t("signin.mfa.about")}</p>
+        <ToggleRow
+          label={t("signin.mfa.remember")}
+          description={<Explained label={t("signin.mfa.rememberHint")} text={t("signin.mfa.rememberTip")} />}
+          checked={v.remember}
+          onCheckedChange={(x) => setV({ ...v, remember: x })}
+          className="border-t pt-4 pb-0"
+        />
+        {v.remember && (
+          <div className="space-y-3 rounded-lg border p-3">
+            <Field label={t("signin.mfa.rememberFor")} hint={t("signin.mfa.rememberForHint")}>
+              <Select value={String(v.remember_days)} onValueChange={(x) => setV({ ...v, remember_days: Number(x) as RememberDays })}>
+                <SelectTrigger className="w-full sm:max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {REMEMBER_DAYS.map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {dayText(d)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <ToggleRow
+              label={t("signin.mfa.rememberAdmins")}
+              description={t("signin.mfa.rememberAdminsHint")}
+              checked={v.remember_admins}
+              onCheckedChange={(x) => setV({ ...v, remember_admins: x })}
+              className="py-0"
+            />
+          </div>
+        )}
       </SheetBody>
       <SheetActions>
         <span />
-        <SaveBar busy={busy} dirty={on !== initial.required_all} onSave={() => void save()} />
+        <SaveBar busy={busy} dirty={dirty} onSave={() => void save()} />
       </SheetActions>
     </>
   )

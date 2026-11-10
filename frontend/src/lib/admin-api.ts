@@ -269,9 +269,15 @@ export interface EntraSettings {
   rev?: number
 }
 
-/** "Zweiter Faktor für alle" (GET/PUT /api/admin/auth/mfa) */
+/** "Zweiter Faktor für alle" and "Zweiten Faktor auf dem Gerät merken" (GET/PUT /api/admin/auth/mfa) */
 export interface MfaSettings {
   required_all: boolean
+  remember: boolean
+  /** 0: the maximum session lifetime (`session_h`), else days */
+  remember_days: 0 | 1 | 7 | 30
+  remember_admins: boolean
+  /** the maximum session lifetime in hours (Einstellungen → Anmeldung → Sitzungen) – read only here */
+  session_h: number
   rev: number
 }
 
