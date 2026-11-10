@@ -267,9 +267,7 @@ export function LoginPage({ resume }: { resume?: Step }) {
         <div className="space-y-6">
           {back}
           <StepHeader icon={ShieldCheck} title={t("auth.mfaTitle")} text={t("auth.mfaText")} />
-          <div className="flex justify-center">
-            <CodeInput size="lg" value={otp} onChange={setOtp} onComplete={(v) => void sendCode(v)} />
-          </div>
+          {/* before the code: a complete code is sent at once */}
           {remember && (
             <ToggleRow
               label={remember.until ? t("auth.rememberUntil", { until: fmtDateTime(remember.until) }) : t("auth.remember")}
@@ -279,6 +277,9 @@ export function LoginPage({ resume }: { resume?: Step }) {
               className="rounded-xl border px-4 py-3"
             />
           )}
+          <div className="flex justify-center">
+            <CodeInput size="lg" value={otp} onChange={setOtp} onComplete={(v) => void sendCode(v)} />
+          </div>
           {errorBox}
           <Button size="lg" className="h-10 w-full" disabled={otp.length < 6 || loading} onClick={() => void sendCode(otp)}>
             {loading && <Loader2 className="animate-spin" />} {t("auth.verify")}
