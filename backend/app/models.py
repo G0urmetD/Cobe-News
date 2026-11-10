@@ -1303,6 +1303,32 @@ class VendorRead(Base):
     unread: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
 
+class VendorConfirm(Base):
+    """"Treffer bestätigt" (app/finding_confirm.py): a Vendor News finding of a followed product assessed for everybody –
+    not affected, mitigated or the risk accepted, with a reason. While it stands (`ended_at` None and `facts` still those
+    of the finding) the finding counts as handled and is not notified. It ends by hand ("aufheben", `ended_reason`
+    "undone") or by itself when the finding changes materially (exploited, rated higher, new CVEs, a version's verdict,
+    withdrawn). The row stays after the end: the events made while it stood are never sent later (`held_from`,
+    `held_until`)."""
+
+    __tablename__ = "vendor_confirms"
+
+    product: Mapped[str] = mapped_column(Text, primary_key=True)
+    finding: Mapped[str] = mapped_column(Text, primary_key=True)
+    status: Mapped[str] = mapped_column(Text)  # not_affected | mitigated | accepted
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    user_name: Mapped[str] = mapped_column(Text, default="", server_default="")  # kept for display (account deleted)
+    confirmed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    facts: Mapped[dict] = mapped_column(Json, default=dict)  # the finding as it was confirmed (finding_confirm.facts_of)
+    # its events made in [held_from, held_until) are never sent – while it stands (held_until None) none of them is
+    held_from: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    held_until: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    ended_reason: Mapped[str | None] = mapped_column(Text)  # undone | exploited | severity | cves | verdict | withdrawn
+    ended_by: Mapped[str | None] = mapped_column(Text)  # the name of who undid it (a lapse: none)
+
+
 class PersonMute(Base):
     """"Stummschalten" for a while: a person silences a catalogue product or one CVE until `until` – none of their own
     deliveries (app/personal.py) for it, dimmed or hidden in their lists, left out of their unread numbers. Never anybody

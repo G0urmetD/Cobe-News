@@ -4,6 +4,7 @@ off by default), with an active account and an e-mail address, get one mail a we
 
 - **Content** of the seven days before: new vulnerabilities by severity (the most severe listed), own versions affected
   now, advisory changes with an effect on them, EOL within 90 days, new versions – each with a link into Cobe News.
+  A confirmed finding (app/finding_confirm.py) is handled: neither among the new ones nor counted as affecting.
   HTML and a text alternative as the other mails; every value from the feeds is escaped (Jinja autoescape) or plain text.
 - **Exactly once** per team, person and ISO week (team_weekly_sends, keyed): queued once per week (team_weekly.last_week),
   claimed (pending → sending) and committed before the mail goes out – a restart or a crash in between never sends it
@@ -326,17 +327,19 @@ async def prune(db: AsyncSession, days: int = 90) -> int:
 
 async def _affected(db: AsyncSession, follows: list[VendorFollow]) -> list[dict]:
     """Per own version how many vulnerabilities affect it now (the product page's card)."""
+    from app import finding_confirm
     from app import vendor as vendor_svc
 
     out = []
     vers = await vendor_svc.versions_of(db, [f.id for f in follows])
+    st = await finding_confirm.standing(db, [f.product for f in follows])  # confirmed findings are handled: not counted
     for f in follows:
         vs = vers.get(f.id, [])
         if not vs or vendor_svc.product_of(f) is None:
             continue
         try:
             view = await vendor_svc.product_view(db, f, vs)
-            per = vendor_svc.summary(view, vs)["per_version"]
+            per = vendor_svc.summary(view, vs, st.skip(f.product, view["findings"]) if st else frozenset())["per_version"]
         except Exception:  # noqa: BLE001 - one product's view must not stop the review
             log.exception("weekly: view of %s failed", f.product)
             continue
@@ -371,7 +374,7 @@ async def _eol(db: AsyncSession, follows: list[VendorFollow], today: date) -> li
 
 async def content(db: AsyncSession, team_id: uuid.UUID, until: datetime) -> dict:
     """What the review of a team says for the seven days before `until`."""
-    from app import personal
+    from app import finding_confirm, personal
     from app import vendor as vendor_svc
 
     since = until - WINDOW
@@ -382,7 +385,14 @@ async def content(db: AsyncSession, team_id: uuid.UUID, until: datetime) -> dict
     events = list(
         await db.scalars(
             select(VendorEvent)
-            .where(VendorEvent.product.in_(list(labels)), VendorEvent.baseline.is_(False), VendorEvent.kind.in_(("vuln", "version", "change")), VendorEvent.created_at >= since, VendorEvent.created_at < until)
+            .where(
+                VendorEvent.product.in_(list(labels)),
+                VendorEvent.baseline.is_(False),
+                VendorEvent.kind.in_(("vuln", "version", "change")),
+                VendorEvent.created_at >= since,
+                VendorEvent.created_at < until,
+                ~finding_confirm.held(),  # a confirmed finding (app/finding_confirm.py): handled, not in the review
+            )
             .order_by(rank.desc(), VendorEvent.created_at.desc())
             .limit(2000)
         )

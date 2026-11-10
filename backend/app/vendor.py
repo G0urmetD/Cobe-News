@@ -892,6 +892,10 @@ async def drop_advisories(db: AsyncSession, ids: list[str], *, withdrawn: bool =
         gone = (await db.execute(select(VendorAdvisory.id, VendorAdvisory.source, VendorAdvisory.ident, VendorAdvisory.title, VendorAdvisory.cves).where(VendorAdvisory.id.in_(ids)))).all()
         await cve_watch.withdrawn(db, [tuple(r) for r in gone])
     if withdrawn and links:
+        # a confirmed finding of a withdrawn advisory: the confirmation ends (app/finding_confirm.py)
+        from app import finding_confirm
+
+        await finding_confirm.withdrawn(db, [(p, aid) for p, aid in links], {p: str((catalog.product(p) or {}).get("label") or p) for p, _ in links})
         linked: dict[str, set[str]] = {}
         for p, aid in links:
             linked.setdefault(aid, set()).add(p)
@@ -2228,12 +2232,13 @@ async def _add_exploits(found: list[dict]) -> None:
             x["exploit"] = e
 
 
-def summary(view: dict, vers: list[VendorVersion]) -> dict:
+def summary(view: dict, vers: list[VendorVersion], skip: frozenset[str] = frozenset()) -> dict:
     """The card: per version how many vulnerabilities affect it (critical / exploited ones apart; "unklare Altdaten"
-    apart and not counted), the version to go to, the worst state."""
-    if (hit := view.get("_summary")) is not None:
+    apart and not counted), the version to go to, the worst state. `skip`: the ids of confirmed findings
+    (app/finding_confirm.py) – handled, not counted; then computed anew, not kept with the view."""
+    if not skip and (hit := view.get("_summary")) is not None:
         return hit  # computed once per view (the overview asks for it on every load)
-    fs = view["findings"]
+    fs = [f for f in view["findings"] if f["id"] not in skip] if skip else view["findings"]
 
     def blank() -> dict:
         return {"affected": 0, "possible": 0, "critical": 0, "exploited": 0, "service": 0, "unversioned": 0, "stale": 0}
@@ -2256,7 +2261,9 @@ def summary(view: dict, vers: list[VendorVersion]) -> dict:
     for f in fs:
         if f["status"] not in ("not_affected", "stale") and (worst == "none" or ORDER[f["status"]] > ORDER.get(worst, -1)):
             worst = f["status"]
-    view["_summary"] = out = {"per_version": per, "worst": worst}
+    out = {"per_version": per, "worst": worst}
+    if not skip:
+        view["_summary"] = out
     return out
 
 
@@ -2597,7 +2604,12 @@ def _sev_name(rank: int) -> str:
 async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list[VendorVersion], view: dict, now: datetime, *, rated_quiet: bool = False) -> int:
     """One product's events (evaluate_events). `rated_quiet`: "now rated higher" only noted, never sent (the first
     evaluation that knows it – the ratings of before are no news)."""
+    from app import finding_confirm
+
     created = 0
+    # a confirmed finding that changed materially: the confirmation ends before the events are made – the event of the
+    # change goes out and says so (app/finding_confirm.py)
+    lapsed = await finding_confirm.check(db, p, view["findings"], now)
     targets = [(v.version, v) for v in vs] or [("*", None)]
     scopes = [f"vuln:{f.product}:{text}" for text, _ in targets]
     said = await _known(db, scopes)
@@ -2644,6 +2656,7 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                 "exploited": fd["exploited"],
                 "published_at": fd["published_at"],
                 **({"tlp": fd["tlp"]} if fd.get("tlp") else {}),
+                **({"confirm_lapsed": lapsed[fd["id"]]} if fd["id"] in lapsed else {}),
             }
             key = f"{scope}:{fd['id']}"[:400]
             rank = SEV_RANK.get(fd["severity"], 0)

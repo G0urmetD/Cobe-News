@@ -1,4 +1,4 @@
-import { memo, useDeferredValue, useMemo, useState } from "react"
+import { createContext, memo, useContext, useDeferredValue, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import {
@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   Search,
   ShieldAlert,
+  ShieldCheck,
   SlidersHorizontal,
   TrendingUp,
   UsersRound,
@@ -47,6 +48,7 @@ import { Explained } from "@/components/cobe/explained"
 import { QueryError } from "@/components/cobe/query-state"
 import { WatchStar } from "@/components/cobe/watch-star"
 import { useAuth } from "@/lib/auth"
+import { cardLines } from "@/lib/finding-confirm"
 import { errorText } from "@/lib/errors"
 import { fmtDate, fmtDay, fmtDayFrom } from "@/lib/format"
 import { IN_PAGE, type VendorUrlFilter, readVendorFilter, readerVisible, useVendorRead, writeVendorFilter } from "@/lib/reader-api"
@@ -124,6 +126,7 @@ const CHIP_LABEL: Record<FilterChip, string> = {
   team: "vendor.scope.team",
   unread: "reader.onlyUnread",
   muted: "vendor.filters.mutedChip",
+  confirmed: "confirm.chip",
   review: "review.filter",
   now: "vendor.sum.filterNow",
   exploited: "vendor.sum.filterExploited",
@@ -330,7 +333,7 @@ export function Overview({ onOpen, scope: sc, onSuggest }: { onOpen: OnOpen; sco
       ) : layout === "list" ? (
         <ProductList items={items} onOpen={onOpen} />
       ) : (
-        <>
+        <ShowConfirmed.Provider value={uf.confirmed}>
           {urgent.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {urgent.map((i) => (
@@ -339,7 +342,7 @@ export function Overview({ onOpen, scope: sc, onSuggest }: { onOpen: OnOpen; sco
             </div>
           )}
           {ok.length > 0 && <OkCards items={ok} heading={urgent.length > 0} onOpen={onOpen} />}
-        </>
+        </ShowConfirmed.Provider>
       )}
       {onSuggest && (
         <p className="flex flex-wrap items-center gap-1 pt-2 text-xs text-muted-foreground">
@@ -472,6 +475,12 @@ function FilterMenu({
             {t("reader.showMuted")}
           </Label>
         </div>
+        <div className="flex items-center gap-2.5">
+          <Switch id="vendor-confirmed" checked={uf.confirmed} onCheckedChange={(v) => onChange({ confirmed: v })} />
+          <Label htmlFor="vendor-confirmed" className="flex-1 text-sm" title={t("confirm.showHelp")}>
+            {t("confirm.show")}
+          </Label>
+        </div>
         {(review !== null || uf.filter === "review") && (
           <div className="flex items-center gap-2.5">
             <Switch id="vendor-review" checked={uf.filter === "review"} onCheckedChange={(v) => onChange({ filter: v ? "review" : null })} />
@@ -590,10 +599,15 @@ const VERSION_DOT = { affected: "--warning", possible: "--muted-foreground", not
 
 const CARD_TONE: Partial<Record<Urgency, string>> = { exploited: "--sev-critical", critical: "--sev-critical", affected: "--warning" }
 
+/** "Mit Bestätigten" (the filter menu): the cards list the confirmed findings too, after the open ones. */
+const ShowConfirmed = createContext(false)
+
 /** One followed product: what to do, its versions with their support, the three worst findings. */
 export const ProductCard = memo(function ProductCard({ item, onOpen }: { item: OverviewItem; onOpen: OnOpen }) {
   const { t } = useTranslation()
   const ct = useCatalogTexts()
+  const withConfirmed = useContext(ShowConfirmed)
+  const lines = cardLines(item.latest, item.latest_confirmed, withConfirmed)
   const { product: p, counts, versions, releases } = item
   const tier = urgencyOf(item)
   const accent = CARD_TONE[tier]
@@ -661,17 +675,18 @@ export const ProductCard = memo(function ProductCard({ item, onOpen }: { item: O
       ) : (
         !p.cloud && counts.unversioned === 0 && <p className="text-xs text-muted-foreground">{t("vendor.giveVersion")}</p>
       )}
-      {item.latest.length > 0 && (
-        // the worst first, like the drawer – a click opens the drawer at that finding
+      {lines.length > 0 && (
+        // the worst first, like the drawer – a click opens the drawer at that finding; confirmed ones after them
         <div className="relative z-10 mt-auto space-y-0.5 border-t pt-2">
           <ul className="space-y-0.5">
-            {item.latest.slice(0, 3).map((f) => (
+            {lines.map(({ line: f, confirmed }) => (
               <li key={f.id}>
                 <FindingLine
                   f={f}
                   productKey={p.key}
                   onOpen={onOpen}
                   prefix={tier === "affected" || tier === "critical" || tier === "exploited" ? f.status !== "affected" : f.status !== "possible"}
+                  confirmed={confirmed}
                 />
               </li>
             ))}
@@ -768,7 +783,20 @@ function SupportPill({ state, until }: { state?: string; until: string | null })
 }
 
 /** CVSS badge, CVE, readable title – the drawer opens at it. */
-function FindingLine({ f, productKey, onOpen, prefix }: { f: OverviewItem["latest"][number]; productKey: string; onOpen: OnOpen; prefix: boolean }) {
+function FindingLine({
+  f,
+  productKey,
+  onOpen,
+  prefix,
+  confirmed = false,
+}: {
+  f: OverviewItem["latest"][number]
+  productKey: string
+  onOpen: OnOpen
+  prefix: boolean
+  /** a confirmed finding ("Mit Bestätigten"): dimmed, marked */
+  confirmed?: boolean
+}) {
   const { t } = useTranslation()
   const sev = NEWS_SEV_COLOR[f.severity]
   const cve = normalizeCve(f.ident)
@@ -777,7 +805,10 @@ function FindingLine({ f, productKey, onOpen, prefix }: { f: OverviewItem["lates
       type="button"
       onClick={() => onOpen(productKey, f.id)}
       aria-label={t("vendor.card.openFinding", { ident: f.ident })}
-      className="flex w-full min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+      className={cn(
+        "flex w-full min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50",
+        confirmed && "opacity-60",
+      )}
     >
       <span
         className="w-8 shrink-0 rounded px-1 py-px text-center font-mono text-[11px] font-semibold tabular-nums"
@@ -791,7 +822,8 @@ function FindingLine({ f, productKey, onOpen, prefix }: { f: OverviewItem["lates
           {t(`vendor.card.short.${f.status}`, { defaultValue: "" })}
         </span>
       )}
-      <span className={cn("line-clamp-1 min-w-0 text-muted-foreground", f.muted && "opacity-60")}>
+      {confirmed && <ShieldCheck className="size-3 shrink-0 text-success" aria-label={t("confirm.short")} />}
+      <span className={cn("line-clamp-1 min-w-0 text-muted-foreground", f.muted && !confirmed && "opacity-60")}>
         {f.unread && <span aria-hidden className="mr-1 inline-block size-1.5 rounded-full bg-primary align-middle" />}
         {f.unread && <span className="sr-only">{t("reader.unread")}: </span>}
         <span className={cn("font-mono text-foreground/80", f.unread && "font-semibold text-foreground")}>{f.ident}</span> {f.headline || f.title}
@@ -856,6 +888,14 @@ const OkCard = memo(function OkCard({ item, onOpen }: { item: OverviewItem; onOp
         {due.length > 0 && (
           <span className="ml-1.5">
             <DuePill days={Math.max(...due.map((v) => v.review?.age_days ?? 0))} compact />
+          </span>
+        )}
+        {(item.confirmed ?? 0) > 0 && (
+          // all is well because findings were confirmed: said, so nobody wonders where they went
+          <span className="relative z-10 ml-1.5" title={t("confirm.countHelp")}>
+            <Pill color="--success" fg="--success-fg">
+              <ShieldCheck /> {t("confirm.count", { count: item.confirmed })}
+            </Pill>
           </span>
         )}
         <p className="truncate text-xs text-muted-foreground" title={shown || undefined}>
@@ -1049,13 +1089,21 @@ const ListRow = memo(function ListRow({ item, onOpen }: { item: OverviewItem; on
 function ReaderPills({ item }: { item: OverviewItem }) {
   const { t } = useTranslation()
   const n = item.unread ?? 0
-  if (!n && !item.muted) return null
+  const done = item.confirmed ?? 0
+  if (!n && !item.muted && !done) return null
   return (
     <span className="relative z-10 mt-1 flex flex-wrap items-center gap-1">
       {n > 0 && (
         <Pill color="--primary" dot>
           {t("reader.newCount", { count: n })}
         </Pill>
+      )}
+      {done > 0 && (
+        <span title={t("confirm.countHelp")}>
+          <Pill color="--success" fg="--success-fg">
+            <ShieldCheck /> {t("confirm.count", { count: done })}
+          </Pill>
+        </span>
       )}
       {item.muted && (
         <span title={t("reader.mute.onlyYou")}>

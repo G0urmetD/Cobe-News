@@ -883,6 +883,19 @@ einmal pro Woche wieder die neuesten 2000: was die NVD für die CPE nicht mehr l
 verliert dann die Zuordnung. Eine geänderte Version wird sofort neu bewertet – ohne neuen Abruf. Ereignisse entfernter
 Versionen und nicht mehr gefolgter Produkte werden gelöscht.
 
+**Bestätigte Treffer** (`backend/app/finding_confirm.py`, Tabelle `vendor_confirms`, Migration 0043): je Produkt und
+Befund die Bewertung für alle (nicht betroffen, Maßnahme umgesetzt, Risiko akzeptiert), Begründung, wer (Name bleibt,
+auch wenn das Konto gelöscht wird) und wann, dazu die Fakten, auf die bestätigt wurde. Admins und – bei eingeschalteten
+Teams – die Mitglieder eines Teams des Produkts dürfen bestätigen (`POST /api/vendor/findings/confirm`, `…/unconfirm`).
+Solange sie steht, zählt der Befund nicht (Kacheln, Badge, ungelesen, Wochenrückblick, API v1) und keine Regel und kein
+persönlicher Weg sendet seine Ereignisse – auch nicht nachträglich. Sie endet von selbst, wenn der Befund jetzt
+ausgenutzt, höher eingestuft wird, neue CVEs bekommt, eine eingetragene Version (stärker) betrifft oder zurückgezogen
+wird – geprüft bei jeder Bewertung der Ereignisse, vor dem Anlegen; Protokoll `vendor.finding_confirm_lapsed`. Die
+Ereignisse des letzten Tages davor (die Advisory-Änderung, die es auslöste) gehen dann doch hinaus. Die Zeilen bleiben
+nach dem Ende stehen (sie halten, was in der Zeit entstand, zurück); mit dem Produkt, dem niemand mehr folgt, gehen sie
+(stündlicher Prune mit den Lesemarken). Ein späteres Zusammenlegen von Katalog-Schlüsseln muss `vendor_confirms` mit
+umziehen (wie `vendor_reads`).
+
 **Ausgehende Hosts** (nur bei gefolgten Produkten): `services.nvd.nist.gov`, `endoflife.date`, `www.cisa.gov`;
 mit Palo-Alto-Produkten `security.paloaltonetworks.com`, mit Fortinet-Produkten `filestore.fortinet.com`, mit
 Veeam-Produkten `www.veeam.com`; dazu die [weiteren Quellen](#weitere-quellen-csaf-anbieter-cvelistv5-epss-osv).

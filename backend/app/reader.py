@@ -28,6 +28,10 @@ stays when one of them is muted). A watched CVE that is muted is silent too – 
 newer one wins until it ends. A muted product's KEV ("now exploited") is not delivered either, but the list shows it
 with a badge even while muted ones are hidden – an exploited vulnerability never disappears from sight.
 
+**Confirmed** (app/finding_confirm.py, vendor_confirms) is not a person's: a finding confirmed for everybody counts as
+handled – left out of everybody's unread numbers (VendorReading.confirms), shown in the lists with its badge. A mute
+stays the person's own and ends by itself; the two never change each other.
+
 **Saved views** (saved_views): the raw query string of News or Vendor News under a name, per person – unknown
 parameters are kept (a parameter renamed later must not break a view); the page validates what it reads.
 """
@@ -45,6 +49,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app import db as dbm
+from app import finding_confirm
 from app.models import NewsItem, NewsRead, PersonMute, ReaderState, SavedView, User, VendorEvent, VendorFollow, VendorRead
 
 AUTO_READ = timedelta(days=30)  # older than this (by arrival): read without a mark
@@ -269,6 +274,11 @@ class VendorReading:
     reads: dict[tuple[str, str], tuple[datetime, bool]]
     floor: datetime
     mutes: Mutes
+    # the findings confirmed for everybody (app/finding_confirm.py): handled – not in the unread numbers
+    confirms: "finding_confirm.Standing | None" = None
+
+    def confirmed(self, product: str, f: dict) -> dict | None:
+        return self.confirms.of(product, f) if self.confirms else None
 
     def unread(self, product: str, finding: str) -> bool:
         k = (product, finding)
@@ -284,20 +294,21 @@ class VendorReading:
         return self.mutes.finding(product, f.get("cves"))
 
     def count(self, product: str, findings: list[dict]) -> int:
-        """Unread findings of a product the card counts (not muted, of the kinds the card shows)."""
+        """Unread findings of a product the card counts (not muted, not confirmed, of the kinds the card shows)."""
         if product in self.mutes.products:
             return 0
-        return sum(1 for f in findings if f["status"] in RELEVANT and self.unread(product, f["id"]) and not self.muted(product, f))
+        return sum(1 for f in findings if f["status"] in RELEVANT and self.unread(product, f["id"]) and not self.muted(product, f) and not self.confirmed(product, f))
 
     def count_all(self, product: str, findings: list[dict]) -> int:
         """Unread findings of a product including the muted ones – what "Alle N als gelesen" marks while "Stummgeschaltete
-        zeigen" is on."""
-        return sum(1 for f in findings if f["status"] in RELEVANT and self.unread(product, f["id"]))
+        zeigen" is on (a confirmed one is handled: not counted either way)."""
+        return sum(1 for f in findings if f["status"] in RELEVANT and self.unread(product, f["id"]) and not self.confirmed(product, f))
 
 
 async def vendor_reading(db: AsyncSession, user: User, products: list[str], now: datetime | None = None, m: Marks | None = None) -> VendorReading:
     """The arrivals of the findings of these products (their newest event within AUTO_READ that was notified – a
-    baseline is read: it was there before), the person's marks of them and their mutes. Two small queries."""
+    baseline is read: it was there before), the person's marks of them, their mutes and the confirmed findings. A few
+    small queries."""
     now = now or now_utc()
     m = m or await marks(db, user)
     floor = max(m.vendor_at, now - AUTO_READ)
@@ -313,7 +324,8 @@ async def vendor_reading(db: AsyncSession, user: User, products: list[str], now:
                 arrivals[(product, fid)] = at
         rq = select(VendorRead.product, VendorRead.finding, VendorRead.read_at, VendorRead.unread).where(VendorRead.user_id == user.id, VendorRead.product.in_(products))
         reads = {(p, f): (at, un) for p, f, at, un in await db.execute(rq)}
-    return VendorReading(arrivals, reads, floor, await mutes_of(db, user.id, now))
+    confirms = await finding_confirm.standing(db, products, now)
+    return VendorReading(arrivals, reads, floor, await mutes_of(db, user.id, now), confirms)
 
 
 async def vendor_mark(db: AsyncSession, user_id: uuid.UUID, product: str, finding: str, *, read: bool, at: datetime | None = None) -> None:
@@ -373,7 +385,7 @@ async def prune(db: AsyncSession) -> dict[str, int]:
     again" mark stays – it goes with its story, or when its product is no longer followed)."""
     now = now_utc()
     cut = now - AUTO_READ
-    out = {"mutes": 0, "news": 0, "vendor": 0}
+    out = {"mutes": 0, "news": 0, "vendor": 0, "confirms": 0}
     out["mutes"] = (await db.execute(delete(PersonMute).where(PersonMute.until <= now))).rowcount or 0
     await db.commit()
     # read marks of stories older than AUTO_READ, or below the person's watermark – in batches (one short statement each)
@@ -395,4 +407,5 @@ async def prune(db: AsyncSession) -> dict[str, int]:
         out["news"] += len(rows)
     followed = select(VendorFollow.product)
     out["vendor"] = await dbm.delete_batched(db, VendorRead, or_(and_(VendorRead.unread.is_(False), VendorRead.read_at < cut), VendorRead.product.not_in(followed)))
+    out["confirms"] = await finding_confirm.prune(db)  # a product no longer followed: its confirmations go too
     return out

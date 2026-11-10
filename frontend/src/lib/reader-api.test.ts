@@ -106,7 +106,7 @@ describe("topics in the address", () => {
     expect(hasFilter(new URLSearchParams("ours=1"), "vendor")).toBe(false)
     expect(hasFilter(new URLSearchParams("ours=1"), "news")).toBe(true)
     expect(hasFilter(new URLSearchParams("topic=exploited&status=ok"), "vendor")).toBe(true)
-    expect(readVendorFilter(new URLSearchParams("topic=exploited"))).toEqual({ status: null, filter: null, q: "", unread: false, muted: false })
+    expect(readVendorFilter(new URLSearchParams("topic=exploited"))).toEqual({ status: null, filter: null, q: "", unread: false, muted: false, confirmed: false })
     expect(writeVendorFilter(new URLSearchParams("topic=zeroday"), { status: "check" }).get("status")).toBe("check")
   })
 })
@@ -156,8 +156,9 @@ describe("vendor filter in the address", () => {
       q: "pan",
       unread: true,
       muted: false,
+      confirmed: false,
     })
-    expect(readVendorFilter(new URLSearchParams("status=<script>&filter=nope"))).toEqual({ status: null, filter: null, q: "", unread: false, muted: false })
+    expect(readVendorFilter(new URLSearchParams("status=<script>&filter=nope"))).toEqual({ status: null, filter: null, q: "", unread: false, muted: false, confirmed: false })
     expect(readVendorFilter(new URLSearchParams("filter=action")).status).toBe("action")
     // "Versionen prüfen" (catalog care): its summary filter survives the address too
     expect(readVendorFilter(new URLSearchParams("filter=review")).filter).toBe("review")

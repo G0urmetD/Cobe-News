@@ -459,6 +459,9 @@ Weile** stumm: für **7 Tage**, **30 Tage** oder **bis zu einem Datum** (höchst
 **Wo:** im Menü **⋯** einer Meldung oder einer Produktkachel, unten in der Meldung bzw. Produkt-Schublade, an einem
 Befund und in der Merkliste der [beobachteten CVEs](#cves-liste) (aufgeklappte Zeile).
 
+**Bestätigen statt stummschalten?** Ist ein Befund für alle erledigt (z. B. die betroffene Funktion ist nicht im
+Einsatz), [bestätige](/docs/vendor-news#treffer-bestaetigen) ihn – das gilt für alle und bleibt.
+
 **Was es bewirkt – nur für dich:**
 
 - **Keine persönlichen Benachrichtigungen** dafür auf deinen Wegen (E-Mail, Desktop-Push, eigener Teams-Webhook):

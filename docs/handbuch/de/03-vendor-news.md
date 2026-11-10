@@ -26,7 +26,7 @@ Die Seite zeigt die gefolgten Produkte mit ihrem Stand. Von oben nach unten:
   genau die angezeigten Produkte (siehe [Gelesen, stumm und Ansichten](#vendor-lesen)).
 
 Unter **Filter** stehen die Schalter „Nur ungelesene“ (mit der Zahl der ungelesenen Befunde), „Stummgeschaltete
-zeigen“, „Versionen zu prüfen“ (mit ihrer Zahl, wenn [Versionen prüfen](#versionen-pruefen) eingeschaltet ist) und
+zeigen“, „Bestätigte zeigen“ ([Treffer bestätigen](#treffer-bestaetigen)), „Versionen zu prüfen“ (mit ihrer Zahl, wenn [Versionen prüfen](#versionen-pruefen) eingeschaltet ist) und
 „Mein Team | Alle“ (siehe [Mein Team](#mein-team)).
 
 Der **Katalog** – alle Produkte, denen man folgen kann (über 900, in Kategorien) – öffnet sich über **⋯ → Produkt
@@ -663,6 +663,33 @@ Produkt).
   keine gespeicherte Ansicht sind). Ältere Links und Ansichten gelten weiter: „Sofort“, „aktiv ausgenutzt“ und „Support
   endet / beendet“ der früheren Zusammenfassung erscheinen als Chip, `?tab=catalog` und `?tab=suggestions` öffnen
   Katalog und Vorschläge.
+
+## Treffer bestätigen {#treffer-bestaetigen}
+
+Manche Treffer betreffen die eigene Installation nicht, obwohl die Version im betroffenen Bereich liegt – etwa ein
+PAN-OS-Advisory, das nur zählt, wenn eine bestimmte Funktion (z. B. Brotli) eingeschaltet ist. Dafür gibt es am Befund in
+der Schublade **Bestätigen …**: eine Bewertung für **alle**, mit Begründung.
+
+- **Bewertungen:** *Nicht betroffen* (Funktion oder Konfiguration nicht im Einsatz), *Maßnahme umgesetzt* (Workaround
+  oder Gegenmaßnahme) und *Risiko akzeptiert* – diese nur mit Begründung. Die Begründung ist kurz (bis 500 Zeichen).
+- **Wirkung:** Ein bestätigter Treffer zählt als erledigt – nicht in den Zahlen der Kachel, ihrem Zustand, der Zahl an
+  „Vendor News“, den ungelesenen, dem [Wochenrückblick](/docs/benachrichtigungen#wochenrueckblick) und den Zahlen der
+  [API](/docs/api) – und meldet sich nicht mehr: weder über die Regeln noch über die persönlichen Wege. Was in der Zeit
+  entsteht, kommt auch später nicht nach.
+- **Sichtbar bleibt er:** in der Schublade blass mit „Bestätigt · Nicht betroffen“, wer, wann und warum stehen darunter
+  und beim Darüberfahren. Die Kachel nennt „2 bestätigt“; unter *Filter* zeigt **Bestätigte zeigen** (Chip „Mit
+  Bestätigten“) sie auch in den Zeilen der Kachel.
+- **Von selbst aufgehoben** wird die Bestätigung, wenn sich der Treffer wesentlich ändert: jetzt aktiv ausgenutzt,
+  höher eingestuft, neue CVEs, eine eingetragene Version jetzt (sicherer) betroffen – auch eine später eingetragene –
+  oder das Advisory zurückgezogen. Dann zählt und meldet er sich wieder; die Meldung sagt „Bestätigung aufgehoben: jetzt
+  ausgenutzt“, die Schublade ebenso. Eine neue Fix-Version allein hebt sie nicht auf.
+- **Wer darf:** Admins immer, bei eingeschalteten Teams auch die Mitglieder eines Teams, dem das Produkt zugeordnet ist
+  (dieselben, die seine [Versionen prüfen](#versionen-pruefen)). Alle anderen sehen die Bestätigung nur.
+  **Bestätigung aufheben** macht sie rückgängig. Bestätigen, Aufheben und das Aufheben von selbst stehen im Protokoll.
+
+**Bestätigen oder stummschalten?** [Stummschalten](/docs/benachrichtigungen#stummschalten) ist deins und auf Zeit: nur
+deine Meldungen und Zahlen, bis zu einem Datum. Bestätigen gilt für alle und bleibt, bis jemand es aufhebt oder der
+Treffer sich ändert – es ist die Bewertung der Installation.
 
 ## Mein Team {#mein-team}
 
