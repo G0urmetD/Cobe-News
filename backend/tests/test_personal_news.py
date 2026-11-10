@@ -280,7 +280,7 @@ async def test_migration_0042_down_and_up():
         return set(inspect(conn).get_table_names())
 
     def down(conn):  # noqa: ANN001, ANN202
-        command.downgrade(db.alembic_config(conn), "-1")  # one step: whatever comes before it after a merge
+        command.downgrade(db.alembic_config(conn), "0042-1")  # to just before 0042, whatever comes after it
         return tables(conn)
 
     def up(conn):  # noqa: ANN001, ANN202

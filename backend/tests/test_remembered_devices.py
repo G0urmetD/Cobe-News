@@ -422,3 +422,25 @@ async def test_hourly_cleanup_removes_expired_devices(client):
         await s.commit()
         await sessions.cleanup(s)
     assert await _rows() == []
+
+
+async def test_migration_0043_down_and_up():
+    from alembic import command
+    from sqlalchemy import inspect
+
+    def tables(conn):  # noqa: ANN001, ANN202
+        return set(inspect(conn).get_table_names())
+
+    def down(conn):  # noqa: ANN001, ANN202
+        command.downgrade(db.alembic_config(conn), "0043-1")  # to just before it, whatever comes after it
+        return tables(conn)
+
+    def up(conn):  # noqa: ANN001, ANN202
+        command.upgrade(db.alembic_config(conn), "head")
+        return tables(conn)
+
+    async with db.engine().begin() as conn:
+        assert "remembered_devices" not in await conn.run_sync(down)
+    async with db.engine().begin() as conn:
+        assert "remembered_devices" in await conn.run_sync(up)
+    assert await _rows() == []
