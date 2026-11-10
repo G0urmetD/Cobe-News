@@ -924,6 +924,7 @@ function SessionsForm({ initial }: { initial: SessionSettings }) {
       await withReauth(() => api.put("/api/admin/auth/sessions", v))
       toast.success(t("common.saved"))
       void qc.invalidateQueries({ queryKey: ["admin", "sessions"] })
+      void qc.invalidateQueries({ queryKey: ["admin", "mfa"] }) // "Sitzungsdauer" of the remembered devices
     } catch (e) {
       toast.error(errorText(t, e))
     } finally {

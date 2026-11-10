@@ -710,7 +710,7 @@ const de: Record<string, string> = {
   "settings.profile.title": "Profil",
   "settings.sessions.desc": "Wann eine Anmeldung abläuft – ohne Aktion und spätestens.",
   "settings.mfa.title": "Zweiter Faktor",
-  "settings.mfa.desc": "Wer sich mit einem zweiten Faktor anmelden muss – Admins immer.",
+  "settings.mfa.desc": "Wer sich mit einem zweiten Faktor anmelden muss – Admins immer – und ob ein Gerät ihn sich merken darf.",
   "settings.tab.channels": "Kanäle",
   "settings.tab.mappings": "Rollen-Zuordnung",
   "settings.tab.rules": "Regeln",

@@ -702,7 +702,7 @@ const en: Record<string, string> = {
   "settings.profile.title": "Profile",
   "settings.sessions.desc": "When a sign-in ends – without activity and at the latest.",
   "settings.mfa.title": "Second factor",
-  "settings.mfa.desc": "Who has to sign in with a second factor – admins always.",
+  "settings.mfa.desc": "Who has to sign in with a second factor – admins always – and whether a device may remember it.",
   "settings.tab.channels": "Channels",
   "settings.tab.mappings": "Role mapping",
   "settings.tab.rules": "Rules",
