@@ -168,6 +168,10 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "catalog.version_confirmed",
         "catalog.versions_confirmed",
         "catalog.refreshed",
+        # Treffer bestätigen (app/finding_confirm.py): by hand, undone, lapsed by itself
+        "vendor.finding_confirmed",
+        "vendor.finding_unconfirmed",
+        "vendor.finding_confirm_lapsed",
         "suggestion.accepted",
         "suggestion.rejected",
         "suggestion.duplicate",

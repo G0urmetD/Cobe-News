@@ -35,6 +35,9 @@ desktop push and a Microsoft Teams Workflows webhook of their own.
   event; a watched CVE's events too) – is skipped ("muted") for that person, when queued and again before it is sent;
   never sent later when the mute ends. Only that person's rows: team channels, the admins' rules and everybody else are
   untouched.
+- **Confirmed** (app/finding_confirm.py, vendor_confirms): a finding confirmed for everybody ("Treffer bestätigen") is
+  handled – its events are not routed (a queued one is skipped as "confirmed"), and one made while it stood is never
+  sent later, also when the confirmation is undone. When it lapses (the finding changed) the event of the change goes.
 - **Egress.** Mail through notify.send_mail (the SMTP settings, its pinned and checked connection). The Teams URL is a
   person's input: https on the Teams / Power Automate hosts only (TEAMS_HOSTS), public addresses only – never
   WEBHOOK_PRIVATE_NETS (notify.PUBLIC_ONLY) –, encrypted at rest (crypto) and never sent back or logged. Desktop push
@@ -57,7 +60,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app import db as dbm
-from app import concerns, delivery_log, netaddr, notify, quiet, reader, teams, webpush
+from app import concerns, delivery_log, finding_confirm, netaddr, notify, quiet, reader, teams, webpush
 from app import systems as systems_svc
 from app import settings as settings_store
 from app.config import get_config
@@ -278,6 +281,7 @@ def _routes(
         or_(TeamProduct.all_members.is_(True), chosen),
         ~later,
         ~_covered(),  # away: the deputy gets it instead (unless "also to me")
+        ~finding_confirm.held(),  # a confirmed finding (app/finding_confirm.py): handled – not sent, not later either
     ]
     if after is not None:
         where.append(VendorEvent.created_at > after)  # the way allowed by an admin only since then
@@ -353,6 +357,7 @@ def _deputy_routes(way: str, on, since, *, user_id, user_ids, event_ids, fresh: 
         or_(TeamProduct.all_members.is_(True), chosen),
         ~later,
         ~exists().where(away.user_id == pa.deputy_id, away.starts_at <= VendorEvent.created_at, away.ends_at > VendorEvent.created_at),
+        ~finding_confirm.held(),
     ]
     if after is not None:
         where.append(VendorEvent.created_at > after)
@@ -767,8 +772,11 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
         still = {k: kept_ for k, rows in still.items() if (kept_ := [r for r in rows if (r[0], k[0]) not in hushed])}
     kept = {(uid, way, r[0]) for (uid, way), rows in still.items() for r in rows}
     gone = [(ev, uid, way) for (uid, way), evs in open_.items() for ev in evs if (uid, way, ev) not in kept]
+    # confirmed since it was queued (app/finding_confirm.py): no longer routed – said as such
+    confirmed = await finding_confirm.held_events(db, {g[0] for g in gone if (g[0], g[1]) not in hushed}) if gone else set()
     await _skip_rows(db, [g for g in gone if (g[0], g[1]) in hushed], "muted")
-    await _skip_rows(db, [g for g in gone if (g[0], g[1]) not in hushed], "not_routed")
+    await _skip_rows(db, [g for g in gone if (g[0], g[1]) not in hushed and g[0] in confirmed], "confirmed")
+    await _skip_rows(db, [g for g in gone if (g[0], g[1]) not in hushed and g[0] not in confirmed], "not_routed")
     jobs: list[_Job] = []
     no: dict[str, list[tuple[uuid.UUID, str]]] = {"no_address": [], "no_device": [], "no_url": []}
     desktop = sorted({uid for uid, way in still if way == "desktop"})

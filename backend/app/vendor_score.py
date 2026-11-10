@@ -162,16 +162,20 @@ def apply(view: dict, today: date | None = None) -> None:
     view.pop("_score_top", None)
 
 
-def top(view: dict) -> dict | None:
+def top(view: dict, skip: frozenset[str] = frozenset()) -> dict | None:
     """The product's number for its card: its most urgent finding (value, level, breakdown, which finding) – None when
-    it has no finding. After `apply`."""
-    if "_score_top" in view:
+    it has no finding. After `apply`. `skip`: confirmed findings (app/finding_confirm.py) – handled, never the card's
+    number; then computed anew, not kept with the view."""
+    if not skip and "_score_top" in view:
         return view["_score_top"]
     best = None
     for f in view.get("findings") or []:
+        if f["id"] in skip:
+            continue
         s = f.get("score")
         if s and (best is None or s["value"] > best[0]["value"] or (s["value"] == best[0]["value"] and s["raw"] > best[0]["raw"])):
             best = (s, f)
     out = {**best[0], "finding": best[1]["id"], "ident": best[1]["ident"]} if best else None
-    view["_score_top"] = out
+    if not skip:
+        view["_score_top"] = out
     return out

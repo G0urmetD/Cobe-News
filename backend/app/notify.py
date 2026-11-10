@@ -53,7 +53,7 @@ from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import advisory_changes, audit, bounded, delivery_log
+from app import advisory_changes, audit, bounded, delivery_log, finding_confirm
 from app import db as dbm
 from app import concerns
 from app import keywords as words_svc
@@ -1823,6 +1823,8 @@ def vendor_filter(rule: NotifyRule, teams) -> list | None:  # noqa: ANN001
     if rule.severities:
         where.append(or_(VendorEvent.kind.not_in(SEVERITY_KINDS), VendorEvent.severity.in_(list(rule.severities))))
     where.append(_teams_clause(teams))
+    # a confirmed finding (app/finding_confirm.py) is handled: its events are not sent – also not once it is undone
+    where.append(~finding_confirm.held())
     # the rule's systems: the event's product (a vendor: each of its catalogue products); its words and exclusions are
     # for news only
     if (c := concerns.vendor_clause(rule_systems(rule))) is not None:
@@ -2199,6 +2201,9 @@ VENDOR_LABELS = {
         "exploited": "aktiv ausgenutzt",
         "now_exploited": "Jetzt aktiv ausgenutzt",
         "rated_higher": "Jetzt höher eingestuft: {to} (vorher {was})",
+        # a confirmed finding that changed (app/finding_confirm.py): its confirmation ended by itself
+        "confirm_lapsed": "Bestätigung aufgehoben: {why}",
+        "lapse": {"exploited": "jetzt ausgenutzt", "severity": "höher eingestuft", "cves": "neue CVEs", "verdict": "Version jetzt betroffen", "withdrawn": "Advisory zurückgezogen"},
         "version": "{product} {version}: neue Version {latest} verfügbar",
         "version_text": "Release-Linie {line} – aktuellste Version {latest}.",
         "eol_soon": "{product} {version}: Ende des Supports am {date}",
@@ -2232,6 +2237,8 @@ VENDOR_LABELS = {
         "exploited": "actively exploited",
         "now_exploited": "Now actively exploited",
         "rated_higher": "Now rated higher: {to} (was {was})",
+        "confirm_lapsed": "Confirmation lifted: {why}",
+        "lapse": {"exploited": "now exploited", "severity": "rated higher", "cves": "new CVEs", "verdict": "version now affected", "withdrawn": "advisory withdrawn"},
         "version": "{product} {version}: new version {latest} available",
         "version_text": "Release line {line} – latest version {latest}.",
         "eol_soon": "{product} {version}: end of support on {date}",
@@ -2285,6 +2292,8 @@ def vendor_story(ev: VendorEvent, lang: str) -> Story:
             parts.append(lb["exploited"])
         if d.get("now_exploited") and (d.get("kev") or {}).get("ransomware"):
             parts.append("Ransomware")
+        if why := d.get("confirm_lapsed"):
+            parts.insert(0, lb["confirm_lapsed"].format(why=lb["lapse"].get(str(why), str(why))))
         summary = " · ".join(parts) + (f"\n{d['summary']}" if d.get("summary") else "")
         # the readable title (the vendor's, a short description – not NVD's marketing sentence); events from before
         # 0.1.14 have none stored: made the same way from what they have

@@ -2,8 +2,10 @@
 Vendor News with their versions and their findings. Stable shapes of their own (the response models below) – the web
 UI's endpoints change with the UI and are never reachable with a token.
 
-Nothing here knows a person: no read marks, no teams, no notes of the admins, no names of users. A token sees what every
-signed-in reader sees on the shared pages ("Alle" in Vendor News).
+Nothing here knows a person: no read marks, no teams, no notes of the admins, no names of users – except who confirmed a
+finding (app/finding_confirm.py: the name every reader sees at it). A token sees what every signed-in reader sees on
+the shared pages ("Alle" in Vendor News). A confirmed finding is handled: not in a product's counts; the findings carry
+the confirmation and /vendor/findings can leave them out (`confirmed=false`).
 
 The OpenAPI description (`openapi()`) is made from these routes and /metrics only and is served to admins
 (GET /api/admin/api-tokens/openapi.json) – the app has no public /docs."""
@@ -18,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.dialects.postgresql import array as pg_array
 
-from app import __version__, epss, exploits
+from app import __version__, epss, exploits, finding_confirm
 from app import news as news_svc
 from app import vendor as svc
 from app.api_tokens import ReadToken
@@ -115,6 +117,13 @@ class Kev(BaseModel):
     ransomware: bool | str | None = None
 
 
+class Confirmation(BaseModel):
+    status: Literal["not_affected", "mitigated", "accepted"] = Field(description="not_affected (e.g. the feature is not in use), mitigated (a workaround in place), accepted (risk accepted)")
+    note: str = Field("", description="The reason given")
+    by: str = Field("", description="Who confirmed it (the name as shown in the app)")
+    at: datetime
+
+
 class Finding(BaseModel):
     id: str = Field(description="Stable id of the advisory (`<source>:<ident>`)")
     source: str
@@ -133,6 +142,7 @@ class Finding(BaseModel):
     published_at: str | None = None
     versions: list[FindingVersion] = []
     tlp: str | None = Field(None, description="\"GREEN\": from a CSAF provider's TLP:GREEN document (allowed by an admin) – share within your organisation or community only, never publicly")
+    confirmed: Confirmation | None = Field(None, description="Confirmed for the installation (\"Treffer bestätigen\"): handled – not counted, not notified. Ends by itself when the finding changes materially")
 
 
 class ProductFinding(Finding):
@@ -280,7 +290,8 @@ def _version(v, p: dict) -> dict:  # noqa: ANN001
     return {"id": v.id, "version": v.version, "label": v.label, "valid": ok}
 
 
-def _finding(x: dict) -> dict:
+def _finding(x: dict, st: finding_confirm.Standing | None = None, product: str = "") -> dict:
+    c = st.of(product, x) if st else None
     return {
         **{k: x.get(k) for k in ("id", "source", "ident", "title", "headline", "url", "cvss", "severity", "kev", "epss", "status", "published_at")},
         "cves": list(x.get("cves") or []),
@@ -288,6 +299,7 @@ def _finding(x: dict) -> dict:
         "exploits": list(x.get("exploit") or []),
         "versions": [{"version": r.get("version"), "status": r.get("status"), "fixed": r.get("fixed")} for r in x.get("versions") or []],
         "tlp": x.get("tlp") or None,
+        "confirmed": finding_confirm.out(c) if c else None,
     }
 
 
@@ -319,11 +331,15 @@ def _counts(fs: list[dict]) -> dict:
 
 @router.get("/vendor/products", response_model=ProductList, responses=TOKEN_ERRORS, summary="The followed products", operation_id="listProducts", tags=["Vendor News"])
 async def products(token: ReadToken, db: Db) -> dict:
-    """Every followed product with its versions, how many findings of each kind concern it and how urgent it is."""
+    """Every followed product with its versions, how many findings of each kind concern it and how urgent it is –
+    confirmed findings not counted (handled)."""
     items = []
-    for f, vs, view in await _views(db):
+    views = await _views(db)
+    st = await finding_confirm.standing(db, [f.product for f, _vs, _view in views])
+    for f, vs, view in views:
         p = view["product"]
-        counts = _counts(view["findings"])
+        skip = st.skip(f.product, view["findings"]) if st else frozenset()
+        counts = _counts([x for x in view["findings"] if x["id"] not in skip])  # a confirmed finding is handled
         releases = [svc.release_info(p, v.version) or {} for v in vs]
         items.append({**_product(p), "tags": list(f.tags or []), "versions": [_version(v, p) for v in vs], "counts": counts, "urgency": svc.urgency(counts, releases)})
     return {"items": items}
@@ -357,11 +373,12 @@ async def product(
     by_status: dict[str, int] = {}
     for x in fs:
         by_status[x["status"]] = by_status.get(x["status"], 0) + 1
+    st = await finding_confirm.standing(db, [key])
     return {
         **_product(p),
         "tags": list(f.tags or []),
         "versions": [_version(v, p) for v in vs],
-        "findings": [_finding(x) for x in shown[offset : offset + limit]],
+        "findings": [_finding(x, st, key) for x in shown[offset : offset + limit]],
         "offset": offset,
         "limit": limit,
         "shown": len(shown),
@@ -376,23 +393,28 @@ async def findings(
     status: Annotated[list[Status], Query(description="Verdicts (default: affected and possible)")] = [],  # noqa: B006
     severity: Annotated[list[Severity], Query(description="Only these severities")] = [],  # noqa: B006
     exploited: Annotated[bool | None, Query(description="true: only known exploited ones")] = None,
+    confirmed: Annotated[bool | None, Query(description="false: without the confirmed (handled) ones, true: only those – default: all, each with its confirmation")] = None,
     offset: Annotated[int, Query(ge=0, le=100000)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> dict:
     """One list for a SIEM or a ticket system: each finding once per product, the most relevant first."""
     want = frozenset(status) or frozenset({"affected", "possible"})
     views = await _views(db)
-    # the sorted list is made once per state of the views and filter – a page of it is a slice (it was built and sorted
-    # anew for every page: ~330 ms per page at 44 000 findings, whatever the limit)
-    key = (tuple((f.product, view["stamp"]) for f, _vs, view in views), want, frozenset(severity), exploited)
+    # the sorted list is made once per state of the views, the confirmations and the filter – a page of it is a slice
+    # (it was built and sorted anew for every page: ~330 ms per page at 44 000 findings, whatever the limit)
+    key = (tuple((f.product, view["stamp"]) for f, _vs, view in views), finding_confirm.generation(), want, frozenset(severity), exploited, confirmed)
     rows = _sorted.get(key)
     if rows is None:
         rows = []
+        st = await finding_confirm.standing(db, [f.product for f, _vs, _view in views])
         for f, _vs, view in views:
             for x in view["findings"]:
                 if x["status"] not in want or (severity and x["severity"] not in severity) or (exploited is not None and bool(x["exploited"]) != exploited):
                     continue
-                rows.append({**_finding(x), "product": f.product})
+                row = {**_finding(x, st, f.product), "product": f.product}
+                if confirmed is not None and (row["confirmed"] is not None) != confirmed:
+                    continue
+                rows.append(row)
         order = {"affected": 0, "possible": 1, "service": 2, "unversioned": 3, "stale": 4, "not_affected": 5}
         rows.sort(key=lambda r: (order.get(r["status"], 9), not r["exploited"], -(r["cvss"] or 0), r["product"], r["id"]))
         _sorted[key] = rows
