@@ -1,13 +1,13 @@
 import type { TFunction } from "i18next"
 import { useTranslation } from "react-i18next"
-import { AlertTriangle, Fingerprint, KeyRound, LogOut, Monitor, Pencil, Smartphone, Trash2 } from "lucide-react"
+import { AlertTriangle, Fingerprint, KeyRound, LogOut, Monitor, Pencil, ShieldCheck, Smartphone, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Pill } from "@/components/cobe/badges"
 import { Ts } from "@/components/cobe/time"
 import { ApiError } from "@/lib/api"
 import { errorText } from "@/lib/errors"
-import type { Passkey, SessionRow } from "@/lib/security-api"
+import type { Passkey, RememberedDevice, SessionRow } from "@/lib/security-api"
 import { parseUserAgent } from "@/lib/user-agent"
 import { PasskeyError } from "@/lib/webauthn"
 
@@ -136,6 +136,48 @@ export function SessionList({ rows, onEnd, busy }: { rows: SessionRow[]; onEnd: 
           </li>
         )
       })}
+    </ul>
+  )
+}
+
+/** Remembered devices ("Zweiten Faktor auf dem Gerät merken"): browser and system, since when, until when, last used –
+ *  "Vergessen" for each where the list allows it (the own list). */
+export function DeviceList({ rows, onForget, busy }: { rows: RememberedDevice[]; onForget?: (d: RememberedDevice) => void; busy?: string | null }) {
+  const { t } = useTranslation()
+  return (
+    <ul className="divide-y">
+      {rows.map((d) => (
+        <li key={d.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+          <ShieldCheck className="size-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] sm:basis-0">
+            <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+              <span className="min-w-0 [overflow-wrap:anywhere]">{deviceLabel(t, d.user_agent)}</span>
+              {d.current && <Pill color="--primary">{t("security.thisDevice")}</Pill>}
+            </p>
+            <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+              {t("security.rememberedSince")} <Ts at={d.created_at} rel /> · {t("security.rememberedUntil")} <Ts at={d.expires_at} />
+              {d.ip && (
+                <>
+                  {" · "}
+                  <span className="font-mono">{d.ip}</span>
+                </>
+              )}
+            </p>
+            {d.last_used_at && (
+              <p className="text-xs text-muted-foreground">
+                {t("security.lastUsed")} <Ts at={d.last_used_at} rel />
+              </p>
+            )}
+          </div>
+          {onForget && (
+            <div className="shrink-0 pl-7 sm:pl-0">
+              <Button variant="ghost" size="sm" disabled={busy === d.id} onClick={() => onForget(d)}>
+                <Trash2 /> {t("security.forget")}
+              </Button>
+            </div>
+          )}
+        </li>
+      ))}
     </ul>
   )
 }

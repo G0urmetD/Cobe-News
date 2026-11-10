@@ -46,8 +46,8 @@ import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
 import { fmtDate, fmtDateTime, initials } from "@/lib/format"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { PasskeyList, SessionList } from "@/components/cobe/security"
-import { type Passkey, type SessionRow, useUserPasskeys, useUserSessions } from "@/lib/security-api"
+import { DeviceList, PasskeyList, SessionList } from "@/components/cobe/security"
+import { type Passkey, type SessionRow, useUserDevices, useUserPasskeys, useUserSessions } from "@/lib/security-api"
 import { Loading, SheetActions, SheetBody } from "@/pages/settings-shared"
 import { isoList } from "@/lib/bidi"
 
@@ -515,6 +515,7 @@ function UserSecuritySheet({ u, onChanged }: { u: UserRow; onChanged: () => void
   const qc = useQueryClient()
   const sq = useUserSessions(u.id)
   const pq = useUserPasskeys(u.id)
+  const dq = useUserDevices(u.id)
   const [busy, setBusy] = useState<string | null>(null)
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["admin", "users", u.id] })
@@ -541,6 +542,10 @@ function UserSecuritySheet({ u, onChanged }: { u: UserRow; onChanged: () => void
     if (!(await confirmAction({ title: t("passkey.removeTitle"), text: t("users.passkeyRemoveText", { name: p.name, user: u.display_name }), confirm: t("common.remove") }))) return
     await run(p.id, () => api.del(`/api/admin/users/${u.id}/passkeys/${p.id}`), t("passkey.removed"))
   }
+  const forgetDevices = async () => {
+    if (!(await confirmAction({ title: t("users.forgetDevicesTitle"), text: t("users.forgetDevicesText", { name: u.display_name }), confirm: t("users.forgetDevices") }))) return
+    await run("devices", () => api.post(`/api/admin/users/${u.id}/devices/forget-all`), t("users.forgetDevicesDone", { name: u.display_name }))
+  }
   const others = (sq.data ?? []).filter((s) => !s.current).length
   return (
     <SheetContent className="w-full gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-lg">
@@ -565,6 +570,17 @@ function UserSecuritySheet({ u, onChanged }: { u: UserRow; onChanged: () => void
             </div>
           )}
         </section>
+        {!!dq.data?.length && (
+          <section className="rounded-xl border">
+            <h3 className="border-b px-5 py-2.5 text-sm font-semibold">{t("security.devices")}</h3>
+            <DeviceList rows={dq.data} />
+            <div className="flex justify-end border-t px-5 py-2.5">
+              <Button variant="outline" size="sm" disabled={busy === "devices"} onClick={() => void forgetDevices()}>
+                {busy === "devices" ? <Loader2 className="animate-spin" /> : <ShieldOff />} {t("users.forgetDevices")}
+              </Button>
+            </div>
+          </section>
+        )}
         {u.auth_source === "local" && (
           <section className="rounded-xl border">
             <h3 className="border-b px-5 py-2.5 text-sm font-semibold">{t("passkey.title")}</h3>

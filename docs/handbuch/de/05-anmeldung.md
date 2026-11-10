@@ -110,6 +110,38 @@ Ist er an, braucht jede Anmeldung einen zweiten Faktor – nicht nur die der Adm
   („Ein zweiter Faktor ist Pflicht …“).
 - Ausschalten nimmt niemandem etwas weg: eingerichtete Apps und Passkeys bleiben.
 
+### Zweiten Faktor auf dem Gerät merken {#geraet-merken}
+
+[Einstellungen → Anmeldung](/settings/auth), Karte *Zweiter Faktor*, Schalter „Zweiten Faktor auf dem Gerät merken“ –
+**standardmäßig aus**: Er schwächt den zweiten Faktor, das entscheidet der Admin. Speichern verlangt eine
+[erneute Bestätigung](#erneut-bestaetigen) und steht im [Protokoll](/docs/betrieb#protokoll).
+
+Ist er an, zeigt der Schritt mit dem Code den Schalter „Auf diesem Gerät merken (bis …)“. Wer ihn einschaltet, gibt in
+diesem Browser bis dahin nur noch das **Passwort** ein – der Code wird übersprungen.
+
+| Einstellung | Auswahl | Standard |
+|---|---|---|
+| Merken für | Sitzungsdauer (die Höchstdauer unter [Zeitlimits](#sitzungen-zeitlimits)), 1, 7 oder 30 Tage | Sitzungsdauer |
+| Auch für Admins | an / aus | aus – Admins geben den Code bei jeder Anmeldung ein |
+
+- **Nur der Code** wird übersprungen, nie das Passwort. Ein [Startpasswort](#benutzer-anlegen) wird trotzdem ersetzt,
+  eine fällige Einrichtung trotzdem verlangt. Sperren nach falschen Passwörtern gelten wie immer.
+- **Das Notfall-Konto** wird nie gemerkt.
+- **Entra-Konten:** gilt nur dort, wo Cobe News seinen eigenen TOTP fragt ([MFA-Nachweis](#entra-mfa-nachweis)). Den
+  zweiten Faktor bei Microsoft regelt Microsoft.
+- **Heikle Änderungen** fragen trotzdem nach dem Code: Eine Anmeldung über ein gemerktes Gerät zählt nicht als
+  [erneute Bestätigung](#erneut-bestaetigen).
+- **Wie es gespeichert ist:** Der Browser hält ein zufälliges Token in einem eigenen Cookie (HttpOnly, Secure wie das
+  Sitzungs-Cookie, SameSite=Strict, nur für `/api/auth`), der Server nur dessen Hash. Es gilt nur für das Konto, für
+  das es gemerkt wurde.
+- **Es gilt nicht mehr**, sobald sich Passwort, TOTP oder Rolle des Kontos ändern, die Dauer abgelaufen ist (eine
+  kürzere Dauer gilt sofort auch für schon gemerkte Geräte), der Schalter aus ist oder Admins ausgenommen werden.
+- **Vergessen** werden gemerkte Geräte unter [Meine Sitzungen](#meine-sitzungen) (eins oder alle), durch einen Admin
+  („Sitzungen & Passkeys“ → „Gemerkte Geräte vergessen“), mit „Alle anderen abmelden“ / „Alle Sitzungen beenden“, beim
+  Sperren, Deaktivieren und Zurücksetzen. Ausschalten vergisst alle – wieder einschalten bringt keins zurück.
+- Im [Protokoll](/docs/betrieb#protokoll): „Gerät für den zweiten Faktor gemerkt“, „Gemerkte Geräte vergessen“; die
+  Anmeldung eines Admins über ein gemerktes Gerät mit der Anmeldeart „Passwort + gemerktes Gerät“.
+
 ### Verwalten {#benutzer-verwalten}
 
 In jeder Zeile der Benutzerliste:
@@ -969,10 +1001,14 @@ wird abgelehnt.
 Sitzungen enden außerdem von selbst bei: Passwortänderung (alle anderen), Zurücksetzen von Passwort oder TOTP durch
 einen Admin, Rolle ändern, Deaktivieren oder Sperren (alle) und Entfernen eines Passkeys (die damit angemeldeten).
 
+Ist [Zweiten Faktor auf dem Gerät merken](#geraet-merken) an, steht darunter *Gemerkte Geräte*: wo die Anmeldung nach
+dem Passwort nicht nach dem Code fragt – mit „Dieses Gerät“, seit wann, bis wann, zuletzt genutzt. „Vergessen“ für
+eins, „Alle Geräte vergessen“ für alle. „Alle anderen abmelden“ vergisst sie ebenfalls.
+
 ### Erneut bestätigen {#erneut-bestaetigen}
 
 Heikle Änderungen verlangen, dass du dich in den letzten **10 Minuten** ausgewiesen hast – die Anmeldung selbst zählt
-dazu. Betroffen sind:
+dazu (nicht die über ein [gemerktes Gerät](#geraet-merken) ohne Code). Betroffen sind:
 
 - **Anmeldung und Konten:** Anmelde-Einstellungen (AD, Entra, Sitzungen), Rollen-Zuordnungen, einen Admin anlegen, eine
   Rolle ändern, ein Admin-Konto aktivieren oder deaktivieren oder seine E-Mail-Adresse ändern, Passwort oder TOTP eines

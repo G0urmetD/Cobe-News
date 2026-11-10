@@ -106,6 +106,38 @@ With it on, every sign-in needs a second factor – not only the admins':
   is required …").
 - Switching it off takes nothing away: apps and passkeys set up stay.
 
+### Remember the second factor on the device {#geraet-merken}
+
+[Settings → Sign-in](/settings/auth), card *Second factor*, switch "Remember the second factor on the device" –
+**off by default**: it weakens the second factor, the admin decides. Saving requires
+[confirmation](#erneut-bestaetigen) and is in the [audit log](/docs/betrieb#protokoll).
+
+While it is on, the code step shows the switch "Remember on this device (until …)". Whoever switches it on enters only
+the **password** in this browser until then – the code is skipped.
+
+| Setting | Choice | Default |
+|---|---|---|
+| Remember for | session lifetime (the maximum under [Time limits](#sitzungen-zeitlimits)), 1, 7 or 30 days | session lifetime |
+| For admins too | on / off | off – admins enter the code at every sign-in |
+
+- **Only the code** is skipped, never the password. A [temporary password](#benutzer-anlegen) is still replaced, a due
+  set-up still asked. Locks after wrong passwords apply as always.
+- **The emergency account** is never remembered.
+- **Entra accounts:** only where Cobe News asks its own TOTP ([MFA proof](#entra-mfa-nachweis)). The second factor at
+  Microsoft is Microsoft's business.
+- **Sensitive changes** still ask for the code: a sign-in on a remembered device does not count as
+  [confirmation](#erneut-bestaetigen).
+- **How it is stored:** the browser holds a random token in a cookie of its own (HttpOnly, Secure like the session
+  cookie, SameSite=Strict, only for `/api/auth`), the server only its hash. It counts only for the account it was
+  remembered for.
+- **It stops counting** once the account's password, TOTP or role change, the time is up (a shorter time applies at once
+  to devices remembered already), the switch is off or admins are excluded.
+- **Forgotten** are remembered devices under [My sessions](#meine-sitzungen) (one or all), by an admin ("Sessions &
+  passkeys" → "Forget remembered devices"), with "Sign out all others" / "End all sessions", on blocking, disabling and
+  resetting. Switching it off forgets all of them – switching it on again brings none back.
+- In the [audit log](/docs/betrieb#protokoll): "Device remembered for the second factor", "Remembered devices
+  forgotten"; an admin's sign-in on a remembered device with the method "Password + remembered device".
+
 ### Manage {#benutzer-verwalten}
 
 In each row of the user list:
@@ -929,10 +961,14 @@ session is gone at once – that browser's next request is refused.
 Sessions also end by themselves on: a password change (all others), a password or TOTP reset by an admin, a role
 change, disabling or blocking (all), and removing a passkey (those signed in with it).
 
+While [Remember the second factor on the device](#geraet-merken) is on, *Remembered devices* follow below: where the
+sign-in asks for no code after the password – with "This device", since when, until when, last used. "Forget" for one,
+"Forget all devices" for all. "Sign out all others" forgets them as well.
+
 ### Confirm it is you {#erneut-bestaetigen}
 
-Sensitive changes require that you proved who you are within the last **10 minutes** – the sign-in itself counts. This
-applies to:
+Sensitive changes require that you proved who you are within the last **10 minutes** – the sign-in itself counts (not
+one on a [remembered device](#geraet-merken) without the code). This applies to:
 
 - **Sign-in and accounts:** sign-in settings (AD, Entra, sessions), role mappings, creating an admin, changing a role,
   enabling or disabling an admin account or changing its e-mail address, resetting someone else's password or TOTP,

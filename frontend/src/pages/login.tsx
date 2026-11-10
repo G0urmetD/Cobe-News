@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Field } from "@/components/cobe/form"
+import { Field, ToggleRow } from "@/components/cobe/form"
 import { CodeInput, NewPasswordFields, TotpEnroll } from "@/components/cobe/mfa"
 import { AuthLayout } from "@/pages/auth-layout"
 import { ApiError, api, type LoginStep } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
+import { fmtDateTime } from "@/lib/format"
+import { type RememberInfo, mfaBody, rememberInfo } from "@/lib/remember-device"
 import { passkeyErrorText, suggestedPasskeyName } from "@/components/cobe/security"
 import { type EnrollInfo, enrollPasskey, signInWithPasskey } from "@/lib/security-api"
 import { PasskeyError, passkeySupport } from "@/lib/webauthn"
@@ -104,6 +106,32 @@ export function LoginPage({ resume }: { resume?: Step }) {
     [auth],
   )
 
+  // "Auf diesem Gerät merken" at the TOTP step – only while the admin switch is on (GET /api/auth/state says so). A
+  // browser remembered already lands here only from Microsoft (Entra: the Strict cookie stays behind on that redirect):
+  // the page asks for it itself, a miss (409) just leaves the code to be typed
+  const [remember, setRemember] = useState<RememberInfo | null>(null)
+  const [rememberOn, setRememberOn] = useState(false)
+  useEffect(() => {
+    if (step !== "mfa") return
+    let alive = true
+    api.get<unknown>("/api/auth/state").then(
+      (r) => {
+        if (!alive) return
+        const info = rememberInfo(r)
+        setRemember(info)
+        if (info?.device)
+          api.post<LoginStep>("/api/auth/mfa/device").then(
+            (res) => alive && handle(res),
+            () => undefined,
+          )
+      },
+      () => undefined, // only the switch – the code works without it
+    )
+    return () => {
+      alive = false
+    }
+  }, [step, handle])
+
   // passkeys: switched on, possible at the configured address – and this page opened at exactly that address in a
   // browser that can (otherwise the button is not shown: the passkeys of this site are bound to that address)
   const pk = auth.config?.passkeys
@@ -143,6 +171,7 @@ export function LoginPage({ resume }: { resume?: Step }) {
       setLoading(false)
     }
   }
+  const sendCode = (code: string) => run(() => api.post<LoginStep>("/api/auth/mfa", mfaBody(code, rememberOn, remember)))
 
   const back = (
     <button
@@ -238,11 +267,21 @@ export function LoginPage({ resume }: { resume?: Step }) {
         <div className="space-y-6">
           {back}
           <StepHeader icon={ShieldCheck} title={t("auth.mfaTitle")} text={t("auth.mfaText")} />
+          {/* before the code: a complete code is sent at once */}
+          {remember && (
+            <ToggleRow
+              label={remember.until ? t("auth.rememberUntil", { until: fmtDateTime(remember.until) }) : t("auth.remember")}
+              description={t("auth.rememberHint")}
+              checked={rememberOn}
+              onCheckedChange={setRememberOn}
+              className="rounded-xl border px-4 py-3"
+            />
+          )}
           <div className="flex justify-center">
-            <CodeInput size="lg" value={otp} onChange={setOtp} onComplete={(v) => void run(() => api.post<LoginStep>("/api/auth/mfa", { code: v }))} />
+            <CodeInput size="lg" value={otp} onChange={setOtp} onComplete={(v) => void sendCode(v)} />
           </div>
           {errorBox}
-          <Button size="lg" className="h-10 w-full" disabled={otp.length < 6 || loading} onClick={() => void run(() => api.post<LoginStep>("/api/auth/mfa", { code: otp }))}>
+          <Button size="lg" className="h-10 w-full" disabled={otp.length < 6 || loading} onClick={() => void sendCode(otp)}>
             {loading && <Loader2 className="animate-spin" />} {t("auth.verify")}
           </Button>
           <p className="text-center text-xs text-muted-foreground">{t("auth.mfaLost")}</p>

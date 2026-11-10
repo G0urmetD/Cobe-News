@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
 from app import settings as settings_store
+from app.auth import devices
 from app.config import get_config
 from app.crypto import new_token, token_hash
 from app.models import User, UserSession
@@ -28,7 +29,8 @@ def now() -> datetime:
     return datetime.now(UTC)
 
 
-METHODS = ("password", "password_totp", "ldap", "ldap_totp", "passkey", "entra", "entra_totp")
+# …_device: the TOTP step skipped on a remembered device (app/auth/devices.py) – only the password (or Microsoft) asked
+METHODS = ("password", "password_totp", "ldap", "ldap_totp", "passkey", "entra", "entra_totp", "password_device", "ldap_device", "entra_device")
 
 
 async def create(
@@ -69,6 +71,12 @@ def with_totp(sess: UserSession) -> None:
     """The TOTP code was checked in this sign-in: password → password_totp, ldap → ldap_totp, entra → entra_totp."""
     if sess.method in ("password", "ldap", "entra"):
         sess.method = f"{sess.method}_totp"
+
+
+def with_device(sess: UserSession) -> None:
+    """The TOTP step skipped on a remembered device: password → password_device, ldap → ldap_device, entra → entra_device."""
+    if sess.method in ("password", "ldap", "entra"):
+        sess.method = f"{sess.method}_device"
 
 
 def rekey(sess: UserSession) -> str:
@@ -165,6 +173,9 @@ async def revoke(db: AsyncSession, session_id: uuid.UUID) -> None:
 
 
 async def revoke_all(db: AsyncSession, user_id: uuid.UUID, except_id: uuid.UUID | None = None) -> None:
+    """Every session of the account (but `except_id`) – and its remembered devices (app/auth/devices.py): whatever ends
+    the sessions (a block, a deactivation, a reset, a new role, a new password) also asks for the second factor again."""
+    await devices.forget_all(db, user_id)
     stmt = delete(UserSession).where(UserSession.user_id == user_id)
     if except_id:
         stmt = stmt.where(UserSession.id != except_id)
@@ -172,7 +183,9 @@ async def revoke_all(db: AsyncSession, user_id: uuid.UUID, except_id: uuid.UUID 
 
 
 async def revoke_users(db: AsyncSession, user_ids) -> None:  # noqa: ANN001 - a list of ids or a select of them
-    """Every session of these accounts (a role mapping removed, a directory switched off) – not committed."""
+    """Every session of these accounts (a role mapping removed, a directory switched off) and their remembered devices –
+    not committed."""
+    await devices.forget_users(db, user_ids)
     if isinstance(user_ids, list):
         for i in range(0, len(user_ids), 1000):
             await db.execute(delete(UserSession).where(UserSession.user_id.in_(user_ids[i : i + 1000])))
@@ -182,6 +195,7 @@ async def revoke_users(db: AsyncSession, user_ids) -> None:  # noqa: ANN001 - a 
 
 async def cleanup(db: AsyncSession) -> int:
     res = await db.execute(delete(UserSession).where(UserSession.expires_at <= now()))
+    await devices.cleanup(db)  # remembered devices past their end
     await db.commit()
     return res.rowcount or 0
 

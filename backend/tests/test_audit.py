@@ -322,6 +322,8 @@ def test_every_action_has_a_case_or_a_reason():
         "vendor.finding_confirmed",
         "vendor.finding_unconfirmed",  # test_finding_confirm.py: test_admins_and_the_products_team_confirm_everybody_else_reads
         "vendor.finding_confirm_lapsed",  # test_finding_confirm.py: _lapsed_by
+        "device.remembered",
+        "device.forgotten",  # test_remembered_devices.py: test_audit_entries
     }
     covered = {a for a, _, act in CASES if act is not None} | elsewhere | {"team.member_added"}
     assert set(audit.ACTIONS) == covered, set(audit.ACTIONS) ^ covered

@@ -247,7 +247,7 @@ class UserSession(Base):
     pending: Mapped[dict] = mapped_column(Json, default=dict)
     reauth_at: Mapped[datetime | None] = mapped_column(UTCDateTime)  # last proof of identity (sign-in or re-confirmation)
     # how it was signed in (shown under "Meine Sitzungen"): password | password_totp | ldap | ldap_totp | passkey | entra |
-    # entra_totp
+    # entra_totp | password_device | ldap_device | entra_device (the TOTP step skipped on a remembered device)
     # – None: a session of an older version
     method: Mapped[str | None] = mapped_column(Text)
     # signed in with this passkey: removing the passkey ends the session (app/passkeys_api.py)
@@ -272,6 +272,24 @@ class UserPasskey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     # the counter went back (or stood still) although it counts: maybe a cloned authenticator – shown as a warning
     sign_count_warning_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class RememberedDevice(Base):
+    """"Auf diesem Gerät merken" (app/auth/devices.py): a browser that may skip the TOTP step after the right password.
+    The browser holds a random token in its own cookie, the table its keyed hash – plus `factor`, a keyed fingerprint of
+    the account's password, TOTP secret and role when it was remembered: any change of them makes the row worthless."""
+
+    __tablename__ = "remembered_devices"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(Text, unique=True)
+    factor: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    ip: Mapped[str | None] = mapped_column(Text)
+    user_agent: Mapped[str | None] = mapped_column(Text)
 
 
 class PasswordHistory(Base):

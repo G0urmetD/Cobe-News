@@ -261,9 +261,10 @@ async def test_a_reader_reauth_needs_no_proof_while_none_is_required(admin_clien
 
 
 async def test_second_factor_for_all_setting(admin_client):
-    assert (await admin_client.get("/api/admin/auth/mfa")).json() == {"required_all": False, "rev": 0}
+    off = {"remember": False, "remember_days": 0, "remember_admins": False, "session_h": 12}
+    assert (await admin_client.get("/api/admin/auth/mfa")).json() == {"required_all": False, **off, "rev": 0}
     r = await admin_client.put("/api/admin/auth/mfa", json={"required_all": True, "rev": 0})
-    assert r.json() == {"required_all": True, "rev": 1}
+    assert r.json() == {"required_all": True, **off, "rev": 1}
     assert (await admin_client.put("/api/admin/auth/mfa", json={"required_all": False, "rev": 0})).json()["detail"]["code"] == "stale"
     [e] = await _entries("signin.config_changed")
     assert e.target_id == "mfa" and e.details["changes"] == {"required_all": {"from": False, "to": True}}

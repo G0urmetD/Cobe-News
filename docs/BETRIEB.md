@@ -314,6 +314,12 @@ abgelehnte AD-Anmeldung sperrt nie das gleichnamige lokale Konto. AD-Sperren sie
 Laufende Konto-Sperren und Adress-Sperren überstehen einen Neustart (Tabelle `auth_locks`); die Zähler bis dahin nicht.
 Optional **„Zweiter Faktor für alle Pflicht“** (aus ab Werk): dann richten auch Leser bei der nächsten Anmeldung TOTP
 (lokal wahlweise einen Passkey) ein. Ein neues Passwort darf keines der letzten fünf sein (nur lokale Konten).
+Optional **„Zweiten Faktor auf dem Gerät merken“** (aus ab Werk; Dauer: Sitzungsdauer, 1, 7 oder 30 Tage; Admins nur mit
+„Auch für Admins“, das Notfall-Konto nie): beim Code „Auf diesem Gerät merken“ – danach fragt dieser Browser nur noch das
+Passwort. Cookie `__Secure-cobe_news_device` (ohne HTTPS `cobe_news_device`; HttpOnly, SameSite=Strict, Path=/api/auth),
+in der Tabelle `remembered_devices` nur der Hash des Tokens und ein Fingerabdruck von Passwort, TOTP und Rolle – ändert
+sich davon etwas, gilt das Gerät nicht mehr. Ausschalten vergisst alle gemerkten Geräte; abgelaufene löscht der stündliche
+Aufräumlauf (Handbuch *Anmeldung → Zweiten Faktor auf dem Gerät merken*).
 Sitzungs- und CSRF-Cookie heißen mit HTTPS `__Host-cobe_news_session` / `__Host-cobe_news_csrf` (nur diese Origin, nur
 über HTTPS – keine Subdomain und keine http-Seite kann sie setzen). Ein kürzeres absolutes Timeout gilt sofort auch für
 laufende Sitzungen. Zweiten Faktor ersetzen oder entfernen verlangt den aktuellen Code (ohne TOTP: das Passwort).

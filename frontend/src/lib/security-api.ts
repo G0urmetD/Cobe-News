@@ -15,7 +15,20 @@ export interface Passkey {
   sign_count_warning_at: string | null
 }
 
-export type SignInMethod = "password" | "password_totp" | "ldap" | "ldap_totp" | "passkey" | "entra" | "entra_totp"
+/** …_device: the TOTP step skipped on a remembered device */
+export type SignInMethod = "password" | "password_totp" | "ldap" | "ldap_totp" | "passkey" | "entra" | "entra_totp" | "password_device" | "ldap_device" | "entra_device"
+
+/** A remembered device ("Zweiten Faktor auf dem Gerät merken", app/auth/devices.py) – it skips the TOTP step. */
+export interface RememberedDevice {
+  id: string
+  /** this browser */
+  current: boolean
+  created_at: string
+  expires_at: string
+  last_used_at: string | null
+  ip: string | null
+  user_agent: string
+}
 
 export interface SessionRow {
   id: string
@@ -45,6 +58,10 @@ export const useMySessions = () => useQuery({ queryKey: ["me", "sessions"], quer
 export const useUserPasskeys = (uid: string) => useQuery({ queryKey: ["admin", "users", uid, "passkeys"], queryFn: () => api.get<Passkey[]>(`/api/admin/users/${uid}/passkeys`) })
 export const useUserSessions = (uid: string) =>
   useQuery({ queryKey: ["admin", "users", uid, "sessions"], queryFn: () => api.get<SessionRow[]>(`/api/admin/users/${uid}/sessions`) })
+// the own list under /api/auth: the device cookie (Path=/api/auth) comes along there – "dieses Gerät"
+export const useMyDevices = () => useQuery({ queryKey: ["me", "devices"], queryFn: () => api.get<RememberedDevice[]>("/api/auth/devices") })
+export const useUserDevices = (uid: string) =>
+  useQuery({ queryKey: ["admin", "users", uid, "devices"], queryFn: () => api.get<RememberedDevice[]>(`/api/admin/users/${uid}/devices`) })
 export const usePasskeySettings = () => useQuery({ queryKey: ["admin", "passkeys"], queryFn: () => api.get<PasskeySettings>("/api/admin/auth/passkeys") })
 
 /** Registers a passkey of this device: the options (needs a fresh re-confirmation – call inside withReauth), the
