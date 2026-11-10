@@ -805,7 +805,10 @@ function FindingLine({
       type="button"
       onClick={() => onOpen(productKey, f.id)}
       aria-label={t("vendor.card.openFinding", { ident: f.ident })}
-      className="flex w-full min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+      className={cn(
+        "flex w-full min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50",
+        confirmed && "opacity-60",
+      )}
     >
       <span
         className="w-8 shrink-0 rounded px-1 py-px text-center font-mono text-[11px] font-semibold tabular-nums"
@@ -820,7 +823,7 @@ function FindingLine({
         </span>
       )}
       {confirmed && <ShieldCheck className="size-3 shrink-0 text-success" aria-label={t("confirm.short")} />}
-      <span className={cn("line-clamp-1 min-w-0 text-muted-foreground", (f.muted || confirmed) && "opacity-60")}>
+      <span className={cn("line-clamp-1 min-w-0 text-muted-foreground", f.muted && !confirmed && "opacity-60")}>
         {f.unread && <span aria-hidden className="mr-1 inline-block size-1.5 rounded-full bg-primary align-middle" />}
         {f.unread && <span className="sr-only">{t("reader.unread")}: </span>}
         <span className={cn("font-mono text-foreground/80", f.unread && "font-semibold text-foreground")}>{f.ident}</span> {f.headline || f.title}
