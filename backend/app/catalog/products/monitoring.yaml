@@ -57,6 +57,7 @@
   cpes: [a:uptime.kuma:uptime_kuma]
   kw: [Uptime Kuma]
   example: 1.23.16
+  releases: {github: louislam/uptime-kuma}  # tags 2.5.9 (checked 2026-11-11)
 
 # ---------------------------------------------------------------- endoflife.date products moved here (0.1.45)
 - key: centreon
@@ -92,6 +93,7 @@
   kw: [LibreNMS]
   example: "24.12.0"
   where: web_about
+  releases: {github: librenms/librenms, lines: 1}  # monthly releases 26.10.2 (one tag 26.9.1.1) – a rolling release: the year is the line (checked 2026-11-11)
 
 # ---------------------------------------------------------------- added 0.1.47
 - key: oxidized
@@ -105,3 +107,4 @@
   example: "0.18.1"  # oxidized-web's numbers, not oxidized's (0.37.0)
   version_cmd: gem list oxidized-web
   where: oxidized_web
+  releases: {github: ytti/oxidized-web}  # the web interface the CPE names: tags 0.18.1 (checked 2026-11-11)

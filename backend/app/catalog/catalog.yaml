@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=schema/catalog.schema.json
 # The version of the Vendor News catalogue data (separate from the app version): YYYY.MM.DD-N, raised with every change
 # of a file in this directory (docs/BETRIEB.md „Katalog pflegen“). Shown in the catalogue and on "Version & Changelog".
-catalog_version: 2026.11.06-3
+catalog_version: 2026.11.11-1
 format: 1

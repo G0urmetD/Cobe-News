@@ -178,8 +178,16 @@ export interface ReleaseLine {
 
 export type EolState = "ok" | "soon" | "past" | "unknown"
 
+/**
+ * Where a product's release lines come from: endoflife.date (with support dates) or – for products it lacks – a release
+ * source of the catalogue (GitHub releases, the vendor's release notes page: lines and newest versions, no support
+ * dates). `fetched_at` null: not fetched yet (fetched for followed products only).
+ */
+export type ReleaseSource = { kind: "eol" } | { kind: "github" | "page"; ref: string; url: string; fetched_at: string | null }
+
 export interface ReleaseInfo {
   lines?: ReleaseLine[]
+  source?: ReleaseSource | null
   line?: {
     name: string
     label: string | null
@@ -376,6 +384,8 @@ export interface CareReason {
   cve?: string
   source?: string
   last?: string
+  /** releases_failed: the release source's last error */
+  error?: string
 }
 
 export interface CatalogCheckVerdict {

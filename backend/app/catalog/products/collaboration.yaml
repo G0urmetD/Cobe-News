@@ -178,6 +178,8 @@
   kw: [BookStack]
   example: "26.09.2"  # tags v26.09.2, v26.09 – year.month(.patch)
   where: web_about
+  releases: {github: BookStackApp/BookStack}  # tags v26.09.3, v26.09 (checked 2026-11-11)
+  depth: 2  # v26.09 is a release of its own (26.09.0), not "ungenau"
 - key: semaphore-ui
   label: Semaphore UI (Ansible Semaphore)
   vendor: Semaphore UI
@@ -188,6 +190,7 @@
   aliases: [Ansible Semaphore, Semaphore]
   example: "2.19.18"
   where: web_about
+  releases: {github: semaphoreui/semaphore}  # tags v2.20.24, rcs left out (checked 2026-11-11)
 - key: wikijs
   label: Wiki.js
   vendor: Requarks
@@ -197,6 +200,7 @@
   aliases: [WikiJS]
   example: "2.5.315"
   where: web_about
+  releases: {github: requarks/wiki}  # tags 3.3.1 (checked 2026-11-11)
 
 # ---------------------------------------------------------------- added 0.1.54
 - key: n8n
@@ -209,3 +213,4 @@
   example: 1.123.76
   version_cmd: n8n --version
   where: web_about
+  releases: {github: n8n-io/n8n, tag: '^n8n@(?P<version>\d+\.\d+\.\d+)$'}  # tags n8n@2.48.1; the moving tags v1, stable, beta left out (checked 2026-11-11)

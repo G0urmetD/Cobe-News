@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/wazuh/wazuh/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/wazuh/wazuh/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/wazuh/wazuh/releases.atom"/>
+  <title>Release notes from wazuh</title>
+  <updated>2026-11-05T09:13:53Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v4.14.10</id>
+    <updated>2026-11-09T10:33:53Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v4.14.10"/>
+    <title>Wazuh v4.14.10</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>MarcelKemp</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v5.0.0-rc2</id>
+    <updated>2026-10-30T15:07:12Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v5.0.0-rc2"/>
+    <title>v5.0.0-rc2</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>wazuhci</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v4.14.9</id>
+    <updated>2026-10-15T17:40:40Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v4.14.9"/>
+    <title>Wazuh v4.14.9</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>jotacarma90</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v5.0.0-rc1</id>
+    <updated>2026-10-05T13:36:38Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v5.0.0-rc1"/>
+    <title>v5.0.0-rc1</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>wazuhci</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v4.14.8</id>
+    <updated>2026-09-25T18:19:40Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v4.14.8"/>
+    <title>Wazuh v4.14.8</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>jotacarma90</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v4.10.5</id>
+    <updated>2026-09-15T13:43:34Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v4.10.5"/>
+    <title>Wazuh v4.10.5</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>jotacarma90</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v5.0.0-beta5</id>
+    <updated>2026-09-07T12:33:16Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v5.0.0-beta5"/>
+    <title>Wazuh v5.0.0 Beta 5</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>wazuhci</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v4.14.7</id>
+    <updated>2026-07-30T16:32:45Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v4.14.7"/>
+    <title>Wazuh v4.14.7</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>jotacarma90</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v5.0.0-beta4</id>
+    <updated>2026-07-21T12:27:04Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v5.0.0-beta4"/>
+    <title>Wazuh v5.0.0 Beta 4</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>wazuhci</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/40556106/v5.0.0-beta3</id>
+    <updated>2026-07-02T15:48:47Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/wazuh/wazuh/releases/tag/v5.0.0-beta3"/>
+    <title>Wazuh v5.0.0 Beta 3</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>wazuhci</name>
+    </author>
+  </entry>
+</feed>

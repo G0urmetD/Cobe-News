@@ -1307,6 +1307,9 @@ async def active_keys(db: AsyncSession) -> set[str]:
     if not products:
         return extra | kev
     keys = {"kev", "eol"}
+    from app import release_sources
+
+    keys |= {release_sources.fetch_key(p) for p in release_sources.wanted(products)}
     for p in products:
         keys.update(k[:300] for k in fetch_keys(p, cfg))
         if _keyword_search(p):
@@ -1333,6 +1336,10 @@ async def run_round(*, force: bool = False, only: str | None = None) -> dict:
         if only == "catalog":
             # the admin's "Katalog aktualisieren": also while Vendor News is switched off (the API said "ok")
             await sync_eol(db, eol_every, True)
+            # the release sources of the followed products too (app/release_sources.py) – never of others
+            from app import release_sources
+
+            await release_sources.sync(db, [p for f in await follows(db) if (p := product_of(f))], eol_every, True)
             return {"catalog": 1}
         # the KEV also with nothing followed (or Vendor News off) while the news are on: their topics need it
         if await kev_wanted(db):
@@ -1357,6 +1364,9 @@ async def run_round(*, force: bool = False, only: str | None = None) -> dict:
         ix = await current_index(db)
         key = nvd_key(cfg)
         await sync_eol(db, eol_every, False)
+        from app import release_sources  # release data endoflife.date lacks: GitHub releases, vendors' pages
+
+        out |= await release_sources.sync(db, products, eol_every, force)
         try:
             if (r := await relink_catalog(db)) is not None:
                 out["relink:catalog"] = r
@@ -1742,7 +1752,7 @@ def target_versions(product: dict, groups: list[dict], found: list[dict], versio
     update (`to` in the own line; `open` remain – `newer` a newer line that fixes some of them) | newer_line (only a
     newer line fixes anything) | no_fix."""
     scheme = product.get("scheme") or "generic"
-    rels = catalog.releases(product.get("eol"))
+    rels = catalog.product_releases(product)
     by_id = {g["primary"].id: g for g in groups}
     maintained = [r for r in rels if r.get("isMaintained") or not r.get("isEol")]
     newest = max(maintained or rels, key=lambda r: r.get("releaseDate") or "") if rels else None
@@ -1904,16 +1914,19 @@ def _line(rels: list[dict], v: V) -> dict | None:
 
 def line_of(product: dict, version: str | None) -> dict | None:
     """The release line (endoflife.date) an installed version belongs to, with its release date."""
-    rels = catalog.releases(product.get("eol"))
+    rels = catalog.product_releases(product)
     v = stored_v(product, version) if version and rels else None
     return _line(rels, v) if v is not None else None
 
 
 def release_info(product: dict, version: str | None, today: date | None = None) -> dict | None:
-    """Release line of a version (endoflife.date): latest in the line, a newer line, support and EOL dates."""
-    rels = catalog.releases(product.get("eol"))
+    """Release line of a version (endoflife.date, else the product's release source): latest in the line, a newer
+    line, support and EOL dates (a release source has none – unknown). `source`: where the lines come from; the
+    product's own answer (no version) names a release source also before its first fetch."""
+    rels = catalog.product_releases(product)
     if not rels:
-        return None
+        src_ = catalog.release_source(product) if version is None else None
+        return {"lines": [], "source": src_} if src_ else None
     today = today or datetime.now(UTC).date()
     scheme = product.get("scheme") or "generic"
     v = stored_v(product, version) if version else None
@@ -1931,6 +1944,7 @@ def release_info(product: dict, version: str | None, today: date | None = None) 
     maintained = [r for r in rels if r.get("isMaintained") or not r.get("isEol")]
     newest = max(maintained or rels, key=lambda r: r.get("releaseDate") or "")
     out: dict = {"lines": [{k: r.get(k) for k in ("name", "label", "latest", "latestDate", "releaseDate", "eolFrom", "eoasFrom", "isEol", "isLts", "isMaintained")} | {"eol_state": state(r.get("eolFrom")) if r.get("eolFrom") else ("past" if r.get("isEol") else "unknown")} for r in rels[:30]]}
+    out["source"] = catalog.release_source(product)
     if v is None:
         return out
     if line is None:
@@ -2775,7 +2789,9 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                 line = info["line"]
                 evs = []
                 if info.get("update_available") and line.get("latest"):
-                    evs.append(("version", f"version:{f.product}:{ver.version}:{line['latest']}", "low", {"latest": line["latest"]}, base, None))
+                    # silent also for a release that was out when the product's release source was first read
+                    quiet_rel = catalog.release_baseline(p, line["latest"])
+                    evs.append(("version", f"version:{f.product}:{ver.version}:{line['latest']}", "low", {"latest": line["latest"]}, base or quiet_rel, None))
                 stage = eol_stage(line.get("eol_from"), now.date())
                 if stage is not None:
                     # the pre-warning of this version (90, 30 days, ended) – it says more than "Support endet bald" of

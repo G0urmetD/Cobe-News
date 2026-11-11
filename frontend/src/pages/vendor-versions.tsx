@@ -52,6 +52,7 @@ import {
   type FollowedVersion,
   type ProductDetail,
   type ReleaseLine,
+  type ReleaseSource,
   type Support,
   type VendorProduct,
   type VersionTarget,
@@ -67,6 +68,7 @@ import {
 export function Versions({ d, canEdit, canConfirm = canEdit, vulnsHref }: { d: ProductDetail; canEdit: boolean; canConfirm?: boolean; vulnsHref: string }) {
   const ct = useCatalogTexts()
   const lines = d.releases?.lines ?? []
+  const source = d.releases?.source ?? null
   const yours = new Set(d.versions.map((v) => v.release?.line?.name).filter((x): x is string => !!x))
   return (
     <div className="space-y-7">
@@ -80,7 +82,7 @@ export function Versions({ d, canEdit, canConfirm = canEdit, vulnsHref }: { d: P
           </>
         )
       )}
-      {lines.length > 0 && <ReleaseLines lines={lines} yours={yours} />}
+      {lines.length > 0 ? <ReleaseLines lines={lines} yours={yours} source={source} /> : source && source.kind !== "eol" && <SourceNote source={source} />}
       {d.follow && <Notes d={d} canEdit={canEdit} />}
     </div>
   )
@@ -350,7 +352,8 @@ function ReleaseChips({ v, lines, veeam, affected, target }: { v: FollowedVersio
   const { t } = useTranslation()
   const r = v.release
   if (!r) return <span className="text-xs text-muted-foreground">{t("vendor.lines.noData")}</span>
-  if (!r.line) return <span className="text-xs text-muted-foreground">{t("vendor.lines.noLine")}</span>
+  const own = !!r.source && r.source.kind !== "eol" // a release source: lines and newest versions, no support dates
+  if (!r.line) return <span className="text-xs text-muted-foreground">{t(own ? "vendor.lines.noLineSource" : "vendor.lines.noLine")}</span>
   const lineName = r.line.label || r.line.name
   const row = lines.find((l) => l.name === r.line?.name)
   const support = supportState(r.line.eol_from ?? row?.eolFrom, row?.isEol ?? (r.eol_state === "past" ? true : undefined))
@@ -395,7 +398,13 @@ function ReleaseChips({ v, lines, veeam, affected, target }: { v: FollowedVersio
           </Hint>
         )
       )}
-      <SupportChip support={support} eolFrom={r.line.eol_from ?? row?.eolFrom ?? null} />
+      {own ? (
+        <Pill color="--muted-foreground">
+          <CalendarClock /> {t("vendor.lines.eolUnknown")}
+        </Pill>
+      ) : (
+        <SupportChip support={support} eolFrom={r.line.eol_from ?? row?.eolFrom ?? null} />
+      )}
       {/* where the version stands: its line, and a newer one as a muted hint – an upgrade, not an urgent update */}
       <p className="flex w-full flex-wrap items-center gap-x-1.5 pt-0.5 text-xs text-muted-foreground">
         <span>{t("vendor.v.line", { line: lineName })}</span>
@@ -666,8 +675,47 @@ function VersionForm({ p, lines, v, onDone }: { p: VendorProduct; lines: Release
 
 // ---------------------------------------------------------------- release lines, explained
 
-function ReleaseLines({ lines, yours }: { lines: ReleaseLine[]; yours: Set<string> }) {
+/** Where the lines come from: endoflife.date, or a release source of the catalogue with its last fetch. */
+function SourceLine({ source }: { source: ReleaseSource | null }) {
   const { t } = useTranslation()
+  if (!source || source.kind === "eol") return <p className="text-[11px] text-muted-foreground">{t("vendor.lines.source")}</p>
+  return (
+    <p className="text-[11px] text-muted-foreground">
+      {t(source.kind === "github" ? "vendor.lines.sourceGithub" : "vendor.lines.sourcePage")}{" "}
+      <a href={source.url} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">
+        {source.ref}
+      </a>
+      {source.fetched_at ? (
+        <>
+          {", "}
+          {t("vendor.lines.fetched")} <Ts at={source.fetched_at} rel />
+        </>
+      ) : (
+        <> – {t("vendor.lines.notFetched")}</>
+      )}
+      {" · "}
+      {t("vendor.lines.noSupportData")}
+    </p>
+  )
+}
+
+/** A product with a release source that has no lines yet (not fetched, or nothing found). */
+function SourceNote({ source }: { source: ReleaseSource }) {
+  const { t } = useTranslation()
+  return (
+    <section className="space-y-1.5" aria-labelledby="vendor-lines">
+      <SectionTitle>
+        <span id="vendor-lines">{t("vendor.lines.title")}</span>
+      </SectionTitle>
+      <p className="text-xs text-muted-foreground">{t("vendor.lines.sourceEmpty")}</p>
+      <SourceLine source={source} />
+    </section>
+  )
+}
+
+function ReleaseLines({ lines, yours, source }: { lines: ReleaseLine[]; yours: Set<string>; source: ReleaseSource | null }) {
+  const { t } = useTranslation()
+  const own = !!source && source.kind !== "eol"
   const [showOld, setShowOld] = useState(false)
   const rows = lines.map((l) => ({ l, s: supportState(l.eolFrom, l.isEol), mine: yours.has(l.name) }))
   const current = rows.filter((r) => r.s !== "past" || r.mine)
@@ -713,7 +761,7 @@ function ReleaseLines({ lines, yours }: { lines: ReleaseLine[]; yours: Set<strin
               </span>
               <span className="tabular" style={s === "past" || s === "soon" ? { color: `var(${SUPPORT_COLOR[s]})` } : undefined}>
                 <span className="text-muted-foreground sm:hidden">{t("vendor.lines.colEol")}: </span>
-                {l.eolFrom ? fmtDay(l.eolFrom) : l.isEol ? "–" : t("vendor.lines.noEnd")}
+                {l.eolFrom ? fmtDay(l.eolFrom) : l.isEol ? "–" : t(own ? "vendor.lines.eolUnknown" : "vendor.lines.noEnd")}
               </span>
               <span className="w-full sm:w-auto">
                 <Pill color={SUPPORT_COLOR[s]} dot>
@@ -735,7 +783,7 @@ function ReleaseLines({ lines, yours }: { lines: ReleaseLine[]; yours: Set<strin
           </button>
         )}
       </div>
-      <p className="text-[11px] text-muted-foreground">{t("vendor.lines.source")}</p>
+      <SourceLine source={source} />
     </section>
   )
 }

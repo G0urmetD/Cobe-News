@@ -841,6 +841,7 @@ Versionen** betreffen, neue Versionen, Support-Ende und passende News.
 | NVD API 2.0 (`services.nvd.nist.gov`) | alle Produkte mit CPE: CVEs mit CPE-Versionsbereichen und den Angaben des CNA (Microsoft: Build-Bereiche bis zum Security Update), CVSS, „von CISA als ausgenutzt gelistet“; neue, noch nicht analysierte CVEs per Stichwortsuche der letzten 30 Tage | je CPE die neuesten 2000 CVEs, danach nur Geänderte (`lastModStartDate`); ohne Schlüssel höchstens 5 Anfragen / 30 s |
 | CISA KEV (`www.cisa.gov`) | ganzer Katalog ausgenutzter Schwachstellen | täglich, bedingt |
 | endoflife.date (`/api/v1/products/full`) | Katalog, Release-Linien, aktuellste Version je Linie, Support- und EOL-Daten | täglich, eine Anfrage, bedingt |
+| Release-Quellen (`github.com/<owner>/<repo>/releases.atom`, Release-Notes-Seiten der Hersteller wie `passwork.pro/blog/release-notes/`) | für Produkte ohne endoflife.date-Daten (`releases` im Katalog): Versionen → Release-Linien, neueste Version je Linie; **keine** Support-/EOL-Daten. Der GitHub-Feed nennt nur die neuesten 10 Releases – was gesehen wurde, bleibt gespeichert (`./data/vendor_releases.json`) | nur gefolgte Produkte; täglich (wie endoflife.date), eine Anfrage je Produkt (ein gemeinsamer Feed einmal je Runde), bedingt; Fehler in der Quellen-Gesundheit (Familie „Release-Quellen“, Schlüssel `releases:<produkt>`) |
 | ENISA EUVD | „aktiv ausgenutzt“ – aus den News (wenn die Quelle eingeschaltet ist) | – |
 | CSAF-Anbieter (Siemens, Cisco, Schneider Electric, Open-Xchange) | die CSAF-Hinweise des Herstellers: Produkte mit Bereichen und Fix-Versionen | nur mit gefolgtem Produkt des Herstellers; alle 6 Stunden, Liste bedingt, je Runde höchstens 25 Dokumente – [Weitere Quellen](#weitere-quellen-csaf-anbieter-cvelistv5-epss-osv) |
 | cvelistV5 (GitHub) | CVE-Einträge, wie der Hersteller (CNA) sie meldet, und die Einstufung der CISA (CVSS, SSVC, KEV) – vor allem für CVEs, die die NVD noch nicht analysiert hat | dreimal am Tag die Änderungen des Tages, einmal der Tagesabschluss des Vortags; einzelne ältere Einträge bei Bedarf |
@@ -913,7 +914,11 @@ Zusammenlegen von Katalog-Schlüsseln muss `vendor_confirms` und `vendor_confirm
 
 **Ausgehende Hosts** (nur bei gefolgten Produkten): `services.nvd.nist.gov`, `endoflife.date`, `www.cisa.gov`;
 mit Palo-Alto-Produkten `security.paloaltonetworks.com`, mit Fortinet-Produkten `filestore.fortinet.com`, mit
-Veeam-Produkten `www.veeam.com`; dazu die [weiteren Quellen](#weitere-quellen-csaf-anbieter-cvelistv5-epss-osv).
+Veeam-Produkten `www.veeam.com`; mit Produkten ohne endoflife.date-Daten deren Release-Quelle: `github.com` (Portainer,
+BookStack, BloodHound CE, LibreNMS, Wazuh, Vaultwarden, Gitea, NetBox …) bzw. die Seite des Herstellers (`passwork.pro`);
+dazu die [weiteren Quellen](#weitere-quellen-csaf-anbieter-cvelistv5-epss-osv). Eine Egress-Freigabe (Firewall,
+Proxy-Allow-List) braucht diese Hosts, für Passwork also `passwork.pro`. Die Liste aller Hosts je Produkt steht im
+Katalog (`releases:` in `backend/app/catalog/products/*.yaml`).
 
 ### Weitere Quellen (CSAF-Anbieter, cvelistV5, EPSS, OSV)
 
@@ -1121,7 +1126,13 @@ dann `scheme: cloud`), `filter` (ein Wort, das eine CVE nennen muss; mehrere Alt
 Controller `Active Directory Domain Services|Kerberos|Netlogon|…`), `replaces` (Schlüssel, die in diesem Produkt
 aufgegangen sind – ein endoflife.date-Produkt dieses Schlüssels fällt weg, sein Name bleibt als Suchname; die Daten
 zieht eine Migration um, z. B. 0025: `db2` → `ibm-db2`; ein Test prüft, dass Katalog und Migration dasselbe sagen),
-`depth` (aus wie vielen Teilen eine vollständige
+`releases` (Release-Daten, wo endoflife.date keine hat – `app/release_sources.py`: `{github: owner/repo}` mit optional
+`tag` – regulärer Ausdruck auf den ganzen Tag mit Gruppe `version`, Standard `^v?(?P<version>\d+(?:\.\d+){1,3})$` –,
+oder `{page: https://…, pattern: …}` – regulärer Ausdruck mit Gruppe `version` und optional `date`, im Text der Seite
+gesucht; dazu `lines` (Teile, die die Linie nennen, Standard 2; 1 bei Rolling Releases wie LibreNMS), `lts` (Ausdruck
+auf den Release-Titel, z. B. `\bLTS\b` bei Portainer) und `prerelease: true`, wenn Vorabversionen zählen sollen;
+endoflife.date geht vor, ein Support-Ende kennen diese Quellen nicht; den ersten Abruf eines Produkts meldet Vendor News
+nicht – erst danach erscheinende Versionen), `depth` (aus wie vielen Teilen eine vollständige
 Version besteht, wenn endoflife.date es nicht oder falsch zeigt – weniger Teile gelten als „ungenau“; ohne Release-Daten
 und ohne `depth` ist keine Version ungenau). Regeln für eingetragene Versionen (`app/version_input.py`): `pattern`
 (regulärer Ausdruck, dem eine Version genügen muss, z. B. nur Builds) mit `pattern_hint` (Text aus texts.yaml),
@@ -1186,7 +1197,8 @@ Produkte mit einem Problem zeigen es zusätzlich in ihrer Schublade. Geprüft wi
 | CVEs zur CPE in den letzten 3 Jahren | gefolgte Produkte: die schon geholten NVD-Daten; sonst NVD (Anzahl und neueste CVE, zwei Anfragen) | keine oder älter: Warnung (nicht bei Cloud-Diensten) |
 | endoflife.date-Schlüssel | die zuletzt geholte endoflife.date-Liste (keine eigene Anfrage) | unbekannt: **Fehler**; anderer Hersteller in den CPEs: Warnung |
 | letzter Hinweis des Herstellers (Palo Alto, Fortinet, Veeam) | gespeicherte Hinweise gefolgter Produkte | älter als 2 Jahre: Warnung |
-| gefolgt, aber ohne CPE | Katalog | Warnung (nur Hinweise und News) |
+| gefolgt, aber ohne CPE | Katalog | Warnung (nur Hinweise und News) – nicht mit `cna`: dann bringen NVD-Stichwortsuche und cvelistV5 die CVEs |
+| Release-Quelle (`releases`) eines gefolgten Produkts | der letzte Abruf (`vendor_fetch` `releases:<produkt>`) und `./data/vendor_releases.json`, keine eigene Anfrage | nicht abrufbar, Muster findet keine Version, oder neueste Version älter als 18 Monate: Warnung |
 
 Anfragen an die NVD laufen über dieselbe Bremse wie Vendor News (6,5 s Abstand ohne Schlüssel, gemeinsame Pause nach
 429) und nur, wenn Vendor News an ist, einem Produkt gefolgt wird und die Vendor-News-Runde gerade nicht läuft:
@@ -1540,6 +1552,8 @@ Runde, mehr als eine Zusammenfassung; „Kritisch“ bleibt stehen, bis man sie 
 - **`./data/backups/`**: die Sicherungen (siehe [Sicherung](#sicherung-wiederherstellung-export))
 - **`./data/vendor_catalog.json`**: der zuletzt von endoflife.date neu gebaute Vendor-News-Katalog (fehlt er, gilt
   der mitgelieferte `backend/app/data/vendor_catalog.json`)
+- **`./data/vendor_releases.json`**: die Release-Daten der Produkte ohne endoflife.date (GitHub-Releases,
+  Hersteller-Seiten); fehlt sie, holt der nächste Abruf sie neu (ohne Meldungen für schon erschienene Versionen)
 - **`./data/secret.key`**: Schlüssel für gespeicherte Geheimnisse (fehlt er, müssen Webhook-URLs, SMTP-/Bind-Passwort
   und Entra-Geheimnis neu eingegeben werden). Besser: `SECRET_KEY` in der `.env` setzen und **getrennt** von der
   Datensicherung aufbewahren – eine Sicherung ohne Passphrase enthält dann keine lesbaren Geheimnisse. `SECRET_KEY`:

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/portainer/portainer/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/portainer/portainer/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/portainer/portainer/releases.atom"/>
+  <title>Release notes from portainer</title>
+  <updated>2026-10-21T23:19:56Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.45.3</id>
+    <updated>2026-10-22T07:15:49Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.45.3"/>
+    <title>Release 2.45.3 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.45.2</id>
+    <updated>2026-10-08T02:09:22Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.45.2"/>
+    <title>Release 2.45.2 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.45.1</id>
+    <updated>2026-09-17T02:11:43Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.45.1"/>
+    <title>Release 2.45.1 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.39.8</id>
+    <updated>2026-09-17T00:18:08Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.39.8"/>
+    <title>Release 2.39.8 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.45.0</id>
+    <updated>2026-08-27T06:41:31Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.45.0"/>
+    <title>Release 2.45.0 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.39.7</id>
+    <updated>2026-08-27T06:27:21Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.39.7"/>
+    <title>Release 2.39.7 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.39.6</id>
+    <updated>2026-08-13T00:37:46Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.39.6"/>
+    <title>Release 2.39.6 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.44.0</id>
+    <updated>2026-07-30T05:12:13Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.44.0"/>
+    <title>Release 2.44.0 STS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.39.5</id>
+    <updated>2026-07-13T23:44:38Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.39.5"/>
+    <title>Release 2.39.5 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/59239347/2.39.4</id>
+    <updated>2026-06-25T02:51:59Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/portainer/portainer/releases/tag/2.39.4"/>
+    <title>Release 2.39.4 LTS</title>
+    <content type="html">&lt;p&gt;(release notes trimmed)&lt;/p&gt;</content>
+    <author>
+      <name>portainer-bot[bot]</name>
+    </author>
+  </entry>
+</feed>

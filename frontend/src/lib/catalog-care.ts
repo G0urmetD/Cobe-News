@@ -55,6 +55,7 @@ export function careReason(t: TFunction, r: CareReason): string {
     cve: r.cve ?? "",
     day: day(r.newest ?? r.last),
     source: SOURCE[r.source ?? ""] ?? r.source ?? "",
+    error: r.error ?? "",
     defaultValue: r.code,
   })
 }

@@ -12,7 +12,19 @@ const t = (lng: "de" | "en") => {
 
 describe("careReason", () => {
   it("words every reason code in both languages", () => {
-    for (const code of ["cpe_missing", "cpe_deprecated", "no_cves", "stale_cves", "eol_missing", "eol_mismatch", "adv_stale", "nocpe_followed"]) {
+    for (const code of [
+      "cpe_missing",
+      "cpe_deprecated",
+      "no_cves",
+      "stale_cves",
+      "eol_missing",
+      "eol_mismatch",
+      "adv_stale",
+      "nocpe_followed",
+      "releases_failed",
+      "releases_none",
+      "releases_stale",
+    ]) {
       expect(de[`vendor.care.reason.${code}`], code).toBeTruthy()
       expect(en[`vendor.care.reason.${code}`], code).toBeTruthy()
     }
@@ -23,6 +35,16 @@ describe("careReason", () => {
     expect(stale).toContain("CVE-2023-1")
     expect(stale).not.toContain("2023-07-02") // a calendar day is shown formatted, never in ISO form
     expect(careReason(t("en"), { code: "adv_stale", level: "warn", source: "paloalto", months: 30, last: "2024-04-01" })).toContain("Palo Alto Networks")
+  })
+
+  it("words the release source reasons with their source and day", () => {
+    const stale = careReason(t("de"), { code: "releases_stale", level: "warn", source: "GitHub portainer/portainer", months: 20, last: "2025-03-01" })
+    expect(stale).toContain("GitHub portainer/portainer")
+    expect(stale).toContain("seit 20 Monaten")
+    expect(stale).not.toContain("2025-03-01")
+    expect(careReason(t("en"), { code: "releases_failed", level: "warn", source: "passwork.pro", error: "http: HTTP 404" })).toBe(
+      "Release source passwork.pro cannot be fetched (http: HTTP 404)",
+    )
   })
 
   it("an unknown code shows the code, not an empty line", () => {
