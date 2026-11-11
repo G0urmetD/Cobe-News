@@ -174,6 +174,42 @@ def parse_github_atom(body: bytes, cfg: dict) -> list[dict]:
     return list(out.values())
 
 
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+
+
+def _drop_blocks(src: str) -> str:
+    """The HTML without the content of <script> and <style> elements – linear: str.find from a position that only moves
+    forward (each tag name's next opening is searched again only once it lies behind), an unclosed element drops the
+    rest of the page as a browser would. A regular expression over unclosed tags backtracks quadratically (a hostile
+    3 MB page of "<script" took minutes – and re holds the GIL, so to_thread would not spare the event loop)."""
+    low = src.translate(_ASCII_LOWER)  # same length as src (str.lower() may not be: "İ" → "i̇")
+    out: list[str] = []
+    pos = 0
+    nxt = {name: low.find(f"<{name}", 0) for name in ("script", "style")}
+    while True:
+        for name, at in nxt.items():
+            if 0 <= at < pos:
+                nxt[name] = low.find(f"<{name}", pos)
+        live = [(at, name) for name, at in nxt.items() if at >= 0]
+        if not live:
+            out.append(src[pos:])
+            break
+        at, name = min(live)
+        after = at + 1 + len(name)
+        if after < len(low) and low[after] not in " \t\r\n\f/>":
+            out.append(src[pos:after])  # <scripts>, <styles…>: another tag, kept
+            pos = after
+            continue
+        out.append(src[pos:at])
+        end = low.find(f"</{name}", after)
+        if end < 0:
+            break  # unclosed: the rest is the element's content
+        close = low.find(">", end)
+        pos = len(low) if close < 0 else close + 1
+        out.append(" ")
+    return "".join(out)
+
+
 def page_text(body: bytes) -> str:
     """A page's HTML as plain text – linear (no regex over unclosed tags), script and style left out, bounded."""
     import nh3
@@ -184,7 +220,7 @@ def page_text(body: bytes) -> str:
     if news._tame(src):
         text = html.unescape(nh3.clean(news._BREAKS.sub("\n", src), tags=set()))
     else:
-        text = news._plain(re.sub(r"(?is)<(script|style)\b[^<>]*>[^<]*(?:<(?!/\1)[^<]*)*</\1\s*>", " ", src[:PAGE_LIMIT]))
+        text = news._plain(_drop_blocks(src))
     return re.sub(r"[ \t\r\f\v\xa0]+", " ", text)[:TEXT_MAX]
 
 

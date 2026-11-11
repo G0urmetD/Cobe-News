@@ -61,6 +61,22 @@ def test_passwork_page_only_the_server_releases():
     assert [(ln["name"], ln["latest"]) for ln in lines] == [("7.7", "7.7.0"), ("7.6", "7.6.2")]
 
 
+def test_script_and_style_dropped_linearly_also_from_a_hostile_page():
+    import time
+
+    # not "tame" for nh3 (too many tags): the plain way – script/style content still dropped, the text kept
+    many = "<b>x</b>" * 20_001
+    page = f"<html>{many}<p>Jun 20, 2026 — Passwork 7.6.2</p><SCRIPT type=x>Aug 03, 2026 — Passwork 9.9.9</SCRIPT><scripts>Jul 01, 2026 — Passwork 7.6.3</scripts>"
+    page += "<style>p{}</style><İ><p>May 22, 2026 — Passwork 7.6.1</p><script>never closed Aug 04, 2026 — Passwork 9.9.8"
+    vs = release_sources.parse(page.encode(), cfg_of("passwork"))
+    assert [v["v"] for v in vs] == ["7.6.2", "7.6.3", "7.6.1"]
+    # unclosed "<script" repeated up to PAGE_LIMIT (a backtracking regex took minutes – holding the GIL): well under a second
+    for hostile in ("<script " * (release_sources.PAGE_LIMIT // 8), "<script>a" * (release_sources.PAGE_LIMIT // 9), "<style>" + "<script x" * 300_000, "<scriptx" * 380_000):
+        t0 = time.perf_counter()
+        release_sources.parse(hostile.encode(), cfg_of("passwork"))
+        assert time.perf_counter() - t0 < 1.0
+
+
 def test_a_feed_with_a_dtd_or_not_atom_is_refused():
     from app.news import NewsError
 
