@@ -40,7 +40,7 @@ import { HelpLink } from "@/components/cobe/doc-markdown"
 import { Ts } from "@/components/cobe/time"
 import { copyWithToast } from "@/lib/clipboard"
 import { ApiError, api, type Role } from "@/lib/api"
-import { type UserRow, isBlocked, isPending, useUsers } from "@/lib/admin-api"
+import { type UserRow, handedBack, isBlocked, isPending, useUsers } from "@/lib/admin-api"
 import { withReauth } from "@/lib/reauth"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
@@ -130,6 +130,19 @@ export function UsersPane() {
       if (e instanceof ApiError && e.code === "stale") refresh()
     }
   }
+  // the switch *Aktiv*: switching on is re-confirmed (withReauth in act). A directory account an admin had switched off
+  // goes back to the sync and stays off for now – said, not just flipped back; one the sync switched off is the
+  // directory's to switch on (409 directory_managed – said in words that fit the switch)
+  const setActive = (u: UserRow, on: boolean) =>
+    act(async () => {
+      try {
+        const row = await api.patch<UserRow>(`/api/admin/users/${u.id}`, { is_active: on, version: u.version })
+        if (handedBack(on, row)) toast.info(t("users.handedBack", { name: u.display_name }))
+      } catch (e) {
+        if (on && e instanceof ApiError && e.code === "directory_managed") toast.error(t("errors.directory_managed_active", { name: u.display_name }))
+        else throw e
+      }
+    })
   if (!q.data) return <Loading error={q.error} onRetry={q.refetch} />
   const waits = (u: UserRow) => isPending(u) || u.pending_role === "admin"
   const waiting = q.data.filter(waits).length
@@ -318,7 +331,7 @@ export function UsersPane() {
                         disabled={!!protectedWhy}
                         aria-label={t("users.active")}
                         title={protectedWhy ? undefined : t("users.active")}
-                        onCheckedChange={(x) => (x && isPending(u) ? void approve(u) : void act(() => api.patch(`/api/admin/users/${u.id}`, { is_active: x, version: u.version })))}
+                        onCheckedChange={(x) => (x && isPending(u) ? void approve(u) : void setActive(u, x))}
                       />
                     </Why>
                   </label>
