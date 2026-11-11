@@ -274,6 +274,8 @@ const de: Record<string, string> = {
   "errors.csrf_failed": "Sicherheitsprüfung fehlgeschlagen – bitte die Seite neu laden.",
   "errors.directory_disabled": "Dein Konto ist deaktiviert.",
   "errors.directory_managed": "Das verwaltet das Verzeichnis (AD bzw. Entra ID).",
+  "errors.directory_managed_active":
+    "{{name}} hat der Verzeichnisabgleich ausgeschaltet (nicht mehr in einer zugeordneten Gruppe, im Verzeichnis deaktiviert oder gelöscht). Einschalten kann nur das Verzeichnis: das Konto dort aktivieren bzw. in eine zugeordnete Gruppe aufnehmen – die nächste Anmeldung oder der stündliche Abgleich schaltet es dann ein.",
   "errors.directory_no_role": "Dein Konto ist in keiner Gruppe, die Zugang zu Cobe News gibt.",
   "errors.directory_unavailable": "Das Verzeichnis ist gerade nicht erreichbar.",
   "errors.directory_username_conflict": "Ein anderes Konto hat schon diesen Benutzernamen – wende dich an einen Admin.",
@@ -1077,6 +1079,8 @@ const de: Record<string, string> = {
   "users.unblockText": "Danach entscheidet wieder der Abgleich: {{name}} wird aktiv, sobald eine Anmeldung oder der nächste Abgleich eine zugeordnete Gruppe oder ein Team findet.",
   "users.unblockTextLocal": "{{name}} ist danach sofort wieder aktiv und kann sich anmelden.",
   "users.unblockDone": "Sperre von {{name}} aufgehoben.",
+  "users.handedBack":
+    "{{name}} geht an den Verzeichnisabgleich zurück und bleibt vorerst aus – aktiv wieder, sobald die nächste Anmeldung oder der stündliche Abgleich das Konto in einer zugeordneten Gruppe (oder einem Team) findet.",
   "users.protectedEmergency": "Das Notfallkonto bleibt immer aktiver Admin.",
   "users.protectedSelf": "Das eigene Konto kann man nicht herabstufen, deaktivieren oder löschen.",
   "users.resetDoneTitle": "Temporäres Passwort für {{name}}",

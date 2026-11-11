@@ -1276,3 +1276,24 @@ async def test_an_answer_never_sent_frees_the_slot(admin_client, backups_here):
     with pytest.raises(Exception):  # noqa: B017, PT011 - Starlette names the disconnect its own way
         await resp({"type": "http", "asgi": {"spec_version": "2.4"}}, receive, gone)
     assert backup._dl_running == {}
+
+
+async def test_a_lock_held_in_another_database_is_not_a_running_backup_or_restore_test():
+    """An advisory lock belongs to one database: the same key held in another database of the same server (another
+    installation, a parallel test run) must not make this one look busy – only this database's counts."""
+    from app import restore_test
+
+    other = await asyncpg.connect(make_url(_admin_dsn()).set(database="postgres").render_as_string(hide_password=False))
+    here = await asyncpg.connect(DATABASE_URL.set(drivername="postgresql").render_as_string(hide_password=False))
+    try:
+        for key in (backup.BACKUP_LOCK, restore_test.LOCK):
+            assert await other.fetchval("SELECT pg_try_advisory_lock($1)", key)
+        async with db.session() as s:
+            assert not await backup.running(s) and not await restore_test.running(s)
+        for key in (backup.BACKUP_LOCK, restore_test.LOCK):
+            assert await here.fetchval("SELECT pg_try_advisory_lock($1)", key)
+        async with db.session() as s:
+            assert await backup.running(s) and await restore_test.running(s)
+    finally:
+        await other.close()
+        await here.close()

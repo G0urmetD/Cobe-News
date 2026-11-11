@@ -172,6 +172,11 @@ export const isPending = (u: { is_active: boolean; deactivated_reason: string | 
 /** The lasting block of an admin – lifted only by an admin (the switch is off already for a "sync:…" account). */
 export const isBlocked = (u: { is_active: boolean; deactivated_reason: string | null }) => !u.is_active && u.deactivated_reason === "admin"
 
+/** The switch *Aktiv* turned on (PATCH is_active: true) and the account came back off: a directory account an admin had
+ *  switched off is handed back to the sync ("sync:unblocked") – it stays off until a sign-in or the hourly sync finds a
+ *  mapped group (or a team) again. The page says so instead of the switch just flipping back. */
+export const handedBack = (asked: boolean, row: { is_active: boolean; deactivated_reason: string | null }) => asked && !row.is_active && row.deactivated_reason === "sync:unblocked"
+
 /** Before removing a role mapping: whom it concerns (GET /api/admin/auth/mappings/{id}/impact). */
 export interface MappingImpact {
   /** no role left: switched off and signed out */

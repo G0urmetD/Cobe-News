@@ -497,8 +497,12 @@ async def running(s: AsyncSession) -> bool:
     task = _job["task"]
     if task is not None and not task.done():
         return True
+    # an advisory lock belongs to one database: the same key held in another database of the server is not this one's
     held = await s.scalar(
-        text("SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND classid = 0 AND objid = :k AND objsubid = 1 AND granted)"),
+        text(
+            "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND classid = 0 AND objid = :k AND objsubid = 1 AND granted"
+            " AND database = (SELECT oid FROM pg_database WHERE datname = current_database()))"
+        ),
         {"k": BACKUP_LOCK},
     )
     return bool(held)

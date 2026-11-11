@@ -269,6 +269,8 @@ const en: Record<string, string> = {
   "errors.csrf_failed": "Security check failed – please reload the page.",
   "errors.directory_disabled": "Your account is disabled.",
   "errors.directory_managed": "The directory (AD or Entra ID) manages that.",
+  "errors.directory_managed_active":
+    "The directory sync switched {{name}} off (no longer in a mapped group, disabled or deleted in the directory). Only the directory can switch it on: enable the account there or add it to a mapped group – the next sign-in or the hourly sync then switches it on.",
   "errors.directory_no_role": "Your account is in no group that gives access to Cobe News.",
   "errors.directory_unavailable": "The directory cannot be reached right now.",
   "errors.directory_username_conflict": "Another account already has this user name – contact an admin.",
@@ -1061,6 +1063,8 @@ const en: Record<string, string> = {
   "users.unblockText": "Afterwards the sync decides again: {{name}} becomes active as soon as a sign-in or the next sync finds a mapped group or a team.",
   "users.unblockTextLocal": "{{name}} is active again at once and can sign in.",
   "users.unblockDone": "Block of {{name}} lifted.",
+  "users.handedBack":
+    "{{name}} goes back to the directory sync and stays off for now – active again as soon as the next sign-in or the hourly sync finds the account in a mapped group (or a team).",
   "users.protectedEmergency": "The emergency account always stays an active admin.",
   "users.protectedSelf": "You cannot demote, disable or delete your own account.",
   "users.resetDoneTitle": "Temporary password for {{name}}",
