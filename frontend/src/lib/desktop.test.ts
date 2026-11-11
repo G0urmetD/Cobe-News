@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { DESKTOP_MAX, isShownMessage, planNotifications, storyBody, summaryBody, systemOf } from "@/lib/desktop"
+import { DESKTOP_MAX, isShownMessage, planNotifications, storyBody, summaryBody, systemOf, watchPermission } from "@/lib/desktop"
+import i18n from "@/i18n"
 import type { NewsItem } from "@/lib/news-api"
 
 const item = (id: string): NewsItem => ({
@@ -35,6 +36,15 @@ describe("desktop notifications", () => {
   it("does nothing on a quiet round", () => {
     expect(planNotifications([], 0, () => true)).toEqual({ single: [], more: 0, rest: [] })
   })
+
+  it("takes the first few of the server's order – critical or exploited first, the most important shown last", () => {
+    // as /news/recent lists them: the critical and the exploited one before the newer high ones
+    const items = [item("crit-old"), item("exploited"), item("high-new"), item("high-2"), item("high-3")]
+    const { single, more, rest } = planNotifications(items, 5, () => true)
+    expect(single.map((i) => i.id)).toEqual(["high-new", "exploited", "crit-old"])
+    expect(rest.map((i) => i.id)).toEqual(["high-2", "high-3"])
+    expect(more).toBe(2)
+  })
 })
 
 // ---------------------------------------------------------------- rounds across tabs (node: localStorage, Notification and locks as stand-ins)
@@ -45,11 +55,13 @@ import { POLL_MS, lastKey, poll, tick } from "@/lib/desktop"
 import { swErrorReason } from "@/lib/push"
 
 const shown: string[] = []
+const bodies: string[] = []
 let mem: Map<string, string>
 
 beforeEach(() => {
   mem = new Map()
   shown.length = 0
+  bodies.length = 0
   Object.defineProperty(globalThis, "localStorage", {
     value: { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) },
     configurable: true,
@@ -57,8 +69,9 @@ beforeEach(() => {
   })
   class FakeNotification {
     onclick: (() => void) | null = null
-    constructor(title: string) {
+    constructor(title: string, opts?: NotificationOptions) {
       shown.push(title)
+      bodies.push(opts?.body ?? "")
     }
     close() {}
   }
@@ -70,7 +83,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function server(rounds: { items: NewsItem[]; total: number; cursor: number }[]) {
+function server(rounds: { items: NewsItem[]; total: number; cursor: number; unlisted_top?: string | null }[]) {
   const asked: string[] = []
   vi.spyOn(api, "get").mockImplementation(async (path: string) => {
     asked.push(path)
@@ -108,6 +121,14 @@ describe("what matched", () => {
     ).toBe('desktop.summaryTop{"sev":"news.sev.critical"} · FortiOS, PAN-OS')
     expect(summaryBody([], t)).toBe("desktop.summaryText")
   })
+  it("the summary's severity covers the rest the server did not list", () => {
+    const n = (products: string[]) => ({ rated: true, cvss: null, exploited: false, products })
+    const rest = [{ severity: "medium" as const, notice: n(["FortiOS"]) }]
+    expect(summaryBody(rest, t, "critical")).toBe('desktop.summaryTop{"sev":"news.sev.critical"} · FortiOS')
+    expect(summaryBody(rest, t, "low")).toBe('desktop.summaryTop{"sev":"news.sev.medium"} · FortiOS') // the listed one is higher
+    expect(summaryBody([], t, "high")).toBe('desktop.summaryTop{"sev":"news.sev.high"}') // only unlisted ones
+    expect(summaryBody(rest, t, null)).toBe('desktop.summaryTop{"sev":"news.sev.medium"} · FortiOS')
+  })
 })
 
 describe("rounds", () => {
@@ -122,6 +143,17 @@ describe("rounds", () => {
     expect(asked[1]).toContain("after=7")
     expect(shown).toEqual(["a", "b"])
     expect(mem.get("cobe-news.desktop.seq.u")).toBe("9")
+  })
+
+  it("the summary names the highest severity of the stories the server did not list", async () => {
+    mem.set("cobe-news.desktop.seq.u", "3")
+    vi.spyOn(i18n, "t").mockImplementation(((k: string, o?: Record<string, unknown>) => (o ? `${k}${JSON.stringify(o)}` : k)) as never)
+    const listed = Array.from({ length: 10 }, (_, n) => ({ ...item(`s${n}`), severity: "low" as const }))
+    server([{ items: listed, total: 25, unlisted_top: "critical", cursor: 28 }])
+    await poll("u", () => undefined)
+    expect(shown.slice(0, 3)).toEqual(["s2", "s1", "s0"])
+    expect(shown).toHaveLength(4) // three on their own, one summary for the other 22
+    expect(bodies[3]).toBe('desktop.summaryTop{"sev":"news.sev.critical"}')
   })
 
   it("with push working in this browser the tab only moves the cursor", async () => {
@@ -219,5 +251,40 @@ describe("test feedback", () => {
     expect(isShownMessage({ type: "cobe-news-open", url: "/" })).toBe(false)
     expect(isShownMessage({ type: "cobe-news-shown", kind: "test" })).toBe(false)
     expect(isShownMessage(null)).toBe(false)
+  })
+})
+
+describe("notification permission", () => {
+  it("a permission query answering after the page is gone attaches nothing", async () => {
+    let answer: (s: { onchange: (() => void) | null }) => void = () => undefined
+    const status = { onchange: null as (() => void) | null }
+    const listeners = new Map<string, () => void>()
+    vi.stubGlobal("navigator", { permissions: { query: () => new Promise((r) => (answer = r)) } })
+    vi.stubGlobal("window", { addEventListener: (k: string, f: () => void) => listeners.set(k, f), removeEventListener: (k: string) => listeners.delete(k) })
+    vi.stubGlobal("document", { ...document, addEventListener: (k: string, f: () => void) => listeners.set(k, f), removeEventListener: (k: string) => listeners.delete(k) })
+    let calls = 0
+    const stop = watchPermission(() => calls++)
+    listeners.get("focus")?.()
+    expect(calls).toBe(1)
+    stop() // unmounted before the browser answered
+    expect(listeners.size).toBe(0)
+    answer(status)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(status.onchange).toBeNull()
+    expect(calls).toBe(1)
+  })
+
+  it("while mounted, the permission's change event checks again – and is detached on stop", async () => {
+    const status = { onchange: null as (() => void) | null }
+    vi.stubGlobal("navigator", { permissions: { query: async () => status } })
+    vi.stubGlobal("window", { addEventListener: () => undefined, removeEventListener: () => undefined })
+    vi.stubGlobal("document", { ...document, addEventListener: () => undefined, removeEventListener: () => undefined })
+    let calls = 0
+    const stop = watchPermission(() => calls++)
+    await new Promise((r) => setTimeout(r, 0))
+    status.onchange?.()
+    expect(calls).toBe(1)
+    stop()
+    expect(status.onchange).toBeNull()
   })
 })

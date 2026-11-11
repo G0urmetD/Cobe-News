@@ -102,7 +102,9 @@ wenn kein Tab offen ist – solange der Browser läuft.
   beendet Push nicht.
 
 Für beide Wege gilt: Bis zu drei Meldungen einer Runde kommen einzeln, mehr als eine Zusammenfassung
-(„N weitere neue Meldungen“). „Kritisch“ bleibt stehen, bis du sie wegklickst. Desktop-Benachrichtigungen zeigen nur
+(„N weitere neue Meldungen“). Einzeln kommen zuerst die kritischen und die aktiv ausgenutzten, dann die neuesten; die
+höchste Schwere der Zusammenfassung zählt alle übrigen Meldungen der Runde. „Kritisch“ bleibt stehen, bis du sie
+wegklickst. Desktop-Benachrichtigungen zeigen nur
 Security-Meldungen aus dem News-Feed; Vendor News und den Zustand der Quellen gibt es über Kanäle und Regeln – die
 Vendor News deiner eigenen Produkte auch über [Hersteller-News meiner Produkte](#meine-produkte).
 

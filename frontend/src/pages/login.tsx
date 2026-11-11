@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { AlertTriangle, ArrowLeft, Fingerprint, KeyRound, Loader2, Lock, ShieldCheck, ShieldX, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -108,9 +108,19 @@ export function LoginPage({ resume }: { resume?: Step }) {
 
   // "Auf diesem Gerät merken" at the TOTP step – only while the admin switch is on (GET /api/auth/state says so). A
   // browser remembered already lands here only from Microsoft (Entra: the Strict cookie stays behind on that redirect):
-  // the page asks for it itself, a miss (409) just leaves the code to be typed
+  // the page asks for it itself, a miss (409) just leaves the code to be typed. That ask and a typed code are one at a
+  // time (`second`): the code field waits while the page asks, a code on its way keeps the page from asking – and the
+  // effect runs once per step (handle through a ref: the auth context changing meanwhile neither asks again nor drops
+  // the answer).
   const [remember, setRemember] = useState<RememberInfo | null>(null)
   const [rememberOn, setRememberOn] = useState(false)
+  const [deviceBusy, setDeviceBusy] = useState(false)
+  const second = useRef<"device" | "code" | null>(null)
+  const codeBox = useRef<HTMLFieldSetElement>(null)
+  const handleRef = useRef(handle)
+  useEffect(() => {
+    handleRef.current = handle
+  }, [handle])
   useEffect(() => {
     if (step !== "mfa") return
     let alive = true
@@ -119,18 +129,29 @@ export function LoginPage({ resume }: { resume?: Step }) {
         if (!alive) return
         const info = rememberInfo(r)
         setRemember(info)
-        if (info?.device)
-          api.post<LoginStep>("/api/auth/mfa/device").then(
-            (res) => alive && handle(res),
+        if (!info?.device || second.current) return
+        second.current = "device"
+        setDeviceBusy(true)
+        api
+          .post<LoginStep>("/api/auth/mfa/device")
+          .then(
+            (res) => alive && handleRef.current(res),
             () => undefined,
           )
+          .finally(() => {
+            if (second.current === "device") second.current = null
+            if (!alive) return
+            setDeviceBusy(false)
+            setTimeout(() => codeBox.current?.querySelector("input")?.focus()) // a miss: back to the code (disabled meanwhile, it lost the focus)
+          })
       },
       () => undefined, // only the switch – the code works without it
     )
     return () => {
       alive = false
+      setDeviceBusy(false)
     }
-  }, [step, handle])
+  }, [step])
 
   // passkeys: switched on, possible at the configured address – and this page opened at exactly that address in a
   // browser that can (otherwise the button is not shown: the passkeys of this site are bound to that address)
@@ -171,7 +192,15 @@ export function LoginPage({ resume }: { resume?: Step }) {
       setLoading(false)
     }
   }
-  const sendCode = (code: string) => run(() => api.post<LoginStep>("/api/auth/mfa", mfaBody(code, rememberOn, remember)))
+  const sendCode = async (code: string) => {
+    if (second.current) return // the page is asking for the remembered browser (or a code is on its way)
+    second.current = "code"
+    try {
+      await run(() => api.post<LoginStep>("/api/auth/mfa", mfaBody(code, rememberOn, remember)))
+    } finally {
+      if (second.current === "code") second.current = null
+    }
+  }
 
   const back = (
     <button
@@ -277,12 +306,12 @@ export function LoginPage({ resume }: { resume?: Step }) {
               className="rounded-xl border px-4 py-3"
             />
           )}
-          <div className="flex justify-center">
+          <fieldset ref={codeBox} disabled={deviceBusy} className="flex justify-center">
             <CodeInput size="lg" value={otp} onChange={setOtp} onComplete={(v) => void sendCode(v)} />
-          </div>
+          </fieldset>
           {errorBox}
-          <Button size="lg" className="h-10 w-full" disabled={otp.length < 6 || loading} onClick={() => void sendCode(otp)}>
-            {loading && <Loader2 className="animate-spin" />} {t("auth.verify")}
+          <Button size="lg" className="h-10 w-full" disabled={otp.length < 6 || loading || deviceBusy} onClick={() => void sendCode(otp)}>
+            {(loading || deviceBusy) && <Loader2 className="animate-spin" />} {t("auth.verify")}
           </Button>
           <p className="text-center text-xs text-muted-foreground">{t("auth.mfaLost")}</p>
         </div>
