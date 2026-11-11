@@ -1836,8 +1836,14 @@ Ablauf:
    beiden Prüfungen; die Vergleichsbasis entsteht ebenso neben der gesperrten Tabelle. Alles in derselben Transaktion:
    scheitert etwas, stehen auch die Einträge wieder, wo sie waren. Danach ist die Sperre weiter aktiv; die Ausgabe nennt
    die beiseitegelegten Einträge, `backup.restored` trägt ihre Zahl (`set_aside`).
-5. Das Schema auf den Stand dieser Version bringen. Anmeldungen, die es zur Zeit der Sicherung gab, gelten wieder;
-   spätere nicht.
+5. Das Schema auf den Stand dieser Version bringen. Die Sitzungen und gemerkten Geräte („Zweiten Faktor auf dem Gerät
+   merken“) aus der Sicherung werden gelöscht (seit 0.1.56; `backup.restored`: `sessions_ended`, `devices_forgotten`) –
+   alle melden sich neu an, mit Code.
+
+Als **Superuser** verbunden (statt als `cobe_news_app`): Abbruch, bevor etwas geändert ist (seit 0.1.56; vorher nur eine
+Warnung) – als Superuser könnte ein präparierter Dump beliebige Programme auf dem Datenbank-Server starten. Der
+beschriebene Weg nutzt nie den Superuser. Wer Cobe News an einem eigenen PostgreSQL ohne eigene Rolle betreibt, gibt
+`--allow-superuser` mit (dann wieder nur die Warnung).
 
 Anderer Schlüssel: Abbruch mit Erklärung – `--use-backup-key` übernimmt den Schlüssel aus einer verschlüsselten
 Sicherung nach `data/secret.key` (der alte bleibt daneben; mit `SECRET_KEY` in der `.env` dort eintragen),
@@ -2021,7 +2027,9 @@ Abschluss – führt er `audit-lock.sql` einmal aus (`db-init: audit_log is ther
 locked`; bekommt er die Tabelle nicht binnen 5 Sekunden, versucht er es 10 Sekunden später noch einmal). Neue
 Installationen sind also wenige Sekunden nach dem ersten Start der App gesperrt; kam die App in den 30 Minuten nicht,
 folgt die Sperre beim nächsten Start des Datenbank-Containers (`docker compose restart db`). `pending` gilt auch, wenn
-`audit-lock.sql` die Übernahme abgelehnt hat (ein fremder Trigger, eine Regel oder Zeilensicherheit auf `audit_log` –
+`audit-lock.sql` die Übernahme abgelehnt hat (ein fremder Trigger, eine Regel oder Zeilensicherheit auf `audit_log`,
+seit 0.1.56 auch ein CHECK- oder Exclusion-Constraint, eine Spalte eines Typs außerhalb von `pg_catalog` oder ein Index
+oder Spalten-Vorgabe, die eine Funktion außerhalb von `pg_catalog` aufruft –
 Zeile `db-init: WARNING – audit log NOT locked …` im Log der Datenbank); `superuser` – die App verbindet sich als
 Superuser, den hält keine Sperre auf; `incomplete` – ein Teil fehlt oder die App hat ein Recht zu viel (Log prüfen,
 Datenbank neu starten).

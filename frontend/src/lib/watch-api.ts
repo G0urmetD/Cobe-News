@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { ApiError, api } from "@/lib/api"
+import { withReauth } from "@/lib/reauth"
 import type { Epss, ExploitHint } from "@/lib/vendor-api"
 import type { PersonalWay } from "@/lib/teams-api"
 
@@ -408,7 +409,8 @@ export interface CalendarState {
 
 export const CALENDAR_KEY = ["me", "calendar"] as const
 export const useCalendar = () => useQuery({ queryKey: CALENDAR_KEY, queryFn: () => api.get<CalendarState>("/api/me/calendar"), staleTime: 30_000 })
-export const makeCalendar = () => api.post<{ url: string; created_at: string }>("/api/me/calendar")
+// a session signed in on a remembered device (no code) shows its second factor first (deps.require_factor)
+export const makeCalendar = () => withReauth(() => api.post<{ url: string; created_at: string }>("/api/me/calendar"))
 export const deleteCalendar = () => api.del<{ removed: boolean }>("/api/me/calendar")
 
 /** The same address for clients that open webcal:// (Apple Calendar, Outlook on the desktop). */

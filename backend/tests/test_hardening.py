@@ -219,6 +219,9 @@ def test_ldap_does_not_follow_referrals(monkeypatch):
         def __init__(self, server, **kw):
             made.update(kw)
             self.bound = False
+            self.strategy = type("S", (), {"no_real_dsa": False})()
+            # the address reached at connect (checked again since 0.1.56 – ldap_dir._check_peer): a DC in the company net
+            self.socket = type("Sock", (), {"getpeername": lambda _self: ("10.0.0.5", 636)})()
 
         def open(self):
             pass

@@ -439,8 +439,8 @@ docker compose start app
 **5. Check** – sign in, look at *Version & changelog*, *Settings → Backup & export* shows the pre-restore backup as the
 last backup, test a channel.
 
-Anyone who signed in only after the backup was made signs in again; sign-ins that existed at the time of the backup are
-valid again. A backup of an older version is brought up to this version; one of a **newer** version is refused.
+Afterwards everybody signs in again: the sessions and [remembered devices](/docs/anmeldung#geraet-merken) of the backup
+are deleted (since 0.1.56 – no browser of then is back in with them; `backup.restored` names their number). A backup of an older version is brought up to this version; one of a **newer** version is refused.
 
 The commands for the newest backup are also in the app: "Copy the restore commands".
 

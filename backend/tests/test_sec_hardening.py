@@ -387,3 +387,33 @@ def test_forwarded_story_and_comment_without_direction_or_control_characters():
         forward.render_webhook(f, "Kanal", "de", "d-1"),
     ):
         _clean(out)
+
+
+# ---------------------------------------------------------------- 0.1.56 review
+
+
+def test_the_shown_path_has_no_control_characters():
+    from app.main import shown_path
+
+    assert shown_path("/api/x\x1b[31mred\x07\n\r\x85 end") == "/api/x?[31mred?????end"
+    assert shown_path("/api/news/ünïcode") == "/api/news/ünïcode"
+    assert shown_path("/api/admin/backup/download/secret-ticket\x1b") == "/api/admin/backup/download/…"
+
+
+async def test_the_access_log_shows_an_anonymous_path_without_escapes(client, caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="cobe_news.access"):
+        await client.get("/api/nothing%1b%5b2J%0afake%20line%c2%85")
+    lines = [r.getMessage() for r in caplog.records if r.name == "cobe_news.access" and "nothing" in r.getMessage()]
+    assert lines and all("\x1b" not in x and "\n" not in x and "\x85" not in x for x in lines), lines
+    assert "/api/nothing?[2J" in lines[0] and "line? 404" in lines[0]
+
+
+def test_the_export_cells_never_start_a_formula_after_a_separator():
+    from app.backup import _cell
+
+    assert _cell("v1;=1+1") == "v1;'=1+1"
+    assert _cell(["a", "=cmd"]) == "a; '=cmd"
+    assert _cell({"note": "x,=HYPERLINK(1)"}) == '{"note": "x,\\u003dHYPERLINK(1)"}'
+    assert _cell("=1") == "'=1" and _cell(None) == "" and _cell(True) == "true" and _cell([]) == ""

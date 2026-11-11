@@ -168,6 +168,18 @@ async def patch_user(uid: uuid.UUID, body: UserPatch, admin: Admin, sess: Active
         if set(ch) - {"is_active"}:
             raise api_error(409, "approval_pending")
         return await _approve(u, version, admin, sess, db)
+    handback = False
+    if ch.get("is_active") and not u.is_active:
+        # switching an account back on gives its rights back: re-confirmed, as lifting a block (block_user). A directory
+        # account follows the block's rule: switched off by the sync (sync:…) only the directory switches it on; one an
+        # admin switched off is handed back to the sync – off ("sync:unblocked") until a sign-in or the next sync finds a
+        # mapped group again
+        require_reauth(sess, admin)
+        if u.auth_source != "local":
+            if (u.deactivated_reason or "").startswith("sync:"):
+                raise api_error(409, "directory_managed")
+            ch.pop("is_active")
+            handback = True
     # checked before anything is written: the last active admin is never demoted or switched off
     if u.role == "admin" and u.is_active and (ch.get("role") == "reader" or ch.get("is_active") is False) and await admins_count(db) <= 1:
         raise api_error(409, "last_admin")
@@ -183,6 +195,9 @@ async def patch_user(uid: uuid.UUID, body: UserPatch, admin: Admin, sess: Active
         await sessions.revoke_all(db, u.id)
     elif ch.get("is_active"):
         u.deactivated_reason = None
+    elif handback:
+        u.deactivated_reason = "sync:unblocked"
+        audit.record(db, admin, "user.unblocked", audit.user_target(u), {"is_active": False, "reason": u.deactivated_reason})
     if "role" in ch:
         await sessions.revoke_all(db, u.id)  # new rights at the next sign-in
     after = {"display_name": u.display_name, "email": u.email, "role": u.role, "is_active": u.is_active}

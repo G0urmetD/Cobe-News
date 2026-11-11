@@ -285,14 +285,15 @@ async def _age_reauth(user_id) -> None:  # noqa: ANN001
 
 async def test_own_password_change_is_no_reauth_for_sensitive_actions():
     """Bug hunt 0.1.16 H4: /me/password needs only the current password – it must not count as the re-confirmation
-    (password + TOTP) that creating an admin and the like demand."""
-    u = await add_user("anna", "admin", totp_secret=pyotp.random_base32())
+    (password + TOTP) that creating an admin and the like demand – not even with the code it asks since 0.1.56."""
+    secret = pyotp.random_base32()
+    u = await add_user("anna", "admin", totp_secret=secret)
     async with make_client() as c:
         await sign_in(c, u)
         await _age_reauth(u.id)
         r = await c.post("/api/admin/users", json={"username": "evil", "role": "admin"})
         assert r.status_code == 403 and r.json()["detail"]["code"] == "reauth_required"
-        r = await c.post("/api/me/password", json={"current_password": PASSWORD, "new_password": "Ein-anderes-langes-Passwort-77"})
+        r = await c.post("/api/me/password", json={"current_password": PASSWORD, "new_password": "Ein-anderes-langes-Passwort-77", "code": pyotp.TOTP(secret).now()})
         assert r.status_code == 200
         r = await c.post("/api/admin/users", json={"username": "evil", "role": "admin"})
         assert r.status_code == 403 and r.json()["detail"]["code"] == "reauth_required"

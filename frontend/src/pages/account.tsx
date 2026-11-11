@@ -482,18 +482,23 @@ function MyDevices() {
 
 function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { t } = useTranslation()
+  // with TOTP set up the current code too (0.1.56): the password alone is what a remembered device proved
+  const totp = !!useAuth().user?.totp
   const [current, setCurrent] = useState("")
+  const [code, setCode] = useState("")
   const [next, setNext] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const change = async () => {
     setBusy(true)
     try {
-      await api.post("/api/me/password", { current_password: current, new_password: next })
+      await api.post("/api/me/password", { current_password: current, new_password: next, ...(totp ? { code } : {}) })
       toast.success(t("account.pwChanged"))
       setCurrent("")
+      setCode("")
       onOpenChange(false)
     } catch (e) {
       toast.error(errorText(t, e))
+      setCode("") // a code counts once
     } finally {
       setBusy(false)
     }
@@ -511,11 +516,16 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               <Input id="cur-pw" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
             </Field>
             <NewPasswordFields onValid={setNext} autoFocus={false} />
+            {totp && (
+              <Field label={t("account.reauthCode")} hint={t("account.pwCodeHint")}>
+                <CodeInput value={code} onChange={setCode} />
+              </Field>
+            )}
             <DialogFooter>
               <Button variant="ghost" onClick={() => onOpenChange(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button disabled={!current || !next || busy} onClick={() => void change()}>
+              <Button disabled={!current || !next || (totp && code.length < 6) || busy} onClick={() => void change()}>
                 {busy && <Loader2 className="animate-spin" />} {t("common.save")}
               </Button>
             </DialogFooter>

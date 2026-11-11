@@ -417,9 +417,10 @@ async def login(body: LoginIn, request: Request, response: Response, db: Db):
         # (devices.factor); one that was valid moves on to the new hash, nothing else is accepted
         remembered = bool(user.totp_secret_enc) and await devices.recognised(db, user, devices.cookie(request))
         if user.password_hash and passwords.needs_rehash(user.password_hash):
+            old_factor = devices.factor(user)
             user.password_hash = await passwords.ahash_password(body.password)
             if remembered:
-                await devices.rebind(db, user, devices.cookie(request))
+                await devices.rebind(db, user, old_factor)
         sess, _ = await sessions.create(db, user, "pre", ip, user_agent(request), method="password")
         return await _finish(db, sess, user, await _next_after_password(db, sess, user, request, remembered), response)
 
@@ -549,7 +550,12 @@ async def mfa_device(got: MfaSession, request: Request, response: Response, db: 
     The token cannot be guessed (32 random bytes), so a miss is not counted; the account's lock still applies."""
     sess, user = got
     await _guard(bruteforce.lock_key(user), client_ip(request), emergency=user.is_emergency)
-    await db.refresh(sess)
+    # the row locked and read again: a second request of the same moment waits here and then finds the session promoted
+    # already – it must not promote it a second time (a second token for the same session)
+    await db.refresh(sess, with_for_update=True)
+    if (stage := sess.stage) != "mfa":
+        await db.rollback()
+        raise api_error(403, "wrong_stage", stage=stage)
     if not await devices.recognised(db, user, devices.cookie(request)):
         await db.commit()  # a row of this account that no longer counts is gone
         resp = JSONResponse({"detail": {"code": "device_unknown"}}, status_code=409)
@@ -562,6 +568,7 @@ async def mfa_device(got: MfaSession, request: Request, response: Response, db: 
 class NewPasswordIn(_M):
     new_password: str = Field(min_length=1, max_length=256)
     current_password: str | None = Field(default=None, max_length=256)
+    code: str | None = Field(default=None, max_length=12)  # the own change with TOTP set up: the current code too
 
 
 async def _set_password(db, user: User, pw: str) -> None:
@@ -866,12 +873,18 @@ async def my_password(body: NewPasswordIn, user: Reader, sess: ActiveSession, re
         raise api_error(403, "ip_blocked")
     # like /auth/reauth: no account-lock check (anyone can lock a name from outside – the signed-in owner must still be
     # able to change the password); guessing is held by the session's own counter instead – 5 misses end it
+    # with TOTP set up the current code as well: the password alone is what a session on a remembered device proved
+    # (app/auth/devices.py) – it must not be able to take the account over (the new password ends every other session)
+    if user.totp_secret_enc and not body.code:
+        raise api_error(400, "code_required")
     key = bruteforce.lock_key(user)
     async with bruteforce.gate(f"reauth:{sess.id}", ip) as free, _brake(user.is_emergency) as go:
         if not free or not go:
             raise api_error(429, "too_many_attempts")
         if not await passwords.averify_password(user.password_hash, body.current_password or ""):
             return await _fail(db, key, ip, emergency=user.is_emergency, lock=False, sess=sess, stage="password_change")
+        if user.totp_secret_enc and not await _check_totp(db, user, body.code or ""):
+            return await _fail(db, key, ip, "invalid_code", emergency=user.is_emergency, lock=False, sess=sess, stage="password_change")
     await _set_password(db, user, body.new_password)
     await sessions.revoke_all(db, user.id, except_id=sess.id)  # other browsers sign in again
     audit.record(db, user, "account.password_changed", audit.user_target(user), {"other_sessions_ended": True})

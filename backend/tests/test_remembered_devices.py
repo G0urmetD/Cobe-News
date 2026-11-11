@@ -257,7 +257,7 @@ async def test_changed_factors_ask_again(client):
     await _remembered(client, u, secret)
     async with make_client() as c:
         await sign_in(c, await _user(u.id))
-        r = await c.post("/api/me/password", json={"current_password": PASSWORD, "new_password": NEW_PASSWORD})
+        r = await c.post("/api/me/password", json={"current_password": PASSWORD, "new_password": NEW_PASSWORD, "code": await _code(u.id, secret)})
         assert r.json() == {"ok": True}
     assert await _rows() == []
 
@@ -470,3 +470,109 @@ async def test_migration_0044_down_and_up():
     async with db.engine().begin() as conn:
         assert "remembered_devices" in await conn.run_sync(up)
     assert await _rows() == []
+
+
+# ---------------------------------------------------------------- 0.1.56 review
+
+
+async def _device_session(c, u, secret: str) -> None:  # noqa: ANN001
+    """Remembered, signed out – and signed in again on the device: password only (method password_device)."""
+    await _remembered(c, u, secret)
+    assert (await _login(c, u.username))["next"] == "done"
+    assert await _method(c) == "password_device"
+
+
+async def test_a_device_session_changes_the_password_only_with_the_code(client):
+    secret = pyotp.random_base32()
+    u = await add_user("tina", totp_secret=secret)
+    await _setup(remember=True)
+    await _device_session(client, u, secret)
+    body = {"current_password": PASSWORD, "new_password": NEW_PASSWORD}
+    r = await client.post("/api/me/password", json=body)
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "code_required"
+    r = await client.post("/api/me/password", json={**body, "code": "000000" if pyotp.TOTP(secret).now() != "000000" else "111111"})
+    assert r.status_code == 401 and r.json()["detail"]["code"] == "invalid_code"
+    assert len(await _rows(u.id)) == 1  # nothing changed: the device, the other sessions, the password
+    r = await client.post("/api/me/password", json={**body, "code": await _code(u.id, secret)})
+    assert r.json() == {"ok": True} and await _rows() == []
+
+
+async def test_a_device_session_makes_a_calendar_address_only_after_the_second_factor(client):
+    secret = pyotp.random_base32()
+    u = await add_user("tina", totp_secret=secret)
+    await _setup(remember=True)
+    async with make_client() as normal:  # a full sign-in: as before, nothing more asked
+        await sign_in(normal, u)
+        assert (await normal.post("/api/me/calendar")).status_code == 200
+    await _device_session(client, u, secret)
+    r = await client.post("/api/me/calendar")
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "reauth_required" and r.json()["detail"]["totp"] is True
+    r = await client.post("/api/auth/reauth", json={"password": PASSWORD, "code": await _code(u.id, secret)})
+    assert r.json()["ok"] is True
+    assert (await client.post("/api/me/calendar")).status_code == 200
+
+
+async def test_a_renewed_hash_moves_every_device_of_the_old_hash_and_no_other(client, monkeypatch):
+    secret = pyotp.random_base32()
+    u = await add_user("tina", totp_secret=secret)
+    await _setup(remember=True)
+    await _remembered(client, u, secret)
+    async with make_client() as other:
+        await _remembered(other, u, secret)
+    # a third row that stood on something else already (an older password): never revived
+    async with db.session() as s:
+        s.add(RememberedDevice(user_id=u.id, token_hash="h" * 64, factor="older", expires_at=datetime.now(UTC) + timedelta(days=1)))
+        await s.commit()
+    monkeypatch.setattr(passwords, "needs_rehash", lambda h: True)
+    assert (await _login(client, "tina"))["next"] == "done"
+    now = devices.factor(await _user(u.id))
+    assert sorted(r.factor for r in await _rows(u.id)) == sorted([now, now, "older"])
+
+
+async def test_two_requests_of_the_same_moment_promote_the_session_once(client):
+    import asyncio
+
+    secret = pyotp.random_base32()
+    await _setup(remember=True)
+    async with db.session() as s:
+        u = User(username="erika@corp.example", display_name="Erika", role="reader", auth_source="entra", external_id=str(uuid.uuid4()), totp_secret_enc=encrypt_str(secret))
+        s.add(u)
+        await s.commit()
+    async with db.session() as s:
+        sess, _ = await sessions.create(s, await s.get(User, u.id), "pre", "127.0.0.1", "pytest", method="entra")
+        token = await sessions.promote(s, sess, "mfa")
+        await s.commit()
+    client.cookies.set(sessions.cookie_name(), token)
+    r = await client.post("/api/auth/mfa", json={"code": await _code(u.id, secret), "remember": True})
+    device = client.cookies.get(DEVICE)
+    async with db.session() as s:
+        sess, _ = await sessions.create(s, await s.get(User, u.id), "pre", "127.0.0.1", "pytest", method="entra")
+        token = await sessions.promote(s, sess, "mfa")
+        await s.commit()
+    async with make_client() as a, make_client() as b:
+        for c in (a, b):
+            c.cookies.set(sessions.cookie_name(), token)
+            c.cookies.set(DEVICE, device, domain="news.test", path="/api/auth")
+            await c.get("/api/auth/config")  # the CSRF cookie first
+        ra, rb = await asyncio.gather(a.post("/api/auth/mfa/device"), b.post("/api/auth/mfa/device"))
+    assert sorted([ra.status_code, rb.status_code]) in ([200, 401], [200, 403]), (ra.text, rb.text)
+    async with db.session() as s:
+        assert len(list(await s.scalars(select(UserSession).where(UserSession.id == sess.id, UserSession.stage == "active")))) == 1
+
+
+async def test_forget_all_leaves_another_accounts_cookie_in_a_shared_browser(client):
+    s1, s2 = pyotp.random_base32(), pyotp.random_base32()
+    tina = await add_user("tina", totp_secret=s1)
+    otto = await add_user("otto", totp_secret=s2)
+    await _setup(remember=True)
+    await _remembered(client, tina, s1)
+    await _remembered(client, otto, s2)  # the same browser: otto's cookie replaces tina's
+    otto_token = client.cookies.get(DEVICE)
+    assert await _login(client, "tina") == {"next": "mfa"}
+    assert (await client.post("/api/auth/mfa", json={"code": await _code(tina.id, s1)})).json()["next"] == "done"
+    r = await client.post("/api/auth/devices/forget-all")
+    assert r.json() == {"ok": True, "forgotten": 1}
+    assert not any(h.startswith(f"{DEVICE}=") for h in r.headers.get_list("set-cookie"))  # otto's cookie stays
+    assert client.cookies.get(DEVICE) == otto_token and len(await _rows(otto.id)) == 1
+    await client.post("/api/auth/logout")
+    assert (await _login(client, "otto"))["next"] == "done"

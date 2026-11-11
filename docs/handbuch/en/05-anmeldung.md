@@ -126,7 +126,8 @@ the **password** in this browser until then – the code is skipped.
 - **Entra accounts:** only where Cobe News asks its own TOTP ([MFA proof](#entra-mfa-nachweis)). The second factor at
   Microsoft is Microsoft's business.
 - **Sensitive changes** still ask for the code: a sign-in on a remembered device does not count as
-  [confirmation](#erneut-bestaetigen).
+  [confirmation](#erneut-bestaetigen). Changing your own password always asks the code when TOTP is set up; creating a
+  [calendar address](/docs/benachrichtigungen#kalender-ical) in such a session asks the confirmation first.
 - **How it is stored:** the browser holds a random token in a cookie of its own (HttpOnly, Secure like the session
   cookie, SameSite=Strict, only for `/api/auth`), the server only its hash. It counts only for the account it was
   remembered for.
@@ -134,7 +135,11 @@ the **password** in this browser until then – the code is skipped.
   to devices remembered already), the switch is off or admins are excluded.
 - **Forgotten** are remembered devices under [My sessions](#meine-sitzungen) (one or all), by an admin ("Sessions &
   passkeys" → "Forget remembered devices"), with "Sign out all others" / "End all sessions", on blocking, disabling and
-  resetting. Switching it off forgets all of them – switching it on again brings none back.
+  resetting, and all of them after a [restore](/docs/sicherung#wiederherstellung). Switching it off forgets all of them –
+  switching it on again brings none back.
+- **One browser, two accounts:** the browser keeps one device only – the one remembered last. The other account's
+  device stays in that account's list but no longer counts in this browser (the sign-in there asks for the code again);
+  "Forget" clears it away. One account's "Forget all devices" leaves the other account's remembered device alone.
 - In the [audit log](/docs/betrieb#protokoll): "Device remembered for the second factor", "Remembered devices
   forgotten"; an admin's sign-in on a remembered device with the method "Password + remembered device".
 
@@ -332,7 +337,9 @@ domain controller, reads the groups and derives the role from them. Admins from 
 
 Domain controllers may be in the company network (private addresses are allowed). Never allowed are loopback,
 link-local, Cobe News' own Docker networks and the Docker host itself (e.g. `host.docker.internal`, with Docker Desktop
-the network `192.168.65.0/24`). "Test connection" then reports "Target not allowed …". On errors Cobe News only shows
+the network `192.168.65.0/24`). "Test connection" then reports "Target not allowed …". The name is checked and – when
+connecting – the address actually reached, before StartTLS or any password (a name that then points at a forbidden
+target does not help). On errors Cobe News only shows
 their kind, never answers from the server.
 
 ### Errors when testing {#ad-fehler}
