@@ -242,12 +242,15 @@ async def next_after_mfa(db, sess: UserSession, user: User) -> str:  # noqa: ANN
     return "active" if sess.method in ("password_totp", "ldap_totp", "passkey", "password_device", "ldap_device") else "enroll"
 
 
-async def _next_after_password(db, sess: UserSession, user: User, request: Request) -> str:  # noqa: ANN001
+async def _next_after_password(db, sess: UserSession, user: User, request: Request, remembered: bool | None = None) -> str:  # noqa: ANN001
     """After the right password: the TOTP step – unless this browser is a remembered device of the account
-    (app/auth/devices.py); then on as after the code (a temporary password or a due set-up still come)."""
+    (app/auth/devices.py); then on as after the code (a temporary password or a due set-up still come). `remembered`:
+    checked already by the caller (before the password hash was renewed – login)."""
     if not user.totp_secret_enc:
         return await next_after_mfa(db, sess, user)
-    if await devices.recognised(db, user, devices.cookie(request)):
+    if remembered is None:
+        remembered = await devices.recognised(db, user, devices.cookie(request))
+    if remembered:
         sessions.with_device(sess)
         return await next_after_mfa(db, sess, user)
     return "mfa"
@@ -410,10 +413,15 @@ async def login(body: LoginIn, request: Request, response: Response, db: Db):
             # python -m app.cli reset-emergency) – no session, and not counted (nothing was guessed)
             log.info("sign-in of %s refused: temporary password expired", user.username)
             raise api_error(401, "temp_password_expired")
+        # the remembered device is checked against the account as it is – before a renewed hash changes its fingerprint
+        # (devices.factor); one that was valid moves on to the new hash, nothing else is accepted
+        remembered = bool(user.totp_secret_enc) and await devices.recognised(db, user, devices.cookie(request))
         if user.password_hash and passwords.needs_rehash(user.password_hash):
             user.password_hash = await passwords.ahash_password(body.password)
+            if remembered:
+                await devices.rebind(db, user, devices.cookie(request))
         sess, _ = await sessions.create(db, user, "pre", ip, user_agent(request), method="password")
-        return await _finish(db, sess, user, await _next_after_password(db, sess, user, request), response)
+        return await _finish(db, sess, user, await _next_after_password(db, sess, user, request, remembered), response)
 
 
 async def _login_ldap(db, username: str, password: str, ip: str, request: Request, response: Response):

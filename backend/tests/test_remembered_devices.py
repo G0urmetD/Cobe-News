@@ -153,6 +153,32 @@ async def test_cookie_flags_and_only_a_hash_stored(client, monkeypatch):
     assert h.startswith("__Secure-cobe_news_device=") and "Secure" in h and "HttpOnly" in h and "Path=/api/auth" in h
 
 
+async def test_a_renewed_password_hash_keeps_a_valid_device_and_accepts_no_other(client, monkeypatch):
+    """Other Argon2 parameters: the right password is hashed anew at the sign-in – a device valid before stays valid
+    (moved to the new hash); one that was not valid before (a TOTP changed meanwhile) is not made valid by it."""
+    secret = pyotp.random_base32()
+    u = await add_user("tina", totp_secret=secret)
+    await _setup(remember=True)
+    await _remembered(client, u, secret)
+    old_hash = (await _user(u.id)).password_hash
+    monkeypatch.setattr(passwords, "needs_rehash", lambda h: True)
+    assert (await _login(client, "tina"))["next"] == "done"
+    assert await _method(client) == "password_device"
+    assert (await _user(u.id)).password_hash != old_hash  # renewed …
+    [row] = await _rows(u.id)
+    assert row.factor == devices.factor(await _user(u.id))  # … and the device moved with it
+    await client.post("/api/auth/logout")
+    assert (await _login(client, "tina"))["next"] == "done"  # still valid at the next sign-in
+    await client.post("/api/auth/logout")
+    # a device that no longer counts (new TOTP) is not revived by the renewed hash
+    secret = pyotp.random_base32()
+    async with db.session() as s:
+        await s.execute(update(User).where(User.id == u.id).values(totp_secret_enc=encrypt_str(secret)))
+        await s.commit()
+    assert await _login(client, "tina") == {"next": "mfa"}
+    assert await _rows() == []
+
+
 async def test_another_persons_cookie_is_ignored(client):
     s1, s2 = pyotp.random_base32(), pyotp.random_base32()
     tina = await add_user("tina", totp_secret=s1)
