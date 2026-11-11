@@ -148,7 +148,7 @@ async def test_story_carried_by_several_sources_counts_for_each(reader_client, a
     # desktop choice and notification rule naming only B get it
     async with db.session() as s:
         where = [NewsItem.id == item.id, *api.desktop_filter({"sources": [str(b)]}), *api.fresh_filter()]
-        rows, total = await api.arrived(s, where)
+        rows, total, _top = await api.arrived(s, where)
         assert total == 1
         rule = NotifyRule(name="B only", severities=[], sources=[str(b)], kinds=["news"], active_since=datetime.now(UTC) - timedelta(days=1))
         s.add(rule)

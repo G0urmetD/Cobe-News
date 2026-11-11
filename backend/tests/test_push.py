@@ -341,3 +341,114 @@ async def test_parallel_subscribes_of_one_endpoint(reader_client, service, monke
     assert [r.status_code for r in rs] == [200] * 4
     async with db.session() as s:
         assert len(list(await s.scalars(select(PushSubscription).where(PushSubscription.endpoint == FCM)))) == 1
+
+
+# ---------------------------------------------------------------- the most important first, the summary's severity (review 0.1.56)
+
+
+async def _story(src: NewsSource, title: str, severity: str, reasons: list | None = None) -> None:
+    async with db.session() as s:
+        now = datetime.now(UTC)
+        seq = await news.next_seq(s)
+        s.add(NewsItem(source_id=src.id, url=f"https://p.example.org/{title}", url_key=title, title=title, title_key=title, published_at=now, fetched_at=now, severity=severity, reasons=reasons or [], seq=seq))
+        await s.commit()
+
+
+async def test_critical_and_exploited_get_their_own_notification_in_tab_and_push_alike(reader_client, service):
+    """A critical story among positions 4–10 of a round was only part of the summary (the singles were the newest):
+    critical or exploited ones come first now, then the newest – the tab's list and the Web Push the same."""
+    b = Browser()
+    await _desktop(reader_client.user, severities=[])
+    src = await _source()
+    cur = (await reader_client.get("/api/news/recent?mine=true")).json()["cursor"]
+    await reader_client.post("/api/me/push", json={"endpoint": FCM, "keys": b.keys(), "lang": "de"})
+    await _story(src, "crit-old", "critical", [{"kind": "cvss", "value": "9.8"}])
+    await _story(src, "kev-low", "low", [{"kind": "kev"}])  # exploited (CISA KEV), rated low
+    for k in range(5):
+        await _story(src, f"low-{k}", "low", [{"kind": "cvss", "value": "3.1"}])
+    tab = (await reader_client.get("/api/news/recent", params={"after": cur, "mine": "true"})).json()
+    assert [i["title"] for i in tab["items"]] == ["kev-low", "crit-old", "low-4", "low-3", "low-2", "low-1", "low-0"]
+    assert tab["total"] == 7 and tab["unlisted_top"] is None  # all of them listed
+    assert await _dispatch() == {"sent": 1, "failed": 0}
+    got = [b.read(r.content) for r in service.requests]
+    # the first three of that order, the most important last (on top) – the tab's planNotifications does the same
+    assert [g["title"] for g in got] == ["low-4", "crit-old", "kev-low", "4 neue Security-Meldungen"]
+    assert got[2]["body"] == "Niedrig · ausgenutzt · Push Feed"
+    assert got[3]["body"] == "Höchste Schwere: Niedrig"
+
+
+async def test_summary_names_the_highest_severity_also_of_what_the_round_did_not_list(reader_client, service):
+    """More than RECENT_MAX in a round: the summary's "Höchste Schwere" came only from the listed rest – a higher one
+    beyond the list counted only in "N weitere". Now the server's one aggregate adds the highest of the unlisted ones."""
+    b = Browser()
+    await _desktop(reader_client.user, severities=[])
+    src = await _source()
+    cur = (await reader_client.get("/api/news/recent?mine=true")).json()["cursor"]
+    await reader_client.post("/api/me/push", json={"endpoint": FCM, "keys": b.keys(), "lang": "de"})
+    await _story(src, "high-old", "high", [{"kind": "cvss", "value": "8.1"}])  # oldest – beyond the newest ten
+    await _story(src, "info-unrated", "info")  # unrated: counts, names no severity
+    for k in range(12):
+        await _story(src, f"med-{k}", "medium", [{"kind": "cvss", "value": "5.0"}])
+    tab = (await reader_client.get("/api/news/recent", params={"after": cur, "mine": "true"})).json()
+    assert tab["total"] == 14 and len(tab["items"]) == 10 and tab["unlisted_top"] == "high"
+    assert "high-old" not in [i["title"] for i in tab["items"]]
+    assert await _dispatch() == {"sent": 1, "failed": 0}
+    got = [b.read(r.content) for r in service.requests]
+    assert [g["title"] for g in got] == ["med-9", "med-10", "med-11", "11 neue Security-Meldungen"]
+    assert got[3]["body"] == "Höchste Schwere: Hoch"
+    async with db.session() as s:
+        from app import api
+
+        # all of them listed: nothing unlisted
+        _rows, total, top = await api.arrived(s, [NewsItem.title.in_(["info-unrated", *[f"med-{k}" for k in range(9)]])])
+        assert total == 10 and top is None
+        # only an unrated one beyond the list: it names no severity
+        _rows, total, top = await api.arrived(s, [NewsItem.title.in_(["info-unrated", *[f"med-{k}" for k in range(10)]])])
+        assert total == 11 and top is None
+
+
+FCM3 = "https://fcm.googleapis.com/fcm/send/test-endpoint-3"
+FCM4 = "https://fcm.googleapis.com/fcm/send/test-endpoint-4"
+
+
+async def test_grouped_round_same_payloads_per_browser_and_one_failure_stays_its_own(reader_client, service, monkeypatch):
+    """dispatch asks the database once per desktop choice and cursor (review 0.1.56: it was N+1 per browser). Two
+    browsers of one person, a second person with the same choice, a third with another: each gets exactly what its
+    person chose in its language; a browser that fails backs off alone, the others' cursors move."""
+    olga, paul = await add_user("olga"), await add_user("paul")
+    await _desktop(reader_client.user, severities=[])
+    await _desktop(olga, severities=[])  # the same choice as the reader
+    await _desktop(paul, severities=["critical"])  # another one
+    browsers = {FCM: Browser(), FCM2: Browser(), FCM3: Browser(), FCM4: Browser()}
+    await reader_client.post("/api/me/push", json={"endpoint": FCM, "keys": browsers[FCM].keys(), "lang": "de"})
+    await reader_client.post("/api/me/push", json={"endpoint": FCM2, "keys": browsers[FCM2].keys(), "lang": "en"})
+    for user, ep in ((olga, FCM3), (paul, FCM4)):
+        async with make_client() as c:
+            await sign_in(c, user)
+            await c.post("/api/me/push", json={"endpoint": ep, "keys": browsers[ep].keys(), "lang": "de"})
+    src = await _source()
+    await _story(src, "crit", "critical", [{"kind": "cvss", "value": "9.8"}])
+    await _story(src, "high", "high", [{"kind": "cvss", "value": "7.5"}])
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        service.requests.append(req)
+        return httpx.Response(500 if str(req.url) == FCM3 else 201)  # olga's browser fails
+
+    monkeypatch.setattr(notify, "transport", httpx.MockTransport(handler))
+    assert await _dispatch() == {"sent": 3, "failed": 1}
+    got: dict[str, list] = {}
+    for r in service.requests:
+        got.setdefault(str(r.url), []).append(browsers[str(r.url)].read(r.content))
+    assert [(g["title"], g["body"]) for g in got[FCM]] == [("high", "Hoch (CVSS 7.5) · Push Feed"), ("crit", "Kritisch (CVSS 9.8) · Push Feed")]
+    assert [(g["title"], g["body"]) for g in got[FCM2]] == [("high", "High (CVSS 7.5) · Push Feed"), ("crit", "Critical (CVSS 9.8) · Push Feed")]
+    assert [g["title"] for g in got[FCM3]] == ["high"]  # tried (the first message failed)
+    assert [g["title"] for g in got[FCM4]] == ["crit"]
+    assert [g["id"] for g in got[FCM]] == [g["id"] for g in got[FCM2]]
+    async with db.session() as s:
+        subs = {x.endpoint: x for x in await s.scalars(select(PushSubscription))}
+        top = await news.last_seq(s)
+    assert all(subs[e].cursor == top and subs[e].failures == 0 and subs[e].last_ok_at for e in (FCM, FCM2, FCM4))
+    assert subs[FCM3].cursor < top and subs[FCM3].failures == 1 and subs[FCM3].last_error == "http: HTTP 500" and subs[FCM3].next_try_at > datetime.now(UTC)
+    # the next round: nothing for the others, olga's browser waits for its backoff
+    n = len(service.requests)
+    assert await _dispatch() == {} and len(service.requests) == n

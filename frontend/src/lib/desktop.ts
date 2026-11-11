@@ -159,13 +159,19 @@ export function storyBody(item: Pick<NewsItem, "severity" | "source" | "hits" | 
 }
 
 /** The summary's line: the highest severity of the stories it stands for and their products – "Ein Klick öffnet die
- *  News." when nothing is known of them (the server listed only the newest few). */
-export function summaryBody(items: Pick<NewsItem, "severity" | "hits" | "notice">[], t: (k: string, o?: Record<string, unknown>) => string = i18n.t.bind(i18n)): string {
+ *  News." when nothing is known of them. `unlistedTop`: the highest severity of the rest the server did not list
+ *  (/news/recent `unlisted_top`) – the line names the highest of all of the rest, as the Web Push's (webpush.summary_line). */
+export function summaryBody(
+  items: Pick<NewsItem, "severity" | "hits" | "notice">[],
+  t: (k: string, o?: Record<string, unknown>) => string = i18n.t.bind(i18n),
+  unlistedTop: string | null = null,
+): string {
   const rank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 }
-  const rated = items.filter((i) => i.notice?.rated ?? true)
+  const sevs: string[] = items.filter((i) => i.notice?.rated ?? true).map((i) => i.severity)
+  if (unlistedTop) sevs.push(unlistedTop)
   const parts: string[] = []
-  if (rated.length) {
-    const top = rated.reduce((a, b) => ((rank[b.severity] ?? 0) > (rank[a.severity] ?? 0) ? b : a)).severity
+  if (sevs.length) {
+    const top = sevs.reduce((a, b) => ((rank[b] ?? 0) > (rank[a] ?? 0) ? b : a))
     parts.push(t("desktop.summaryTop", { sev: t(`news.sev.${top}`) }))
   }
   const names: string[] = []
@@ -260,8 +266,10 @@ export function currentSystem() {
 export const DESKTOP_MAX = 3
 
 /**
- * Which stories of one round get a notification of their own (oldest of them first), and how many more there are for
- * the summary. `claim` marks one as shown (false: another tab showed it already). Pure – desktop.test.ts checks it.
+ * Which stories of one round get a notification of their own, and how many more there are for the summary. The server
+ * lists the most important first (critical or exploited, then the newest – api.arrived): the first few not shown yet
+ * get their own, in reverse (the most important last, on top) – as the Web Push does. `claim` marks one as shown
+ * (false: another tab showed it already). Pure – desktop.test.ts checks it.
  */
 export function planNotifications(items: NewsItem[], total: number, claim: (id: string) => boolean): { single: NewsItem[]; more: number; rest: NewsItem[] } {
   const fresh = items.filter((i) => claim(i.id))
@@ -272,8 +280,12 @@ export function planNotifications(items: NewsItem[], total: number, claim: (id: 
   return { single, more, rest: fresh.slice(DESKTOP_MAX) }
 }
 
-function showSummary(count: number, rest: NewsItem[], open: () => void) {
-  return notify(i18n.t("desktop.summaryTitle", { count }), { body: summaryBody(rest), tag: `cobe-news-summary-${Date.now()}`, critical: false, path: "/" }, open)
+function showSummary(count: number, rest: NewsItem[], unlistedTop: string | null, open: () => void) {
+  return notify(
+    i18n.t("desktop.summaryTitle", { count }),
+    { body: summaryBody(rest, undefined, unlistedTop), tag: `cobe-news-summary-${Date.now()}`, critical: false, path: "/" },
+    open,
+  )
 }
 
 /** One round: what arrived since the cursor. With push working in this browser the push messages show it – the round
@@ -283,14 +295,17 @@ export async function poll(userId: string, open: (id: string | null) => void): P
   const after = raw !== null && /^\d+$/.test(raw) ? raw : null
   // the person's choice (severities, sources, topics, systems, words) is applied by the server – the count then is exactly what is new for them
   // a background request: the rounds of an open tab do not keep the session alive (lib/poll.ts)
-  const res = await api.get<{ items: NewsItem[]; total: number; cursor: number }>(`/api/news/recent?mine=true${after !== null ? `&after=${after}` : ""}`, {
-    background: true,
-  })
+  const res = await api.get<{ items: NewsItem[]; total: number; unlisted_top?: string | null; cursor: number }>(
+    `/api/news/recent?mine=true${after !== null ? `&after=${after}` : ""}`,
+    {
+      background: true,
+    },
+  )
   write(cursorKey(userId), String(res.cursor))
   if (after === null || pushActiveHere(userId)) return
   const { single, more, rest } = planNotifications(res.items, res.total ?? res.items.length, (id) => claim(userId, id))
   for (const item of single) await showStory(item, open)
-  if (more > 0) await showSummary(more, rest, () => open(null))
+  if (more > 0) await showSummary(more, rest, res.unlisted_top ?? null, () => open(null))
 }
 
 type Locks = { request: (name: string, options: { ifAvailable?: boolean; steal?: boolean }, cb: (lock: unknown) => Promise<void> | void) => Promise<void> }
@@ -379,29 +394,39 @@ function currentPermission(): NotificationPermission | "unsupported" {
   return desktopSupported() ? Notification.permission : "unsupported"
 }
 
+/** Calls `check` whenever the browser's permission may have changed (its change event, focus, visibility, every 5 s)
+ *  until the returned stop is called – also when the permission query answers only after that (a page left at once):
+ *  then nothing is attached and `check` is never called again. */
+export function watchPermission(check: () => void): () => void {
+  let alive = true
+  const run = () => {
+    if (alive) check()
+  }
+  let status: PermissionStatus | null = null
+  navigator.permissions
+    ?.query({ name: "notifications" })
+    .then((s) => {
+      if (!alive) return
+      status = s
+      s.onchange = run
+    })
+    .catch(() => undefined)
+  window.addEventListener("focus", run)
+  document.addEventListener("visibilitychange", run)
+  const id = setInterval(run, 5_000)
+  return () => {
+    alive = false
+    if (status) status.onchange = null
+    window.removeEventListener("focus", run)
+    document.removeEventListener("visibilitychange", run)
+    clearInterval(id)
+  }
+}
+
 /** The browser's permission, kept current: granted in the settings, in the address bar or in another tab. */
 export function useNotificationPermission(): NotificationPermission | "unsupported" {
   const [perm, setPerm] = useState(currentPermission)
-  useEffect(() => {
-    const check = () => setPerm(currentPermission())
-    let status: PermissionStatus | null = null
-    navigator.permissions
-      ?.query({ name: "notifications" })
-      .then((s) => {
-        status = s
-        s.onchange = check
-      })
-      .catch(() => undefined)
-    window.addEventListener("focus", check)
-    document.addEventListener("visibilitychange", check)
-    const id = setInterval(check, 5_000)
-    return () => {
-      if (status) status.onchange = null
-      window.removeEventListener("focus", check)
-      document.removeEventListener("visibilitychange", check)
-      clearInterval(id)
-    }
-  }, [])
+  useEffect(() => watchPermission(() => setPerm(currentPermission())), [])
   return perm
 }
 

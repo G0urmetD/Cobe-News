@@ -11,9 +11,9 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import ConfigDict, Field, ValidationError, field_validator
-from sqlalchemy import Text, and_, cast, delete, exists, false, func, literal, or_, select, update
+from sqlalchemy import Text, and_, case, cast, delete, exists, false, func, literal, or_, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, JSONPATH
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -422,6 +422,10 @@ def desktop_hits(prefs: dict | None):  # noqa: ANN201
     return lambda i: concerns.story_hits(i, chosen, words, want)
 
 
+EXPLOITED_REASONS = ("kev", "euvd", "exploited", "ransomware")  # a reason of these kinds: the story says "ausgenutzt"
+SEV_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+
+
 def notice_facts(i: NewsItem) -> dict:
     """What a notification of one story says besides its title (the tab's and the Web Push's line, webpush.notice_line):
     `rated` – the severity comes from the story (a reason: CVSS, BSI, the vendor's rating …); an unrated story ("info"
@@ -432,9 +436,16 @@ def notice_facts(i: NewsItem) -> dict:
     return {
         "rated": bool(reasons) or i.severity != "info",
         "cvss": cvss,
-        "exploited": any(r.get("kind") in ("kev", "euvd", "exploited", "ransomware") for r in reasons),
+        "exploited": any(r.get("kind") in EXPLOITED_REASONS for r in reasons),
         "products": concerns.story_names(i)[:10],
     }
+
+
+# notice_facts in SQL – for the order of a round (arrived) and the highest severity of what it does not list
+_EXPLOITED_SQL = func.jsonb_path_exists(NewsItem.reasons, cast("$[*] ? (" + " || ".join(f'@.kind == "{k}"' for k in EXPLOITED_REASONS) + ")", JSONPATH))
+_RATED_SQL = or_(NewsItem.severity != "info", func.jsonb_path_exists(NewsItem.reasons, cast('$[*] ? (@.type() == "object")', JSONPATH)))
+_SEV_RANK_SQL = case(SEV_RANK, value=NewsItem.severity, else_=0)
+_PRIORITY_SQL = case((or_(NewsItem.severity == "critical", _EXPLOITED_SQL), 1), else_=0)
 
 
 def fresh_filter() -> list:
@@ -444,12 +455,21 @@ def fresh_filter() -> list:
     return [news_svc.visible(), NewsItem.backlog.is_(False)]
 
 
-async def arrived(db: AsyncSession, where: list) -> tuple[list[tuple[NewsItem, NewsSource]], int]:
-    """The newest RECENT_MAX stories matching `where` and how many match in all."""
+async def arrived(db: AsyncSession, where: list) -> tuple[list[tuple[NewsItem, NewsSource]], int, str | None]:
+    """At most RECENT_MAX stories matching `where`, the most important first – critical or exploited (notice_facts),
+    then the newest –, how many match in all, and the highest severity of the matching ones not listed (rated ones
+    only, as the summary line; None: there are none). A notification round shows the first few of the list on their own
+    (tab and Web Push alike), so a critical story is never only a number in the summary. The count and the severity are
+    one aggregate over the same rows, asked only when the list is full."""
     q = select(NewsItem, NewsSource).join(NewsSource, NewsSource.id == NewsItem.source_id).where(*where)
-    rows = [(r[0], r[1]) for r in (await db.execute(q.order_by(NewsItem.seq.desc(), NewsItem.published_at.desc()).limit(RECENT_MAX))).all()]
-    total = len(rows) if len(rows) < RECENT_MAX else int(await db.scalar(select(func.count()).select_from(q.subquery())) or 0)
-    return rows, total
+    order = (_PRIORITY_SQL.desc(), NewsItem.seq.desc(), NewsItem.published_at.desc())
+    rows = [(r[0], r[1]) for r in (await db.execute(q.order_by(*order).limit(RECENT_MAX))).all()]
+    if len(rows) < RECENT_MAX:
+        return rows, len(rows), None
+    rest = and_(_RATED_SQL, NewsItem.id.not_in([i.id for i, _s in rows]))
+    agg = select(func.count(), func.max(_SEV_RANK_SQL).filter(rest)).select_from(NewsItem).join(NewsSource, NewsSource.id == NewsItem.source_id).where(*where)
+    total, rank = (await db.execute(agg)).one()
+    return rows, int(total or 0), next((k for k, v in SEV_RANK.items() if v == rank), None) if rank is not None else None
 
 
 @router.get("/news/recent")
@@ -457,8 +477,10 @@ async def recent(user: Reader, db: Db, after: Annotated[int | None, Query(ge=0)]
     """For desktop notifications in an open tab: stories that arrived after the cursor `after` (the arrival number the
     tab got last time – `cursor` is the next one). Without a cursor nothing, only `cursor`: a new tab shows no backlog.
     `mine`: only what this person chose for desktop notifications (severities, sources, topics, systems, words – each
-    story then with its `hits`, "Treffer", when systems or words are chosen). `total` counts all of them –
-    the tab shows the newest few and one summary for the rest, nothing gets lost however many arrived.
+    story then with its `hits`, "Treffer", when systems or words are chosen). `items`: at most RECENT_MAX, critical or
+    exploited ones first, then the newest (arrived); `total` counts all of them, `unlisted_top` is the highest severity
+    of those not listed – the tab shows the first few on their own and one summary for the rest (its line names that
+    severity too), nothing gets lost however many arrived.
 
     The cursor is read first and the stories up to it after: a story stored meanwhile has a higher number and comes the
     next time. `since` (a time, `now` of the last answer) is what tabs of the previous build still send – a time cursor misses stories
@@ -478,10 +500,10 @@ async def recent(user: Reader, db: Db, after: Annotated[int | None, Query(ge=0)]
     if mine:
         await load_desktop(db, user.desktop)
         where += desktop_filter(user.desktop)
-    rows, total = await arrived(db, where)
+    rows, total, unlisted_top = await arrived(db, where)
     hit = desktop_hits(user.desktop) if mine else None
     items = [_item_out(i, s, None) | {"notice": notice_facts(i)} | ({"hits": hit(i)} if hit else {}) for i, s in rows]
-    return {"items": items, "total": total, "now": now.isoformat(), "cursor": top}
+    return {"items": items, "total": total, "unlisted_top": unlisted_top, "now": now.isoformat(), "cursor": top}
 
 
 @router.get("/news/sources/{sid}/logo")

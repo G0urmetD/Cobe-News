@@ -98,8 +98,9 @@ no tab is open – as long as the browser is running.
 - Signing out switches push off for this browser. A deactivated account gets nothing. A session that merely expired
   does not end push.
 
-For both ways: up to three stories of a round come one by one, more as one summary ("N more new stories"). "Critical"
-stays on screen until you dismiss it. Desktop notifications only show security stories of the news feed; Vendor News and
+For both ways: up to three stories of a round come one by one, more as one summary ("N more new stories"). The ones on
+their own are the critical and the actively exploited first, then the newest; the summary's highest severity counts all
+the other stories of the round. "Critical" stays on screen until you dismiss it. Desktop notifications only show security stories of the news feed; Vendor News and
 the state of the sources come through channels and rules – the Vendor News of your own products also through
 [Vendor news of my products](#meine-produkte).
 
