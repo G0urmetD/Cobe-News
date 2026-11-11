@@ -150,10 +150,12 @@ async def test_a_mail_server_failure_retries_one_that_may_have_arrived_does_not(
     rows = await _sends()
     assert sorted(r.status for r in rows) == ["pending", "pending"] and sorted(r.tries for r in rows) == [0, 1]  # the second never started
     mails.fail[:] = ["timeout"]
-    await _run(monkeypatch, MONDAY + timedelta(minutes=1))
+    await _run(monkeypatch, MONDAY + timedelta(minutes=1))  # within the pause after "refused": not tried at all
+    assert sorted(r.tries for r in await _sends()) == [0, 1]
+    await _run(monkeypatch, MONDAY + timedelta(minutes=3))
     assert sorted(r.status for r in await _sends()) == ["failed", "pending"]  # a timeout may have delivered it: never again
     mails.fail.clear()
-    assert await _run(monkeypatch, MONDAY + timedelta(minutes=2)) == 1
+    assert await _run(monkeypatch, MONDAY + timedelta(minutes=4)) == 1
     assert len(mails.sent) == 1
 
 
@@ -273,3 +275,74 @@ async def test_eol_within_90_days_and_affected_from_the_real_views(monkeypatch):
         got = await REAL_EOL(s, follows, MONDAY.date())
         assert got == [{"product": "panos", "version": "11.1.2", "date": "2026-12-01"}]  # 10.2 ends in more than 90 days
         assert await REAL_AFFECTED(s, follows) == []
+
+
+async def test_a_mail_server_failure_pauses_growing_instead_of_a_try_every_round(mails, monkeypatch):
+    """Deep review 0.1.56: a retryable failure put the row back with no pause – each round (a minute) used up one of
+    TRIES. Now every pending row waits the channels' growing pause (2, 4, 8 … minutes)."""
+    await _switch()
+    a = await _person("anja")
+    tid, _ = await _team([a])
+    await _weekly(tid)
+    await _optin(a)
+    mails.fail.append("refused")
+    at, tried = MONDAY, []
+    for _ in range(30):  # half an hour of rounds a minute
+        await _run(monkeypatch, at)
+        tried.append((await _sends())[0].tries)
+        at += timedelta(minutes=1)
+    assert tried[-1] == 4 and (await _sends())[0].status == "pending"  # 0, 2, 6, 14 min: 4 tries, not 30
+    mails.fail.clear()
+    assert await _run(monkeypatch, at + timedelta(hours=1)) == 1
+
+
+async def test_an_error_of_one_review_never_strands_the_others_claimed_with_it(mails, monkeypatch):
+    """Deep review 0.1.56: an exception that is no NotifyError (the content, the rendering) left the whole claimed batch
+    at "sending" until it became failed ("interrupted") an hour later. Now only that review is touched – put back as a
+    try – and the others go out."""
+    await _switch()
+    a, b = await _person("anja"), await _person("bert")
+    t1, _ = await _team([a], name="Broken")
+    t2, _ = await _team([b], name="Fine")
+    for t in (t1, t2):
+        await _weekly(t)
+    await _optin(a)
+    await _optin(b)
+    real = weekly.content
+
+    async def content(db_, team_id, until):  # noqa: ANN001, ANN202
+        if team_id == t1:
+            raise ValueError("a record the review cannot read")
+        return await real(db_, team_id, until)
+
+    monkeypatch.setattr(weekly, "content", content)
+    assert await _run(monkeypatch, MONDAY) == 1
+    assert [m["to"] for m in mails.sent] == [["bert@corp.example"]]
+    rows = {r.team_id: r for r in await _sends()}
+    assert (rows[t1].status, rows[t1].error, rows[t1].tries) == ("pending", "error", 1) and rows[t2].status == "sent"
+    monkeypatch.setattr(weekly, "content", real)
+    assert await _run(monkeypatch, MONDAY + timedelta(minutes=1)) == 0  # after a pause, not round after round
+    assert await _run(monkeypatch, MONDAY + timedelta(minutes=3)) == 1
+    assert len(mails.sent) == 2
+
+
+async def test_sent_but_the_state_not_written_is_never_sent_again(mails, monkeypatch):
+    await _switch()
+    a = await _person("anja")
+    tid, _ = await _team([a])
+    await _weekly(tid)
+    await _optin(a)
+    real = weekly._done
+
+    async def done(db_, *a_, **values):  # noqa: ANN001, ANN002, ANN003, ANN202
+        if values.get("status") == "sent":
+            raise RuntimeError("the database went away")
+        return await real(db_, *a_, **values)
+
+    monkeypatch.setattr(weekly, "_done", done)
+    await _run(monkeypatch, MONDAY)
+    monkeypatch.setattr(weekly, "_done", real)
+    await _run(monkeypatch, MONDAY + timedelta(minutes=5))
+    assert len(mails.sent) == 1  # left at "sending" – failed ("interrupted") later, never twice
+    await _run(monkeypatch, MONDAY + timedelta(hours=2))
+    assert [(r.status, r.error) for r in await _sends()] == [("failed", "interrupted")] and len(mails.sent) == 1

@@ -30,7 +30,8 @@ desktop push and a Microsoft Teams Workflows webhook of their own.
   out together when they are due; urgent rows (person_deliveries.marks against the person's choice) pass at once.
 - **Absence** (app/absence.py, 0.1.35): the events of an absent person's routed products created during the absence
   go to the deputy (a recipient like any other: keyed per person and way, so exactly once also when the deputy gets the
-  product anyway) – never a watched CVE, never on to a deputy who is away themselves (then to the person).
+  product anyway) – never a watched CVE, never on to a deputy who is away themselves, nor to one without a way that
+  can carry it (allowed by an admin, switched on before the event, Teams with a URL): then to the person.
 - **Muted** (app/reader.py, person_mutes): what a person muted for a while – a product, or a CVE (all CVEs of the
   event; a watched CVE's events too) – is skipped ("muted") for that person, when queued and again before it is sent;
   never sent later when the mute ends. Only that person's rows: team channels, the admins' rules and everybody else are
@@ -52,7 +53,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode, urlsplit
 
-from sqlalchemy import Integer, Uuid, and_, case, cast, delete, exists, func, literal, or_, select, text, true, tuple_, union, update
+from sqlalchemy import Integer, Uuid, and_, case, cast, delete, exists, false, func, literal, or_, select, text, true, tuple_, union, update
 from sqlalchemy import Text as SqlText
 from sqlalchemy.dialects.postgresql import ARRAY, TIMESTAMP
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -260,10 +261,13 @@ def _routes(
     event_ids: list[uuid.UUID] | None = None,
     fresh: bool = True,
     after: datetime | None = None,
+    cover: dict[str, datetime | None] | None = None,
 ):  # noqa: ANN202
     """SQL: (event id, kind, severity, person, created, product) – a Vendor News event of a product of a team whose member gets
     it on `way`: not a baseline, not older than MAX_AGE, the account active, the way switched on before the event, the
-    event after the assignment, the joining and the routing. `fresh`: only those not decided for that way yet."""
+    event after the assignment, the joining and the routing. `fresh`: only those not decided for that way yet. `cover`:
+    the ways an admin allows, each with since when (_cover) – an absent member's event goes to the deputy only when one
+    of them can carry it (_covered); without it the member keeps it."""
     on = getattr(PersonNotify, f"{way}_on")
     since = getattr(PersonNotify, f"{way}_since")
     chosen = exists().where(TeamProductMember.team_product_id == TeamProduct.id, TeamProductMember.user_id == TeamMember.user_id)
@@ -280,7 +284,7 @@ def _routes(
         VendorEvent.created_at > TeamMember.added_at,
         or_(TeamProduct.all_members.is_(True), chosen),
         ~later,
-        ~_covered(),  # away: the deputy gets it instead (unless "also to me")
+        ~_covered(cover or {}),  # away: the deputy gets it instead (unless "also to me")
         ~finding_confirm.held(),  # a confirmed finding (app/finding_confirm.py): handled – not sent, not later either
     ]
     if after is not None:
@@ -307,28 +311,45 @@ def _routes(
     return union(team, _watch_routes(way, on, since, user_id=user_id, user_ids=user_ids, event_ids=event_ids, fresh=fresh, after=after), deputy)
 
 
-def _deputy_ok(pa, team_id, at):  # noqa: ANN001, ANN202
+def _cover(ways: dict[str, bool], since: dict[str, datetime | None]) -> dict[str, datetime | None]:
+    """The ways a deputy can take an event on (_covered): those an admin allows, each with since when (allowed_since)."""
+    return {w: since.get(w) for w in WAYS if ways.get(w)}
+
+
+def _deputy_ok(pa, team_id, at, cover: dict[str, datetime | None]):  # noqa: ANN001, ANN202
     """SQL: the deputy of absence `pa` takes an event of a product of team `team_id` created at `at`: an active account,
-    a member of that team since before the event, not away then themselves (no chains), with a way of their own on."""
+    a member of that team since before the event, not away then themselves (no chains), with a way of their own the
+    deputy routes (_deputy_routes) carry it on – allowed by an admin (`cover`, since before the event), switched on
+    before the event, Teams with a URL. No such way: nobody would get it – the member keeps it."""
     du, dm, dp, away = aliased(User), aliased(TeamMember), aliased(PersonNotify), aliased(PersonAbsence)
+    carried = []
+    for way, after in cover.items():
+        since = getattr(dp, f"{way}_since")
+        one = [getattr(dp, f"{way}_on").is_(True), since.is_not(None), at > since]
+        if after is not None:
+            one.append(at > after)
+        if way == "teams":
+            one.append(dp.teams_url_enc.is_not(None))
+        carried.append(and_(*one))
     # nested two levels deep: correlated explicitly (everything but the subquery's own table comes from outside)
     return and_(
         exists().where(du.id == pa.deputy_id, du.is_active.is_(True)).correlate_except(du),
         exists().where(dm.team_id == team_id, dm.user_id == pa.deputy_id, dm.added_at < at).correlate_except(dm),
         ~exists().where(away.user_id == pa.deputy_id, away.starts_at <= at, away.ends_at > at).correlate_except(away),
-        exists().where(dp.user_id == pa.deputy_id, or_(dp.email_on.is_(True), dp.desktop_on.is_(True), dp.teams_on.is_(True))).correlate_except(dp),
+        exists().where(dp.user_id == pa.deputy_id, or_(false(), *carried)).correlate_except(dp),
     )
 
 
-def _covered():  # noqa: ANN202
-    """SQL (inside the team routes): the member was away when the event came and a deputy took it – not "also to me"."""
+def _covered(cover: dict[str, datetime | None]):  # noqa: ANN202
+    """SQL (inside the team routes): the member was away when the event came and a deputy took it on a way that can
+    carry it (_deputy_ok) – not "also to me"."""
     pa = aliased(PersonAbsence)
     return exists().where(
         pa.user_id == TeamMember.user_id,
         pa.also_me.is_(False),
         pa.starts_at <= VendorEvent.created_at,
         pa.ends_at > VendorEvent.created_at,
-        _deputy_ok(pa, TeamProduct.team_id, VendorEvent.created_at),
+        _deputy_ok(pa, TeamProduct.team_id, VendorEvent.created_at, cover),
     )
 
 
@@ -425,7 +446,7 @@ async def enqueue(db: AsyncSession, ways: dict[str, bool]) -> int:
     for way in WAYS:
         if not ways.get(way):
             continue
-        rows = list(await db.execute(_routes(way, after=since.get(way))))
+        rows = list(await db.execute(_routes(way, after=since.get(way), cover=_cover(ways, since))))
         if not rows:
             continue
         prefs = await _prefs(db, {r[3] for r in rows})
@@ -746,6 +767,7 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
     if not groups:
         await db.commit()
         return []
+    cover = _cover(ways, await allowed_since(db))
     uids = sorted({u for u, _ in groups})
     people = {p.user_id: (p, email) for p, email in await db.execute(select(PersonNotify, User.email).join(User, User.id == PersonNotify.user_id).where(PersonNotify.user_id.in_(uids)))}
     # the open rows of these person-ways, at most PER_GROUP each (the oldest first)
@@ -769,7 +791,7 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
         mine = {(k[0], e) for k in keys for e in open_[k]}
         who = sorted({k[0] for k in keys})
         for i in range(0, len(evs), IN_CHUNK):
-            for ev, kind, sev, uid, at, product in await db.execute(_routes(way, user_ids=who, event_ids=evs[i : i + IN_CHUNK], fresh=False)):
+            for ev, kind, sev, uid, at, product in await db.execute(_routes(way, user_ids=who, event_ids=evs[i : i + IN_CHUNK], fresh=False, cover=cover)):
                 entry = people.get(uid)
                 if (uid, ev) in mine and entry is not None and wants(entry[0], kind, sev, product, chosen.of(entry[0])):
                     still.setdefault((uid, way), []).append((ev, sev, at))
