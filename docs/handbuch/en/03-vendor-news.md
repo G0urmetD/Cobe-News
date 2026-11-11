@@ -336,8 +336,31 @@ For each entered version Vendor News works out what to do:
 - If your line has no fix, it says "Newer line needed: …". If there is no fix at all yet, it says "No fix yet for …".
 - If the target version is itself affected by another vulnerability, that is shown as well.
 
-**Update available** means: your release line has a newer patch (according to endoflife.date) – an update within the
-line, not a line change. "Current" means: you run the newest patch of the line.
+**Update available** means: your release line has a newer patch (according to endoflife.date or the product's
+[release source](#release-daten)) – an update within the line, not a line change. "Current" means: you run the newest
+patch of the line.
+
+### Where the release data come from {#release-daten}
+
+Release lines, the latest version per line and the end of support come from **endoflife.date** – when it knows the
+product, that always counts. Many self-hosted products are not on endoflife.date (Passwork, Portainer, BookStack,
+BloodHound CE, LibreNMS, Wazuh …). For them the catalogue names a **release source**:
+
+- the project's **GitHub releases** (e.g. `portainer/portainer`) – Cobe News reads the public releases feed, no token.
+  Pre-releases (rc, beta, alpha …) do not count.
+- the **vendor's release notes** (e.g. passwork.pro) – only the product's own entries; for Passwork "Passwork 7.7.0"
+  counts, "Desktop app 1.4.1" or "Browser extension 2.0.37" do not.
+
+From these come the lines (usually the first two parts: 7.6, 7.7; for Portainer with the LTS mark), the newest version
+per line and the newest of all – "Update available", "Newer line" and the target versions work the same way. **These
+sources know no end of support:** it says "End of support unknown", and they never lead to an "end of support soon"
+notification. Below the lines the source is named with its last fetch ("Source: GitHub releases portainer/portainer,
+fetched 3 hours ago").
+
+Like endoflife.date they are fetched once a day (setting "Versions & KEV every") and **only for followed products**.
+The first fetch of a product sends no notifications for versions that were already out – only a version released after
+it reports "New version available". When a source fails or finds nothing any more, that shows in
+[source health](/docs/news-quellen#quellen-gesundheit) and in [catalogue care](#was-geprueft-wird).
 
 **End of support** ([EOL](term:eol)) comes from endoflife.date:
 
@@ -740,6 +763,7 @@ A suggestion is answered exactly once. Addresses are only shown as text and link
 | [NVD](term:nvd) | every product with a CPE: CVEs with version ranges and the vendor's data (Microsoft: build ranges), [CVSS](term:cvss); new CVEs not analysed yet by keyword search over the last 30 days |
 | CISA [KEV](term:kev) | "actively exploited" |
 | endoflife.date | release lines, latest version per line, end of support |
+| GitHub releases, vendors' release notes | release lines and latest version for products without endoflife.date ([release data](#release-daten)) – no end of support |
 | ENISA [EUVD](term:euvd) | "actively exploited" – from the news, when that source is switched on |
 | CSAF providers (Siemens, Cisco, Schneider Electric, Open-Xchange) | the [CSAF](term:csaf) advisories straight from the vendor: affected ranges and fixed versions per product |
 | CVE list (cvelistV5) | the vendor's data on a CVE and CISA's assessment ([SSVC](term:ssvc)) – above all while the NVD has not analysed a CVE yet |
@@ -757,7 +781,7 @@ the followed products. Fetching runs in the background, independent of the news:
 | What | Default | Adjustable |
 |---|---|---|
 | vendor advisories and NVD ("Advisories & NVD every") | 6 hours | 1 to 48 hours |
-| endoflife.date and KEV ("Versions & KEV every") | 24 hours | 6 to 168 hours |
+| endoflife.date, release sources and KEV ("Versions & KEV every") | 24 hours | 6 to 168 hours |
 
 Per CPE, Vendor News first fetches the newest 2000 CVEs, after that only what NVD changed since the last fetch. After
 errors it asks again with growing pauses; if NVD refuses ("too many requests"), all NVD queries pause together. Admins
@@ -814,7 +838,8 @@ the top are "Last check", the catalogue version and how many CPEs have been chec
 | CVEs for the CPE in the last 3 years? | none or only older ones: warning (not for cloud services) |
 | Does endoflife.date still know the key? | unknown: **error**; another vendor: warning |
 | The vendor's last advisory (Palo Alto, Fortinet, Veeam) | older than 2 years: warning |
-| Followed, but without a CPE | warning – vulnerabilities only come from vendor advisories and news |
+| Followed, but without a CPE | warning – vulnerabilities only come from vendor advisories and news (not when the catalogue knows the product's CNA names: then the keyword search and the CVE list bring its CVEs) |
+| Release source (GitHub, vendor page) of a followed product | cannot be fetched, the pattern finds no version any more, or no new version for 18 months: warning |
 
 **Limits:** only NVD is asked, through the same brake as the Vendor News fetch, and only when Vendor News is on, a
 product is followed and no Vendor News round is running. Followed products are checked **weekly**, the whole catalogue

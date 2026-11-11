@@ -53,6 +53,9 @@
   cpes: [a:portainer:portainer]
   kw: [Portainer]
   example: 2.27.9
+  releases:  # tags 2.45.3; titles "Release 2.45.3 LTS" / "Release 2.44.0 STS" (checked 2026-11-11)
+    github: portainer/portainer
+    lts: '\bLTS\b'
 - key: k3s
   label: K3s
   vendor: SUSE

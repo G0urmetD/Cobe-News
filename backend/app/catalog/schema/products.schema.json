@@ -489,6 +489,18 @@
           "description": "Key of a text in texts.yaml (hints) shown when a version does not match `pattern`.",
           "title": "Pattern Hint"
         },
+        "releases": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReleaseSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Release data where endoflife.date has none: GitHub releases or the vendor's release notes page – release lines and the newest version, no support dates (endoflife.date comes first)."
+        },
         "replaces": {
           "anyOf": [
             {
@@ -586,6 +598,116 @@
         "key"
       ],
       "title": "Product",
+      "type": "object"
+    },
+    "ReleaseSource": {
+      "additionalProperties": false,
+      "description": "Where a product's release data come from when endoflife.date has none (app/release_sources.py): GitHub releases\n(the repository's public Atom feed) or the vendor's release notes page – exactly one of the two.",
+      "properties": {
+        "github": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "owner/repo on github.com – its releases (github.com/<owner>/<repo>/releases.atom).",
+          "title": "Github"
+        },
+        "lines": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Parts of a version that name its release line (default 2: 7.6.2 → line 7.6; 1: 26.10.2 → 26).",
+          "title": "Lines"
+        },
+        "lts": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Regular expression on the release title: a match marks its line LTS (Portainer 'Release 2.45.3 LTS').",
+          "title": "Lts"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "maxLength": 320,
+              "pattern": "^https://[a-z0-9.-]+(?::\\d{2,5})?/[^\\s]{0,300}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The vendor's release notes page (HTML, read as text – no JavaScript).",
+          "title": "Page"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Page: regular expression (Python, searched in the page's text) with a group 'version' and optionally 'date'.",
+          "title": "Pattern"
+        },
+        "prerelease": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Also pre-releases (rc, beta, alpha, preview, dev …); default false.",
+          "title": "Prerelease"
+        },
+        "tag": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "GitHub: regular expression (Python, whole tag) with a group 'version'; default ^v?(?P<version>\\d+(?:\\.\\d+){1,3})$. Tags it does not match are left out.",
+          "title": "Tag"
+        }
+      },
+      "title": "ReleaseSource",
       "type": "object"
     }
   },

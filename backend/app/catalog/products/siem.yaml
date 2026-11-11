@@ -47,6 +47,7 @@
   kw: [Wazuh]
   aliases: [Wazuh Server, Wazuh Indexer, Wazuh Dashboard]
   example: 4.12.0
+  releases: {github: wazuh/wazuh}  # tags v4.14.10, betas/rcs v5.0.0-beta5 left out (checked 2026-11-11)
 - key: wazuh-agent
   label: Wazuh Agent
   vendor: Wazuh
@@ -55,6 +56,7 @@
   kw: [Wazuh]
   example: 4.12.0
   version_cmd: /var/ossec/bin/wazuh-control info
+  releases: {github: wazuh/wazuh}  # manager and agent share the version and the repository
 - key: kibana
   cpes: [a:elastic:kibana]
 - key: logstash
@@ -173,6 +175,7 @@
   cpes: [a:securityonionsolutions:security_onion]
   kw: [Security Onion]
   example: 2.4.150
+  releases: {github: Security-Onion-Solutions/securityonion, tag: '^(?P<version>\d+\.\d+\.\d+)-\d{8}$'}  # tags 3.4.0-20261102 (checked 2026-11-11)
 - key: trend-vision-one
   label: Trend Vision One (platform)
   vendor: Trend Micro

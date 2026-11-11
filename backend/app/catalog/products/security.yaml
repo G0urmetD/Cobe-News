@@ -276,10 +276,17 @@
 - key: bloodhound
   label: BloodHound (Community Edition)
   vendor: SpecterOps
-  cpes: [a:bloodhound_project:bloodhound]  # the legacy BloodHound (up to 4.x); CE's CVEs have no CPE yet (checked 2026-11-03)
-  cna: [[SpecterOps, BloodHound]]  # CE from 5.0: VulnCheck and VulDB name it so
+  # no CPE: a:bloodhound_project:bloodhound is BloodHound Legacy (BloodHoundAD/BloodHound, up to 4.x – its last CVE
+  # CVE-2021-3210, ≤ 4.0.1); CE (5.0+) never falls in those ranges, the old CPE only made "no CVE data for 68 months".
+  # CE's CVEs have no CPE in the NVD (CVE-2026-59255, CVE-2026-85241: "Deferred"; a:specterops:* is not in the CPE
+  # dictionary – VulDB's record names cpe:2.3:a:specterops:bloodhound, add it once the NVD lists it); they come from
+  # NVD's keyword search and cvelistV5 by the CNA rows below (checked 2026-11-11)
+  cpes: []
+  cna: [[SpecterOps, BloodHound]]  # CE from 5.0: VulnCheck (CVE-2026-59255) and VulDB (CVE-2026-85241) name it so
   kw: [BloodHound]
+  aliases: [BloodHound CE, BloodHound Community Edition, SpecterOps BloodHound]
   example: "9.9.0"
+  releases: {github: SpecterOps/BloodHound}  # tags v9.9.2, release candidates v9.10.0-rc1 left out (checked 2026-11-11)
 - key: velociraptor
   label: Velociraptor
   vendor: Rapid7
@@ -291,3 +298,4 @@
   example: "0.77.3"
   version_cmd: velociraptor version
   where: web_about
+  releases: {github: Velocidex/velociraptor}  # tags v0.77.3 (checked 2026-11-11)

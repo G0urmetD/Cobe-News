@@ -6,7 +6,12 @@ Per catalogue product (results in catalog_checks, what the NVD said per CPE in c
 - the endoflife.date key exists (in the latest endoflife.date list the catalogue was built from – no request of its own)
   and its CPEs still name the same vendor as ours,
 - products with the vendor's own advisories (paloalto, fortinet, veeam): when the last advisory for it was seen,
-- a followed product without any CPE gets a hint (its vulnerabilities come only from advisories and news).
+- a followed product without any CPE gets a hint (its vulnerabilities come only from advisories and news) – unless the
+  catalogue names it in CNA data (cna): then NVD's keyword search and cvelistV5 bring its CVEs (BloodHound CE, whose
+  CVEs have no CPE in the NVD),
+- a product with a release source (releases: GitHub, a vendor's page – app/release_sources.py, fetched for followed
+  products): the last fetch failed, the pattern found no version, or the newest release is older than
+  RELEASE_STALE_MONTHS (the source or its pattern may have changed) – no request of its own.
 Status per product: error (a CPE that does not exist, an endoflife.date key that is gone), warn (deprecated CPE, no or
 only old CVEs, no advisory for long, followed without CPE), ok, unchecked (no answer for its CPEs yet). Reasons are codes
 with parameters ({"code", "level", …}) – the UI words them in German and English.
@@ -58,6 +63,7 @@ BUDGET_PER_HOUR = 20
 MANUAL_MAX = 60
 NO_CVE_MONTHS = 36  # "any CVE in the last 3 years" – fewer CVEs than that is normal for small products, not a sign of a stale CPE
 ADV_MONTHS = 24
+RELEASE_STALE_MONTHS = 18  # no release for this long: the tag or page pattern probably no longer matches what the vendor writes
 LOOP_EVERY_S = 600.0
 RETRY_AFTER_ERROR = timedelta(hours=6)
 NVD_HOST = "services.nvd.nist.gov"
@@ -267,8 +273,25 @@ def _day(d: datetime | None) -> str | None:
     return d.date().isoformat() if d else None
 
 
-def verdict(p: dict, cpes: dict[str, CatalogCpeCheck], eol: dict[str, dict], followed: bool, last_adv: datetime | None, adv_ok: bool, now: datetime) -> tuple[str, list[dict]]:
-    """ok | warn | error | unchecked and the reasons, from what is known (no I/O)."""
+def release_facts(states: dict[str, VendorFetch], p: dict) -> dict | None:
+    """What is known of a product's release source: its last error, how many versions it found, the newest release day
+    (None: the product reads none – endoflife.date's lines come first – or it was never fetched)."""
+    from app import release_sources
+
+    cfg = release_sources.config(p)
+    if cfg is None or catalog.releases(p.get("eol")):
+        return None
+    st = states.get(release_sources.fetch_key(p))
+    if st is None or (st.last_ok_at is None and not st.error):
+        return None
+    src_ = release_sources.describe(cfg)
+    return {"source": f"{'GitHub ' if src_['kind'] == 'github' else ''}{src_['ref']}", "error": st.error, "newest": release_sources.newest_day(p["key"])}
+
+
+def verdict(
+    p: dict, cpes: dict[str, CatalogCpeCheck], eol: dict[str, dict], followed: bool, last_adv: datetime | None, adv_ok: bool, now: datetime, rel: dict | None = None
+) -> tuple[str, list[dict]]:
+    """ok | warn | error | unchecked and the reasons, from what is known (no I/O). `rel`: release_facts()."""
     reasons: list[dict] = []
     checked = True
     own = list(p.get("cpes") or [])
@@ -296,7 +319,7 @@ def verdict(p: dict, cpes: dict[str, CatalogCpeCheck], eol: dict[str, dict], fol
                 months = max(NO_CVE_MONTHS, int((now - newest).days / 30.44))
                 cve = next((r.newest_cve for r in found if r.newest_at == newest), None)
                 reasons.append(_r("stale_cves", "warn", months=months, newest=_day(newest), cve=cve))
-    elif followed and not own and not p.get("cloud"):
+    elif followed and not own and not p.get("cloud") and not p.get("cna"):
         reasons.append(_r("nocpe_followed", "warn"))
     key = p.get("eol")
     if key:
@@ -307,6 +330,16 @@ def verdict(p: dict, cpes: dict[str, CatalogCpeCheck], eol: dict[str, dict], fol
             ours, theirs = {c.split(":")[1] for c in own}, {c.split(":")[1] for c in e["cpes"]}
             if not ours & theirs:
                 reasons.append(_r("eol_mismatch", "warn", key=key, theirs=", ".join(sorted(theirs))[:120]))
+    if rel is not None:
+        err = str(rel.get("error") or "")
+        if err.startswith("parse: no version"):
+            reasons.append(_r("releases_none", "warn", source=rel["source"]))
+        elif err and not err.startswith("rate_limited"):
+            reasons.append(_r("releases_failed", "warn", source=rel["source"], error=err[:120]))
+        elif (newest := rel.get("newest")) is not None:
+            at = datetime(newest.year, newest.month, newest.day, tzinfo=UTC)
+            if at < _months_ago(now, RELEASE_STALE_MONTHS):
+                reasons.append(_r("releases_stale", "warn", source=rel["source"], months=int((now - at).days / 30.44), last=newest.isoformat()))
     if followed and p.get("adv") and adv_ok:
         if last_adv is None:
             reasons.append(_r("adv_none", "info", source=p["adv"]))
@@ -342,6 +375,7 @@ async def evaluate(db: AsyncSession, now: datetime | None = None) -> int:
     last_adv = await last_advisories(db, followed)
     fetched = await adv_fetched(db)
     old = {c.product: c for c in await db.scalars(select(CatalogCheck))}
+    rel_states = {s.key: s for s in await db.scalars(select(VendorFetch).where(VendorFetch.key.startswith("releases:", autoescape=True)))}
     seen: set[str] = set()
     changed = 0
     version = catalog.catalog_version()
@@ -360,7 +394,7 @@ async def evaluate(db: AsyncSession, now: datetime | None = None) -> int:
 
     for p in products:
         is_f = p["key"] in fol
-        status, reasons = verdict(p, cpes, eol, is_f, last_adv.get(p["key"]), bool(fetched.get(p.get("adv") or "")), now)
+        status, reasons = verdict(p, cpes, eol, is_f, last_adv.get(p["key"]), bool(fetched.get(p.get("adv") or "")), now, release_facts(rel_states, p) if is_f else None)
         put(p["key"], status, reasons, is_f)
     for o in gone_patches(eol):
         put(o["key"], "error", [_r("eol_missing", "error", key=o["key"])], o["key"] in fol)

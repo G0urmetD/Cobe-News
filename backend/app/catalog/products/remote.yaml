@@ -227,6 +227,7 @@
   aliases: [Guacamole]
   example: "1.6.0"
   where: linux_package
+  releases: {github: apache/guacamole-server}  # tags 1.6.0, 1.6.0-RC3 left out (checked 2026-11-11)
 
 # ---------------------------------------------------------------- added 0.1.54 (file transfer: often exploited)
 - key: crushftp
