@@ -27,7 +27,9 @@ listing, a new CVE) is often made by the round before the evaluation sees it.
 **Which events are held.** Each period a confirmation stood is a row of its own. A period holds the events of its
 finding made from the end of the finding's previous period (the first one: from the beginning – an event made before the
 confirmation and still waiting on a channel stays unsent, as the personal ways skip it) up to its end; while it stands,
-all of them. The time between two periods, when none stood, is never held. Its finding's events are its vulnerability
+all of them. So the time between two periods, when none stood, is held by the next period: an event made then that
+still waits on a channel when the finding is confirmed again stays unsent, like one made before the first
+confirmation (what went out in between went out). Its finding's events are its vulnerability
 events (by their key) and the advisory changes of every record it groups – its leading advisory and the NVD, cvelistV5
 and OSV records of its CVEs (vendor_confirm_records: one index lookup per event). A watched CVE's events (kind "watch",
 app/cve_watch.py) are the watcher's own and still come.
@@ -268,8 +270,8 @@ async def current(db: AsyncSession, product: str, finding: str) -> VendorConfirm
 
 async def confirm(db: AsyncSession, user: User, product: str, f: dict, status: str, note: str, now: datetime | None = None) -> VendorConfirm:
     """Confirm a finding as it is now – or change the one that stands (status, reason, facts; its period and what it
-    holds go on). A confirmation made again after one ended is a new period: the time in between, when none stood, is
-    never held. Not committed; call changed() after the commit."""
+    holds go on). A confirmation made again after one ended is a new period, holding from the previous period's end:
+    what was made in between and still waits on a channel stays unsent. Not committed; call changed() after the commit."""
     now = now or now_utc()
     values = {"status": status, "note": note, "user_id": user.id, "user_name": _name(user), "confirmed_at": now, "facts": facts_of(f)}
     c = await current(db, product, f["id"])
@@ -280,8 +282,8 @@ async def confirm(db: AsyncSession, user: User, product: str, f: dict, status: s
         await _records(db, c.id, product, f)
         return c
     # a new period holds from where the previous one of this finding ended – what was made before and still waits on a
-    # channel is held as well, and stays unsent when it ends (as the personal ways skip it); the time between two
-    # periods, when none stood, is never held
+    # channel is held as well, and stays unsent when it ends (as the personal ways skip it) – the time between two
+    # periods included
     prev = await db.scalar(select(func.max(VendorConfirm.ended_at)).where(VendorConfirm.product == product, VendorConfirm.finding == f["id"]))
     stmt = pg_insert(VendorConfirm).values(id=uuid.uuid4(), product=product, finding=f["id"], held_from=prev or EPOCH, **values)
     # two confirmations at the same moment: the second changes the one the first made (one standing per finding)
