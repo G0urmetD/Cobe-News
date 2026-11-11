@@ -99,10 +99,13 @@ SECRET_PATHS = ("/api/admin/backup/download/",)
 
 
 def shown_path(path: str) -> str:
+    """The path as logs and the audit log show it: a secret part cut off (SECRET_PATHS), and every character that is not
+    printable – an escape sequence, a line break, U+0085 from an anonymous request – as "?": nothing in it can start a
+    line of its own or steer the terminal that reads `docker logs`."""
     for prefix in SECRET_PATHS:
         if path.startswith(prefix):
             return prefix + "…"
-    return path
+    return "".join(c if c.isprintable() else "?" for c in path)
 
 
 def _secure_headers(request: Request, resp: Response, api: bool) -> Response:

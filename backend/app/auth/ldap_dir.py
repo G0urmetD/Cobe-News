@@ -75,6 +75,24 @@ def _server(cfg: dict, host: str) -> Server:
     return Server(f"{'ldaps' if ldaps else 'ldap'}://{host}", use_ssl=ldaps, tls=tls, get_info=NONE, connect_timeout=int(cfg.get("timeout") or 10))
 
 
+def _check_peer(conn: Connection) -> None:
+    """The address the socket actually reached, checked like the configured host (_server): ldap3 resolves the name
+    again when it connects, so a name that answered with a company address at the check could point elsewhere a moment
+    later (DNS rebinding). Checked after open() – before StartTLS and the bind, so no password ever goes there (the TLS
+    handshake of LDAPS carries none). ldap3's in-memory directory (tests) has no socket."""
+    if getattr(conn.strategy, "no_real_dsa", False):
+        return
+    try:
+        peer = str(conn.socket.getpeername()[0])
+    except (AttributeError, OSError, IndexError, TypeError) as exc:
+        raise LdapError("connection") from exc
+    try:
+        netaddr.check_host(peer)
+    except (netaddr.ForbiddenTarget, ValueError) as exc:
+        log.warning("ldap: the directory server's name led to a forbidden address at connect – refused")
+        raise LdapError("forbidden_target") from exc
+
+
 def _pool(cfg: dict) -> ServerPool:
     """The first reachable server wins: the first entry is the primary DC, the others are fallbacks in order."""
     return ServerPool([_server(cfg, h) for h in cfg["servers"]], FIRST, active=1, exhaust=False)
@@ -101,6 +119,7 @@ def connection(cfg: dict, user: str, password: str) -> Connection:
     )
     try:
         conn.open()
+        _check_peer(conn)
         if cfg["encryption"] == "starttls" and not conn.start_tls():
             raise LdapError("tls")
         conn.bind()

@@ -141,11 +141,15 @@ async def forget_my_device(did: uuid.UUID, user: Reader, sess: ActiveSession, re
 
 
 @router.post("/auth/devices/forget-all")
-async def forget_my_devices(user: Reader, sess: ActiveSession, response: Response, db: Db) -> dict:
+async def forget_my_devices(user: Reader, sess: ActiveSession, request: Request, response: Response, db: Db) -> dict:
+    # the cookie of this browser goes only when it is this account's – a browser shared with another account keeps
+    # that account's (its "merken" replaced this one's cookie; this account's row is forgotten here all the same)
+    mine = await devices.find(db, devices.cookie(request))
     n = await devices.forget_all(db, user.id)
     _forgotten(db, user, user, "all", n, False)
     await db.commit()
-    devices.clear_cookie(response)
+    if mine is not None and mine.user_id == user.id:
+        devices.clear_cookie(response)
     return {"ok": True, "forgotten": n}
 
 

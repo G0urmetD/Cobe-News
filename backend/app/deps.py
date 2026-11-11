@@ -175,6 +175,14 @@ def require_reauth(sess: UserSession, user: User) -> None:
         raise api_error(403, "reauth_required", via="entra" if user.auth_source == "entra" else "password", totp=bool(user.totp_secret_enc))
 
 
+def require_factor(sess: UserSession, user: User) -> None:
+    """A session that skipped the TOTP step on a remembered device (method …_device, app/auth/devices.py) proved only the
+    password: before a lasting change made with it (a calendar address) the second factor is shown once – the same
+    re-confirmation as for sensitive actions (its sign-in set no reauth_at). Other sessions: nothing more asked."""
+    if (sess.method or "").endswith("_device"):
+        require_reauth(sess, user)
+
+
 Reader = Annotated[User, Depends(current_user)]
 Admin = Annotated[User, Depends(admin_user)]
 ActiveSession = Annotated[UserSession, Depends(current_session)]

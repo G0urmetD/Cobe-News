@@ -22,7 +22,7 @@ from pathlib import Path
 import asyncpg
 
 import pytest
-from conftest import DATABASE_URL, _admin_dsn
+from conftest import DATABASE_URL, _admin_dsn, add_user
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.engine import make_url
 
@@ -30,7 +30,8 @@ from app import backup, cli, crypto, db
 from app import settings as settings_store
 from app.config import get_config
 from app.crypto import encrypt_str
-from app.models import NewsItem, NewsSource, NotifyChannel, NotifyRule, NotifyRuleChannel, User, UserSession, VendorFollow, VendorVersion
+from app.auth import sessions
+from app.models import AuditEntry, NewsItem, NewsSource, NotifyChannel, NotifyRule, NotifyRuleChannel, RememberedDevice, User, UserSession, VendorFollow, VendorVersion
 
 pytestmark = pytest.mark.skipif(shutil.which("pg_dump") is None or shutil.which("psql") is None, reason="needs the PostgreSQL 18 client tools")
 
@@ -195,7 +196,7 @@ async def test_restore_into_a_fresh_empty_database(backups_here, monkeypatch):
             return 0
 
         monkeypatch.setattr(backup, "others_connected", nobody)
-        assert await cli._restore([str(res.path), "--yes"]) == 0
+        assert await cli._restore([str(res.path), "--yes", "--allow-superuser"]) == 0
         assert [x["name"] for x in backup.listing()] == [res.name]  # no pre-restore backup of an empty database
         async with db.session() as s:
             assert sorted(await s.scalars(select(User.username))) == ["anna"]
@@ -553,6 +554,12 @@ async def test_restore_keeps_the_backup_it_restores_and_its_way_back(backups_her
     async with db.session() as s:
         await settings_store.put(s, backup.SECTION, {"keep": 3})
         await s.commit()
+    # a session and a remembered device of the backup's time: gone after the restore (0.1.56)
+    u = await add_user("tina")
+    async with db.session() as s:
+        await sessions.create(s, await s.get(User, u.id), "active", "127.0.0.1", "pytest")
+        s.add(RememberedDevice(user_id=u.id, token_hash="h" * 64, factor="f", expires_at=datetime.now(UTC) + timedelta(days=1)))
+        await s.commit()
     res = await backup.create()
     oldest = backups_here / "cobe-news-20260101-000000.tar"
     os.replace(res.path, oldest)
@@ -563,7 +570,15 @@ async def test_restore_keeps_the_backup_it_restores_and_its_way_back(backups_her
         return 0
 
     monkeypatch.setattr(backup, "others_connected", nobody)
-    assert await cli._restore([str(oldest), "--yes"]) == 0
+    # the tests connect as a superuser: refused without --allow-superuser, nothing changed
+    assert await cli._restore([str(oldest), "--yes"]) == 1
+    assert not any("-pre-restore" in p.name for p in backups_here.iterdir())
+    assert await cli._restore([str(oldest), "--yes", "--allow-superuser"]) == 0
+    async with db.session() as s:
+        assert await s.scalar(select(func.count()).select_from(UserSession)) == 0
+        assert await s.scalar(select(func.count()).select_from(RememberedDevice)) == 0
+        e = await s.scalar(select(AuditEntry).where(AuditEntry.action == "backup.restored"))
+        assert e.details["sessions_ended"] == 1 and e.details["devices_forgotten"] == 1
     names = sorted(p.name for p in backups_here.iterdir())
     assert oldest.name in names and any("-pre-restore" in n for n in names)
     async with db.session() as s:  # bug hunt L3: the last backup is the one made before the restore, not the restored one's note

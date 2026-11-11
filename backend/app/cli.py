@@ -35,13 +35,13 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app import audit, audit_lock, backup, db, passkeys_api, sqlite_import, webpush
 from app.auth import passwords, sessions
 from app.auth_api import issue_setup_token
 from app.config import get_config
-from app.models import User
+from app.models import RememberedDevice, User, UserSession
 
 
 def _opt(args: list[str], name: str, default: str | None = None) -> str | None:
@@ -141,7 +141,7 @@ async def _migrate_sqlite(args: list[str]) -> int:
 
 async def _restore(args: list[str]) -> int:
     if not args or args[0].startswith("--"):
-        print("restore FILE [--yes] [--use-backup-key | --ignore-key] [--allow-unsigned] [--passphrase-file F]")
+        print("restore FILE [--yes] [--use-backup-key | --ignore-key] [--allow-unsigned] [--passphrase-file F] [--allow-superuser]")
         return 2
     try:
         phrase = _phrase_for_reading(args)
@@ -161,7 +161,12 @@ async def _restore(args: list[str]) -> int:
             }[plan.auth]
         )
         if await backup.superuser():
-            print("WARNING: connected as a database superuser – Cobe News should use its own role (docs/BETRIEB.md: PostgreSQL, Rollen).")
+            # the documented way restores as the app's own role (cobe_news_app, no superuser): a crafted dump could run
+            # anything on the database server as a superuser. --allow-superuser: an own PostgreSQL without such a role
+            if "--allow-superuser" not in args:
+                print("Not restored: connected as a database superuser – Cobe News restores as its own role (docs/BETRIEB.md: PostgreSQL, Rollen); --allow-superuser restores anyway.")
+                return 1
+            print("WARNING: connected as a database superuser (--allow-superuser) – Cobe News should use its own role (docs/BETRIEB.md: PostgreSQL, Rollen).")
         cfg = get_config()
         if not plan.key_matches:
             if plan.backup_key and "--use-backup-key" in args:
@@ -204,8 +209,11 @@ async def _restore(args: list[str]) -> int:
             lock_installed = await audit_lock.installed(conn)
         aside = lock["set_aside"] - aside_before  # the audit log's lock: the entries before set aside, not deleted
         await backup.record_restored(before, plan.manifest, Path(args[0]).name)
-        # in the restored database (its log is the backup's): the restore itself, and the backup made right before it
+        # in the restored database (its log is the backup's): the restore itself, and the backup made right before it.
+        # The sessions and remembered devices of the backup's time go – a browser of then must not be back in with them
         async with db.session() as s:
+            ended = (await s.execute(delete(UserSession))).rowcount or 0
+            forgotten = (await s.execute(delete(RememberedDevice))).rowcount or 0
             audit.record(
                 s,
                 audit.CLI,
@@ -218,6 +226,8 @@ async def _restore(args: list[str]) -> int:
                     "auth": plan.auth,
                     "rows": sum(rows.values()),
                     "pre_restore": before.name if before else None,
+                    "sessions_ended": ended,
+                    "devices_forgotten": forgotten,
                     **({"set_aside": aside} if lock_installed else {}),
                 },
             )

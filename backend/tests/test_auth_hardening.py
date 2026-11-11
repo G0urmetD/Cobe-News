@@ -331,7 +331,7 @@ async def test_on_a_passkey_counts_and_can_be_set_up_instead(client):
     async with db.session() as s:
         pk = await s.scalar(select(UserPasskey))
         sess = await s.scalar(select(UserSession).where(UserSession.stage == "active"))
-        assert pk.user_id == rudi.id and sess.passkey_id == pk.id and sess.method == "password"
+        assert pk.user_id == rudi.id and sess.passkey_id == pk.id and sess.method == "passkey"  # not "password": a second factor was given
     [added] = await _entries("passkey.added")
     assert added.details["at_signin"] is True
     # … the sign-in with it needs nothing more

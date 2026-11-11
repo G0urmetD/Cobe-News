@@ -402,3 +402,36 @@ async def test_switching_entra_off_ends_its_sessions(admin_client):
     body = {"enabled": False, "tenant_id": cur["tenant_id"], "client_id": cur["client_id"], "client_secret": "", "rev": cur["rev"]}
     assert (await admin_client.put("/api/admin/auth/entra", json=body)).status_code == 200
     assert await _sessions(eva.id) == 0
+
+
+async def test_switching_an_account_back_on_is_re_confirmed_and_follows_the_block_rule(admin_client):
+    """0.1.56 review: PATCH {"is_active": true} gave rights back without re-confirmation and cleared any reason – also
+    the sync's (sync:disabled), past the hand-back rule of lifting a block. Now re-confirmed; a local account is on
+    again, a directory account the sync switched off stays the directory's, one an admin switched off goes back to the
+    sync (off, "sync:unblocked")."""
+    local = await add_user("lena", "reader")
+    async with db.session() as s:
+        ad_off = User(username="user5", display_name="User 5", role="reader", auth_source="ldap", external_id=str(uuid.UUID(int=5)), is_active=False, deactivated_reason="sync:disabled")
+        ad_admin_off = User(username="user6", display_name="User 6", role="reader", auth_source="ldap", external_id=str(uuid.UUID(int=6)), is_active=False, deactivated_reason="admin")
+        s.add_all([ad_off, ad_admin_off])
+        await s.commit()
+    assert (await admin_client.patch(f"/api/admin/users/{local.id}", json={"is_active": False})).json()["deactivated_reason"] == "admin"
+    async with db.session() as s:
+        await s.execute(update(UserSession).where(UserSession.user_id == admin_client.user.id).values(reauth_at=datetime.now(UTC) - timedelta(hours=1)))
+        await s.commit()
+    for u in (local, ad_off, ad_admin_off):
+        r = await admin_client.patch(f"/api/admin/users/{u.id}", json={"is_active": True})
+        assert r.status_code == 403 and r.json()["detail"]["code"] == "reauth_required"
+    # switching off stays as it was: no re-confirmation for a reader
+    other = await add_user("otto", "reader")
+    assert (await admin_client.patch(f"/api/admin/users/{other.id}", json={"is_active": False})).status_code == 200
+    async with db.session() as s:
+        await s.execute(update(UserSession).where(UserSession.user_id == admin_client.user.id).values(reauth_at=datetime.now(UTC)))
+        await s.commit()
+    r = await admin_client.patch(f"/api/admin/users/{local.id}", json={"is_active": True})
+    assert r.status_code == 200 and r.json()["is_active"] and r.json()["deactivated_reason"] is None
+    r = await admin_client.patch(f"/api/admin/users/{ad_off.id}", json={"is_active": True})
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "directory_managed"
+    assert (await _get(ad_off.id)).deactivated_reason == "sync:disabled"
+    r = await admin_client.patch(f"/api/admin/users/{ad_admin_off.id}", json={"is_active": True})
+    assert r.status_code == 200 and not r.json()["is_active"] and r.json()["deactivated_reason"] == "sync:unblocked"

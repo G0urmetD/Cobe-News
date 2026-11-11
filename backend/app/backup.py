@@ -49,7 +49,7 @@ from pathlib import Path
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import __version__, audit_lock, crypto, db
+from app import __version__, audit, audit_lock, crypto, db
 from app import settings as settings_store
 from app.config import get_config
 
@@ -1302,18 +1302,17 @@ async def export_data(s: AsyncSession) -> dict:
 
 
 def _cell(v: object) -> str:
-    """A CSV cell: lists joined, objects as JSON – and never a formula (a leading = + - @ is quoted for spreadsheets)."""
+    """A CSV cell: lists joined, objects as JSON – and never a formula: the audit log export's rules (audit.cell – also a
+    formula right after a separator, "v1;=1+1"; audit.json_cell – JSON that stays JSON)."""
     if v is None:
-        s = ""
-    elif isinstance(v, bool):
-        s = "true" if v else "false"
-    elif isinstance(v, list) and all(not isinstance(x, (dict, list)) for x in v):
-        s = "; ".join(str(x) for x in v)
-    elif isinstance(v, (dict, list)):
-        s = json.dumps(v, ensure_ascii=False, sort_keys=True)
-    else:
-        s = str(v)
-    return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
+        return ""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, list) and all(not isinstance(x, (dict, list)) for x in v):
+        return audit.cell("; ".join(str(x) for x in v))
+    if isinstance(v, (dict, list)):
+        return audit.json_cell(v) if v else json.dumps(v)  # type: ignore[arg-type] - a list is JSON as well
+    return audit.cell(v)
 
 
 def to_csv_zip(data: dict) -> bytes:

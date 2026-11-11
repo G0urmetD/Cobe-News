@@ -195,7 +195,8 @@ Nur für lokale Konten. Meldest du dich mit Active Directory an, änderst du das
 verwaltet Microsoft es.
 
 1. *Profil & Sicherheit* öffnen und „Passwort ändern“ wählen.
-2. Aktuelles Passwort und das neue Passwort eingeben, „Speichern“.
+2. Aktuelles Passwort und das neue Passwort eingeben – mit eingerichtetem TOTP auch den aktuellen Code aus der App –,
+   „Speichern“.
 3. Andere Browser, in denen du angemeldet bist, werden abgemeldet.
 
 Regeln für das neue Passwort: mindestens 12 Zeichen, nicht zu häufig, nicht der Benutzername und nicht das bisherige

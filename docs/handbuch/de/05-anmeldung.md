@@ -130,7 +130,8 @@ diesem Browser bis dahin nur noch das **Passwort** ein – der Code wird übersp
 - **Entra-Konten:** gilt nur dort, wo Cobe News seinen eigenen TOTP fragt ([MFA-Nachweis](#entra-mfa-nachweis)). Den
   zweiten Faktor bei Microsoft regelt Microsoft.
 - **Heikle Änderungen** fragen trotzdem nach dem Code: Eine Anmeldung über ein gemerktes Gerät zählt nicht als
-  [erneute Bestätigung](#erneut-bestaetigen).
+  [erneute Bestätigung](#erneut-bestaetigen). Das eigene Passwort ändern verlangt mit TOTP immer den Code, eine
+  [Kalender-Adresse](/docs/benachrichtigungen#kalender-ical) erzeugen in einer solchen Sitzung erst die Bestätigung.
 - **Wie es gespeichert ist:** Der Browser hält ein zufälliges Token in einem eigenen Cookie (HttpOnly, Secure wie das
   Sitzungs-Cookie, SameSite=Strict, nur für `/api/auth`), der Server nur dessen Hash. Es gilt nur für das Konto, für
   das es gemerkt wurde.
@@ -138,7 +139,11 @@ diesem Browser bis dahin nur noch das **Passwort** ein – der Code wird übersp
   kürzere Dauer gilt sofort auch für schon gemerkte Geräte), der Schalter aus ist oder Admins ausgenommen werden.
 - **Vergessen** werden gemerkte Geräte unter [Meine Sitzungen](#meine-sitzungen) (eins oder alle), durch einen Admin
   („Sitzungen & Passkeys“ → „Gemerkte Geräte vergessen“), mit „Alle anderen abmelden“ / „Alle Sitzungen beenden“, beim
-  Sperren, Deaktivieren und Zurücksetzen. Ausschalten vergisst alle – wieder einschalten bringt keins zurück.
+  Sperren, Deaktivieren und Zurücksetzen, nach einer [Wiederherstellung](/docs/sicherung#wiederherstellung) alle.
+  Ausschalten vergisst alle – wieder einschalten bringt keins zurück.
+- **Ein Browser, zwei Konten:** Der Browser merkt sich nur ein Gerät – das zuletzt gemerkte. Das Gerät des anderen
+  Kontos steht weiter in dessen Liste, gilt in diesem Browser aber nicht mehr (dort fragt die Anmeldung wieder nach dem
+  Code); „Vergessen“ räumt es weg. „Alle Geräte vergessen“ des einen Kontos lässt das gemerkte Gerät des anderen stehen.
 - Im [Protokoll](/docs/betrieb#protokoll): „Gerät für den zweiten Faktor gemerkt“, „Gemerkte Geräte vergessen“; die
   Anmeldung eines Admins über ein gemerktes Gerät mit der Anmeldeart „Passwort + gemerktes Gerät“.
 
@@ -341,7 +346,9 @@ Domänencontroller, liest die Gruppen und bestimmt daraus die Rolle. Admins aus 
 
 Domänencontroller dürfen im Firmennetz liegen (private Adressen sind erlaubt). Nie erlaubt sind Loopback, Link-Local,
 die eigenen Docker-Netze von Cobe News und der Docker-Host selbst (z. B. `host.docker.internal`, bei Docker Desktop das
-Netz `192.168.65.0/24`). „Verbindung testen“ meldet dann „Ziel nicht erlaubt …“. Bei Fehlern zeigt Cobe News nur deren
+Netz `192.168.65.0/24`). „Verbindung testen“ meldet dann „Ziel nicht erlaubt …“. Geprüft wird der Name und – beim
+Verbinden – die Adresse, die tatsächlich erreicht wurde, bevor StartTLS oder ein Passwort folgt (ein Name, der danach auf
+ein verbotenes Ziel zeigt, hilft nicht). Bei Fehlern zeigt Cobe News nur deren
 Art, nie Antworten des Servers.
 
 ### Fehler beim Testen {#ad-fehler}

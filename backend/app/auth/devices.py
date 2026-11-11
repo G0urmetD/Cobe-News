@@ -34,7 +34,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Request, Response
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 from app import audit
 from app import settings as settings_store
@@ -143,13 +143,16 @@ async def recognised(db, user: User, token: str | None, *, use: bool = True) -> 
     return True
 
 
-async def rebind(db, user: User, token: str | None) -> None:  # noqa: ANN001
-    """The same password, hashed anew (passwords.needs_rehash – other Argon2 parameters): the browser's row – which the
-    caller found valid (`recognised`) just before – stands on the new hash. Only for a password just verified; any other
-    change of the factors keeps making a row worthless. Not committed."""
-    row = await find(db, token)
-    if row is not None and row.user_id == user.id:
-        row.factor = factor(user)
+async def rebind(db, user: User, old_factor: str) -> int:  # noqa: ANN001
+    """The same password, hashed anew (passwords.needs_rehash – other Argon2 parameters): every row of the account that
+    stood on the old hash – `old_factor`, the fingerprint just before the rehash – stands on the new one, not only this
+    browser's. Called only when this browser's row was valid (`recognised`), i.e. with a password just verified and the
+    account's factors unchanged; a row with any other fingerprint (an older password, another TOTP) is never revived.
+    Not committed."""
+    res = await db.execute(
+        update(RememberedDevice).where(RememberedDevice.user_id == user.id, RememberedDevice.factor == old_factor).values(factor=factor(user)).execution_options(synchronize_session=False)
+    )
+    return res.rowcount or 0
 
 
 async def remember(db, user: User, ip: str | None, user_agent: str | None, old_token: str | None = None) -> tuple[str, int] | None:  # noqa: ANN001

@@ -131,8 +131,10 @@ SELECT to_regclass('public.audit_log') IS NULL AS no_table \gset
 \quit
 \endif
 
--- the table handed over – only as the migrations make it: no trigger, rule or row security of anyone else (code of
--- the app that would then run as cobe_news_audit). Otherwise it stays as it is (not locked) and the log says why.
+-- the table handed over – only as the migrations make it: no trigger, rule or row security of anyone else, no CHECK or
+-- exclusion constraint, no column of a type outside pg_catalog (a domain can carry a CHECK), no index or column default
+-- that calls a function outside pg_catalog (code of the app that would then run as cobe_news_audit – or, in the
+-- statements below, as this superuser). Otherwise it stays as it is (not locked) and the log says why.
 -- Checked and handed over in one transaction, the table locked meanwhile: nothing can be added between the two.
 BEGIN;
 LOCK TABLE public.audit_log IN ACCESS EXCLUSIVE MODE;
@@ -142,6 +144,13 @@ SELECT concat_ws(', ',
          (SELECT 'rules ' || string_agg(r.rulename, ' ') FROM pg_rewrite r WHERE r.ev_class = 'public.audit_log'::regclass),
          (SELECT 'policies ' || string_agg(p.polname, ' ') FROM pg_policy p WHERE p.polrelid = 'public.audit_log'::regclass),
          (SELECT 'row security' FROM pg_class c WHERE c.oid = 'public.audit_log'::regclass AND (c.relrowsecurity OR c.relforcerowsecurity)),
+         (SELECT 'constraints ' || string_agg(co.conname, ' ') FROM pg_constraint co WHERE co.conrelid = 'public.audit_log'::regclass AND co.contype IN ('c', 'x')),
+         (SELECT 'column types ' || string_agg(a.attname, ' ') FROM pg_attribute a JOIN pg_type ty ON ty.oid = a.atttypid
+             WHERE a.attrelid = 'public.audit_log'::regclass AND a.attnum > 0 AND NOT a.attisdropped AND ty.typnamespace <> 'pg_catalog'::regnamespace),
+         (SELECT 'functions ' || string_agg(DISTINCT p.proname, ' ') FROM pg_depend d JOIN pg_proc p ON p.oid = d.refobjid
+             WHERE d.refclassid = 'pg_proc'::regclass AND p.pronamespace <> 'pg_catalog'::regnamespace
+               AND ((d.classid = 'pg_class'::regclass AND d.objid IN (SELECT i.indexrelid FROM pg_index i WHERE i.indrelid = 'public.audit_log'::regclass))
+                 OR (d.classid = 'pg_attrdef'::regclass AND d.objid IN (SELECT ad.oid FROM pg_attrdef ad WHERE ad.adrelid = 'public.audit_log'::regclass)))),
          (SELECT 'owner ' || pg_get_userbyid(c.relowner) FROM pg_class c WHERE c.oid = 'public.audit_log'::regclass
              AND pg_get_userbyid(c.relowner) NOT IN ('cobe_news_app', 'cobe_news_audit'))
        ) AS odd \gset
@@ -154,9 +163,12 @@ ROLLBACK;
 
 -- the table's shape of migrations 0032 and 0033, as they make it: locked, the app's migrations leave audit_log alone
 -- (audit_lock.ddl_skipped) – an install from before 0.1.50 (revision 0017 … 0031) updating straight to this image gets
--- the columns here, before the handover (without them the GRANT below fails and the database never becomes ready)
+-- the columns here, before the handover (without them the GRANT below fails and the database never becomes ready).
+-- Done as the table's owner, the app's role – not as the superuser: whatever the UPDATE and the index builds evaluate
+-- on a table the app owned runs with the app's rights, never more
 SELECT NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.audit_log'::regclass AND attname = 'seq' AND NOT attisdropped) AS before_0032 \gset
 \if :before_0032
+SET LOCAL ROLE cobe_news_app;
 ALTER TABLE public.audit_log
   ADD COLUMN actor_role text, ADD COLUMN auth_method text, ADD COLUMN session_ref text, ADD COLUMN ua_family text,
   ADD COLUMN ua_version text, ADD COLUMN ua_os text, ADD COLUMN req_method text, ADD COLUMN req_path text,
@@ -172,14 +184,20 @@ CREATE INDEX ix_audit_log_session ON public.audit_log (session_ref, at) WHERE se
 CREATE INDEX ix_audit_log_notable ON public.audit_log (at, id) WHERE notable;
 CREATE UNIQUE INDEX ux_audit_log_seq ON public.audit_log (seq) WHERE seq IS NOT NULL;
 CREATE INDEX ix_audit_log_unsealed ON public.audit_log (id) WHERE seq IS NULL;
+RESET ROLE;
 \echo 'db-init: audit_log brought to the shape of migration 0032 before the lock'
 \endif
 -- 0033 – only with pg_trgm there (since migration 0002; the app owns the extension and could drop it, and that must
--- not stop the database from starting)
-SELECT to_regclass('public.ix_audit_log_search') IS NULL AND EXISTS (SELECT 1 FROM pg_opclass WHERE opcname = 'gin_trgm_ops' AND opcnamespace = 'public'::regnamespace) AS before_0033 \gset
+-- not stop the database from starting). Built as the app's role too (the operator class is the app's extension) –
+-- hence only while the app still owns the table; a table locked already without it stays without (the search works,
+-- slower)
+SELECT to_regclass('public.ix_audit_log_search') IS NULL AND EXISTS (SELECT 1 FROM pg_opclass WHERE opcname = 'gin_trgm_ops' AND opcnamespace = 'public'::regnamespace)
+  AND (SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid = 'public.audit_log'::regclass) = 'cobe_news_app' AS before_0033 \gset
 \if :before_0033
+SET LOCAL ROLE cobe_news_app;
 CREATE INDEX ix_audit_log_search ON public.audit_log USING gin
   (lower(actor_name || ' ' || actor_display || ' ' || action || ' ' || coalesce(target_label, '') || ' ' || coalesce(target_id, '') || ' ' || coalesce(ip, '')) public.gin_trgm_ops);
+RESET ROLE;
 \endif
 
 ALTER TABLE public.audit_log OWNER TO cobe_news_audit;  -- its indexes and its identity sequence with it
