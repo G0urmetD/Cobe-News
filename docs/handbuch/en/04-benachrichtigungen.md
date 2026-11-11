@@ -608,8 +608,10 @@ no tracking pixels.
   without summaries.
 - **Button "Open Cobe News".** With one story it opens exactly that story. With several it opens the news list filtered
   to exactly the message's stories – also those under "… and N more" (chip "From the notification (N)", up to 50 stories;
-  more: the whole list). Vendor News findings of one product open that product, of several products Vendor News. The
-  same goes for the button in Slack and Teams, the click on ntfy, Gotify and desktop push messages and the personal
+  more: the whole list). A Vendor News story opens its product right where it matters: a vulnerability at the finding,
+  a new version or an end of support at "Versions", a revised advisory at "Changes", a watched CVE in the list of
+  watched CVEs – "Open in Cobe News" as well. Several stories of one product open the product (at the tab they share,
+  if any), of several products Vendor News. The same goes for the button in Slack and Teams, the click on ntfy, Gotify and desktop push messages and the personal
   messages; a forwarded story opens itself.
 - **Time.** Local time with the zone's abbreviation, so it is unambiguous: "2026-11-04 11:19 CET" (summer: CEST; in
   German "MEZ"/"MESZ") – likewise in the chat cards, push texts and forwards. Channels use Europe/Berlin; [personal messages](#meine-produkte) the person's time zone (from

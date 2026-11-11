@@ -51,7 +51,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlsplit
 
 from sqlalchemy import Integer, Uuid, and_, case, cast, delete, exists, false, func, literal, or_, select, text, true, tuple_, union, update
 from sqlalchemy import Text as SqlText
@@ -489,22 +489,12 @@ async def _prefs(db: AsyncSession, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, 
 
 
 def event_path(ev: VendorEvent) -> str:
-    """The event in Vendor News: the product's drawer – at the finding (a vulnerability) or its versions."""
-    if ev.kind == WATCH:
-        return "/watch?" + urlencode({"cve": str((ev.data or {}).get("cve") or "")})
-    q = {"product": ev.product}
-    if ev.kind == "vuln" and (finding := reader.finding_of(ev.key, ev.scope)):
-        q["finding"] = finding  # also "now exploited" and "now rated higher": at the finding they are about
-    elif ev.kind in ("version", "eol"):
-        q["view"] = "versions"
-    elif ev.kind == "change":
-        q["view"] = "changes"
-    return "/vendor?" + urlencode(q)
+    """The event in Vendor News (or the watched CVEs) – the same path a rule's channels link to (notify.vendor_path)."""
+    return notify.vendor_path(ev)
 
 
 def story(ev: VendorEvent, lang: str) -> notify.Story:
-    s = notify.vendor_story(ev, lang)
-    s.link = get_config().base_url + event_path(ev)
+    s = notify.vendor_story(ev, lang)  # its link: notify.vendor_path, as event_path
     s.ours = []  # every event here is of the person's own products – the footer says so, no mark on each
     return s
 

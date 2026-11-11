@@ -118,6 +118,13 @@ const vendorDe: Record<string, string> = {
   "vendor.showNotAffected_other": "auch {{count}} nicht betroffene zeigen",
   "vendor.noFindings": "Keine Schwachstellen",
   "vendor.noFindingsText": "Für dieses Produkt liegt (noch) nichts vor. Nach dem ersten Abruf erscheinen hier die Hinweise des Herstellers und die CVEs der NVD.",
+  // there is data, but nothing concerns the versions entered (the drawer of a version event): not "nothing yet"
+  "vendor.noneAffect_one": "Keine Schwachstelle betrifft eure Version",
+  "vendor.noneAffect_other": "Keine Schwachstelle betrifft eure Versionen",
+  "vendor.noneAffectText_one": "{{count}} Schwachstelle dieses Produkts betrifft {{yours}} nicht – über den Schalter oben einblendbar.",
+  "vendor.noneAffectText_other": "{{count}} Schwachstellen dieses Produkts betreffen {{yours}} nicht – über den Schalter oben einblendbar.",
+  "vendor.yourVersion_one": "eure Version",
+  "vendor.yourVersion_other": "eure Versionen",
   "vendor.ransomware": "Ransomware",
   "vendor.exploited": "aktiv ausgenutzt",
   "vendor.affectsOf": "betrifft {{count}} von {{total}} Versionen",

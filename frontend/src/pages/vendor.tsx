@@ -1126,7 +1126,19 @@ const Vulns = memo(function Vulns({
           )}
         </div>
       )}
-      {d.follow && shown.length === 0 && rest === 0 && <EmptyState icon={ShieldAlert} title={t("vendor.noFindings")} text={t("vendor.noFindingsText")} />}
+      {d.follow &&
+        shown.length === 0 &&
+        rest === 0 &&
+        // data, but none of it concerns the versions entered (hidden behind the switch) – not "nothing yet"
+        (counts.not_affected > 0 ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title={t("vendor.noneAffect", { count: versions.length })}
+            text={t("vendor.noneAffectText", { count: counts.not_affected, yours: t("vendor.yourVersion", { count: versions.length }) })}
+          />
+        ) : (
+          <EmptyState icon={ShieldAlert} title={t("vendor.noFindings")} text={t("vendor.noFindingsText")} />
+        ))}
       {groups.map(({ g, items }) =>
         // "unklare Altdaten": folded – open by itself only when the card pointed at one of them
         g === "stale" && !staleOpen ? (
