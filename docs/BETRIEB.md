@@ -2122,6 +2122,7 @@ cd frontend && NEWS_API=http://127.0.0.1:8611 npx vite --port 5611
 cd frontend && BASE_URL=http://localhost:5611 CREDS=/tmp/cn-e2e/creds.json \
   PLAYWRIGHT=/pfad/zu/node_modules/playwright/index.mjs node e2e/select-in-sheet.mjs   # creds.json: {"user","password","totp"}
 # ebenso: node e2e/signin-settings.mjs (speichert AD/LDAP der Wegwerf-Instanz mit Namen unter corp.example)
+# ebenso: node e2e/drawer-reopen.mjs (Schublade gleich wieder geöffnet: Abdunklung unter, nicht über ihr; PRODUCT=<Katalog-Key>)
 ```
 
 **Basis-Images** sind mit ihrem Digest festgeschrieben (`Dockerfile`: `node:24-slim@sha256:…`, `python:3.13-slim@sha256:…`;

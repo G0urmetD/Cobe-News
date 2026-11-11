@@ -6,6 +6,7 @@ import { cn } from "cn"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
+import { LayerPortal } from "@/components/ui/layer-portal"
 import { focusContentOnOpen } from "@/lib/focus"
 import { XIcon } from "lucide-react"
 
@@ -47,7 +48,7 @@ function DialogContent({
   overlayClassName?: string
 }) {
   return (
-    <DialogPortal>
+    <LayerPortal>
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
@@ -69,7 +70,7 @@ function DialogContent({
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
-    </DialogPortal>
+    </LayerPortal>
   )
 }
 
