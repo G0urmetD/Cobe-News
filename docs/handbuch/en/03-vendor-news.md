@@ -652,15 +652,18 @@ that only counts when a certain feature (e.g. Brotli) is switched on. For this, 
   mitigation) and *Risk accepted* – this one only with a reason. The reason is short (up to 500 characters).
 - **Effect:** a confirmed finding counts as handled – not in the tile's numbers, its state, the number on "Vendor
   News", the unread ones, the [weekly review](/docs/benachrichtigungen#wochenrueckblick) and the numbers of the
-  [API](/docs/api) – and sends nothing more: neither through the rules nor on the personal ways. What arises meanwhile
-  does not come later either.
+  [API](/docs/api) – and sends nothing more: neither through the rules nor on the personal ways, nor a change of one of
+  its records (vendor advisory, NVD, cvelistV5, OSV). What arises meanwhile does not come later when somebody undoes the
+  confirmation. A CVE you [watch](/docs/benachrichtigungen#cves-liste) yourself still notifies you – that is your own
+  choice.
 - **It stays visible:** pale in the drawer with "Confirmed · Not affected", who, when and why below it and on hover.
   The tile says "2 confirmed"; under *Filters*, **Show confirmed** (chip "With confirmed") lists them in the tile's lines
   too.
 - **Lifted by itself** when the finding changes materially: now actively exploited, rated higher, new CVEs, a version
   entered now (more surely) affected – also one entered later – or the advisory withdrawn. Then it counts and notifies
-  again; the message says "Confirmation lifted: now exploited", so does the drawer. A new fixed version alone does not
-  lift it.
+  again; the message says "Confirmation lifted: now exploited", so does the drawer. What arose in the 24 hours before
+  (such as the advisory change that caused it) still goes out – for a confirmation younger than 24 hours, everything it
+  held back. A new fixed version alone does not lift it.
 - **Who may:** admins always; with Teams on also the members of a team the product is assigned to (the same people who
   [review its versions](#versionen-pruefen)). Everybody else only sees the confirmation. **Undo confirmation** takes it
   back. Confirming, undoing and the lapse by itself are in the audit log.

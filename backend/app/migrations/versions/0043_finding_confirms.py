@@ -1,7 +1,8 @@
-"""Treffer bestätigen (app/finding_confirm.py): vendor_confirms – one row per finding of a followed product (product key
-and finding id, the advisory id the drawer's `?finding=` uses): the assessment (not affected, mitigated, risk accepted),
-the reason, who and when (the name kept for display), the facts it was confirmed on, which of its events are held
-back, and when and why it ended (undone by hand, or lapsed because the finding changed).
+"""Treffer bestätigen (app/finding_confirm.py): vendor_confirms – one row per period in which a finding of a followed
+product stood confirmed (product key and finding id, the advisory id the drawer's `?finding=` uses; at most one standing
+per finding): the assessment (not affected, mitigated, risk accepted), the reason, who and when (the name kept for
+display), the facts it was confirmed on, which of its events are held back, and when and why it ended (undone by hand,
+or lapsed because the finding changed).
 
 Existing data: a new, empty table – nothing counts or notifies differently until somebody confirms a finding. The
 downgrade drops it.
@@ -27,8 +28,9 @@ def upgrade() -> None:
     ts = sa.DateTime(timezone=True)
     op.create_table(
         "vendor_confirms",
-        sa.Column("product", sa.Text(), primary_key=True),
-        sa.Column("finding", sa.Text(), primary_key=True),
+        sa.Column("id", sa.Uuid(), primary_key=True),
+        sa.Column("product", sa.Text(), nullable=False),
+        sa.Column("finding", sa.Text(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False),
         sa.Column("note", sa.Text(), nullable=False, server_default=""),
         sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
@@ -41,7 +43,11 @@ def upgrade() -> None:
         sa.Column("ended_reason", sa.Text(), nullable=True),
         sa.Column("ended_by", sa.Text(), nullable=True),
     )
+    op.create_index("ix_vendor_confirms_finding", "vendor_confirms", ["product", "finding"])
+    op.create_index("ux_vendor_confirms_standing", "vendor_confirms", ["product", "finding"], unique=True, postgresql_where=sa.text("ended_at IS NULL"))
 
 
 def downgrade() -> None:
+    op.drop_index("ux_vendor_confirms_standing", table_name="vendor_confirms")
+    op.drop_index("ix_vendor_confirms_finding", table_name="vendor_confirms")
     op.drop_table("vendor_confirms")

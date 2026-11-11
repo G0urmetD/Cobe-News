@@ -887,6 +887,7 @@ async def drop_advisories(db: AsyncSession, ids: list[str], *, withdrawn: bool =
         return 0
     links = (await db.execute(select(VendorAdvisoryProduct.product, VendorAdvisoryProduct.advisory_id).where(VendorAdvisoryProduct.advisory_id.in_(ids)))).all()
     touched = {p for p, _ in links}
+    ended = 0
     if withdrawn:
         # a watched CVE (CVE beobachten): its advisory withdrawn – said before the record goes
         gone = (await db.execute(select(VendorAdvisory.id, VendorAdvisory.source, VendorAdvisory.ident, VendorAdvisory.title, VendorAdvisory.cves).where(VendorAdvisory.id.in_(ids)))).all()
@@ -895,7 +896,7 @@ async def drop_advisories(db: AsyncSession, ids: list[str], *, withdrawn: bool =
         # a confirmed finding of a withdrawn advisory: the confirmation ends (app/finding_confirm.py)
         from app import finding_confirm
 
-        await finding_confirm.withdrawn(db, [(p, aid) for p, aid in links], {p: str((catalog.product(p) or {}).get("label") or p) for p, _ in links})
+        ended = await finding_confirm.withdrawn(db, [(p, aid) for p, aid in links], {p: str((catalog.product(p) or {}).get("label") or p) for p, _ in links})
         linked: dict[str, set[str]] = {}
         for p, aid in links:
             linked.setdefault(aid, set()).add(p)
@@ -903,6 +904,10 @@ async def drop_advisories(db: AsyncSession, ids: list[str], *, withdrawn: bool =
     await db.execute(delete(VendorAdvisoryProduct).where(VendorAdvisoryProduct.advisory_id.in_(ids)))
     n = (await db.execute(delete(VendorAdvisory).where(VendorAdvisory.id.in_(ids)))).rowcount or 0
     await db.commit()
+    if ended:
+        from app import finding_confirm
+
+        finding_confirm.changed()  # after the commit (API v1's cached lists)
     if touched:
         bump(touched)
     return int(n)
@@ -2772,6 +2777,8 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
     for ev in made:
         ev.created_at = at
     await db.commit()
+    if lapsed:
+        finding_confirm.changed()  # after the commit (API v1's cached lists)
     return created
 
 

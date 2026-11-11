@@ -897,7 +897,10 @@ Solange sie steht, zählt der Befund nicht (Kacheln, Badge, ungelesen, Wochenrü
 persönlicher Weg sendet seine Ereignisse – auch nicht nachträglich. Sie endet von selbst, wenn der Befund jetzt
 ausgenutzt, höher eingestuft wird, neue CVEs bekommt, eine eingetragene Version (stärker) betrifft oder zurückgezogen
 wird – geprüft bei jeder Bewertung der Ereignisse, vor dem Anlegen; Protokoll `vendor.finding_confirm_lapsed`. Die
-Ereignisse des letzten Tages davor (die Advisory-Änderung, die es auslöste) gehen dann doch hinaus. Die Zeilen bleiben
+Ereignisse des letzten Tages davor (die Advisory-Änderung, die es auslöste) gehen dann doch hinaus. Eine Zeile je
+Zeitraum, in dem eine Bestätigung stand (erneut bestätigt: neue Zeile – die Zeit dazwischen hält nichts zurück);
+zurückgehalten werden die Schwachstellen-Ereignisse des Befunds und die Advisory-Änderungen aller seiner Einträge
+(`facts.members`: Herstellerhinweis, NVD-, cvelistV5-, OSV-Eintrag seiner CVEs). Die Zeilen bleiben
 nach dem Ende stehen (sie halten, was in der Zeit entstand, zurück); mit dem Produkt, dem niemand mehr folgt, gehen sie
 (stündlicher Prune mit den Lesemarken). Ein späteres Zusammenlegen von Katalog-Schlüsseln muss `vendor_confirms` mit
 umziehen (wie `vendor_reads`).

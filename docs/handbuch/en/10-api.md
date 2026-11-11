@@ -225,7 +225,8 @@ Notes:
   [Verdicts](/docs/vendor-news#bewertung).
 - A token sees the same as every signed-in reader on the shared pages – in Vendor News the "All" view.
 - A [confirmed finding](/docs/vendor-news#treffer-bestaetigen) carries `confirmed` (`status`, `note`, `by`, `at`) and
-  is not counted in the numbers of `/api/v1/vendor/products`.
+  is not counted in the numbers of `/api/v1/vendor/products`; `/api/v1/vendor/products/{key}` counts it in `confirmed`,
+  not in `by_status`.
 
 ## Errors and limits {#fehler}
 

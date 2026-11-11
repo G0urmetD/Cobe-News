@@ -179,7 +179,8 @@ class ProductDetail(Product):
     offset: int
     limit: int
     shown: int = Field(description="Findings matching the filter in all (the page is `offset`…`offset+limit`)")
-    by_status: dict[str, int]
+    by_status: dict[str, int] = Field(description="How many findings of each verdict – confirmed ones (handled) not among them")
+    confirmed: int = Field(0, description="How many findings are confirmed (\"Treffer bestätigen\": handled, not in `by_status`)")
 
 
 class FindingPage(BaseModel):
@@ -374,10 +375,12 @@ async def product(
     fs = view["findings"]
     want = set(status) or {s for s in Status.__args__ if s != "not_affected"}  # type: ignore[attr-defined]
     shown = [x for x in fs if x["status"] in want]
+    st = await finding_confirm.standing(db, [key])
+    skip = st.skip(key, fs) if st else frozenset()
     by_status: dict[str, int] = {}
     for x in fs:
-        by_status[x["status"]] = by_status.get(x["status"], 0) + 1
-    st = await finding_confirm.standing(db, [key])
+        if x["id"] not in skip:  # a confirmed finding is handled – counted apart, as in /vendor/products
+            by_status[x["status"]] = by_status.get(x["status"], 0) + 1
     return {
         **_product(p),
         "tags": list(f.tags or []),
@@ -387,6 +390,7 @@ async def product(
         "limit": limit,
         "shown": len(shown),
         "by_status": by_status,
+        "confirmed": len(skip),
     }
 
 

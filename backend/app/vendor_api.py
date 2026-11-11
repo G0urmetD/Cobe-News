@@ -23,7 +23,7 @@ from app import settings as settings_store
 from app import systems
 from app.crypto import encrypt_str
 from app.deps import Admin, Db, NoNul, Reader, api_error
-from app.models import VendorConfirm, VendorFetch, VendorFollow, VendorVersion
+from app.models import VendorFetch, VendorFollow, VendorVersion
 from app.news import NewsError
 from app.vendor_match import ORDER
 
@@ -463,15 +463,16 @@ async def confirm_finding(body: ConfirmIn, user: Reader, db: Db) -> dict:
     f, x = await _confirmable_finding(db, user, body.product, body.finding)
     if x["status"] not in reader.RELEVANT:
         raise api_error(422, "finding_not_open")  # not affected / unklare Altdaten: nothing to confirm
-    note = " ".join(body.note.split())
+    note = plaintext.label(body.note)  # one line, no control or direction characters (as every typed label)
     if body.status in finding_confirm.NOTE_REQUIRED and not note:
         raise api_error(422, "note_required")
-    before = await db.get(VendorConfirm, (f.product, x["id"]))
-    was = {"status": before.status, "note": before.note} if before is not None and before.ended_at is None else None
+    before = await finding_confirm.current(db, f.product, x["id"])
+    was = {"status": before.status, "note": before.note} if before is not None else None
     c = await finding_confirm.confirm(db, user, f.product, x, body.status, note)
     details = {"finding": x["id"], "ident": x["ident"], "status": body.status, "note": note} | ({"was": was} if was else {})
     audit.record(db, user, "vendor.finding_confirmed", _follow_target(f), details)
     await db.commit()
+    finding_confirm.changed()  # after the commit: API v1's cached lists are made anew from what is stored
     return {"product": f.product, "finding": x["id"], "confirmed": finding_confirm.out(c)}
 
 
@@ -488,6 +489,7 @@ async def unconfirm_finding(body: FindingIn, user: Reader, db: Db) -> dict:
     ident = body.finding.partition(":")[2] or body.finding
     audit.record(db, user, "vendor.finding_unconfirmed", _follow_target(f), {"finding": body.finding, "ident": ident, "status": c.status, "note": c.note})
     await db.commit()
+    finding_confirm.changed()
     return {"product": f.product, "finding": body.finding, "confirmed": None}
 
 

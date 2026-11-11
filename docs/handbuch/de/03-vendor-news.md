@@ -674,15 +674,19 @@ der Schublade **Bestätigen …**: eine Bewertung für **alle**, mit Begründung
   oder Gegenmaßnahme) und *Risiko akzeptiert* – diese nur mit Begründung. Die Begründung ist kurz (bis 500 Zeichen).
 - **Wirkung:** Ein bestätigter Treffer zählt als erledigt – nicht in den Zahlen der Kachel, ihrem Zustand, der Zahl an
   „Vendor News“, den ungelesenen, dem [Wochenrückblick](/docs/benachrichtigungen#wochenrueckblick) und den Zahlen der
-  [API](/docs/api) – und meldet sich nicht mehr: weder über die Regeln noch über die persönlichen Wege. Was in der Zeit
-  entsteht, kommt auch später nicht nach.
+  [API](/docs/api) – und meldet sich nicht mehr: weder über die Regeln noch über die persönlichen Wege, auch keine
+  Änderung an einem seiner Einträge (Herstellerhinweis, NVD, cvelistV5, OSV). Was in der Zeit entsteht, kommt auch
+  später nicht nach, wenn jemand die Bestätigung aufhebt. Eine CVE, die du selbst
+  [beobachtest](/docs/benachrichtigungen#cves-liste), meldet sich bei dir weiter – das ist deine eigene Wahl.
 - **Sichtbar bleibt er:** in der Schublade blass mit „Bestätigt · Nicht betroffen“, wer, wann und warum stehen darunter
   und beim Darüberfahren. Die Kachel nennt „2 bestätigt“; unter *Filter* zeigt **Bestätigte zeigen** (Chip „Mit
   Bestätigten“) sie auch in den Zeilen der Kachel.
 - **Von selbst aufgehoben** wird die Bestätigung, wenn sich der Treffer wesentlich ändert: jetzt aktiv ausgenutzt,
   höher eingestuft, neue CVEs, eine eingetragene Version jetzt (sicherer) betroffen – auch eine später eingetragene –
   oder das Advisory zurückgezogen. Dann zählt und meldet er sich wieder; die Meldung sagt „Bestätigung aufgehoben: jetzt
-  ausgenutzt“, die Schublade ebenso. Eine neue Fix-Version allein hebt sie nicht auf.
+  ausgenutzt“, die Schublade ebenso. Was in den 24 Stunden davor entstand (etwa die Advisory-Änderung, die es
+  auslöste), geht dann doch noch hinaus – bei einer Bestätigung, die jünger als 24 Stunden ist, also alles, was sie
+  zurückhielt. Eine neue Fix-Version allein hebt sie nicht auf.
 - **Wer darf:** Admins immer, bei eingeschalteten Teams auch die Mitglieder eines Teams, dem das Produkt zugeordnet ist
   (dieselben, die seine [Versionen prüfen](#versionen-pruefen)). Alle anderen sehen die Bestätigung nur.
   **Bestätigung aufheben** macht sie rückgängig. Bestätigen, Aufheben und das Aufheben von selbst stehen im Protokoll.

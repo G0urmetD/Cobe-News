@@ -229,7 +229,8 @@ Hinweise:
   betroffen) – siehe [Bewertung](/docs/vendor-news#bewertung).
 - Ein Token sieht dasselbe wie jeder angemeldete Leser auf den gemeinsamen Seiten – bei Vendor News die Ansicht „Alle“.
 - Ein [bestätigter Treffer](/docs/vendor-news#treffer-bestaetigen) trägt `confirmed` (`status`, `note`, `by`, `at`) und
-  zählt in den Zahlen von `/api/v1/vendor/products` nicht mit.
+  zählt in den Zahlen von `/api/v1/vendor/products` nicht mit; `/api/v1/vendor/products/{key}` zählt ihn nicht in
+  `by_status`, sondern in `confirmed`.
 
 ## Fehler und Grenzen {#fehler}
 

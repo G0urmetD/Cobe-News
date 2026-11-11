@@ -15,6 +15,7 @@ from test_catalog_care import _team as _care_team
 from test_catalog_care import _teams_on
 from test_personal import _event, _person, _switch, _ways, mails  # noqa: F401 - fixture
 from test_personal import _team as _personal_team
+from test_vendor_fixes import _nvd
 from test_vendor_service import (  # noqa: F401 - fixtures
     _dispatch,
     _follow,
@@ -71,8 +72,10 @@ async def _unconfirm(c, finding: str = FID):  # noqa: ANN001, ANN202
 
 
 async def _row(finding: str = FID) -> VendorConfirm | None:
+    """The finding's latest confirmation (one row per period it stood)."""
     async with db.session() as s:
-        return await s.get(VendorConfirm, ("panos", finding))
+        q = select(VendorConfirm).where(VendorConfirm.product == "panos", VendorConfirm.finding == finding)
+        return await s.scalar(q.order_by(VendorConfirm.held_from.desc(), VendorConfirm.confirmed_at.desc()).limit(1))
 
 
 async def _entries(action: str) -> list[AuditEntry]:
@@ -373,3 +376,95 @@ async def test_a_product_no_longer_followed_takes_its_confirmations(admin_client
         assert (await reader.prune(s))["confirms"] == 1
     assert await _row() is None
 
+
+# ---------------------------------------------------------------- review 0.1.56: the records of the group, the periods
+
+
+def _nvd_rec(start: str = "11.2.0", **kw) -> dict:
+    """NVD's record of the finding's CVE – grouped under the PAN-OS advisory (the same finding)."""
+    rec = _nvd(CVE, start=start, end="11.2.4-h30")
+    rec["updated_at"] = datetime.now(UTC) - timedelta(minutes=40) + timedelta(seconds=next(_step))
+    return rec | kw
+
+
+async def test_a_revision_of_a_grouped_record_is_held_too(admin_client, sites, hooks):
+    """M1: a change event is per advisory – the NVD record of the finding's CVE revised (its range widened, the verdict
+    of our version unchanged) is a change of the confirmed finding and is held like one of its leading advisory."""
+    await _follow(admin_client, "panos", "11.2.4-h23")
+    await _webhook_rule(admin_client, ["vendor_vuln", "vendor_change"])
+    await _round()
+    async with db.session() as s:
+        await vendor.store(s, [_adv(), _nvd_rec()], vendor.build_index())
+        await vendor.evaluate_events(s)
+    await _dispatch()
+    before = len(hooks)
+    f = _finding((await admin_client.get("/api/vendor/products/panos")).json())
+    assert f"nvd:{CVE}" in [f"{a['source']}:{a['ident']}" for a in f["also"]]
+    assert (await _confirm(admin_client)).status_code == 200
+    assert f"nvd:{CVE}" in (await _row()).facts["members"]
+    assert await _store(_nvd_rec(start="11.1.0")) == 0
+    async with db.session() as s:
+        evs = list(await s.scalars(select(VendorEvent).where(VendorEvent.kind == "change")))
+        assert evs and {e.data["advisory"] for e in evs} == {f"nvd:{CVE}"}
+        assert await finding_confirm.held_events(s, [e.id for e in evs]) == {e.id for e in evs}
+    assert (await _row()).ended_at is None  # no reason to look again
+    await _dispatch()
+    assert len(hooks) == before
+
+
+async def test_a_new_confirmation_after_a_lapse_holds_nothing_of_the_time_between(admin_client, sites):
+    """M2: confirmed, lapsed, confirmed again, undone – an event made while none stood is not held (each period is a row)."""
+    await _follow(admin_client, "panos", "11.2.4-h23")
+    await _round()
+    assert await _store(_adv()) == 1
+    t0 = datetime.now(UTC) - timedelta(days=10)
+    assert (await _confirm(admin_client)).status_code == 200
+    async with db.session() as s:
+        c = await finding_confirm.current(s, "panos", FID)
+        c.held_from = c.confirmed_at = t0
+        finding_confirm._end(c, "exploited", t0 + timedelta(days=2))  # lapsed 8 days ago – held until 9 days ago
+        ev = await s.scalar(select(VendorEvent).where(VendorEvent.kind == "vuln", VendorEvent.key.like(f"%{FID}")))
+        held = VendorEvent(key=f"rated:high:{ev.scope}:{FID}", kind="vuln", product="panos", severity="high", data=ev.data, created_at=t0 + timedelta(hours=12), scope=ev.scope)
+        gap = VendorEvent(key=f"exploited:{ev.scope}:{FID}", kind="vuln", product="panos", severity="critical", data=ev.data, created_at=t0 + timedelta(days=5), scope=ev.scope)
+        s.add_all([held, gap])
+        await s.commit()
+        ids = (held.id, gap.id)
+    assert (await _confirm(admin_client)).status_code == 200  # confirmed again
+    assert (await _unconfirm(admin_client)).status_code == 200
+    async with db.session() as s:
+        assert await finding_confirm.held_events(s, ids) == {ids[0]}  # the first period's – not the time between
+        rows = list(await s.scalars(select(VendorConfirm).order_by(VendorConfirm.held_from)))
+    assert [(r.ended_reason, r.held_from == t0) for r in rows] == [("exploited", True), ("undone", False)]
+
+
+async def test_the_api_cache_generation_moves_after_the_commit(admin_client, sites):
+    """L1: the generation of API v1's cached lists moves only once the change is stored."""
+    await _setup(admin_client)
+    g = finding_confirm.generation()
+    d = (await admin_client.get("/api/vendor/products/panos")).json()
+    async with db.session() as s:
+        await finding_confirm.confirm(s, admin_client.user, "panos", _finding(d), "not_affected", "")
+        assert finding_confirm.generation() == g  # not yet – nothing is stored
+        await s.rollback()
+    assert (await _confirm(admin_client)).status_code == 200
+    assert finding_confirm.generation() == g + 1
+    assert (await _unconfirm(admin_client)).status_code == 200
+    assert finding_confirm.generation() == g + 2
+
+
+async def test_the_reason_is_a_plain_label(admin_client, sites):
+    """L4: no direction or control characters in the reason (plaintext.label, as every typed label)."""
+    await _setup(admin_client)
+    r = await _confirm(admin_client, note="Brotli\u202e nicht\u0007 aktiviert\u200f")
+    assert r.json()["confirmed"]["note"] == "Brotli nicht aktiviert"
+
+
+async def test_api_v1_product_counts_confirmed_findings_apart(admin_client, sites):
+    """L5: GET /api/v1/vendor/products/{key} – a confirmed finding is not among by_status, it is counted as confirmed."""
+    await _setup(admin_client)
+    token = await make_token(admin_client)
+    before = (await get("/api/v1/vendor/products/panos", token)).json()
+    assert before["confirmed"] == 0
+    await _confirm(admin_client)
+    after = (await get("/api/v1/vendor/products/panos", token)).json()
+    assert after["confirmed"] == 1 and after["by_status"].get("affected", 0) == before["by_status"]["affected"] - 1

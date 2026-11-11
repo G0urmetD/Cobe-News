@@ -1323,22 +1323,29 @@ class VendorRead(Base):
 
 class VendorConfirm(Base):
     """"Treffer bestätigt" (app/finding_confirm.py): a Vendor News finding of a followed product assessed for everybody –
-    not affected, mitigated or the risk accepted, with a reason. While it stands (`ended_at` None and `facts` still those
-    of the finding) the finding counts as handled and is not notified. It ends by hand ("aufheben", `ended_reason`
-    "undone") or by itself when the finding changes materially (exploited, rated higher, new CVEs, a version's verdict,
-    withdrawn). The row stays after the end: the events made while it stood are never sent later (`held_from`,
-    `held_until`)."""
+    not affected, mitigated or the risk accepted, with a reason. One row per period in which a confirmation stood: while
+    it stands (`ended_at` None – at most one per finding – and `facts` still those of the finding) the finding counts as
+    handled and is not notified. It ends by hand ("aufheben", `ended_reason` "undone") or by itself when the finding
+    changes materially (exploited, rated higher, new CVEs, a version's verdict, withdrawn). The row stays after the end:
+    the events made while it stood are never sent later (`held_from`, `held_until`) – a confirmation made again is a new
+    row, so a time in between when none stood is never held."""
 
     __tablename__ = "vendor_confirms"
+    __table_args__ = (
+        Index("ix_vendor_confirms_finding", "product", "finding"),
+        Index("ux_vendor_confirms_standing", "product", "finding", unique=True, postgresql_where=text("ended_at IS NULL")),
+    )
 
-    product: Mapped[str] = mapped_column(Text, primary_key=True)
-    finding: Mapped[str] = mapped_column(Text, primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    product: Mapped[str] = mapped_column(Text)
+    finding: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)  # not_affected | mitigated | accepted
     note: Mapped[str] = mapped_column(Text, default="", server_default="")
     user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     user_name: Mapped[str] = mapped_column(Text, default="", server_default="")  # kept for display (account deleted)
     confirmed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
-    facts: Mapped[dict] = mapped_column(Json, default=dict)  # the finding as it was confirmed (finding_confirm.facts_of)
+    # the finding as it was confirmed (finding_confirm.facts_of) – with the ids of its group's records ("members")
+    facts: Mapped[dict] = mapped_column(Json, default=dict)
     # its events made in [held_from, held_until) are never sent – while it stands (held_until None) none of them is
     held_from: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     held_until: Mapped[datetime | None] = mapped_column(UTCDateTime)
