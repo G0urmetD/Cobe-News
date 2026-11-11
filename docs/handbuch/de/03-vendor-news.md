@@ -675,21 +675,26 @@ der Schublade **Bestätigen …**: eine Bewertung für **alle**, mit Begründung
 - **Wirkung:** Ein bestätigter Treffer zählt als erledigt – nicht in den Zahlen der Kachel, ihrem Zustand, der Zahl an
   „Vendor News“, den ungelesenen, dem [Wochenrückblick](/docs/benachrichtigungen#wochenrueckblick) und den Zahlen der
   [API](/docs/api) – und meldet sich nicht mehr: weder über die Regeln noch über die persönlichen Wege, auch keine
-  Änderung an einem seiner Einträge (Herstellerhinweis, NVD, cvelistV5, OSV). Was in der Zeit entsteht, kommt auch
-  später nicht nach, wenn jemand die Bestätigung aufhebt. Eine CVE, die du selbst
+  Änderung an einem seiner Einträge (Herstellerhinweis, NVD, cvelistV5, OSV). Was in der Zeit entsteht oder beim
+  Bestätigen noch nicht versendet war (etwa ein Kanal in seiner Pause), kommt auch später nicht nach, wenn jemand die
+  Bestätigung aufhebt. Im Wochenrückblick steht der Treffer wieder, sobald er nicht mehr bestätigt ist. Eine CVE, die du selbst
   [beobachtest](/docs/benachrichtigungen#cves-liste), meldet sich bei dir weiter – das ist deine eigene Wahl.
 - **Sichtbar bleibt er:** in der Schublade blass mit „Bestätigt · Nicht betroffen“, wer, wann und warum stehen darunter
   und beim Darüberfahren. Die Kachel nennt „2 bestätigt“; unter *Filter* zeigt **Bestätigte zeigen** (Chip „Mit
   Bestätigten“) sie auch in den Zeilen der Kachel.
 - **Von selbst aufgehoben** wird die Bestätigung, wenn sich der Treffer wesentlich ändert: jetzt aktiv ausgenutzt,
-  höher eingestuft, neue CVEs, eine eingetragene Version jetzt (sicherer) betroffen – auch eine später eingetragene –
-  oder das Advisory zurückgezogen. Dann zählt und meldet er sich wieder; die Meldung sagt „Bestätigung aufgehoben: jetzt
-  ausgenutzt“, die Schublade ebenso. Was in den 24 Stunden davor entstand (etwa die Advisory-Änderung, die es
-  auslöste), geht dann doch noch hinaus – bei einer Bestätigung, die jünger als 24 Stunden ist, also alles, was sie
-  zurückhielt. Eine neue Fix-Version allein hebt sie nicht auf.
+  höher eingestuft, neue CVEs, mehr eingetragene Versionen (sicherer) betroffen als beim Bestätigen – etwa eine später
+  eingetragene oder ein erweiterter Bereich –, das Advisory zurückgezogen, oder ein anderer Hinweis führt den Treffer
+  jetzt an (z. B. kommt nach dem NVD-Eintrag der Herstellerhinweis: „neu zugeordnet“, bitte neu bewerten). Dann zählt und
+  meldet er sich wieder; die Meldung sagt „Bestätigung aufgehoben: jetzt ausgenutzt“, die Schublade ebenso. Was in den
+  24 Stunden davor entstand (etwa die Advisory-Änderung, die es auslöste), geht dann doch noch hinaus. Eine neue
+  Fix-Version allein hebt sie nicht auf, ebenso wenig eine geänderte Version mit derselben Bewertung (11.2.4-h23 →
+  11.2.4-h25, beide betroffen) oder eine entfernte.
 - **Wer darf:** Admins immer, bei eingeschalteten Teams auch die Mitglieder eines Teams, dem das Produkt zugeordnet ist
   (dieselben, die seine [Versionen prüfen](#versionen-pruefen)). Alle anderen sehen die Bestätigung nur.
   **Bestätigung aufheben** macht sie rückgängig. Bestätigen, Aufheben und das Aufheben von selbst stehen im Protokoll.
+  Die Bestätigung eines Teammitglieds – auch „Risiko akzeptiert“ – schaltet den Treffer für alle still, auch für die
+  Kanäle der Admin-Regeln; wer wann warum bestätigt hat, steht am Treffer und im Protokoll.
 
 **Bestätigen oder stummschalten?** [Stummschalten](/docs/benachrichtigungen#stummschalten) ist deins und auf Zeit: nur
 deine Meldungen und Zahlen, bis zu einem Datum. Bestätigen gilt für alle und bleibt, bis jemand es aufhebt oder der

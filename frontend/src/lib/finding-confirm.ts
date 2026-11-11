@@ -1,6 +1,6 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { type InfiniteData, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
-import { productKeyOf, refreshVendor } from "@/lib/vendor-api"
+import { type ProductDetail, productKeyOf } from "@/lib/vendor-api"
 
 /*
  * "Treffer bestätigen" (backend app/finding_confirm.py): a finding of a followed product assessed once for everybody –
@@ -19,7 +19,7 @@ export const NOTE_MAX = 500
 export const NOTE_REQUIRED: readonly ConfirmStatus[] = ["accepted"]
 
 /** Why the confirmation lapsed by itself (the server's REASONS without "undone"). */
-export type LapseReason = "exploited" | "severity" | "cves" | "verdict" | "withdrawn"
+export type LapseReason = "exploited" | "severity" | "cves" | "verdict" | "withdrawn" | "regrouped"
 
 /** A confirmation that stands: what, why, who, when. */
 export interface Confirmation {
@@ -53,12 +53,38 @@ export const confirmFinding = (b: { product: string; finding: string; status: Co
 
 export const unconfirmFinding = (b: { product: string; finding: string }) => api.post<{ product: string; finding: string; confirmed: null }>("/api/vendor/findings/unconfirm", b)
 
-/** Confirm / undo – then every Vendor News view (the numbers, the badge, the drawer) is read again. */
+/** The drawer's loaded pages with one finding's confirmation set from the server's answer (a copy – null: undone). */
+export function withConfirmation(data: InfiniteData<ProductDetail> | undefined, finding: string, confirmed: Confirmation | null): InfiniteData<ProductDetail> | undefined {
+  if (!data) return data
+  return { ...data, pages: data.pages.map((pg) => ({ ...pg, findings: pg.findings.map((f) => (f.id === finding ? { ...f, confirmed, confirm_lapsed: null } : f)) })) }
+}
+
+/** The queries a confirmation changes: the product's drawer (not its revisions), the overview, the badge, the unread numbers. */
+export function confirmTouches(product: string, key: readonly unknown[]): boolean {
+  if (key[0] === "reader") return key[1] === "counts"
+  if (key[0] !== "vendor") return false
+  if (key[1] === "overview" || key[1] === "badge") return true
+  return key[1] === "product" && key[2] === product && key[3] !== "changes"
+}
+
+/**
+ * Confirm / undo: the drawer shows the answer at once (its loaded pages patched), then the views it changes are read
+ * again in the background – the product's drawer, the overview, the badge and the unread numbers in the sidebar; not
+ * every Vendor News query (the catalogue, the revisions), and the button does not wait for them.
+ */
 export function useFindingConfirm(product: string) {
   const qc = useQueryClient()
-  const done = () => refreshVendor(qc, productKeyOf(product))
-  const confirm = useMutation({ mutationFn: (b: { finding: string; status: ConfirmStatus; note: string }) => confirmFinding({ product, ...b }), onSuccess: done })
-  const undo = useMutation({ mutationFn: (finding: string) => unconfirmFinding({ product, finding }), onSuccess: done })
+  const done = (finding: string, confirmed: Confirmation | null) => {
+    qc.setQueriesData<InfiniteData<ProductDetail>>({ queryKey: productKeyOf(product), predicate: (q) => q.queryKey[3] !== "changes" }, (d) =>
+      withConfirmation(d, finding, confirmed),
+    )
+    void qc.invalidateQueries({ predicate: (q) => confirmTouches(product, q.queryKey) })
+  }
+  const confirm = useMutation({
+    mutationFn: (b: { finding: string; status: ConfirmStatus; note: string }) => confirmFinding({ product, ...b }),
+    onSuccess: (r) => done(r.finding, r.confirmed),
+  })
+  const undo = useMutation({ mutationFn: (finding: string) => unconfirmFinding({ product, finding }), onSuccess: (r) => done(r.finding, null) })
   return { confirm, undo, busy: confirm.isPending || undo.isPending }
 }
 

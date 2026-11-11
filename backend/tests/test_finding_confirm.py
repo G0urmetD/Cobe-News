@@ -363,9 +363,15 @@ async def test_the_facts_compared(admin_client):
     assert finding_confirm.lapse_reason(old, {**f, "severity": "critical"}) == "severity"
     assert finding_confirm.lapse_reason(old, {**f, "cves": ["cve-1", "CVE-2"]}) == "cves"
     assert finding_confirm.lapse_reason(old, {**f, "versions": [{"version": "1", "status": "affected"}]}) == "verdict"  # more surely
-    assert finding_confirm.lapse_reason(old, {**f, "versions": [{"version": "2", "status": "possible"}]}) == "verdict"
-    assert finding_confirm.lapse_reason(old, {**f, "versions": [{"version": "3", "status": "possible"}]}) == "verdict"  # a new one
+    assert finding_confirm.lapse_reason(old, {**f, "versions": [{"version": "1", "status": "possible"}, {"version": "2", "status": "possible"}]}) == "verdict"
+    added = [*f["versions"], {"version": "3", "status": "possible"}]
+    assert finding_confirm.lapse_reason(old, {**f, "versions": added}) == "verdict"  # one more version concerned
     assert finding_confirm.lapse_reason(old, {**f, "versions": [{"version": "1", "status": "not_affected"}]}) is None
+    # by the verdicts, not the text: a version edited to another with the same verdict, or removed – no reason
+    assert finding_confirm.lapse_reason(old, {**f, "versions": [{"version": "3", "status": "possible"}]}) is None
+    assert finding_confirm.lapse_reason(old, {**f, "versions": []}) is None
+    swapped = [{"version": "1", "status": "not_affected"}, {"version": "2", "status": "possible"}]
+    assert finding_confirm.lapse_reason(old, {**f, "versions": swapped}) is None  # as many concerned, as certain
 
 
 async def test_a_product_no_longer_followed_takes_its_confirmations(admin_client, sites):
@@ -412,8 +418,10 @@ async def test_a_revision_of_a_grouped_record_is_held_too(admin_client, sites, h
     assert len(hooks) == before
 
 
-async def test_a_new_confirmation_after_a_lapse_holds_nothing_of_the_time_between(admin_client, sites):
-    """M2: confirmed, lapsed, confirmed again, undone – an event made while none stood is not held (each period is a row)."""
+async def test_periods_hold_from_the_previous_end_and_the_review_follows_what_stands(admin_client, reader_client, sites):
+    """Confirmed, lapsed, confirmed again, undone: each period is a row of its own and holds from the end of the previous
+    one (what waited unsent when it began stays unsent); the weekly review asks only what stands now – after the undo the
+    finding's events are in it again."""
     await _follow(admin_client, "panos", "11.2.4-h23")
     await _round()
     assert await _store(_adv()) == 1
@@ -421,20 +429,94 @@ async def test_a_new_confirmation_after_a_lapse_holds_nothing_of_the_time_betwee
     assert (await _confirm(admin_client)).status_code == 200
     async with db.session() as s:
         c = await finding_confirm.current(s, "panos", FID)
-        c.held_from = c.confirmed_at = t0
+        c.confirmed_at = t0
         finding_confirm._end(c, "exploited", t0 + timedelta(days=2))  # lapsed 8 days ago – held until 9 days ago
         ev = await s.scalar(select(VendorEvent).where(VendorEvent.kind == "vuln", VendorEvent.key.like(f"%{FID}")))
-        held = VendorEvent(key=f"rated:high:{ev.scope}:{FID}", kind="vuln", product="panos", severity="high", data=ev.data, created_at=t0 + timedelta(hours=12), scope=ev.scope)
-        gap = VendorEvent(key=f"exploited:{ev.scope}:{FID}", kind="vuln", product="panos", severity="critical", data=ev.data, created_at=t0 + timedelta(days=5), scope=ev.scope)
-        s.add_all([held, gap])
+        late = VendorEvent(key=f"exploited:{ev.scope}:{FID}", kind="vuln", product="panos", severity="critical", data=ev.data, created_at=datetime.now(UTC) - timedelta(days=3), scope=ev.scope)
+        s.add(late)
         await s.commit()
-        ids = (held.id, gap.id)
+        late_id = late.id
+        assert await finding_confirm.held_events(s, [late_id]) == set()  # made while none stood
     assert (await _confirm(admin_client)).status_code == 200  # confirmed again
+    async with db.session() as s:
+        rows = list(await s.scalars(select(VendorConfirm).order_by(VendorConfirm.held_from)))
+        assert [r.held_from for r in rows] == [finding_confirm.EPOCH, rows[0].ended_at]
+        assert await finding_confirm.held_events(s, [late_id]) == {late_id}
+    await _teams_on()
+    tid = await _care_team("Netzwerk", ["panos"], [reader_client.user])
+    until = datetime.now(UTC) + timedelta(minutes=1)
+    async with db.session() as s:
+        assert (await weekly.content(s, tid, until))["vulns"]["total"] == 0  # confirmed now: handled
     assert (await _unconfirm(admin_client)).status_code == 200
     async with db.session() as s:
-        assert await finding_confirm.held_events(s, ids) == {ids[0]}  # the first period's – not the time between
-        rows = list(await s.scalars(select(VendorConfirm).order_by(VendorConfirm.held_from)))
-    assert [(r.ended_reason, r.held_from == t0) for r in rows] == [("exploited", True), ("undone", False)]
+        assert await finding_confirm.held_events(s, [late_id]) == {late_id}  # it waited unsent while one stood: stays
+        assert (await weekly.content(s, tid, until))["vulns"]["total"] == 1  # open again: in the review
+
+
+async def test_undo_keeps_an_event_unsent_that_waited_when_it_was_confirmed(admin_client, sites, hooks):
+    """An event of the finding not yet sent to a channel (made just before, a channel in its pause) when it is confirmed:
+    held while it stands, and still not sent after "Bestätigung aufheben" – as the personal ways skip it."""
+    await _setup(admin_client, "vendor_vuln")  # the event is made, not dispatched yet
+    assert (await _confirm(admin_client)).status_code == 200
+    await _dispatch()
+    sent = len(hooks)
+    assert (await _unconfirm(admin_client)).status_code == 200
+    notify.reset()
+    await _dispatch()
+    assert len(hooks) == sent
+
+
+async def test_a_regrouped_finding_ends_its_confirmation(admin_client, sites, hooks):
+    """NVD's record first (the finding nvd:<CVE>), confirmed; then the vendor's advisory leads the group (a new finding
+    paloalto:<CVE>): the old confirmation ends ("regrouped") – the new finding is open, its changes are not held."""
+    await _follow(admin_client, "panos", "11.2.4-h23")
+    await _webhook_rule(admin_client, ["vendor_vuln", "vendor_change"])
+    await _round()
+    await _store(_nvd_rec())
+    nvd_id = f"nvd:{CVE}"
+    assert nvd_id in [f["id"] for f in (await admin_client.get("/api/vendor/products/panos")).json()["findings"]]
+    assert (await _confirm(admin_client, finding=nvd_id)).status_code == 200
+    await _store(_adv())
+    row = await _row(nvd_id)
+    assert (row.ended_reason, row.ended_at is not None) == ("regrouped", True)
+    [e] = await _entries("vendor.finding_confirm_lapsed")
+    assert e.details["reason"] == "regrouped" and e.details["finding"] == nvd_id
+    f = _finding((await admin_client.get("/api/vendor/products/panos")).json())
+    assert f["confirmed"] is None
+    await _dispatch()
+    before = len(hooks)
+    await _store(_nvd_rec(start="11.1.0"))  # NVD revises its record: a change of the new, open finding
+    async with db.session() as s:
+        evs = list(await s.scalars(select(VendorEvent).where(VendorEvent.kind == "change")))
+        assert evs and await finding_confirm.held_events(s, [e.id for e in evs]) == set()
+    await _dispatch()
+    assert len(hooks) > before
+
+
+async def test_a_version_edited_with_the_same_verdict_keeps_it(admin_client, reader_client, sites):
+    """11.2.4-h23 → 11.2.4-h25, both affected: as many versions affected as when it was confirmed – no lapse."""
+    await _setup(admin_client)
+    await _confirm(admin_client)
+    vid = (await reader_client.get("/api/vendor/products/panos")).json()["versions"][0]["id"]
+    assert (await admin_client.put(f"/api/vendor/versions/{vid}", json={"version": "11.2.4-h25"})).status_code == 200
+    async with db.session() as s:
+        await vendor.evaluate_events(s)
+    assert (await _row()).ended_at is None
+
+
+async def test_check_leaves_a_row_another_transaction_holds(admin_client, sites):
+    """A lapse check meets a confirmation being undone right now: it skips it (no lost update of the undo)."""
+    await _setup(admin_client)
+    await _confirm(admin_client)
+    d = (await admin_client.get("/api/vendor/products/panos")).json()
+    changed_f = {**_finding(d), "exploited": True}
+    async with db.session() as a, db.session() as b:
+        assert await finding_confirm.undo(a, admin_client.user, "panos", FID) is not None  # holds the row
+        assert await finding_confirm.check(b, {"key": "panos", "label": "PAN-OS"}, [changed_f]) == {}
+        await b.commit()
+        await a.commit()
+    row = await _row()
+    assert (row.ended_reason, row.held_until == row.ended_at) == ("undone", True)
 
 
 async def test_the_api_cache_generation_moves_after_the_commit(admin_client, sites):

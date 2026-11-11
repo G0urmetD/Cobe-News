@@ -16,42 +16,47 @@ the overview's lists unless "Mit Bestätigten" is on.
 
 **It lapses by itself** (`check`, in every evaluation of the product's events – before its events are made, so the
 event that brings the change goes out) when the finding changes materially: now exploited (KEV, the vendor, EUVD), rated
-higher, a CVE added, a version entered is affected (or more surely affected) where it was not – a version added later,
-a wider affected range –, the advisory withdrawn (vendor.drop_advisories). A new fixed version alone is no reason. A
+higher, a CVE added, more versions entered affected (or more surely affected) than before – a version added later, a
+wider affected range; compared by the verdicts, not the versions' text (lapse_reason) –, the advisory withdrawn
+(vendor.drop_advisories), its record now grouped under another leading record ("regrouped"). A new fixed version alone is no reason. A
 lapsed confirmation stays as a row (ended_at, ended_reason) – the drawer says "Bestätigung aufgehoben: jetzt
 ausgenutzt" for a while –, an audit entry (vendor.finding_confirm_lapsed) is written and the event of that change says
 so. The events of the last LAPSE_GRACE before the lapse are let through: the advisory change that caused it (a KEV
-listing, a new CVE) is often made by the round before the evaluation sees it (a confirmation younger than that holds
-nothing back once it lapses). Each period a confirmation stood is a row of its own: confirmed again after one ended, the
-time in between – when none stood – is never held. Held are the finding's vulnerability events (by their key) and the
-advisory changes of every record it groups (its leading advisory and the NVD, cvelistV5 and OSV records of its CVEs –
-facts.members). A watched CVE's events (kind "watch", app/cve_watch.py) are the watcher's own and still come. Between a change and the next evaluation
-the numbers already treat it as lapsed (`Standing.of` compares the facts on every read).
+listing, a new CVE) is often made by the round before the evaluation sees it.
+
+**Which events are held.** Each period a confirmation stood is a row of its own. A period holds the events of its
+finding made from the end of the finding's previous period (the first one: from the beginning – an event made before the
+confirmation and still waiting on a channel stays unsent, as the personal ways skip it) up to its end; while it stands,
+all of them. The time between two periods, when none stood, is never held. Its finding's events are its vulnerability
+events (by their key) and the advisory changes of every record it groups – its leading advisory and the NVD, cvelistV5
+and OSV records of its CVEs (vendor_confirm_records: one index lookup per event). A watched CVE's events (kind "watch",
+app/cve_watch.py) are the watcher's own and still come.
 
 A finding is known by its product and its id – the advisory id the drawer uses (`?finding=`, reader.finding_of). When
-the group's leading record changes (the vendor's advisory arrives after NVD's record) the finding gets a new id: the
-old confirmation no longer matches and the finding counts again – the safe way round."""
+the group's leading record changes (the vendor's advisory arrives after NVD's record) the finding gets a new id: the old
+confirmation ends ("regrouped", check) and the finding counts again – the safe way round; it never stands on, unseen,
+holding the new finding's changes."""
 
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, cast, exists, func, or_, select
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import and_, case, delete, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import audit
 from app import db as dbm
-from app.models import User, VendorConfirm, VendorEvent, VendorFollow
+from app.models import User, VendorConfirm, VendorConfirmRecord, VendorEvent, VendorFollow
 from app.vendor_match import ORDER
 
 STATUSES = ("not_affected", "mitigated", "accepted")
 NOTE_MAX = 500
 NOTE_REQUIRED = frozenset({"accepted"})  # "Risiko akzeptiert" only with a reason
-REASONS = ("undone", "exploited", "severity", "cves", "verdict", "withdrawn")
+REASONS = ("undone", "exploited", "severity", "cves", "verdict", "withdrawn", "regrouped")
 CONCERNS = frozenset({"affected", "possible", "service", "unversioned"})  # a version's verdict that needs attention
 SEV_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)  # a finding's first period holds from the beginning
 LAPSE_GRACE = timedelta(days=1)  # events made this long before a lapse are let through (the change that caused it)
 LAPSED_SHOWN = timedelta(days=30)  # "Bestätigung aufgehoben: …" in the drawer this long
 _gen = [0]  # every change of a confirmation (caches of numbers that leave confirmed findings out: api_v1)
@@ -63,8 +68,12 @@ def generation() -> int:
 
 def changed() -> None:
     """After the commit of a change: a request between the change and its commit must not cache the old state under the
-    new generation."""
+    new generation. The notification round looks at everything again at once (an undo or a lapse lets events through
+    – they must not wait for its full look)."""
+    from app import notify
+
     _gen[0] += 1
+    notify.changed()
 
 
 def now_utc() -> datetime:
@@ -99,22 +108,34 @@ def facts_of(f: dict) -> dict:
     }
 
 
+# the verdicts that need attention, the most certain first: "how many versions are at least this concerned"
+LEVELS = sorted(CONCERNS, key=lambda s: -ORDER.get(s, 0))
+
+
+def _concerned(statuses) -> list[int]:  # noqa: ANN001
+    """Per level (LEVELS) how many versions have a verdict at least that certain."""
+    ranks = [ORDER.get(st, 0) for st in statuses if st in CONCERNS]
+    return [sum(1 for r in ranks if r >= ORDER.get(level, 0)) for level in LEVELS]
+
+
 def lapse_reason(old: dict, f: dict) -> str | None:
-    """Why a confirmation made on `old` (facts_of) no longer fits the finding `f` – None: it still does."""
-    cur = facts_of(f)
-    if cur["exploited"] and not old.get("exploited"):
+    """Why a confirmation made on `old` (facts_of) no longer fits the finding `f` – None: it still does.
+
+    The versions are compared by their verdicts, not by their text: it lapses when more versions are affected (or more
+    certainly affected) than when it was confirmed – a version added later that is affected, an affected range widened
+    to a version entered, "possibly" become "affected". A version edited to another one with the same verdict (11.2.4-h23
+    → 11.2.4-h25, both affected), a version removed or one no longer affected is no reason: nothing more is exposed than
+    what was assessed."""
+    if bool(f.get("exploited")) and not old.get("exploited"):
         return "exploited"
-    if SEV_RANK.get(cur["severity"], 0) > SEV_RANK.get(str(old.get("severity") or "info"), 0):
+    if SEV_RANK.get(str(f.get("severity") or "info"), 0) > SEV_RANK.get(str(old.get("severity") or "info"), 0):
         return "severity"
-    if set(cur["cves"]) - {str(c).upper() for c in old.get("cves") or []}:
+    if {str(c).upper() for c in f.get("cves") or []} - {str(c).upper() for c in old.get("cves") or []}:
         return "cves"
-    was = old.get("versions") or {}
-    for v, st in cur["versions"].items():
-        if st not in CONCERNS:
-            continue
-        before = was.get(v)
-        if before not in CONCERNS or ORDER.get(st, 0) > ORDER.get(before, 0):
-            return "verdict"
+    now = _concerned(str(r.get("status")) for r in f.get("versions") or [])
+    was = _concerned((old.get("versions") or {}).values())
+    if any(n > w for n, w in zip(now, was, strict=True)):
+        return "verdict"
     return None
 
 
@@ -197,25 +218,30 @@ async def standing(db: AsyncSession, products: list[str] | set[str] | None = Non
 # ---------------------------------------------------------------- the events it holds back
 
 
-def _of_event():  # noqa: ANN202
-    """SQL: the confirmation row is about the event's finding – a vulnerability event by its key (<scope>:<id>, also
-    "now exploited" and "now rated higher", which end with it as well), an advisory change by its advisory: the
-    leading one or any record the finding groups (an NVD or cvelistV5 record of one of its CVEs – facts.members)."""
-    c = VendorConfirm
-    tail = VendorEvent.scope.concat(":").concat(c.finding)
-    by_key = and_(VendorEvent.kind == "vuln", VendorEvent.scope.is_not(None), func.right(VendorEvent.key, func.length(tail)) == tail)
-    adv = VendorEvent.data["advisory"].as_string()
-    member = cast(c.facts["members"], JSONB).op("?")(adv)
-    by_advisory = and_(VendorEvent.kind == "change", or_(adv == c.finding, member))
-    return and_(c.product == VendorEvent.product, or_(by_key, by_advisory))
+def _record_of_event():  # noqa: ANN202
+    """SQL: the record an event is about – an advisory change's advisory, a vulnerability event's finding (the end of its
+    key after its scope: <scope>:<id>, exploited:<scope>:<id>, rated:<severity>:<scope>:<id>); other kinds none."""
+    sc = VendorEvent.scope
+    finding = func.substr(VendorEvent.key, func.strpos(VendorEvent.key, sc.concat(":")) + func.length(sc) + 1)
+    return case(
+        (VendorEvent.kind == "change", VendorEvent.data["advisory"].as_string()),
+        (and_(VendorEvent.kind == "vuln", sc.is_not(None)), finding),
+        else_=None,
+    )
 
 
-def held():  # noqa: ANN201
-    """SQL: the Vendor News event is about a confirmed finding – one that stands now, or one that stood when the event was
-    made (held_from … held_until): never sent, also not after the confirmation ended."""
-    c = VendorConfirm
-    when = or_(c.ended_at.is_(None), and_(VendorEvent.created_at >= c.held_from, c.held_until.is_not(None), VendorEvent.created_at < c.held_until))
-    return exists().where(_of_event(), when)
+def held(*, standing_only: bool = False):  # noqa: ANN201
+    """SQL: the Vendor News event is about a confirmed finding – one that stands now, or one whose period held it when it
+    ended (held_from … held_until): never sent, also not after the confirmation ended. One index lookup per event: its
+    product and record in vendor_confirm_records (the records the finding groups, the finding itself among them).
+    `standing_only`: only a confirmation that stands now – what a summary of the past shows (the weekly review lists a
+    finding again once it is undone)."""
+    c, r = VendorConfirm, VendorConfirmRecord
+    if standing_only:
+        when = c.ended_at.is_(None)
+    else:
+        when = or_(c.ended_at.is_(None), and_(VendorEvent.created_at >= c.held_from, c.held_until.is_not(None), VendorEvent.created_at < c.held_until))
+    return exists().where(r.product == VendorEvent.product, r.record == _record_of_event(), c.id == r.confirm_id, when)
 
 
 async def held_events(db: AsyncSession, ids: list[uuid.UUID] | set[uuid.UUID]) -> set[uuid.UUID]:
@@ -251,12 +277,24 @@ async def confirm(db: AsyncSession, user: User, product: str, f: dict, status: s
         for k, v in values.items():
             setattr(c, k, v)
         await db.flush()
+        await _records(db, c.id, product, f)
         return c
-    stmt = pg_insert(VendorConfirm).values(id=uuid.uuid4(), product=product, finding=f["id"], held_from=now, **values)
+    # a new period holds from where the previous one of this finding ended – what was made before and still waits on a
+    # channel is held as well, and stays unsent when it ends (as the personal ways skip it); the time between two
+    # periods, when none stood, is never held
+    prev = await db.scalar(select(func.max(VendorConfirm.ended_at)).where(VendorConfirm.product == product, VendorConfirm.finding == f["id"]))
+    stmt = pg_insert(VendorConfirm).values(id=uuid.uuid4(), product=product, finding=f["id"], held_from=prev or EPOCH, **values)
     # two confirmations at the same moment: the second changes the one the first made (one standing per finding)
     up = stmt.on_conflict_do_update(index_elements=["product", "finding"], index_where=VendorConfirm.ended_at.is_(None), set_=values)
     cid = await db.scalar(up.returning(VendorConfirm.id))
+    await _records(db, cid, product, f)
     return await db.get(VendorConfirm, cid, populate_existing=True)
+
+
+async def _records(db: AsyncSession, cid: uuid.UUID, product: str, f: dict) -> None:
+    """The records of the period (vendor_confirm_records) as the finding groups them now."""
+    await db.execute(delete(VendorConfirmRecord).where(VendorConfirmRecord.confirm_id == cid))
+    await db.execute(pg_insert(VendorConfirmRecord).values([{"confirm_id": cid, "record": r, "product": product} for r in members_of(f)]).on_conflict_do_nothing())
 
 
 async def undo(db: AsyncSession, user: User, product: str, finding: str, now: datetime | None = None) -> VendorConfirm | None:
@@ -276,7 +314,7 @@ def _record_lapse(db: AsyncSession, c: VendorConfirm, reason: str, label: str, i
 
 
 def _end(c: VendorConfirm, reason: str, now: datetime) -> None:
-    """A lapse: what was made in the last LAPSE_GRACE is let through (a confirmation younger than that holds nothing)."""
+    """A lapse: what was made in the last LAPSE_GRACE is let through (the change that caused it)."""
     c.ended_at, c.held_until, c.ended_reason, c.ended_by = now, max(c.held_from, now - LAPSE_GRACE), reason, None
 
 
@@ -286,16 +324,29 @@ async def check(db: AsyncSession, product: dict, findings: list[dict], now: date
     after its commit)."""
     now = now or now_utc()
     key = product["key"]
-    rows = list(await db.scalars(select(VendorConfirm).where(VendorConfirm.product == key, VendorConfirm.ended_at.is_(None))))
+    # a row an undo or a new confirmation holds right now is left for the next evaluation (no lost update of theirs)
+    q = select(VendorConfirm).where(VendorConfirm.product == key, VendorConfirm.ended_at.is_(None)).with_for_update(skip_locked=True)
+    rows = list(await db.scalars(q.execution_options(populate_existing=True)))
     if not rows:
         return {}
     by_id = {f["id"]: f for f in findings}
+    grouped: dict[str, dict] | None = None
     out_: dict[str, str] = {}
     for c in rows:
         f = by_id.get(c.finding)
         if f is None:
-            continue  # not shown now (a source switched off, the leading record changed): nothing to compare with
-        why = lapse_reason(c.facts or {}, f)
+            # its record now belongs to a finding led by another one (NVD's record first, the vendor's advisory later):
+            # the finding is a new one – it ends ("regrouped") and is looked at again rather than moved over, the new
+            # leading record may say something else (another range, a workaround). Not shown at all (a source switched
+            # off): nothing to compare with – it stays.
+            if grouped is None:
+                grouped = {r: x for x in findings for r in members_of(x)}
+            f = grouped.get(c.finding)
+            if f is None:
+                continue
+            why = "regrouped"
+        else:
+            why = lapse_reason(c.facts or {}, f)
         if why is None:
             continue
         _end(c, why, now)
@@ -311,7 +362,8 @@ async def withdrawn(db: AsyncSession, links: list[tuple[str, str]], labels: dict
         return 0
     now = now or now_utc()
     pairs = set(links)
-    rows = list(await db.scalars(select(VendorConfirm).where(VendorConfirm.ended_at.is_(None), VendorConfirm.finding.in_(sorted({a for _, a in pairs})))))
+    q = select(VendorConfirm).where(VendorConfirm.ended_at.is_(None), VendorConfirm.finding.in_(sorted({a for _, a in pairs})))
+    rows = list(await db.scalars(q.with_for_update().execution_options(populate_existing=True)))
     n = 0
     for c in rows:
         if (c.product, c.finding) not in pairs:

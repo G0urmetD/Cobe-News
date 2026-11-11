@@ -1357,6 +1357,19 @@ class VendorConfirm(Base):
     ended_by: Mapped[str | None] = mapped_column(Text)  # the name of who undid it (a lapse: none)
 
 
+class VendorConfirmRecord(Base):
+    """The records a confirmation period's finding groups (finding_confirm.members_of): its leading advisory and the
+    NVD, cvelistV5 and OSV records of its CVEs. An event is held back by an index lookup of its product and record (a
+    change's advisory, a vulnerability event's finding) – not by comparing every event with every confirmation."""
+
+    __tablename__ = "vendor_confirm_records"
+    __table_args__ = (Index("ix_vendor_confirm_records_lookup", "product", "record"),)
+
+    confirm_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vendor_confirms.id", ondelete="CASCADE"), primary_key=True)
+    record: Mapped[str] = mapped_column(Text, primary_key=True)
+    product: Mapped[str] = mapped_column(Text)
+
+
 class PersonMute(Base):
     """"Stummschalten" for a while: a person silences a catalogue product or one CVE until `until` – none of their own
     deliveries (app/personal.py) for it, dimmed or hidden in their lists, left out of their unread numbers. Never anybody

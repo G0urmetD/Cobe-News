@@ -889,21 +889,27 @@ einmal pro Woche wieder die neuesten 2000: was die NVD für die CPE nicht mehr l
 verliert dann die Zuordnung. Eine geänderte Version wird sofort neu bewertet – ohne neuen Abruf. Ereignisse entfernter
 Versionen und nicht mehr gefolgter Produkte werden gelöscht.
 
-**Bestätigte Treffer** (`backend/app/finding_confirm.py`, Tabelle `vendor_confirms`, Migration 0043): je Produkt und
-Befund die Bewertung für alle (nicht betroffen, Maßnahme umgesetzt, Risiko akzeptiert), Begründung, wer (Name bleibt,
-auch wenn das Konto gelöscht wird) und wann, dazu die Fakten, auf die bestätigt wurde. Admins und – bei eingeschalteten
-Teams – die Mitglieder eines Teams des Produkts dürfen bestätigen (`POST /api/vendor/findings/confirm`, `…/unconfirm`).
-Solange sie steht, zählt der Befund nicht (Kacheln, Badge, ungelesen, Wochenrückblick, API v1) und keine Regel und kein
-persönlicher Weg sendet seine Ereignisse – auch nicht nachträglich. Sie endet von selbst, wenn der Befund jetzt
-ausgenutzt, höher eingestuft wird, neue CVEs bekommt, eine eingetragene Version (stärker) betrifft oder zurückgezogen
-wird – geprüft bei jeder Bewertung der Ereignisse, vor dem Anlegen; Protokoll `vendor.finding_confirm_lapsed`. Die
-Ereignisse des letzten Tages davor (die Advisory-Änderung, die es auslöste) gehen dann doch hinaus. Eine Zeile je
-Zeitraum, in dem eine Bestätigung stand (erneut bestätigt: neue Zeile – die Zeit dazwischen hält nichts zurück);
-zurückgehalten werden die Schwachstellen-Ereignisse des Befunds und die Advisory-Änderungen aller seiner Einträge
-(`facts.members`: Herstellerhinweis, NVD-, cvelistV5-, OSV-Eintrag seiner CVEs). Die Zeilen bleiben
-nach dem Ende stehen (sie halten, was in der Zeit entstand, zurück); mit dem Produkt, dem niemand mehr folgt, gehen sie
-(stündlicher Prune mit den Lesemarken). Ein späteres Zusammenlegen von Katalog-Schlüsseln muss `vendor_confirms` mit
-umziehen (wie `vendor_reads`).
+**Bestätigte Treffer** (`backend/app/finding_confirm.py`, Tabellen `vendor_confirms` und `vendor_confirm_records`,
+Migrationen 0043 und 0046): je Produkt und Befund die Bewertung für alle (nicht betroffen, Maßnahme umgesetzt, Risiko
+akzeptiert), Begründung, wer (Name bleibt, auch wenn das Konto gelöscht wird) und wann, dazu die Fakten, auf die
+bestätigt wurde. Admins und – bei eingeschalteten Teams – die Mitglieder eines Teams des Produkts dürfen bestätigen
+(`POST /api/vendor/findings/confirm`, `…/unconfirm`); die Bestätigung gilt für alle, auch für die Kanäle der
+Admin-Regeln, und steht im Protokoll. Solange sie steht, zählt der Befund nicht (Kacheln, Badge, ungelesen,
+Wochenrückblick, API v1) und keine Regel und kein persönlicher Weg sendet seine Ereignisse. Sie endet von selbst, wenn
+der Befund jetzt ausgenutzt, höher eingestuft wird, neue CVEs bekommt, mehr eingetragene Versionen (sicherer) betrifft
+als beim Bestätigen (verglichen werden die Bewertungen, nicht die Versionstexte), zurückgezogen wird oder ein anderer
+Eintrag ihn jetzt anführt („regrouped“) – geprüft bei jeder Bewertung der Ereignisse, vor dem Anlegen (Zeilen, die
+gerade aufgehoben werden, überspringt die Prüfung: `FOR UPDATE SKIP LOCKED`); Protokoll
+`vendor.finding_confirm_lapsed`. Die Ereignisse des letzten Tages davor (die Advisory-Änderung, die es auslöste) gehen
+dann doch hinaus. Eine Zeile je Zeitraum, in dem eine Bestätigung stand: er hält die Ereignisse des Befunds ab dem Ende
+des vorigen Zeitraums (der erste: von Anfang an – was beim Bestätigen noch auf einen Kanal wartete, bleibt ungesendet)
+bis zu seinem Ende zurück, solange er steht alle. Zurückgehalten werden die Schwachstellen-Ereignisse des Befunds und die
+Advisory-Änderungen aller seiner Einträge (Herstellerhinweis, NVD-, cvelistV5-, OSV-Eintrag seiner CVEs –
+`vendor_confirm_records`, je Ereignis ein Indexzugriff über Produkt und Eintrag). Der Wochenrückblick fragt nur, was jetzt
+bestätigt ist. Undo und Ablauf lassen die Benachrichtigungsrunde sofort alles neu ansehen. Die Zeilen bleiben nach dem Ende
+stehen; mit dem Produkt, dem niemand mehr folgt, gehen sie (stündlicher Prune mit den Lesemarken). Ein späteres
+Zusammenlegen von Katalog-Schlüsseln muss `vendor_confirms` und `vendor_confirm_records` mit umziehen (wie
+`vendor_reads`).
 
 **Ausgehende Hosts** (nur bei gefolgten Produkten): `services.nvd.nist.gov`, `endoflife.date`, `www.cisa.gov`;
 mit Palo-Alto-Produkten `security.paloaltonetworks.com`, mit Fortinet-Produkten `filestore.fortinet.com`, mit

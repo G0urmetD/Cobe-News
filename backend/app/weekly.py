@@ -391,7 +391,7 @@ async def content(db: AsyncSession, team_id: uuid.UUID, until: datetime) -> dict
                 VendorEvent.kind.in_(("vuln", "version", "change")),
                 VendorEvent.created_at >= since,
                 VendorEvent.created_at < until,
-                ~finding_confirm.held(),  # a confirmed finding (app/finding_confirm.py): handled, not in the review
+                ~finding_confirm.held(standing_only=True),  # confirmed now (app/finding_confirm.py): handled, not in the review
             )
             .order_by(rank.desc(), VendorEvent.created_at.desc())
             .limit(2000)

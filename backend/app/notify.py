@@ -2203,7 +2203,7 @@ VENDOR_LABELS = {
         "rated_higher": "Jetzt höher eingestuft: {to} (vorher {was})",
         # a confirmed finding that changed (app/finding_confirm.py): its confirmation ended by itself
         "confirm_lapsed": "Bestätigung aufgehoben: {why}",
-        "lapse": {"exploited": "jetzt ausgenutzt", "severity": "höher eingestuft", "cves": "neue CVEs", "verdict": "Version jetzt betroffen", "withdrawn": "Advisory zurückgezogen"},
+        "lapse": {"exploited": "jetzt ausgenutzt", "severity": "höher eingestuft", "cves": "neue CVEs", "verdict": "Version jetzt betroffen", "withdrawn": "Advisory zurückgezogen", "regrouped": "neu zugeordnet"},
         "version": "{product} {version}: neue Version {latest} verfügbar",
         "version_text": "Release-Linie {line} – aktuellste Version {latest}.",
         "eol_soon": "{product} {version}: Ende des Supports am {date}",
@@ -2238,7 +2238,7 @@ VENDOR_LABELS = {
         "now_exploited": "Now actively exploited",
         "rated_higher": "Now rated higher: {to} (was {was})",
         "confirm_lapsed": "Confirmation lifted: {why}",
-        "lapse": {"exploited": "now exploited", "severity": "rated higher", "cves": "new CVEs", "verdict": "version now affected", "withdrawn": "advisory withdrawn"},
+        "lapse": {"exploited": "now exploited", "severity": "rated higher", "cves": "new CVEs", "verdict": "version now affected", "withdrawn": "advisory withdrawn", "regrouped": "regrouped"},
         "version": "{product} {version}: new version {latest} available",
         "version_text": "Release line {line} – latest version {latest}.",
         "eol_soon": "{product} {version}: end of support on {date}",

@@ -700,6 +700,7 @@ const vendorDe: Record<string, string> = {
   "confirm.reason.cves": "neue CVEs",
   "confirm.reason.verdict": "Version jetzt betroffen",
   "confirm.reason.withdrawn": "Advisory zurückgezogen",
+  "confirm.reason.regrouped": "neu zugeordnet (anderer Hinweis führt)",
   "confirm.count_one": "{{count}} bestätigt",
   "confirm.count_other": "{{count}} bestätigt",
   "confirm.countHelp": "Bestätigte Treffer zählen als erledigt – im Produkt zu sehen, auf den Karten mit „Bestätigte zeigen“.",

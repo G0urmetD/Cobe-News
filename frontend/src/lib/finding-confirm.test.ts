@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { CONFIRM_STATUSES, NOTE_MAX, NOTE_REQUIRED, cardLines, cleanNote, confirmProblem } from "@/lib/finding-confirm"
+import { CONFIRM_STATUSES, NOTE_MAX, NOTE_REQUIRED, cardLines, cleanNote, confirmProblem, confirmTouches, withConfirmation } from "@/lib/finding-confirm"
+import type { ProductDetail } from "@/lib/vendor-api"
 import { activeFilters, withoutChip } from "@/lib/vendor-filters"
 import { readVendorFilter, writeVendorFilter } from "@/lib/reader-api"
 import confirmPy from "../../../backend/app/finding_confirm.py?raw"
@@ -29,7 +30,7 @@ describe("Treffer bestätigen", () => {
         expect(lang[`confirm.status.${s}`]).toBeTruthy()
         expect(lang[`confirm.statusHint.${s}`]).toBeTruthy()
       }
-      for (const r of ["exploited", "severity", "cves", "verdict", "withdrawn"]) expect(lang[`confirm.reason.${r}`]).toBeTruthy()
+      for (const r of ["exploited", "severity", "cves", "verdict", "withdrawn", "regrouped"]) expect(lang[`confirm.reason.${r}`]).toBeTruthy()
     }
   })
 
@@ -53,5 +54,29 @@ describe("Treffer bestätigen", () => {
     expect(withoutChip("confirmed")).toEqual({ url: { confirmed: false } })
     expect(writeVendorFilter(new URLSearchParams("confirmed=1&q=pan"), { confirmed: false }).toString()).toBe("q=pan")
     expect(writeVendorFilter(new URLSearchParams(), { confirmed: true }).toString()).toBe("confirmed=1")
+  })
+
+  it("reads again what a confirmation changes – the drawer, overview, badge and unread numbers, not every Vendor News query", () => {
+    const yes = [
+      ["vendor", "product", "panos", false, "relevance"],
+      ["vendor", "overview", "all"],
+      ["vendor", "badge"],
+      ["reader", "counts", "all"],
+    ]
+    const no = [["vendor", "product", "panos", "changes"], ["vendor", "product", "fortios", false, "relevance"], ["vendor", "catalog"], ["vendor", "review", "mine"], ["news"]]
+    for (const k of yes) expect(confirmTouches("panos", k), k.join("/")).toBe(true)
+    for (const k of no) expect(confirmTouches("panos", k), k.join("/")).toBe(false)
+  })
+
+  it("shows the answer in the drawer at once", () => {
+    const page = (ids: string[]) => ({ findings: ids.map((id) => ({ id, confirmed: null, confirm_lapsed: { reason: "exploited" } })) }) as unknown as ProductDetail
+    const data = { pages: [page(["a", "b"]), page(["c"])], pageParams: [0, 100] }
+    const c = { status: "not_affected" as const, note: "Brotli aus", by: "Anna", at: "2026-11-11T08:00:00Z" }
+    const got = withConfirmation(data, "c", c)!
+    expect(got.pages[1].findings[0].confirmed).toEqual(c)
+    expect(got.pages[1].findings[0].confirm_lapsed).toBeNull()
+    expect(got.pages[0].findings[0].confirmed).toBeNull()
+    expect(data.pages[1].findings[0].confirmed).toBeNull() // a copy
+    expect(withConfirmation(undefined, "c", c)).toBeUndefined()
   })
 })

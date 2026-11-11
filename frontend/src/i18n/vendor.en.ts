@@ -695,6 +695,7 @@ const vendorEn: Record<string, string> = {
   "confirm.reason.cves": "new CVEs",
   "confirm.reason.verdict": "version now affected",
   "confirm.reason.withdrawn": "advisory withdrawn",
+  "confirm.reason.regrouped": "regrouped (another advisory leads)",
   "confirm.count_one": "{{count}} confirmed",
   "confirm.count_other": "{{count}} confirmed",
   "confirm.countHelp": "Confirmed findings count as handled – shown in the product, on the cards with “Show confirmed”.",
