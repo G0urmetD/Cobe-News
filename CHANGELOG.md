@@ -2,6 +2,19 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.56 – Treffer bestätigen, Gerät merken, Push mit Produkt
+
+### Neu
+- **Treffer bestätigen**: Ein Treffer in Vendor News lässt sich bestätigen – „Nicht betroffen“ (etwa: die betroffene Funktion ist nicht aktiv), „Maßnahme umgesetzt“ oder „Risiko akzeptiert“, mit einer kurzen Begründung (bei „Risiko akzeptiert“ Pflicht). Die Bestätigung gilt für alle: Der Treffer zählt nicht mehr als offen (Karten, Zähler, Seitenleiste, Wochenrückblick, API) und löst keine Benachrichtigung mehr aus – weder über Regeln noch persönlich. Er bleibt sichtbar, abgeblendet mit „Bestätigt · Nicht betroffen“ und wer, wann, warum; „Bestätigte zeigen“ in der Übersicht. Bestätigen und aufheben dürfen Admins und – mit eingeschalteten Teams – das Team, dem das Produkt zugeordnet ist. Anders als Stummschalten (nur für dich, auf Zeit) ist es gemeinsam und dauerhaft.
+- **Bestätigung erlischt von selbst**, wenn sich der Treffer wesentlich ändert: jetzt ausgenutzt, höher eingestuft, neue CVEs, eine eingetragene Version wird (sicherer) als betroffen bewertet, die Meldung zurückgezogen. Die Benachrichtigung dazu sagt „Bestätigung aufgehoben: …“. Eine neue Fix-Version allein ändert nichts.
+- **Zweiten Faktor auf dem Gerät merken**: Ist der Schalter unter *Einstellungen → Anmeldung → Zweiter Faktor* an, kann man beim Code „Auf diesem Gerät merken“ wählen – bis zum Ende der Sitzungsdauer oder 1, 7 bzw. 30 Tage. Danach fragt dieser Browser nur noch das Passwort. **Ab Werk aus**; für Admins nur mit eigenem Schalter, für das Notfallkonto nie. Gemerkte Geräte stehen unter *Meine Sitzungen* (einzeln oder alle vergessen), Admins können sie für eine Person vergessen. Sie verfallen bei einem neuen Passwort oder zweiten Faktor, einer Rollenänderung, Sperre und „Alle Sitzungen beenden“. Heikle Admin-Aktionen fragen den Code weiter ab.
+
+### Verbessert
+- **Push und Desktop-Benachrichtigungen sagen, worum es geht**: Unter dem Titel stehen Schwere (mit CVSS, wenn bekannt), „ausgenutzt“, die Produkte und die Quelle – „Kritisch (CVSS 9.2) · ausgenutzt · PAN-OS, Prisma Cloud · BSI“. Eine Meldung ohne eigene Schwere zeigt keine (bisher „Info“). Sammel-Benachrichtigungen nennen die höchste Schwere und die Produkte, auch bei „Hersteller-News meiner Produkte“.
+
+### Betrieb
+- **Migrationen 0043 und 0044**: zwei neue, leere Tabellen (`vendor_confirms`, `remembered_devices`); bestehende Daten ändern sich nicht. **Zurück auf 0.1.55** wie bei jedem Update (Images der Vorversion, Datenbank aus dem Backup vor dem Update).
+
 ## 0.1.55 – Images ohne behebbare Scanner-Befunde, Scan im Release
 
 ### Neu
