@@ -237,6 +237,8 @@ def test_push_line_severity_only_when_given_with_cvss_exploited_and_products():
     rest = [{"severity": "high", "notice": {**unrated, "rated": True, "products": ["FortiOS"]}}, {"severity": "info", "notice": unrated}, {"severity": "medium", "hits": ["PAN-OS"]}]
     assert webpush.summary_payload(3, "de", None, rest)["body"] == "Höchste Schwere: Hoch · FortiOS, Exchange Server, PAN-OS"
     assert webpush.summary_payload(3, "en")["body"] == "Open Cobe News"
+    # one line, whatever a feed's name or a product label carries
+    assert webpush.story_payload({"id": "x", "title": "T", "severity": "high", "source": "Feed\nB", "notice": {**notice, "products": ["A\tB"]}}, "de")["body"] == "Hoch (CVSS 9.2) · ausgenutzt · A B · Feed B"
 
 
 # ---------------------------------------------------------------- "Hersteller-News meiner Produkte" by system

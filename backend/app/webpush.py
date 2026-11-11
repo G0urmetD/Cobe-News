@@ -247,7 +247,7 @@ def notice_line(story: dict, lang: str) -> str:
     elif names := notify.names_text([str(x) for x in facts.get("products") or []]):
         parts.append(names)
     parts.append(str(story["source"])[:80])
-    return neutral(" · ".join(p for p in parts if p))
+    return notify.one_line(" · ".join(p for p in parts if p))
 
 
 def story_payload(story: dict, lang: str) -> dict:
@@ -305,7 +305,7 @@ def summary_line(stories: list[dict], lang: str) -> str:
                 names.append(str(n))
     if text := notify.names_text(names):
         parts.append(text)
-    return neutral(" · ".join(parts))[:240] if parts else t["summary_text"]
+    return notify.one_line(" · ".join(parts))[:240] if parts else t["summary_text"]
 
 
 def test_payload(lang: str) -> dict:

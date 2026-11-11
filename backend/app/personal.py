@@ -538,7 +538,7 @@ def push_payloads(events: list[VendorEvent], lang: str) -> list[dict]:
             "kind": "vendor-summary",
             "id": f"vendor-summary-{int(time.time())}",
             "title": lb["summary"].format(n=len(top)),
-            "body": lb["summary_text"].format(sev=sev, products=products, first=first.title[:120]),
+            "body": notify.one_line(lb["summary_text"].format(sev=sev, products=products, first=first.title[:120])),
             "severity": top[0].severity,
             # all of them in Vendor News: their product when they are of one, else the overview (as the mail's button)
             "url": notify.overview_path([s for _, s in pairs], len(pairs)),
