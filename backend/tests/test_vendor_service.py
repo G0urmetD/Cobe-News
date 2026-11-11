@@ -359,7 +359,8 @@ async def test_new_finding_notifies_once_per_version(admin_client, sites, hooks)
     stories = {s["title"].split(":")[0]: s for h in hooks for s in json.loads(h.content)["stories"]}
     story = stories["PAN-OS (Firewalls) 11.2.4-h23 (Standort 11.2.4-h23)"]
     assert story["kind"] == "vendor.vuln" and "CVE-2026-9999" in story["title"]
-    assert story["link"] == "https://news.corp.example:8095/vendor?product=panos" and "11.2.4-h30" in story["summary"]
+    # the link opens the product's drawer at the finding (notify.vendor_path) – not only the product
+    assert story["link"] == "https://news.corp.example:8095/vendor?product=panos&finding=paloalto%3ACVE-2026-9999" and "11.2.4-h30" in story["summary"]
     assert stories["PAN-OS (Firewalls) 10.2.13-h5 (Standort 10.2.13-h5)"]["summary"].startswith("Status: möglicherweise betroffen")
     await _dispatch()
     async with db.session() as s:

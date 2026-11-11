@@ -43,7 +43,7 @@ from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from email.utils import format_datetime, formataddr, make_msgid
 from pathlib import Path
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 import aiosmtplib
 import httpx
@@ -59,7 +59,7 @@ from app import concerns
 from app import keywords as words_svc
 from app import netaddr
 from app import news as news_svc
-from app import quiet
+from app import quiet, reader
 from app import systems as systems_svc
 from app import settings as settings_store
 from app import vendor_titles as titles
@@ -378,10 +378,11 @@ def _date(d: datetime, lang: str, tz: str | None = None) -> str:
 
 # ---------------------------------------------------------------- the general link of a message ("Cobe News öffnen")
 #
-# One story: the story itself (_open – a news story in the list, a Vendor News event at its product / finding). Several
-# news stories: the news list filtered to exactly them (NEWS_PATH?ids=…, at most NEWS_IDS_MAX – more, or a link longer
-# than LINK_MAX: the news list); several Vendor News events: their product in Vendor News when it is one, else Vendor
-# News (watched CVEs: the list of watched CVEs); source health: the health view; a mix of kinds: the start page.
+# One story: the story itself (_open – a news story in the list, a Vendor News event where vendor_path puts it: its
+# finding, the versions, the changes). Several news stories: the news list filtered to exactly them (NEWS_PATH?ids=…, at
+# most NEWS_IDS_MAX – more, or a link longer than LINK_MAX: the news list); several Vendor News events: their product in
+# Vendor News when it is one (at the finding or tab they share), else Vendor News (watched CVEs: the list of watched
+# CVEs); source health: the health view; a mix of kinds: the start page.
 
 NEWS_PATH = "/"  # the news list (the index route) – `?ids=<id>,<id>,…` shows only these stories ("Aus der Benachrichtigung (N)")
 NEWS_IDS_MAX = 50  # stories the news list takes in `ids`
@@ -410,9 +411,16 @@ def overview_path(stories: list[Story], total: int, refs: list[tuple[str, str]] 
         where = {urlsplit(p).path for p in paths}
         if where == {"/watch"}:
             return "/watch"
-        products = {dict(x.split("=", 1) for x in urlsplit(p).query.split("&") if "=" in x).get("product", "") for p in paths}
+        queries = [dict(parse_qsl(urlsplit(p).query)) for p in paths]
+        products = {q.get("product", "") for q in queries}
         if where == {"/vendor"} and len(products) == 1 and "" not in products and len(stories) == total:
-            return "/vendor?" + urlencode({"product": products.pop()})
+            # one product: at what they all are about – one finding (found, now exploited), the versions (a new
+            # version, an end of support), the changes – else the product's drawer as it opens
+            q = {"product": products.pop()}
+            for k in ("finding", "view"):
+                if len(vals := {x.get(k, "") for x in queries}) == 1 and (v := vals.pop()):
+                    q[k] = v
+            return "/vendor?" + urlencode(q)
         return "/vendor"
     if kinds == {"health"}:
         return "/settings/integrations?view=health"
@@ -2274,14 +2282,32 @@ def label_now(key: str, stored: str = "") -> str:
     return str((p or {}).get("label") or stored or key)
 
 
+def vendor_path(ev: VendorEvent) -> str:
+    """The event in this app – the path every way that sends it links to (a rule's mail, card, chat message and webhook;
+    a person's mail, Teams card, push and desktop notification; the weekly summary): the product's drawer in Vendor
+    News at what the event is about – a vulnerability at its finding (also "now exploited" and "now rated higher"), a
+    new version or an end of support at the versions, a revised advisory at the changes; a watched CVE in the list of
+    watched CVEs. The page opens there on a fresh load as well (pages/vendor.tsx reads ?view= and ?finding=)."""
+    if ev.kind == "watch":
+        return "/watch?" + urlencode({"cve": str((ev.data or {}).get("cve") or "")})
+    q = {"product": ev.product}
+    if ev.kind == "vuln" and (finding := reader.finding_of(ev.key, ev.scope)):
+        q["finding"] = finding
+    elif ev.kind in ("version", "eol"):
+        q["view"] = "versions"
+    elif ev.kind == "change":
+        q["view"] = "changes"
+    return "/vendor?" + urlencode(q)
+
+
 def vendor_story(ev: VendorEvent, lang: str) -> Story:
-    """A Vendor News event as a story for the channels' formats (title, summary, link to the product page)."""
+    """A Vendor News event as a story for the channels' formats (title, summary, link to the event: vendor_path)."""
     lb = VENDOR_LABELS.get(lang, VENDOR_LABELS["de"])
     d = ev.data or {}
     product = label_now(ev.product, str(d.get("product") or ""))
     version = str(d.get("version") or "")
     where = f"{product} {version}".strip() + (f" ({d['label']})" if d.get("label") else "")
-    link = f"{get_config().base_url}/vendor?product={ev.product}"
+    link = get_config().base_url + vendor_path(ev)
     if ev.kind == "vuln":
         parts = [f"{lb['status']}: {lb.get(str(d.get('status')), str(d.get('status')))}"]
         if d.get("fixed"):

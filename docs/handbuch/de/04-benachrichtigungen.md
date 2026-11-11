@@ -632,7 +632,10 @@ nach – keine Bilder, keine Zählpixel.
   ohne Zusammenfassungen.
 - **Knopf „Cobe News öffnen“.** Bei einer Meldung öffnet er genau diese. Bei mehreren öffnet er die News-Liste, gefiltert
   auf genau die Meldungen der Nachricht – auch die unter „… und N weitere“ (Chip „Aus der Benachrichtigung (N)“, bis
-  50 Meldungen; mehr: die ganze Liste). Vendor-News-Befunde eines Produkts öffnen dieses Produkt, mehrere Produkte
+  50 Meldungen; mehr: die ganze Liste). Eine Vendor-News-Meldung öffnet ihr Produkt genau dort, worum es geht: eine
+  Schwachstelle beim Befund, eine neue Version oder ein Support-Ende bei „Versionen“, ein geändertes Advisory bei
+  „Änderungen“, eine beobachtete CVE in der Liste der beobachteten CVEs – ebenso „In Cobe News öffnen“. Mehrere
+  Meldungen eines Produkts öffnen das Produkt (beim gemeinsamen Reiter, wenn sie einen teilen), mehrere Produkte
   Vendor News. Dasselbe gilt für den Knopf in Slack und Teams, den Klick auf ntfy-, Gotify- und Desktop-Push-Nachrichten
   und die persönlichen Nachrichten; eine weitergeleitete Meldung öffnet sich selbst.
 - **Zeit.** In Ortszeit mit Zonenkürzel, damit sie eindeutig ist: „04.11.2026 11:19 MEZ“ (Sommer: MESZ; englisch

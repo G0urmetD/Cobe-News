@@ -117,6 +117,13 @@ const vendorEn: Record<string, string> = {
   "vendor.showNotAffected_other": "also show {{count}} not affecting",
   "vendor.noFindings": "No vulnerabilities",
   "vendor.noFindingsText": "Nothing (yet) for this product. After the first fetch the vendor's advisories and NVD's CVEs appear here.",
+  // there is data, but nothing concerns the versions entered (the drawer of a version event): not "nothing yet"
+  "vendor.noneAffect_one": "No vulnerability affects your version",
+  "vendor.noneAffect_other": "No vulnerability affects your versions",
+  "vendor.noneAffectText_one": "{{count}} vulnerability of this product does not affect {{yours}} – the switch above shows it.",
+  "vendor.noneAffectText_other": "{{count}} vulnerabilities of this product do not affect {{yours}} – the switch above shows them.",
+  "vendor.yourVersion_one": "your version",
+  "vendor.yourVersion_other": "your versions",
   "vendor.ransomware": "ransomware",
   "vendor.exploited": "actively exploited",
   "vendor.affectsOf": "affects {{count}} of {{total}} versions",
