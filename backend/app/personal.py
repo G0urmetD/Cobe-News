@@ -31,7 +31,8 @@ desktop push and a Microsoft Teams Workflows webhook of their own.
 - **Absence** (app/absence.py, 0.1.35): the events of an absent person's routed products created during the absence
   go to the deputy (a recipient like any other: keyed per person and way, so exactly once also when the deputy gets the
   product anyway) – never a watched CVE, never on to a deputy who is away themselves, nor to one without a way that
-  can carry it (allowed by an admin, switched on before the event, Teams with a URL): then to the person.
+  can carry it (allowed by an admin, switched on before the event, an address / a browser / a Teams URL): then to the
+  person.
 - **Muted** (app/reader.py, person_mutes): what a person muted for a while – a product, or a CVE (all CVEs of the
   event; a watched CVE's events too) – is skipped ("muted") for that person, when queued and again before it is sent;
   never sent later when the mute ends. Only that person's rows: team channels, the admins' rules and everybody else are
@@ -320,15 +321,22 @@ def _deputy_ok(pa, team_id, at, cover: dict[str, datetime | None]):  # noqa: ANN
     """SQL: the deputy of absence `pa` takes an event of a product of team `team_id` created at `at`: an active account,
     a member of that team since before the event, not away then themselves (no chains), with a way of their own the
     deputy routes (_deputy_routes) carry it on – allowed by an admin (`cover`, since before the event), switched on
-    before the event, Teams with a URL. No such way: nobody would get it – the member keeps it."""
+    before the event, and usable the way the round sends (_prepare): e-mail with an address, desktop with a browser
+    subscribed, Teams with a URL. No such way: nobody would get it (the round skips the deputy's row as no_address,
+    no_device, no_url) – the member keeps it."""
     du, dm, dp, away = aliased(User), aliased(TeamMember), aliased(PersonNotify), aliased(PersonAbsence)
+    eu, ps = aliased(User), aliased(PushSubscription)
     carried = []
     for way, after in cover.items():
         since = getattr(dp, f"{way}_since")
         one = [getattr(dp, f"{way}_on").is_(True), since.is_not(None), at > since]
         if after is not None:
             one.append(at > after)
-        if way == "teams":
+        if way == "email":
+            one.append(exists().where(eu.id == dp.user_id, eu.email.is_not(None), eu.email != "").correlate_except(eu))
+        elif way == "desktop":
+            one.append(exists().where(ps.user_id == dp.user_id).correlate_except(ps))
+        elif way == "teams":
             one.append(dp.teams_url_enc.is_not(None))
         carried.append(and_(*one))
     # nested two levels deep: correlated explicitly (everything but the subquery's own table comes from outside)

@@ -5,7 +5,7 @@ Teams with a URL. Otherwise the person keeps it (as without a deputy) – it nev
 
 from datetime import UTC, datetime, timedelta
 
-from test_personal import HOUR, _dispatch, _event, _person, _rows, _switch, _team, _ways, mails, web  # noqa: F401
+from test_personal import HOUR, _dispatch, _event, _person, _rows, _subscribe, _switch, _team, _ways, mails, web  # noqa: F401
 from test_quiet_absence import _away
 
 from app import db
@@ -78,3 +78,44 @@ async def test_a_deputy_way_that_carries_it_still_takes_the_event(mails):
     await _dispatch()
     assert await _who(ev) == [(str(d.id), "email")]
     assert [m["to"][0] for m in mails.sent] == ["dora@corp.example"]
+
+
+async def test_the_deputys_desktop_way_without_a_browser_leaves_it_with_the_person(mails, web):
+    """Final review 0.1.56: desktop on but no browser subscribed – the round skips the deputy's row as no_device, so
+    the event stays with the person."""
+    await _switch()
+    a, d = await _anja_and_dora()
+    await _ways(d, desktop=True)
+    await _away(a, d)
+    ev = await _event("panos")
+    await _dispatch()
+    rows = {(r.user_id, r.way): (r.status, r.error) for r in await _rows(event_id=ev)}
+    assert rows[(a.id, "email")][0] == "sent" and rows.get((d.id, "desktop"), ("skipped", "no_device")) == ("skipped", "no_device")
+    assert [m["to"][0] for m in mails.sent] == ["anja@corp.example"]
+
+
+async def test_the_deputys_desktop_way_with_a_browser_takes_it(mails, web):
+    await _switch()
+    a, d = await _anja_and_dora()
+    await _ways(d, desktop=True)
+    await _subscribe(d)
+    await _away(a, d)
+    ev = await _event("panos")
+    await _dispatch()
+    assert await _who(ev) == [(str(d.id), "desktop")]
+    assert mails.sent == []
+
+
+async def test_the_deputys_email_way_without_an_address_leaves_it_with_the_person(mails):
+    await _switch()
+    a = await _person("anja")
+    d = await _person("dora", email=False)
+    await _team([a, d], products=("panos",))
+    await _ways(a, email=True)
+    await _ways(d, email=True)
+    await _away(a, d)
+    ev = await _event("panos")
+    await _dispatch()
+    rows = {(r.user_id, r.way): (r.status, r.error) for r in await _rows(event_id=ev)}
+    assert rows[(a.id, "email")][0] == "sent" and rows.get((d.id, "email"), ("skipped", "no_address")) == ("skipped", "no_address")
+    assert [m["to"][0] for m in mails.sent] == ["anja@corp.example"]
