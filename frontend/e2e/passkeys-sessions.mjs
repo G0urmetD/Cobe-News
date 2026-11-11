@@ -212,7 +212,7 @@ async function flows(browser, combo, t) {
   await adm.page.goto(`${BASE}/settings/users`)
   await settle(adm.page)
   await adm.page
-    .locator("li")
+    .locator("main li")
     .filter({ hasText: rudi.display_name })
     .first()
     .getByRole("button", { name: t("users.actions") })
@@ -220,6 +220,12 @@ async function flows(browser, combo, t) {
   await adm.page.getByRole("menuitem", { name: t("users.security") }).click()
   const sheet = adm.page.locator("[data-slot=sheet-content]")
   await sheet.waitFor({ timeout: 5000 }).catch(() => {})
+  // the sheet mounts before its lists have loaded – wait for the person's entry before reading
+  await sheet
+    .getByText(rudi.display_name)
+    .first()
+    .waitFor({ timeout: 5000 })
+    .catch(() => {})
   const sheetText = await sheet.innerText()
   await scrollCheck(adm.page, `${lang} admin`, "user sessions & passkeys", SHOTS && `${lang}-admin_user_security`)
   await sheet.getByRole("button", { name: t("users.endAll") }).click()
@@ -292,7 +298,7 @@ async function resetRemovesPasskeys(browser, combo, t, adm, [user, password]) {
   await adm.page.goto(`${BASE}/settings/users`)
   await settle(adm.page)
   await adm.page
-    .locator("li")
+    .locator("main li")
     .filter({ hasText: u.display_name })
     .first()
     .getByRole("button", { name: t("users.actions") })

@@ -513,12 +513,12 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               <DialogDescription>{t("account.pwOthersOut")}</DialogDescription>
             </DialogHeader>
             <Field label={t("account.currentPassword")} htmlFor="cur-pw">
-              <Input id="cur-pw" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+              <Input id="cur-pw" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} autoFocus />
             </Field>
             <NewPasswordFields onValid={setNext} autoFocus={false} />
             {totp && (
               <Field label={t("account.reauthCode")} hint={t("account.pwCodeHint")}>
-                <CodeInput value={code} onChange={setCode} />
+                <CodeInput value={code} onChange={setCode} autoFocus={false} />
               </Field>
             )}
             <DialogFooter>
