@@ -139,6 +139,10 @@ async def put_mine(body: MineIn, user: Reader, db: Db) -> dict:
     p.min_severity = body.min_severity
     if body.systems is not None:
         chosen = concerns.dedupe([x.entry() for x in body.systems])
+        if systems_svc.has_ours(chosen):
+            # "Unsere Produkte" here would be every product of the person's teams – Vendor News is about followed
+            # products only: what "leer" says already
+            raise api_error(422, "invalid", errors="systems: ours is for news")
         concerns.check_known(chosen, personal.person_systems(p))
         p.systems = chosen
     p.lang = body.lang

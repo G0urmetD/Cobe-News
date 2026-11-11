@@ -172,6 +172,8 @@ def _priority():  # noqa: ANN202
 
 async def stories_due(db: AsyncSession, p: PersonNews, way: str, now: datetime) -> list[tuple[NewsItem, NewsSource]]:
     """What the person's filter lets through of what is due – the most urgent CLAIM_MAX."""
+    if systems_svc.has_ours(p.systems):
+        await systems_svc.load_followed(db)  # "Unsere Produkte": the products followed now (kept – not read per person)
     where = [*notify.news_filter(rule_of(p)), *due_where(p, way, now)]
     hush = reader.news_muted(await reader.mutes_of(db, p.user_id, now))
     if hush is not None:

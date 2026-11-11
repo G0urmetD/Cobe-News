@@ -2422,6 +2422,10 @@ async def channel_pending(db: AsyncSession, ch: NotifyChannel, lang_of=None) -> 
             .order_by(NotifyRule.name, NotifyRule.id)
         )
     ).all()
+    if links:
+        # "Unsere Produkte" (a rule's, or a filter before a widening): the products followed now – kept (vendor.gen,
+        # FOLLOWED_TTL), not read per channel or per story
+        await systems_svc.load_followed(db)
     out: dict[tuple[str, uuid.UUID], Row] = {}
     brought: dict[uuid.UUID, list[uuid.UUID]] = {}  # per news story: every rule that brought it ("eure Produkte")
     carried: list[tuple[NewsItem, NewsSource, NotifyRule]] = []  # stories a rule brought for a further source of its
@@ -2870,6 +2874,7 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
     now = now or datetime.now(UTC)
     since = now - timedelta(days=days)
     lang = rule.lang if rule.lang in LABELS else "de"
+    await systems_svc.load_followed(db)  # "Unsere Produkte": the products followed now
     restricted = {"severity": bool(rule.severities), "source": bool(rule.sources), "topic": bool(rule_topics(rule)), "teams": bool(teams)}
     wanted = set(rule_topics(rule))
     want_systems = systems_svc.wanted(rule_systems(rule))

@@ -59,7 +59,8 @@ einmal, nennt die Sammel-Benachrichtigung die höchste Schwere und die Produkte.
 
 **Systeme, Schlagwörter und „Nicht anzeigen, wenn enthalten“** – wie bei den [Regeln](#regel-systeme), nur für dich:
 
-- **Systeme**: Hersteller („Alle Produkte von Palo Alto Networks“) oder einzelne Produkte aus dem ganzen Katalog.
+- **Systeme**: Hersteller („Alle Produkte von Palo Alto Networks“) oder einzelne Produkte aus dem ganzen Katalog – oder
+  ganz oben [Unsere Produkte (aus Vendor News)](#regel-systeme): alle gefolgten Produkte, auch später hinzugefügte.
 - **Schlagwörter**: eigene Wörter als Chips (Enter oder Komma), ganze Wörter in Titel oder Teaser, Groß-/Kleinschreibung
   egal, reiner Text (höchstens 30, je 2–60 Zeichen).
 - Systeme **oder** Schlagwörter – eines genügt, zusammen mit Schwere, Quelle und Thema.
@@ -203,7 +204,8 @@ Teams nimmt die Nachrichten über einen **Workflow** an, den du selbst anlegst. 
   kommen nur deren Hersteller-News („Alle Produkte von Palo Alto Networks“ umfasst auch Produkte, die dir später
   zugeordnet werden). Leer heißt: alle deine Produkte. Wie bei den Systemen einer Regel für Vendor News zählt das
   Produkt der Meldung – es steht ohnehin in jeder Nachricht. Schlagwörter gibt es hier nicht; sie gelten für
-  Security-Meldungen ([Desktop-Benachrichtigungen](#desktop-einschalten)). Beobachtete CVEs kommen immer.
+  Security-Meldungen ([Desktop-Benachrichtigungen](#desktop-einschalten)). „Unsere Produkte“ gibt es hier nicht – es gibt
+  Hersteller-News nur zu gefolgten Produkten, das wäre dasselbe wie leer. Beobachtete CVEs kommen immer.
 - **Filter.** Was dein Filter (Art, Schwere, Systeme) einmal ausgelassen hat, kommt auch nach einer Änderung des Filters
   nicht nach.
 - **Stumm.** Was du [stummgeschaltet](#stummschalten) hast, kommt nicht – auch nicht, wenn die Stummschaltung endet.
@@ -1411,6 +1413,12 @@ eine Regel für genau das, was euch angeht. Beispiel „nur Palo Alto, nur Kriti
     nicht auf ein einzelnes Zyxel-Produkt. Ein Name, den mehrere Produkte eines Herstellers teilen, zählt für das
     Produkt, dessen Name es ist: „PAN-OS“ ist PAN-OS, nicht Panorama; der längere Name gewinnt („NGINX Plus“ ist nicht
     auch nginx).
+- **Unsere Produkte (aus Vendor News)** steht ganz oben in der Auswahl: alle Produkte, denen Cobe News in
+  [Vendor News](/docs/vendor-news) folgt – so, als wäre jedes einzeln gewählt (Details oder Titel/Teaser), dazu per CPE
+  angelegte eigene Produkte über ihre Details. Es gilt die Liste von jetzt: Ein später gefolgtes Produkt zählt für
+  Meldungen, die **ab dann** eintreffen (oder es ab dann bekommen, etwa durch nachgelieferte Details) – ältere Meldungen
+  zu ihm kommen nicht nachträglich. Ein Produkt, dem ihr nicht mehr folgt (ausgeschaltet oder entfernt), zählt nicht
+  mehr. Folgt ihr keinem Produkt, passt nichts. „Treffer“ nennt das Produkt („Treffer: PAN-OS“).
 - Ein **Hersteller ist einer**, auch wenn der Katalog ihn verschieden schreibt: „VMware“ und „Broadcom (VMware)“, „Apache“
   und „Apache Software Foundation“, „LANCOM“ und „LANCOM Systems“ erscheinen als eine Gruppe, „Alle Produkte“ umfasst
   alle. Ein Eigentümer in Klammern macht keinen: „CyberArk (Palo Alto Networks)“ gehört nicht zu Palo Alto Networks.
@@ -1421,8 +1429,8 @@ eine Regel für genau das, was euch angeht. Beispiel „nur Palo Alto, nur Kriti
   Beides leer heißt: keine Einschränkung, wie bisher.
 - **Nicht senden, wenn enthalten:** Steht eines dieser Wörter in Titel oder Teaser, kommt die Meldung über diese Regel
   nie – egal, was sonst passt.
-- **Vendor News:** Systeme gelten auch für Schwachstellen, neue Versionen und geänderte Advisories (über deren Produkt).
-  Schlagwörter und Ausschluss gelten nur für Security-Meldungen, Quellen-Gesundheit kennt keines davon.
+- **Vendor News:** Systeme gelten auch für Schwachstellen, neue Versionen und geänderte Advisories (über deren Produkt;
+  „Unsere Produkte“: jedes gefolgte Produkt). Schlagwörter und Ausschluss gelten nur für Security-Meldungen, Quellen-Gesundheit kennt keines davon.
 - **Details kommen später:** Eine Meldung, die erst durch nachgelieferte Details passt, kommt dann – einmal. Lernt
   dagegen der **Katalog** ein Produkt oder einen Namen dazu (Katalog-Update), werden ältere Meldungen dadurch nicht
   verschickt.

@@ -103,6 +103,7 @@ COLUMNS_NOT_IN_SQLITE = frozenset(
         ("notify_rules", "systems"),  # 0.1.53: '[]' – a rule without systems, keywords and exclusions, as before
         ("notify_rules", "keywords"),
         ("notify_rules", "exclude"),
+        ("vendor_follows", "enabled_at"),  # 0.1.56: NULL – "Unsere Produkte" counts the follow from its created_at
     }
 )
 

@@ -517,7 +517,7 @@ async def put_follow(key: str, body: FollowIn, request: Request, admin: Admin, d
     now = datetime.now(UTC)
     if f is None:
         p = _catalog_product(key)
-        f = VendorFollow(product=key, enabled=body.enabled, note=body.note, tags=list(dict.fromkeys(body.tags)), created_at=now, updated_at=now)
+        f = VendorFollow(product=key, enabled=body.enabled, note=body.note, tags=list(dict.fromkeys(body.tags)), created_at=now, updated_at=now, enabled_at=now)
         db.add(f)
         audit.record(db, admin, "catalog.followed", _follow_target(f), {"enabled": f.enabled, "tags": f.tags})
         await db.commit()
@@ -529,6 +529,7 @@ async def put_follow(key: str, body: FollowIn, request: Request, admin: Admin, d
             # switched on again: what is found now is the baseline, not news – also for its versions (the events that
             # told the earlier notifications apart were pruned while it was off)
             f.baseline_at = None
+            f.enabled_at = now  # "Unsere Produkte" counts it for the stories from now on (app/systems.py, Followed)
             await db.execute(update(VendorVersion).where(VendorVersion.follow_id == f.id).values(baseline_at=None))
         sent = body.model_fields_set
         before = {"enabled": f.enabled, "note": f.note, "tags": list(f.tags or [])}
@@ -579,7 +580,7 @@ async def add_custom(body: CustomIn, request: Request, admin: Admin, db: Db) -> 
     key = f"custom-{uuid.uuid4().hex[:12]}"
     vendor = cpe.split(":")[1].replace("_", " ")
     now = datetime.now(UTC)
-    f = VendorFollow(product=key, enabled=True, custom={"label": body.label, "vendor": vendor[:1].upper() + vendor[1:], "cpe": cpe, "category": body.category}, created_at=now, updated_at=now)
+    f = VendorFollow(product=key, enabled=True, custom={"label": body.label, "vendor": vendor[:1].upper() + vendor[1:], "cpe": cpe, "category": body.category}, created_at=now, updated_at=now, enabled_at=now)
     db.add(f)
     audit.record(db, admin, "catalog.custom_added", audit.target("product", key, body.label), {"cpe": cpe, "category": body.category})
     await db.commit()

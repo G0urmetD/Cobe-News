@@ -473,6 +473,9 @@ class VendorFollow(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     # the first evaluation after following (or switching on) is the baseline: what is found then is not notified
     baseline_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # when it was followed or last switched on (migration 0045): "Unsere Produkte" as a rule's system counts it for the
+    # stories from then on (systems.Followed) – none: created_at
+    enabled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class VendorVersion(Base):

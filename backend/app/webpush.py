@@ -415,6 +415,7 @@ async def dispatch(db: AsyncSession) -> dict[str, int]:
         if user is None or not user.is_active or not (user.desktop or {}).get("enabled"):
             skip.append(sub)  # switched off (the account or its notifications): nothing piles up for later
             continue
+        await api.load_desktop(db, user.desktop)
         where = [*api.fresh_filter(), NewsItem.seq > sub.cursor, NewsItem.seq <= top, *api.desktop_filter(user.desktop)]
         rows, total = await api.arrived(db, where)
         if not rows:

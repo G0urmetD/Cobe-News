@@ -236,7 +236,7 @@ async def list_news(
     time_field: TimeField = "published",
     since_mark: bool = False,
     ids: Annotated[str | None, Query(max_length=IDS_MAX * 40)] = None,
-    system: Annotated[list[str], Query(max_length=systems_svc.ENTRIES_MAX)] = [],  # noqa: B006 - FastAPI query list ("v:<vendor>" | "p:<key>")
+    system: Annotated[list[str], Query(max_length=systems_svc.ENTRIES_MAX)] = [],  # noqa: B006 - FastAPI query list ("v:<vendor>" | "p:<key>" | "ours")
     without: Annotated[list[str], Query(max_length=words_svc.WORDS_MAX)] = [],  # noqa: B006 - FastAPI query list ("ohne …")
 ) -> dict:
     """Stories newest first – "all", "new" (unread by me) or "read" (read by me); app/reader.py decides what is read
@@ -254,7 +254,8 @@ async def list_news(
     date, fetched: its arrival); `since_mark`: what arrived after my read watermark ("Seit meinem letzten Besuch" – its
     time is `mark_at`). `ids`: only these stories (a notification's, "a,b,c", at most 50). `system` ("Systeme",
     app/concerns.py): stories about one of these catalogue vendors ("v:Palo Alto Networks" – each of its products) or
-    products ("p:panos") – by their details or named in title or teaser, also what a story has only quietly (a list
+    products ("p:panos") or the products followed now ("ours" – "Unsere Produkte", also those followed by CPE by their
+    details) – by their details or named in title or teaser, also what a story has only quietly (a list
     shows what concerns a system; only notifications ask for loud ones). `without` ("Ohne …"): none of these words, whole,
     in title or teaser – as a rule's "Nicht senden, wenn enthalten" (checked as there: plain text, at most 30). Each is
     one more filter: the list, every count and the cursor alike (the order stays by date)."""
@@ -274,6 +275,8 @@ async def list_news(
     if wanted is not None:
         where.append(NewsItem.id.in_(wanted))
     if chosen:
+        if systems_svc.has_ours(chosen):
+            await systems_svc.load_followed(db)  # "Unsere Produkte": the products followed now
         where.append(concerns.systems_clause(chosen, quiet_too=True))
     if (no := words_svc.none_of(unwanted)) is not None:
         where.append(no)  # last: the database applies it after the cheaper conditions (a regex per remaining row)
@@ -395,6 +398,13 @@ def desktop_filter(user_prefs: dict | None) -> list:
     return where
 
 
+async def load_desktop(db: AsyncSession, prefs: dict | None) -> None:
+    """What desktop_filter and desktop_hits need read first: the followed products, when the person chose "Unsere
+    Produkte" (systems.load_followed – kept, not read per person)."""
+    if systems_svc.has_ours((prefs or {}).get("systems")):
+        await systems_svc.load_followed(db)
+
+
 def desktop_concerns(prefs: dict | None) -> tuple[list[dict], list[str], list[str]]:
     """A person's desktop systems, words and exclusions as stored (empty: none)."""
     prefs = prefs or {}
@@ -466,6 +476,7 @@ async def recent(user: Reader, db: Db, after: Annotated[int | None, Query(ge=0)]
         assert since is not None
         where += [NewsItem.fetched_at > since, NewsItem.fetched_at <= now]
     if mine:
+        await load_desktop(db, user.desktop)
         where += desktop_filter(user.desktop)
     rows, total = await arrived(db, where)
     hit = desktop_hits(user.desktop) if mine else None
@@ -606,6 +617,8 @@ async def read_all(body: ReadAllIn, user: Reader, db: Db) -> dict:
     if body.ids is not None:
         where.append(NewsItem.id.in_(list(dict.fromkeys(body.ids))))
     if chosen := system_filter(body.system):
+        if systems_svc.has_ours(chosen):
+            await systems_svc.load_followed(db)
         where.append(concerns.systems_clause(chosen, quiet_too=True))
     if (no := words_svc.none_of(words_filter(body.without))) is not None:
         where.append(no)

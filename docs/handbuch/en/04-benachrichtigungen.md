@@ -58,7 +58,8 @@ once, the summary names the highest severity and the products.
 
 **Systems, keywords and "Don't show if it contains"** – as in the [rules](#regel-systeme), just for you:
 
-- **Systems**: vendors ("All products of Palo Alto Networks") or single products from the whole catalogue.
+- **Systems**: vendors ("All products of Palo Alto Networks") or single products from the whole catalogue – or at the top
+  [Our products (from Vendor News)](#regel-systeme): every followed product, also ones added later.
 - **Keywords**: your own words as chips (Enter or comma), whole words in the title or teaser, case ignored, plain text
   (at most 30, 2–60 characters each).
 - Systems **or** keywords – one is enough, together with severity, source and topic.
@@ -194,7 +195,8 @@ Teams takes the messages through a **workflow** you create yourself. It posts in
 - **Only these systems.** Below the severity you can pick vendors or products among your products – then only their
   vendor news comes ("All products of Palo Alto Networks" also covers products assigned to you later). Empty means: all
   your products. As with a rule's systems for Vendor News, the event's product counts – it is in every message anyway.
-  There are no keywords here; they apply to security stories ([desktop notifications](#desktop-einschalten)). Watched
+  There are no keywords here; they apply to security stories ([desktop notifications](#desktop-einschalten)). "Our
+  products" is not offered here – vendor news exist for followed products only, it would be the same as empty. Watched
   CVEs always come.
 - **Filter.** What your filter (kind, severity, systems) left out once does not come later after the filter is changed
   either.
@@ -1376,6 +1378,12 @@ exactly what concerns you. Example "only Palo Alto, only critical":
   - A story that names **only the vendor** ("Zyxel warns of attacks") matches "All products of Zyxel", not a single
     Zyxel product. A name several products of a vendor share counts for the product it is the name of: "PAN-OS" is
     PAN-OS, not Panorama; the longer name wins ("NGINX Plus" is not nginx as well).
+- **Our products (from Vendor News)** is at the very top of the picker: every product Cobe News follows in
+  [Vendor News](/docs/vendor-news) – as if each were chosen on its own (details or title/teaser), plus own products
+  added by CPE through their details. The list of now counts: a product followed later counts for stories that arrive
+  **from then on** (or get it from then on, through details that arrive later, say) – older stories about it are not
+  sent afterwards. A product you no longer follow (switched off or removed) no longer counts. Following no product:
+  nothing matches. "Match" names the product ("Match: PAN-OS").
 - **One vendor is one**, however the catalogue spells it: "VMware" and "Broadcom (VMware)", "Apache" and "Apache
   Software Foundation", "LANCOM" and "LANCOM Systems" show as one group, "All products" covers all of them. An owner in
   parentheses makes none: "CyberArk (Palo Alto Networks)" does not belong to Palo Alto Networks.
@@ -1386,8 +1394,8 @@ exactly what concerns you. Example "only Palo Alto, only critical":
   empty: no restriction, as before.
 - **Do not send if it contains:** if the title or teaser has one of these words, this rule never sends the story –
   whatever else matches.
-- **Vendor News:** systems apply to vulnerabilities, new versions and revised advisories as well (by their product).
-  Keywords and exclusions apply to security stories only; source health knows none of them.
+- **Vendor News:** systems apply to vulnerabilities, new versions and revised advisories as well (by their product;
+  "Our products": every followed product). Keywords and exclusions apply to security stories only; source health knows none of them.
 - **Details come later:** a story that matches only through details that arrive later comes then – once. When the
   **catalogue** learns a product or a name (a catalogue update), older stories are not sent because of it.
 - A product the catalogue no longer knows shows as "no longer in the catalogue" in the rule and matches nothing – never
