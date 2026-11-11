@@ -143,6 +143,15 @@ async def recognised(db, user: User, token: str | None, *, use: bool = True) -> 
     return True
 
 
+async def rebind(db, user: User, token: str | None) -> None:  # noqa: ANN001
+    """The same password, hashed anew (passwords.needs_rehash – other Argon2 parameters): the browser's row – which the
+    caller found valid (`recognised`) just before – stands on the new hash. Only for a password just verified; any other
+    change of the factors keeps making a row worthless. Not committed."""
+    row = await find(db, token)
+    if row is not None and row.user_id == user.id:
+        row.factor = factor(user)
+
+
 async def remember(db, user: User, ip: str | None, user_agent: str | None, old_token: str | None = None) -> tuple[str, int] | None:  # noqa: ANN001
     """Remember this browser for the account – (token for the cookie, max-age in seconds), or None when the rule does
     not allow it (switched off, an admin while admins are excluded, the emergency account). The browser's earlier row of
