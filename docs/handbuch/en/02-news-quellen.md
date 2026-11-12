@@ -254,7 +254,7 @@ names all). The number on the toggle says how many stories that is with the othe
 
 ## Built-in sources {#eingebaute-quellen}
 
-Cobe News comes with 46 sources in five groups. 14 of them are switched on by default; admins switch others on or
+Cobe News comes with 44 sources in five groups. 14 of them are switched on by default; admins switch others on or
 off ([Integrations → News](/docs/integrationen#news)). The language is shown as DE, EN or FR next to the source.
 
 | Group | On by default | Optional |

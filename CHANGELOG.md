@@ -28,6 +28,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 - **Wochenrückblick bei Mailserver-Ausfall**: Fehlversuche kommen mit wachsender Pause statt im Minutentakt (vorher war nach fünf Minuten Schluss); ein Fehler bei einem Team hält die anderen nicht mehr auf.
 - **Security-Meldungen**: Ein Fehler bei einer Person nimmt den anderen ihre Nachrichten nicht mehr weg.
 - **Persönliche Benachrichtigungen bei vielen Bestätigungen** sind schnell (vorher bei großen Teams und vielen bestätigten Treffern bis zu 18 s pro Runde).
+- **Zahl der eingebauten Quellen**: Handbuch und README nannten 46, es sind 44.
 - **Web Push für viele Browser** in einem Bruchteil der Zeit (gleiche Auswahl: eine Abfrage statt vier je Browser).
 
 ### Sicherheit
