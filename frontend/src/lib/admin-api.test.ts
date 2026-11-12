@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest"
 import de from "@/i18n/de"
 import en from "@/i18n/en"
-import { approvalBody, isBlocked, isPending, offKeys, pendingTotal } from "@/lib/admin-api"
+import { approvalBody, handedBack, isBlocked, isPending, offKeys, pendingTotal } from "@/lib/admin-api"
 
 const REASONS = ["admin", "pending", "sync:no_team", "sync:teams_off", "sync:no_role", "sync:disabled", "sync:gone", "sync:unblocked", "sync:later", null]
+
+describe("handedBack", () => {
+  it("knows a directory account switched on that the sync decides on now", () => {
+    expect(handedBack(true, { is_active: false, deactivated_reason: "sync:unblocked" })).toBe(true)
+    expect(handedBack(true, { is_active: true, deactivated_reason: null })).toBe(false) // a local account: on again
+    expect(handedBack(false, { is_active: false, deactivated_reason: "admin" })).toBe(false) // switched off
+  })
+
+  it("has its texts in German and English", () => {
+    for (const texts of [de, en] as Record<string, string>[]) {
+      expect(texts["users.handedBack"]).toContain("{{name}}")
+      expect(texts["errors.directory_managed_active"]).toBeTruthy()
+    }
+  })
+})
 
 describe("offKeys", () => {
   it("tells an admin's lasting block from the sync's reasons", () => {

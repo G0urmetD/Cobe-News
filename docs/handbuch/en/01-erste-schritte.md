@@ -191,7 +191,7 @@ Local accounts only. If you sign in with Active Directory, change the password t
 Microsoft manages it.
 
 1. Open *Profile & security* and choose "Change password".
-2. Enter the current password and the new one, "Save".
+2. Enter the current password and the new one – with TOTP set up, the current code from the app as well –, "Save".
 3. Other browsers you are signed in to are signed out.
 
 Rules for the new password: at least 12 characters, not too common, not the user name and not the current password.

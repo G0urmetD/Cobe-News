@@ -43,7 +43,7 @@ from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from email.utils import format_datetime, formataddr, make_msgid
 from pathlib import Path
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 import aiosmtplib
 import httpx
@@ -53,13 +53,13 @@ from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import advisory_changes, audit, bounded, delivery_log
+from app import advisory_changes, audit, bounded, delivery_log, finding_confirm
 from app import db as dbm
 from app import concerns
 from app import keywords as words_svc
 from app import netaddr
 from app import news as news_svc
-from app import quiet
+from app import quiet, reader
 from app import systems as systems_svc
 from app import settings as settings_store
 from app import vendor_titles as titles
@@ -378,10 +378,11 @@ def _date(d: datetime, lang: str, tz: str | None = None) -> str:
 
 # ---------------------------------------------------------------- the general link of a message ("Cobe News öffnen")
 #
-# One story: the story itself (_open – a news story in the list, a Vendor News event at its product / finding). Several
-# news stories: the news list filtered to exactly them (NEWS_PATH?ids=…, at most NEWS_IDS_MAX – more, or a link longer
-# than LINK_MAX: the news list); several Vendor News events: their product in Vendor News when it is one, else Vendor
-# News (watched CVEs: the list of watched CVEs); source health: the health view; a mix of kinds: the start page.
+# One story: the story itself (_open – a news story in the list, a Vendor News event where vendor_path puts it: its
+# finding, the versions, the changes). Several news stories: the news list filtered to exactly them (NEWS_PATH?ids=…, at
+# most NEWS_IDS_MAX – more, or a link longer than LINK_MAX: the news list); several Vendor News events: their product in
+# Vendor News when it is one (at the finding or tab they share), else Vendor News (watched CVEs: the list of watched
+# CVEs); source health: the health view; a mix of kinds: the start page.
 
 NEWS_PATH = "/"  # the news list (the index route) – `?ids=<id>,<id>,…` shows only these stories ("Aus der Benachrichtigung (N)")
 NEWS_IDS_MAX = 50  # stories the news list takes in `ids`
@@ -410,9 +411,16 @@ def overview_path(stories: list[Story], total: int, refs: list[tuple[str, str]] 
         where = {urlsplit(p).path for p in paths}
         if where == {"/watch"}:
             return "/watch"
-        products = {dict(x.split("=", 1) for x in urlsplit(p).query.split("&") if "=" in x).get("product", "") for p in paths}
+        queries = [dict(parse_qsl(urlsplit(p).query)) for p in paths]
+        products = {q.get("product", "") for q in queries}
         if where == {"/vendor"} and len(products) == 1 and "" not in products and len(stories) == total:
-            return "/vendor?" + urlencode({"product": products.pop()})
+            # one product: at what they all are about – one finding (found, now exploited), the versions (a new
+            # version, an end of support), the changes – else the product's drawer as it opens
+            q = {"product": products.pop()}
+            for k in ("finding", "view"):
+                if len(vals := {x.get(k, "") for x in queries}) == 1 and (v := vals.pop()):
+                    q[k] = v
+            return "/vendor?" + urlencode(q)
         return "/vendor"
     if kinds == {"health"}:
         return "/settings/integrations?view=health"
@@ -1823,6 +1831,8 @@ def vendor_filter(rule: NotifyRule, teams) -> list | None:  # noqa: ANN001
     if rule.severities:
         where.append(or_(VendorEvent.kind.not_in(SEVERITY_KINDS), VendorEvent.severity.in_(list(rule.severities))))
     where.append(_teams_clause(teams))
+    # a confirmed finding (app/finding_confirm.py) is handled: its events are not sent – also not once it is undone
+    where.append(~finding_confirm.held())
     # the rule's systems: the event's product (a vendor: each of its catalogue products); its words and exclusions are
     # for news only
     if (c := concerns.vendor_clause(rule_systems(rule))) is not None:
@@ -2199,6 +2209,9 @@ VENDOR_LABELS = {
         "exploited": "aktiv ausgenutzt",
         "now_exploited": "Jetzt aktiv ausgenutzt",
         "rated_higher": "Jetzt höher eingestuft: {to} (vorher {was})",
+        # a confirmed finding that changed (app/finding_confirm.py): its confirmation ended by itself
+        "confirm_lapsed": "Bestätigung aufgehoben: {why}",
+        "lapse": {"exploited": "jetzt ausgenutzt", "severity": "höher eingestuft", "cves": "neue CVEs", "verdict": "Version jetzt betroffen", "withdrawn": "Advisory zurückgezogen", "regrouped": "neu zugeordnet"},
         "version": "{product} {version}: neue Version {latest} verfügbar",
         "version_text": "Release-Linie {line} – aktuellste Version {latest}.",
         "eol_soon": "{product} {version}: Ende des Supports am {date}",
@@ -2232,6 +2245,8 @@ VENDOR_LABELS = {
         "exploited": "actively exploited",
         "now_exploited": "Now actively exploited",
         "rated_higher": "Now rated higher: {to} (was {was})",
+        "confirm_lapsed": "Confirmation lifted: {why}",
+        "lapse": {"exploited": "now exploited", "severity": "rated higher", "cves": "new CVEs", "verdict": "version now affected", "withdrawn": "advisory withdrawn", "regrouped": "regrouped"},
         "version": "{product} {version}: new version {latest} available",
         "version_text": "Release line {line} – latest version {latest}.",
         "eol_soon": "{product} {version}: end of support on {date}",
@@ -2267,14 +2282,32 @@ def label_now(key: str, stored: str = "") -> str:
     return str((p or {}).get("label") or stored or key)
 
 
+def vendor_path(ev: VendorEvent) -> str:
+    """The event in this app – the path every way that sends it links to (a rule's mail, card, chat message and webhook;
+    a person's mail, Teams card, push and desktop notification; the weekly summary): the product's drawer in Vendor
+    News at what the event is about – a vulnerability at its finding (also "now exploited" and "now rated higher"), a
+    new version or an end of support at the versions, a revised advisory at the changes; a watched CVE in the list of
+    watched CVEs. The page opens there on a fresh load as well (pages/vendor.tsx reads ?view= and ?finding=)."""
+    if ev.kind == "watch":
+        return "/watch?" + urlencode({"cve": str((ev.data or {}).get("cve") or "")})
+    q = {"product": ev.product}
+    if ev.kind == "vuln" and (finding := reader.finding_of(ev.key, ev.scope)):
+        q["finding"] = finding
+    elif ev.kind in ("version", "eol"):
+        q["view"] = "versions"
+    elif ev.kind == "change":
+        q["view"] = "changes"
+    return "/vendor?" + urlencode(q)
+
+
 def vendor_story(ev: VendorEvent, lang: str) -> Story:
-    """A Vendor News event as a story for the channels' formats (title, summary, link to the product page)."""
+    """A Vendor News event as a story for the channels' formats (title, summary, link to the event: vendor_path)."""
     lb = VENDOR_LABELS.get(lang, VENDOR_LABELS["de"])
     d = ev.data or {}
     product = label_now(ev.product, str(d.get("product") or ""))
     version = str(d.get("version") or "")
     where = f"{product} {version}".strip() + (f" ({d['label']})" if d.get("label") else "")
-    link = f"{get_config().base_url}/vendor?product={ev.product}"
+    link = get_config().base_url + vendor_path(ev)
     if ev.kind == "vuln":
         parts = [f"{lb['status']}: {lb.get(str(d.get('status')), str(d.get('status')))}"]
         if d.get("fixed"):
@@ -2285,6 +2318,8 @@ def vendor_story(ev: VendorEvent, lang: str) -> Story:
             parts.append(lb["exploited"])
         if d.get("now_exploited") and (d.get("kev") or {}).get("ransomware"):
             parts.append("Ransomware")
+        if why := d.get("confirm_lapsed"):
+            parts.insert(0, lb["confirm_lapsed"].format(why=lb["lapse"].get(str(why), str(why))))
         summary = " · ".join(parts) + (f"\n{d['summary']}" if d.get("summary") else "")
         # the readable title (the vendor's, a short description – not NVD's marketing sentence); events from before
         # 0.1.14 have none stored: made the same way from what they have
@@ -2413,6 +2448,10 @@ async def channel_pending(db: AsyncSession, ch: NotifyChannel, lang_of=None) -> 
             .order_by(NotifyRule.name, NotifyRule.id)
         )
     ).all()
+    if links:
+        # "Unsere Produkte" (a rule's, or a filter before a widening): the products followed now – kept (vendor.gen,
+        # FOLLOWED_TTL), not read per channel or per story
+        await systems_svc.load_followed(db)
     out: dict[tuple[str, uuid.UUID], Row] = {}
     brought: dict[uuid.UUID, list[uuid.UUID]] = {}  # per news story: every rule that brought it ("eure Produkte")
     carried: list[tuple[NewsItem, NewsSource, NotifyRule]] = []  # stories a rule brought for a further source of its
@@ -2861,6 +2900,7 @@ async def dry_run(db: AsyncSession, rule: NotifyRule, teams: list[uuid.UUID], da
     now = now or datetime.now(UTC)
     since = now - timedelta(days=days)
     lang = rule.lang if rule.lang in LABELS else "de"
+    await systems_svc.load_followed(db)  # "Unsere Produkte": the products followed now
     restricted = {"severity": bool(rule.severities), "source": bool(rule.sources), "topic": bool(rule_topics(rule)), "teams": bool(teams)}
     wanted = set(rule_topics(rule))
     want_systems = systems_svc.wanted(rule_systems(rule))

@@ -20,7 +20,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from app import audit, crypto, passkeys_api, preload, tls
 from app import settings as settings_store
-from app.auth import bruteforce, directory, entra, ldap_dir, lock_store, passwords, sessions
+from app.auth import bruteforce, devices, directory, entra, ldap_dir, lock_store, passwords, sessions
 from app.auth_api import admins_count, user_out
 from app.crypto import encrypt_str
 from app.deps import ActiveSession, Admin, Db, DownloadGuard, NoNul, api_error, require_reauth
@@ -168,6 +168,18 @@ async def patch_user(uid: uuid.UUID, body: UserPatch, admin: Admin, sess: Active
         if set(ch) - {"is_active"}:
             raise api_error(409, "approval_pending")
         return await _approve(u, version, admin, sess, db)
+    handback = False
+    if ch.get("is_active") and not u.is_active:
+        # switching an account back on gives its rights back: re-confirmed, as lifting a block (block_user). A directory
+        # account follows the block's rule: switched off by the sync (sync:…) only the directory switches it on; one an
+        # admin switched off is handed back to the sync – off ("sync:unblocked") until a sign-in or the next sync finds a
+        # mapped group again
+        require_reauth(sess, admin)
+        if u.auth_source != "local":
+            if (u.deactivated_reason or "").startswith("sync:"):
+                raise api_error(409, "directory_managed")
+            ch.pop("is_active")
+            handback = True
     # checked before anything is written: the last active admin is never demoted or switched off
     if u.role == "admin" and u.is_active and (ch.get("role") == "reader" or ch.get("is_active") is False) and await admins_count(db) <= 1:
         raise api_error(409, "last_admin")
@@ -183,6 +195,9 @@ async def patch_user(uid: uuid.UUID, body: UserPatch, admin: Admin, sess: Active
         await sessions.revoke_all(db, u.id)
     elif ch.get("is_active"):
         u.deactivated_reason = None
+    elif handback:
+        u.deactivated_reason = "sync:unblocked"
+        audit.record(db, admin, "user.unblocked", audit.user_target(u), {"is_active": False, "reason": u.deactivated_reason})
     if "role" in ch:
         await sessions.revoke_all(db, u.id)  # new rights at the next sign-in
     after = {"display_name": u.display_name, "email": u.email, "role": u.role, "is_active": u.is_active}
@@ -433,25 +448,56 @@ def _signin_changed(db, admin: User, source: str, current: dict, data: dict) -> 
 
 class MfaIn(_M):
     required_all: bool
+    # "Zweiten Faktor auf dem Gerät merken" (app/auth/devices.py) – None: an older client, the stored value stays
+    remember: bool | None = None
+    remember_days: Literal[0, 1, 7, 30] | None = None  # 0: the maximum session lifetime
+    remember_admins: bool | None = None
     rev: int | None = None
+
+
+def _mfa_out(cfg: dict) -> dict:
+    return {
+        "required_all": bool(cfg["required_all"]),
+        "remember": bool(cfg.get("remember")),
+        "remember_days": devices.days_of(cfg),
+        "remember_admins": bool(cfg.get("remember_admins")),
+        "rev": int(cfg.get("rev") or 0),
+    }
+
+
+async def _session_h(db) -> int:  # noqa: ANN001
+    """The maximum session lifetime – what "Sitzungsdauer" means for the remembered devices (shown with the choice)."""
+    return int((await settings_store.get(db, "sessions"))["absolute_h"])
 
 
 @router.get("/auth/mfa")
 async def get_mfa(admin: Admin, db: Db) -> dict:
-    cfg = await settings_store.get(db, "mfa")
-    return {"required_all": bool(cfg["required_all"]), "rev": int(cfg.get("rev") or 0)}
+    return {**_mfa_out(await settings_store.get(db, "mfa")), "session_h": await _session_h(db)}
 
 
 @router.put("/auth/mfa")
 async def put_mfa(body: MfaIn, admin: Admin, sess: ActiveSession, db: Db) -> dict:
     """"Zweiter Faktor für alle": readers (local, AD/LDAP; Entra without a proof in the token) set up TOTP – a local one
-    also a passkey – at their next sign-in. Sessions already running are not ended: they go on until they end."""
+    also a passkey – at their next sign-in. Sessions already running are not ended: they go on until they end.
+    "Zweiten Faktor auf dem Gerät merken": switched off, every remembered device is forgotten (switching it on again
+    brings none back); admins excluded again, theirs; a shorter duration counts at once (devices.valid)."""
     require_reauth(sess, admin)
-    value = {"required_all": body.required_all}
-    if changes := audit.diff(await settings_store.get(db, "mfa"), value, value.keys()):
-        audit.record(db, admin, "signin.config_changed", audit.target("signin", "mfa", "mfa"), {"changes": changes})
-    out = await _put_section(db, "mfa", value, body.rev)
-    return {"required_all": bool(out["required_all"]), "rev": int(out.get("rev") or 0)}
+    current = _mfa_out(await settings_store.get(db, "mfa"))
+    value = {
+        "required_all": body.required_all,
+        "remember": current["remember"] if body.remember is None else body.remember,
+        "remember_days": current["remember_days"] if body.remember_days is None else body.remember_days,
+        "remember_admins": current["remember_admins"] if body.remember_admins is None else body.remember_admins,
+    }
+    forgotten = 0
+    if current["remember"] and not value["remember"]:
+        forgotten = await devices.forget_everyone(db)
+    elif current["remember_admins"] and not value["remember_admins"]:
+        forgotten = await devices.forget_everyone(db, admins_only=True)
+    if changes := audit.diff(current, value, value.keys()):
+        audit.record(db, admin, "signin.config_changed", audit.target("signin", "mfa", "mfa"), {"changes": changes, **({"devices_forgotten": forgotten} if forgotten else {})})
+    out = await _put_section(db, "mfa", value, body.rev)  # commits – with the forgotten devices (a stale save: neither)
+    return {**_mfa_out(out), "session_h": await _session_h(db)}
 
 
 class PendingIn(_M):

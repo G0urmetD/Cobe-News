@@ -30,11 +30,16 @@ desktop push and a Microsoft Teams Workflows webhook of their own.
   out together when they are due; urgent rows (person_deliveries.marks against the person's choice) pass at once.
 - **Absence** (app/absence.py, 0.1.35): the events of an absent person's routed products created during the absence
   go to the deputy (a recipient like any other: keyed per person and way, so exactly once also when the deputy gets the
-  product anyway) – never a watched CVE, never on to a deputy who is away themselves (then to the person).
+  product anyway) – never a watched CVE, never on to a deputy who is away themselves, nor to one without a way that
+  can carry it (allowed by an admin, switched on before the event, an address / a browser / a Teams URL): then to the
+  person.
 - **Muted** (app/reader.py, person_mutes): what a person muted for a while – a product, or a CVE (all CVEs of the
   event; a watched CVE's events too) – is skipped ("muted") for that person, when queued and again before it is sent;
   never sent later when the mute ends. Only that person's rows: team channels, the admins' rules and everybody else are
   untouched.
+- **Confirmed** (app/finding_confirm.py, vendor_confirms): a finding confirmed for everybody ("Treffer bestätigen") is
+  handled – its events are not routed (a queued one is skipped as "confirmed"), and one made while it stood is never
+  sent later, also when the confirmation is undone. When it lapses (the finding changed) the event of the change goes.
 - **Egress.** Mail through notify.send_mail (the SMTP settings, its pinned and checked connection). The Teams URL is a
   person's input: https on the Teams / Power Automate hosts only (TEAMS_HOSTS), public addresses only – never
   WEBHOOK_PRIVATE_NETS (notify.PUBLIC_ONLY) –, encrypted at rest (crypto) and never sent back or logged. Desktop push
@@ -47,9 +52,9 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlsplit
 
-from sqlalchemy import Integer, Uuid, and_, case, cast, delete, exists, func, literal, or_, select, text, true, tuple_, union, update
+from sqlalchemy import Integer, Uuid, and_, case, cast, delete, exists, false, func, literal, or_, select, text, true, tuple_, union, update
 from sqlalchemy import Text as SqlText
 from sqlalchemy.dialects.postgresql import ARRAY, TIMESTAMP
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -57,7 +62,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app import db as dbm
-from app import concerns, delivery_log, netaddr, notify, quiet, reader, teams, webpush
+from app import concerns, delivery_log, finding_confirm, netaddr, notify, quiet, reader, teams, webpush
 from app import systems as systems_svc
 from app import settings as settings_store
 from app.config import get_config
@@ -114,7 +119,7 @@ LABELS = {
             "Ein- und ausschalten: Einstellungen › Benachrichtigungen › Hersteller-News meiner Produkte (Beobachtete CVEs: Einstellungen › Benachrichtigungen › Beobachtete CVEs).",
         ],
         "summary": "{n} neue Hersteller-News",
-        "summary_text": "Höchste Schwere: {sev} · {first}",
+        "summary_text": "Höchste Schwere: {sev} · {products} · {first}",
     },
     "en": {
         "label": "Vendor news of my products",
@@ -123,7 +128,7 @@ LABELS = {
             "Switch on or off: Settings › Notifications › Vendor news of my products (watched CVEs: Settings › Notifications › Watched CVEs).",
         ],
         "summary": "{n} new vendor news",
-        "summary_text": "Highest severity: {sev} · {first}",
+        "summary_text": "Highest severity: {sev} · {products} · {first}",
     },
 }
 
@@ -257,10 +262,13 @@ def _routes(
     event_ids: list[uuid.UUID] | None = None,
     fresh: bool = True,
     after: datetime | None = None,
+    cover: dict[str, datetime | None] | None = None,
 ):  # noqa: ANN202
     """SQL: (event id, kind, severity, person, created, product) – a Vendor News event of a product of a team whose member gets
     it on `way`: not a baseline, not older than MAX_AGE, the account active, the way switched on before the event, the
-    event after the assignment, the joining and the routing. `fresh`: only those not decided for that way yet."""
+    event after the assignment, the joining and the routing. `fresh`: only those not decided for that way yet. `cover`:
+    the ways an admin allows, each with since when (_cover) – an absent member's event goes to the deputy only when one
+    of them can carry it (_covered); without it the member keeps it."""
     on = getattr(PersonNotify, f"{way}_on")
     since = getattr(PersonNotify, f"{way}_since")
     chosen = exists().where(TeamProductMember.team_product_id == TeamProduct.id, TeamProductMember.user_id == TeamMember.user_id)
@@ -277,7 +285,8 @@ def _routes(
         VendorEvent.created_at > TeamMember.added_at,
         or_(TeamProduct.all_members.is_(True), chosen),
         ~later,
-        ~_covered(),  # away: the deputy gets it instead (unless "also to me")
+        ~_covered(cover or {}),  # away: the deputy gets it instead (unless "also to me")
+        ~finding_confirm.held(),  # a confirmed finding (app/finding_confirm.py): handled – not sent, not later either
     ]
     if after is not None:
         where.append(VendorEvent.created_at > after)  # the way allowed by an admin only since then
@@ -303,28 +312,52 @@ def _routes(
     return union(team, _watch_routes(way, on, since, user_id=user_id, user_ids=user_ids, event_ids=event_ids, fresh=fresh, after=after), deputy)
 
 
-def _deputy_ok(pa, team_id, at):  # noqa: ANN001, ANN202
+def _cover(ways: dict[str, bool], since: dict[str, datetime | None]) -> dict[str, datetime | None]:
+    """The ways a deputy can take an event on (_covered): those an admin allows, each with since when (allowed_since)."""
+    return {w: since.get(w) for w in WAYS if ways.get(w)}
+
+
+def _deputy_ok(pa, team_id, at, cover: dict[str, datetime | None]):  # noqa: ANN001, ANN202
     """SQL: the deputy of absence `pa` takes an event of a product of team `team_id` created at `at`: an active account,
-    a member of that team since before the event, not away then themselves (no chains), with a way of their own on."""
+    a member of that team since before the event, not away then themselves (no chains), with a way of their own the
+    deputy routes (_deputy_routes) carry it on – allowed by an admin (`cover`, since before the event), switched on
+    before the event, and usable the way the round sends (_prepare): e-mail with an address, desktop with a browser
+    subscribed, Teams with a URL. No such way: nobody would get it (the round skips the deputy's row as no_address,
+    no_device, no_url) – the member keeps it."""
     du, dm, dp, away = aliased(User), aliased(TeamMember), aliased(PersonNotify), aliased(PersonAbsence)
+    eu, ps = aliased(User), aliased(PushSubscription)
+    carried = []
+    for way, after in cover.items():
+        since = getattr(dp, f"{way}_since")
+        one = [getattr(dp, f"{way}_on").is_(True), since.is_not(None), at > since]
+        if after is not None:
+            one.append(at > after)
+        if way == "email":
+            one.append(exists().where(eu.id == dp.user_id, eu.email.is_not(None), eu.email != "").correlate_except(eu))
+        elif way == "desktop":
+            one.append(exists().where(ps.user_id == dp.user_id).correlate_except(ps))
+        elif way == "teams":
+            one.append(dp.teams_url_enc.is_not(None))
+        carried.append(and_(*one))
     # nested two levels deep: correlated explicitly (everything but the subquery's own table comes from outside)
     return and_(
         exists().where(du.id == pa.deputy_id, du.is_active.is_(True)).correlate_except(du),
         exists().where(dm.team_id == team_id, dm.user_id == pa.deputy_id, dm.added_at < at).correlate_except(dm),
         ~exists().where(away.user_id == pa.deputy_id, away.starts_at <= at, away.ends_at > at).correlate_except(away),
-        exists().where(dp.user_id == pa.deputy_id, or_(dp.email_on.is_(True), dp.desktop_on.is_(True), dp.teams_on.is_(True))).correlate_except(dp),
+        exists().where(dp.user_id == pa.deputy_id, or_(false(), *carried)).correlate_except(dp),
     )
 
 
-def _covered():  # noqa: ANN202
-    """SQL (inside the team routes): the member was away when the event came and a deputy took it – not "also to me"."""
+def _covered(cover: dict[str, datetime | None]):  # noqa: ANN202
+    """SQL (inside the team routes): the member was away when the event came and a deputy took it on a way that can
+    carry it (_deputy_ok) – not "also to me"."""
     pa = aliased(PersonAbsence)
     return exists().where(
         pa.user_id == TeamMember.user_id,
         pa.also_me.is_(False),
         pa.starts_at <= VendorEvent.created_at,
         pa.ends_at > VendorEvent.created_at,
-        _deputy_ok(pa, TeamProduct.team_id, VendorEvent.created_at),
+        _deputy_ok(pa, TeamProduct.team_id, VendorEvent.created_at, cover),
     )
 
 
@@ -353,6 +386,7 @@ def _deputy_routes(way: str, on, since, *, user_id, user_ids, event_ids, fresh: 
         or_(TeamProduct.all_members.is_(True), chosen),
         ~later,
         ~exists().where(away.user_id == pa.deputy_id, away.starts_at <= VendorEvent.created_at, away.ends_at > VendorEvent.created_at),
+        ~finding_confirm.held(),
     ]
     if after is not None:
         where.append(VendorEvent.created_at > after)
@@ -420,7 +454,7 @@ async def enqueue(db: AsyncSession, ways: dict[str, bool]) -> int:
     for way in WAYS:
         if not ways.get(way):
             continue
-        rows = list(await db.execute(_routes(way, after=since.get(way))))
+        rows = list(await db.execute(_routes(way, after=since.get(way), cover=_cover(ways, since))))
         if not rows:
             continue
         prefs = await _prefs(db, {r[3] for r in rows})
@@ -463,22 +497,12 @@ async def _prefs(db: AsyncSession, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, 
 
 
 def event_path(ev: VendorEvent) -> str:
-    """The event in Vendor News: the product's drawer – at the finding (a vulnerability) or its versions."""
-    if ev.kind == WATCH:
-        return "/watch?" + urlencode({"cve": str((ev.data or {}).get("cve") or "")})
-    q = {"product": ev.product}
-    if ev.kind == "vuln" and (finding := reader.finding_of(ev.key, ev.scope)):
-        q["finding"] = finding  # also "now exploited" and "now rated higher": at the finding they are about
-    elif ev.kind in ("version", "eol"):
-        q["view"] = "versions"
-    elif ev.kind == "change":
-        q["view"] = "changes"
-    return "/vendor?" + urlencode(q)
+    """The event in Vendor News (or the watched CVEs) – the same path a rule's channels link to (notify.vendor_path)."""
+    return notify.vendor_path(ev)
 
 
 def story(ev: VendorEvent, lang: str) -> notify.Story:
-    s = notify.vendor_story(ev, lang)
-    s.link = get_config().base_url + event_path(ev)
+    s = notify.vendor_story(ev, lang)  # its link: notify.vendor_path, as event_path
     s.ours = []  # every event here is of the person's own products – the footer says so, no mark on each
     return s
 
@@ -520,13 +544,20 @@ def push_payloads(events: list[VendorEvent], lang: str) -> list[dict]:
     first = pairs[0][1]
     sev = notify.LABELS[lang]["sev"].get(top[0].severity, top[0].severity)
     lb = LABELS[lang]
+    names: list[str] = []
+    for e in top:  # the products, the most severe first (as _ordered): "PAN-OS, FortiOS +2"
+        d = e.data or {}
+        n = notify.label_now(e.product, str(d["product"])) if d.get("product") else str(d.get("cve") or e.product)
+        if n not in names:
+            names.append(n)
+    products = notify.names_text(names)
     return [
         {
             "v": 1,
             "kind": "vendor-summary",
             "id": f"vendor-summary-{int(time.time())}",
             "title": lb["summary"].format(n=len(top)),
-            "body": lb["summary_text"].format(sev=sev, first=first.title[:120]),
+            "body": notify.one_line(lb["summary_text"].format(sev=sev, products=products, first=first.title[:120])),
             "severity": top[0].severity,
             # all of them in Vendor News: their product when they are of one, else the overview (as the mail's button)
             "url": notify.overview_path([s for _, s in pairs], len(pairs)),
@@ -734,6 +765,7 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
     if not groups:
         await db.commit()
         return []
+    cover = _cover(ways, await allowed_since(db))
     uids = sorted({u for u, _ in groups})
     people = {p.user_id: (p, email) for p, email in await db.execute(select(PersonNotify, User.email).join(User, User.id == PersonNotify.user_id).where(PersonNotify.user_id.in_(uids)))}
     # the open rows of these person-ways, at most PER_GROUP each (the oldest first)
@@ -757,7 +789,7 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
         mine = {(k[0], e) for k in keys for e in open_[k]}
         who = sorted({k[0] for k in keys})
         for i in range(0, len(evs), IN_CHUNK):
-            for ev, kind, sev, uid, at, product in await db.execute(_routes(way, user_ids=who, event_ids=evs[i : i + IN_CHUNK], fresh=False)):
+            for ev, kind, sev, uid, at, product in await db.execute(_routes(way, user_ids=who, event_ids=evs[i : i + IN_CHUNK], fresh=False, cover=cover)):
                 entry = people.get(uid)
                 if (uid, ev) in mine and entry is not None and wants(entry[0], kind, sev, product, chosen.of(entry[0])):
                     still.setdefault((uid, way), []).append((ev, sev, at))
@@ -767,8 +799,11 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], now: datetime, group
         still = {k: kept_ for k, rows in still.items() if (kept_ := [r for r in rows if (r[0], k[0]) not in hushed])}
     kept = {(uid, way, r[0]) for (uid, way), rows in still.items() for r in rows}
     gone = [(ev, uid, way) for (uid, way), evs in open_.items() for ev in evs if (uid, way, ev) not in kept]
+    # confirmed since it was queued (app/finding_confirm.py): no longer routed – said as such
+    confirmed = await finding_confirm.held_events(db, {g[0] for g in gone if (g[0], g[1]) not in hushed}) if gone else set()
     await _skip_rows(db, [g for g in gone if (g[0], g[1]) in hushed], "muted")
-    await _skip_rows(db, [g for g in gone if (g[0], g[1]) not in hushed], "not_routed")
+    await _skip_rows(db, [g for g in gone if (g[0], g[1]) not in hushed and g[0] in confirmed], "confirmed")
+    await _skip_rows(db, [g for g in gone if (g[0], g[1]) not in hushed and g[0] not in confirmed], "not_routed")
     jobs: list[_Job] = []
     no: dict[str, list[tuple[uuid.UUID, str]]] = {"no_address": [], "no_device": [], "no_url": []}
     desktop = sorted({uid for uid, way in still if way == "desktop"})

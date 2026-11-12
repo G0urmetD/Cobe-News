@@ -110,6 +110,43 @@ Ist er an, braucht jede Anmeldung einen zweiten Faktor – nicht nur die der Adm
   („Ein zweiter Faktor ist Pflicht …“).
 - Ausschalten nimmt niemandem etwas weg: eingerichtete Apps und Passkeys bleiben.
 
+### Zweiten Faktor auf dem Gerät merken {#geraet-merken}
+
+[Einstellungen → Anmeldung](/settings/auth), Karte *Zweiter Faktor*, Schalter „Zweiten Faktor auf dem Gerät merken“ –
+**standardmäßig aus**: Er schwächt den zweiten Faktor, das entscheidet der Admin. Speichern verlangt eine
+[erneute Bestätigung](#erneut-bestaetigen) und steht im [Protokoll](/docs/betrieb#protokoll).
+
+Ist er an, zeigt der Schritt mit dem Code den Schalter „Auf diesem Gerät merken (bis …)“. Wer ihn einschaltet, gibt in
+diesem Browser bis dahin nur noch das **Passwort** ein – der Code wird übersprungen.
+
+| Einstellung | Auswahl | Standard |
+|---|---|---|
+| Merken für | Sitzungsdauer (die Höchstdauer unter [Zeitlimits](#sitzungen-zeitlimits)), 1, 7 oder 30 Tage | Sitzungsdauer |
+| Auch für Admins | an / aus | aus – Admins geben den Code bei jeder Anmeldung ein |
+
+- **Nur der Code** wird übersprungen, nie das Passwort. Ein [Startpasswort](#benutzer-anlegen) wird trotzdem ersetzt,
+  eine fällige Einrichtung trotzdem verlangt. Sperren nach falschen Passwörtern gelten wie immer.
+- **Das Notfall-Konto** wird nie gemerkt.
+- **Entra-Konten:** gilt nur dort, wo Cobe News seinen eigenen TOTP fragt ([MFA-Nachweis](#entra-mfa-nachweis)). Den
+  zweiten Faktor bei Microsoft regelt Microsoft.
+- **Heikle Änderungen** fragen trotzdem nach dem Code: Eine Anmeldung über ein gemerktes Gerät zählt nicht als
+  [erneute Bestätigung](#erneut-bestaetigen). Das eigene Passwort ändern verlangt mit TOTP immer den Code, eine
+  [Kalender-Adresse](/docs/benachrichtigungen#kalender-ical) erzeugen in einer solchen Sitzung erst die Bestätigung.
+- **Wie es gespeichert ist:** Der Browser hält ein zufälliges Token in einem eigenen Cookie (HttpOnly, Secure wie das
+  Sitzungs-Cookie, SameSite=Strict, nur für `/api/auth`), der Server nur dessen Hash. Es gilt nur für das Konto, für
+  das es gemerkt wurde.
+- **Es gilt nicht mehr**, sobald sich Passwort, TOTP oder Rolle des Kontos ändern, die Dauer abgelaufen ist (eine
+  kürzere Dauer gilt sofort auch für schon gemerkte Geräte), der Schalter aus ist oder Admins ausgenommen werden.
+- **Vergessen** werden gemerkte Geräte unter [Meine Sitzungen](#meine-sitzungen) (eins oder alle), durch einen Admin
+  („Sitzungen & Passkeys“ → „Gemerkte Geräte vergessen“), mit „Alle anderen abmelden“ / „Alle Sitzungen beenden“, beim
+  Sperren, Deaktivieren und Zurücksetzen, nach einer [Wiederherstellung](/docs/sicherung#wiederherstellung) alle.
+  Ausschalten vergisst alle – wieder einschalten bringt keins zurück.
+- **Ein Browser, zwei Konten:** Der Browser merkt sich nur ein Gerät – das zuletzt gemerkte. Das Gerät des anderen
+  Kontos steht weiter in dessen Liste, gilt in diesem Browser aber nicht mehr (dort fragt die Anmeldung wieder nach dem
+  Code); „Vergessen“ räumt es weg. „Alle Geräte vergessen“ des einen Kontos lässt das gemerkte Gerät des anderen stehen.
+- Im [Protokoll](/docs/betrieb#protokoll): „Gerät für den zweiten Faktor gemerkt“, „Gemerkte Geräte vergessen“; die
+  Anmeldung eines Admins über ein gemerktes Gerät mit der Anmeldeart „Passwort + gemerktes Gerät“.
+
 ### Verwalten {#benutzer-verwalten}
 
 In jeder Zeile der Benutzerliste:
@@ -119,7 +156,7 @@ In jeder Zeile der Benutzerliste:
 | Rolle ändern | Auswahl *Rolle* | Nur lokale Konten – bei AD/Entra folgt die Rolle der Gruppe. Verlangt erneute Bestätigung. Alle Sitzungen des Kontos enden. |
 | Freigeben / Ablehnen | Schaltflächen in der Zeile (*Wartet auf Freigabe*) | Nur solange die [automatische Anmeldung](#freigabe) aus ist. „Freigeben“ schaltet das Konto ein – als Admin mit erneuter Bestätigung; den Schalter *Aktiv* einschalten ist dasselbe. „Ablehnen“ lässt es aus wie *Dauerhaft sperren*. |
 | Aufstieg freigeben / Bleibt Leser | Schaltflächen in der Zeile (*Aufstieg zum Admin wartet auf Freigabe*) | „Aufstieg freigeben“ macht den Leser zum Admin (erneute Bestätigung, alle Sitzungen enden). „Bleibt Leser“: Solange das Konto in der Admin-Gruppe ist, wird nicht wieder gefragt. |
-| Deaktivieren / aktivieren | Schalter *Aktiv* | Sitzungen enden sofort. Bei einem Admin-Konto mit erneuter Bestätigung. Ein von dir deaktiviertes Verzeichniskonto schaltet der Verzeichnisabgleich nie wieder ein. |
+| Deaktivieren / aktivieren | Schalter *Aktiv* | **Ausschalten:** Sitzungen enden sofort; bei einem Admin-Konto mit [erneuter Bestätigung](#erneut-bestaetigen). Ein von dir ausgeschaltetes Verzeichniskonto schaltet der Verzeichnisabgleich nie wieder ein. **Einschalten:** immer mit erneuter Bestätigung. Ein lokales Konto ist sofort wieder aktiv. Ein Verzeichniskonto, das du ausgeschaltet hattest, geht an den Abgleich zurück: Es bleibt vorerst aus (Hinweis „geht an den Verzeichnisabgleich zurück“) und wird aktiv, sobald die nächste Anmeldung oder der stündliche Abgleich es in einer zugeordneten Gruppe (oder einem Team) findet. Ein Verzeichniskonto, das der Abgleich ausgeschaltet hat (nicht mehr in einer zugeordneten Gruppe, im Verzeichnis deaktiviert oder gelöscht), schaltet nur das Verzeichnis wieder ein – der Schalter sagt das und lässt es aus. |
 | Dauerhaft sperren | „Weitere Aktionen“ → „Dauerhaft sperren“ | Auch für ein Konto, das der Abgleich oder Teams schon ausgeschaltet hat (sein Schalter steht schon auf aus). Danach steht *Vom Admin gesperrt*: Weder der Abgleich noch Teams noch eine Anmeldung schalten das Konto wieder ein. Verlangt erneute Bestätigung, alle Sitzungen enden. |
 | Dauerhafte Sperre aufheben | „Weitere Aktionen“ → „Dauerhafte Sperre aufheben“ | Verzeichniskonto: Danach entscheidet wieder der Abgleich (*Wartet auf Abgleich*) – aktiv, sobald eine Anmeldung oder der nächste Abgleich eine zugeordnete Gruppe oder ein Team findet. Lokales Konto: sofort wieder aktiv. Verlangt erneute Bestätigung. |
 | Sperre aufheben | Menü „Weitere Aktionen“ → „Sperre aufheben“ | Nur aktiv, wenn das Konto wegen Fehlversuchen gesperrt ist (Markierung *Gesperrt (… min)*). |
@@ -309,7 +346,9 @@ Domänencontroller, liest die Gruppen und bestimmt daraus die Rolle. Admins aus 
 
 Domänencontroller dürfen im Firmennetz liegen (private Adressen sind erlaubt). Nie erlaubt sind Loopback, Link-Local,
 die eigenen Docker-Netze von Cobe News und der Docker-Host selbst (z. B. `host.docker.internal`, bei Docker Desktop das
-Netz `192.168.65.0/24`). „Verbindung testen“ meldet dann „Ziel nicht erlaubt …“. Bei Fehlern zeigt Cobe News nur deren
+Netz `192.168.65.0/24`). „Verbindung testen“ meldet dann „Ziel nicht erlaubt …“. Geprüft wird der Name und – beim
+Verbinden – die Adresse, die tatsächlich erreicht wurde, bevor StartTLS oder ein Passwort folgt (ein Name, der danach auf
+ein verbotenes Ziel zeigt, hilft nicht). Bei Fehlern zeigt Cobe News nur deren
 Art, nie Antworten des Servers.
 
 ### Fehler beim Testen {#ad-fehler}
@@ -969,10 +1008,14 @@ wird abgelehnt.
 Sitzungen enden außerdem von selbst bei: Passwortänderung (alle anderen), Zurücksetzen von Passwort oder TOTP durch
 einen Admin, Rolle ändern, Deaktivieren oder Sperren (alle) und Entfernen eines Passkeys (die damit angemeldeten).
 
+Ist [Zweiten Faktor auf dem Gerät merken](#geraet-merken) an, steht darunter *Gemerkte Geräte*: wo die Anmeldung nach
+dem Passwort nicht nach dem Code fragt – mit „Dieses Gerät“, seit wann, bis wann, zuletzt genutzt. „Vergessen“ für
+eins, „Alle Geräte vergessen“ für alle. „Alle anderen abmelden“ vergisst sie ebenfalls.
+
 ### Erneut bestätigen {#erneut-bestaetigen}
 
 Heikle Änderungen verlangen, dass du dich in den letzten **10 Minuten** ausgewiesen hast – die Anmeldung selbst zählt
-dazu. Betroffen sind:
+dazu (nicht die über ein [gemerktes Gerät](#geraet-merken) ohne Code). Betroffen sind:
 
 - **Anmeldung und Konten:** Anmelde-Einstellungen (AD, Entra, Sitzungen), Rollen-Zuordnungen, einen Admin anlegen, eine
   Rolle ändern, ein Admin-Konto aktivieren oder deaktivieren oder seine E-Mail-Adresse ändern, Passwort oder TOTP eines

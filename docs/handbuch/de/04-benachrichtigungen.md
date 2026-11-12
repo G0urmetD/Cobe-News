@@ -52,14 +52,20 @@ KEV-Katalog). Ein Thema, das erst später dazukommt – etwa aus den Details aus
 Desktop-Benachrichtigung mehr aus; dafür gibt es [Regeln](#regel-themen), die so eine Meldung dann nachreichen. Der
 offene Tab und Push bei geschlossenem Tab filtern gleich.
 
+**Was die Benachrichtigung zeigt**: Unter dem Titel stehen die Schwere (mit CVSS, wenn die Meldung einen nennt),
+„ausgenutzt“, wenn die Lücke angegriffen wird, die Produkte, um die es geht, und die Quelle – etwa „Kritisch (CVSS 9.2)
+· ausgenutzt · PAN-OS, Prisma Cloud · BSI“. Hat die Meldung keine eigene Schwere, fehlt sie. Kommen mehr Meldungen auf
+einmal, nennt die Sammel-Benachrichtigung die höchste Schwere und die Produkte.
+
 **Systeme, Schlagwörter und „Nicht anzeigen, wenn enthalten“** – wie bei den [Regeln](#regel-systeme), nur für dich:
 
-- **Systeme**: Hersteller („Alle Produkte von Palo Alto Networks“) oder einzelne Produkte aus dem ganzen Katalog.
+- **Systeme**: Hersteller („Alle Produkte von Palo Alto Networks“) oder einzelne Produkte aus dem ganzen Katalog – oder
+  ganz oben [Unsere Produkte (aus Vendor News)](#regel-systeme): alle gefolgten Produkte, auch später hinzugefügte.
 - **Schlagwörter**: eigene Wörter als Chips (Enter oder Komma), ganze Wörter in Titel oder Teaser, Groß-/Kleinschreibung
   egal, reiner Text (höchstens 30, je 2–60 Zeichen).
 - Systeme **oder** Schlagwörter – eines genügt, zusammen mit Schwere, Quelle und Thema.
 - **Nicht anzeigen, wenn enthalten**: Steht ein solches Wort in Titel oder Teaser, kommt keine Benachrichtigung.
-- Die Benachrichtigung sagt dann, warum sie kommt: „Kritisch · heise online · Treffer: PAN-OS“.
+- Die Benachrichtigung sagt dann, warum sie kommt: „Kritisch · Treffer: PAN-OS · heise online“.
 - Es zählt, was die Meldung **beim Eintreffen** hat – vor allem, was Titel und Teaser nennen. Ein System, das erst
   später aus den Details aus der Quelle dazukommt, löst keine Desktop-Benachrichtigung mehr aus (wie ein Thema); eine
   [Regel](#regel-systeme) reicht so eine Meldung nach.
@@ -96,7 +102,9 @@ wenn kein Tab offen ist – solange der Browser läuft.
   beendet Push nicht.
 
 Für beide Wege gilt: Bis zu drei Meldungen einer Runde kommen einzeln, mehr als eine Zusammenfassung
-(„N weitere neue Meldungen“). „Kritisch“ bleibt stehen, bis du sie wegklickst. Desktop-Benachrichtigungen zeigen nur
+(„N weitere neue Meldungen“). Einzeln kommen zuerst die kritischen und die aktiv ausgenutzten, dann die neuesten; die
+höchste Schwere der Zusammenfassung zählt alle übrigen Meldungen der Runde. „Kritisch“ bleibt stehen, bis du sie
+wegklickst. Desktop-Benachrichtigungen zeigen nur
 Security-Meldungen aus dem News-Feed; Vendor News und den Zustand der Quellen gibt es über Kanäle und Regeln – die
 Vendor News deiner eigenen Produkte auch über [Hersteller-News meiner Produkte](#meine-produkte).
 
@@ -198,7 +206,8 @@ Teams nimmt die Nachrichten über einen **Workflow** an, den du selbst anlegst. 
   kommen nur deren Hersteller-News („Alle Produkte von Palo Alto Networks“ umfasst auch Produkte, die dir später
   zugeordnet werden). Leer heißt: alle deine Produkte. Wie bei den Systemen einer Regel für Vendor News zählt das
   Produkt der Meldung – es steht ohnehin in jeder Nachricht. Schlagwörter gibt es hier nicht; sie gelten für
-  Security-Meldungen ([Desktop-Benachrichtigungen](#desktop-einschalten)). Beobachtete CVEs kommen immer.
+  Security-Meldungen ([Desktop-Benachrichtigungen](#desktop-einschalten)). „Unsere Produkte“ gibt es hier nicht – es gibt
+  Hersteller-News nur zu gefolgten Produkten, das wäre dasselbe wie leer. Beobachtete CVEs kommen immer.
 - **Filter.** Was dein Filter (Art, Schwere, Systeme) einmal ausgelassen hat, kommt auch nach einer Änderung des Filters
   nicht nach.
 - **Stumm.** Was du [stummgeschaltet](#stummschalten) hast, kommt nicht – auch nicht, wenn die Stummschaltung endet.
@@ -454,6 +463,9 @@ Weile** stumm: für **7 Tage**, **30 Tage** oder **bis zu einem Datum** (höchst
 **Wo:** im Menü **⋯** einer Meldung oder einer Produktkachel, unten in der Meldung bzw. Produkt-Schublade, an einem
 Befund und in der Merkliste der [beobachteten CVEs](#cves-liste) (aufgeklappte Zeile).
 
+**Bestätigen statt stummschalten?** Ist ein Befund für alle erledigt (z. B. die betroffene Funktion ist nicht im
+Einsatz), [bestätige](/docs/vendor-news#treffer-bestaetigen) ihn – das gilt für alle und bleibt.
+
 **Was es bewirkt – nur für dich:**
 
 - **Keine persönlichen Benachrichtigungen** dafür auf deinen Wegen (E-Mail, Desktop-Push, eigener Teams-Webhook):
@@ -622,7 +634,10 @@ nach – keine Bilder, keine Zählpixel.
   ohne Zusammenfassungen.
 - **Knopf „Cobe News öffnen“.** Bei einer Meldung öffnet er genau diese. Bei mehreren öffnet er die News-Liste, gefiltert
   auf genau die Meldungen der Nachricht – auch die unter „… und N weitere“ (Chip „Aus der Benachrichtigung (N)“, bis
-  50 Meldungen; mehr: die ganze Liste). Vendor-News-Befunde eines Produkts öffnen dieses Produkt, mehrere Produkte
+  50 Meldungen; mehr: die ganze Liste). Eine Vendor-News-Meldung öffnet ihr Produkt genau dort, worum es geht: eine
+  Schwachstelle beim Befund, eine neue Version oder ein Support-Ende bei „Versionen“, ein geändertes Advisory bei
+  „Änderungen“, eine beobachtete CVE in der Liste der beobachteten CVEs – ebenso „In Cobe News öffnen“. Mehrere
+  Meldungen eines Produkts öffnen das Produkt (beim gemeinsamen Reiter, wenn sie einen teilen), mehrere Produkte
   Vendor News. Dasselbe gilt für den Knopf in Slack und Teams, den Klick auf ntfy-, Gotify- und Desktop-Push-Nachrichten
   und die persönlichen Nachrichten; eine weitergeleitete Meldung öffnet sich selbst.
 - **Zeit.** In Ortszeit mit Zonenkürzel, damit sie eindeutig ist: „04.11.2026 11:19 MEZ“ (Sommer: MESZ; englisch
@@ -1403,6 +1418,12 @@ eine Regel für genau das, was euch angeht. Beispiel „nur Palo Alto, nur Kriti
     nicht auf ein einzelnes Zyxel-Produkt. Ein Name, den mehrere Produkte eines Herstellers teilen, zählt für das
     Produkt, dessen Name es ist: „PAN-OS“ ist PAN-OS, nicht Panorama; der längere Name gewinnt („NGINX Plus“ ist nicht
     auch nginx).
+- **Unsere Produkte (aus Vendor News)** steht ganz oben in der Auswahl: alle Produkte, denen Cobe News in
+  [Vendor News](/docs/vendor-news) folgt – so, als wäre jedes einzeln gewählt (Details oder Titel/Teaser), dazu per CPE
+  angelegte eigene Produkte über ihre Details. Es gilt die Liste von jetzt: Ein später gefolgtes Produkt zählt für
+  Meldungen, die **ab dann** eintreffen (oder es ab dann bekommen, etwa durch nachgelieferte Details) – ältere Meldungen
+  zu ihm kommen nicht nachträglich. Ein Produkt, dem ihr nicht mehr folgt (ausgeschaltet oder entfernt), zählt nicht
+  mehr. Folgt ihr keinem Produkt, passt nichts. „Treffer“ nennt das Produkt („Treffer: PAN-OS“).
 - Ein **Hersteller ist einer**, auch wenn der Katalog ihn verschieden schreibt: „VMware“ und „Broadcom (VMware)“, „Apache“
   und „Apache Software Foundation“, „LANCOM“ und „LANCOM Systems“ erscheinen als eine Gruppe, „Alle Produkte“ umfasst
   alle. Ein Eigentümer in Klammern macht keinen: „CyberArk (Palo Alto Networks)“ gehört nicht zu Palo Alto Networks.
@@ -1413,8 +1434,8 @@ eine Regel für genau das, was euch angeht. Beispiel „nur Palo Alto, nur Kriti
   Beides leer heißt: keine Einschränkung, wie bisher.
 - **Nicht senden, wenn enthalten:** Steht eines dieser Wörter in Titel oder Teaser, kommt die Meldung über diese Regel
   nie – egal, was sonst passt.
-- **Vendor News:** Systeme gelten auch für Schwachstellen, neue Versionen und geänderte Advisories (über deren Produkt).
-  Schlagwörter und Ausschluss gelten nur für Security-Meldungen, Quellen-Gesundheit kennt keines davon.
+- **Vendor News:** Systeme gelten auch für Schwachstellen, neue Versionen und geänderte Advisories (über deren Produkt;
+  „Unsere Produkte“: jedes gefolgte Produkt). Schlagwörter und Ausschluss gelten nur für Security-Meldungen, Quellen-Gesundheit kennt keines davon.
 - **Details kommen später:** Eine Meldung, die erst durch nachgelieferte Details passt, kommt dann – einmal. Lernt
   dagegen der **Katalog** ein Produkt oder einen Namen dazu (Katalog-Update), werden ältere Meldungen dadurch nicht
   verschickt.

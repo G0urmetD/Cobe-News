@@ -28,25 +28,35 @@ A story concerns a system when either
 Loud and quiet (as the topics: news.loud_topic): a system gained by an event of the story's own – stored, its title or
 teaser changed, its details arrived or changed – is loud; one gained by a recompute (the first backfill, a catalogue
 change: systems_round; details fetched again unchanged) is quiet (news_items.quiet_systems) – matched and shown, never
-a reason for a rule to send an older story. A rule asks only for loud ones (loud)."""
+a reason for a rule to send an older story. A rule asks only for loud ones (loud).
+
+"Unsere Produkte (aus Vendor News)" ({"ours": true} – `system=ours` in an address) stands for the products Cobe News
+follows in Vendor News at the moment a story is judged (Followed – the enabled follows): a product followed later counts,
+one no longer followed stops counting; never stored as a list. Each counts as if chosen on its own (its key and its
+mention – exact or named), a merged key as the product it is now; a product followed by CPE (custom-<uuid>, no catalogue
+entry) by news_items.products (the details concern it – story_details). Nothing followed: no story (never "all"). For
+the notifications (loud) a product counts from when it was followed (vendor_follows.enabled_at): for a story that
+arrived after that, or that gained it loudly after that – a rule active for months does not send the older stories about
+a product followed today (as a widened rule: from then on). Lists (the News filter, the dry run) count every story."""
 
 import asyncio
 import hashlib
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from sqlalchemy import ColumnElement, Text, and_, any_, cast, false, func, literal, literal_column, or_, select, update
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy import ColumnElement, Text, and_, any_, cast, column, false, func, literal, literal_column, or_, select, update, values
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TIMESTAMP
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import db as dbm
 from app import settings as settings_store
 from app import vendor_catalog as catalog
-from app.models import NewsItem, StoryDetail
+from app.models import NewsItem, StoryDetail, VendorFollow
 
 log = logging.getLogger("cobe_news.systems")
 
@@ -55,6 +65,8 @@ STATE = "news_systems"  # settings row: {"v": SYSTEMS_V, "sig": {"p": {key: hash
 BATCH = 500
 MENTION, VENDOR = "m:", "v:"
 ENTRIES_MAX = 50  # systems a rule names
+OURS = "ours"  # the entry {"ours": True} – the followed products (Followed); its text (text_of) and address value
+FOLLOWED_TTL = 60.0  # seconds the followed products are kept at most (a change in this process is seen at once: vendor.gen)
 
 # Ordinary words – a name made only of these (or of two letters) is no reliable sign of the product on its own: it
 # counts only together with its vendor (or, for the names of CONTEXT, in a security context). Product names of the
@@ -595,14 +607,114 @@ def remention(item: NewsItem) -> None:
             news.touched(item, systems=gained)
 
 
+# ---------------------------------------------------------------- "Unsere Produkte": the followed products
+
+
+@dataclass(frozen=True)
+class Followed:
+    """The products followed in Vendor News (the enabled follows) as "Unsere Produkte" stands for them – read once per
+    round or request (load_followed), not per story."""
+
+    keys: frozenset[str] = frozenset()  # catalogue products, by their key now (a merged one as the product it is now)
+    custom: dict = field(default_factory=dict)  # followed by CPE: custom-<uuid> → its label (no catalogue entry)
+    since: dict = field(default_factory=dict)  # key → when it was followed or last switched on (enabled_at)
+    stamp: tuple = ()
+    at: float = 0.0
+
+
+_followed: list[Followed | None] = [None]
+
+
+async def load_followed(db: AsyncSession) -> Followed:
+    """The followed products for what follows (followed()) – read again when Vendor News' generation counter moved in
+    this process (a follow added, switched, removed: vendor_api bumps it) or after FOLLOWED_TTL (a change elsewhere: the
+    CLI, a restore). One small query; the rounds and the requests that judge "Unsere Produkte" call it first."""
+    from app import vendor  # vendor imports this module
+
+    stamp = (vendor.gen.value, vendor.gen.epoch)
+    cur = _followed[0]
+    if cur is not None and cur.stamp == stamp and time.monotonic() - cur.at < FOLLOWED_TTL:
+        return cur
+    rows = (await db.execute(select(VendorFollow.product, VendorFollow.custom, VendorFollow.enabled_at, VendorFollow.created_at).where(VendorFollow.enabled.is_(True)))).all()
+    keys: set[str] = set()
+    custom: dict[str, str] = {}
+    since: dict[str, datetime] = {}
+    for product, cust, enabled_at, created_at in rows:
+        if cust:
+            key = str(product)
+            custom[key] = str(cust.get("label") or key)
+        else:
+            key = catalog.REPLACED.get(product, product)
+            keys.add(key)
+        at = enabled_at or created_at or datetime.now(UTC)
+        since[key] = min(since.get(key, at), at)  # the old and the merged key both followed: the earlier
+    got = Followed(frozenset(keys), custom, since, stamp, time.monotonic())
+    _followed[0] = got
+    return got
+
+
+def followed() -> Followed:
+    """The followed products as last read (load_followed) – none read yet: nothing followed (never "all")."""
+    cur = _followed[0]
+    if cur is None:
+        log.warning("followed products judged before they were read: none")
+        return Followed()
+    return cur
+
+
+def has_ours(values) -> bool:  # noqa: ANN001
+    return any(OURS in e for e in entries(values))
+
+
+def ours_custom(values) -> list[str]:  # noqa: ANN001
+    """The products followed by CPE "Unsere Produkte" stands for (when chosen) – sorted."""
+    return sorted(followed().custom) if has_ours(values) else []
+
+
+_TS = TIMESTAMP(timezone=True)
+
+
+def ours_loud() -> ColumnElement:
+    """SQL (a notification): the story has one of the followed products loudly – and arrived after that product was
+    followed (or gained it loudly after that: news_items.changes "systems"); a product followed by CPE: its details
+    concern it (news_items.products) and it arrived after the follow. Nothing followed: no story. One VALUES list of
+    (entry, since) – no clause per product."""
+    fol, ix = followed(), index()
+    pairs = [(e, fol.since[k]) for k in sorted(fol.keys) if k in ix.products for e in (k, MENTION + k)]
+    parts = []
+    if pairs:
+        v = values(column("entry", Text), column("since", _TS), name="ours_since").data(pairs)
+        e = func.jsonb_array_elements_text(NewsItem.systems.op("-", return_type=JSONB)(_QUIET)).table_valued(column("value", Text)).alias()
+        when = NewsItem.changes.op("->", return_type=JSONB)(literal("systems", Text)).op("->>", return_type=Text)(e.c.value)
+        later = select(1).select_from(e.join(v, v.c.entry == e.c.value)).where(or_(NewsItem.fetched_at > v.c.since, cast(when, _TS) > v.c.since)).exists()
+        parts.append(and_(NewsItem.systems.op("?|")(pg_array(sorted({x for x, _ in pairs}))), later))
+    if fol.custom:
+        c = values(column("key", Text), column("since", _TS), name="ours_custom").data([(k, fol.since[k]) for k in sorted(fol.custom)])
+        p = func.jsonb_array_elements_text(NewsItem.products).table_valued(column("value", Text)).alias()
+        later = select(1).select_from(p.join(c, c.c.key == p.c.value)).where(NewsItem.fetched_at > c.c.since).exists()
+        parts.append(and_(NewsItem.products.op("?|")(pg_array(sorted(fol.custom))), later))
+    return or_(*parts) if parts else false()
+
+
+def ours_has() -> ColumnElement:
+    """SQL (a list, the dry run): the story has one of the followed products, also only quietly, whenever it arrived."""
+    fol = followed()
+    parts = [has(wanted([{OURS: True}]))]
+    if fol.custom:
+        parts.append(NewsItem.products.op("?|")(pg_array(sorted(fol.custom))))
+    return or_(*parts)
+
+
 # ---------------------------------------------------------------- what a rule's systems stand for
 
 
 def entries(values) -> list[dict]:  # noqa: ANN001
-    """A rule's systems as stored – [{"vendor": …} | {"product": …}], anything else dropped."""
+    """A rule's systems as stored – [{"ours": True} | {"vendor": …} | {"product": …}], anything else dropped."""
     out = []
     for x in values or []:
-        if isinstance(x, dict) and isinstance(x.get("product"), str) and x["product"]:
+        if isinstance(x, dict) and x.get(OURS) is True:
+            out.append({OURS: True})
+        elif isinstance(x, dict) and isinstance(x.get("product"), str) and x["product"]:
             out.append({"product": x["product"]})
         elif isinstance(x, dict) and isinstance(x.get("vendor"), str) and x["vendor"]:
             out.append({"vendor": x["vendor"]})
@@ -610,7 +722,9 @@ def entries(values) -> list[dict]:  # noqa: ANN001
 
 
 def known(entry: dict) -> bool:
-    """Whether the catalogue knows the entry (a merged product as the one it is now)."""
+    """Whether the catalogue knows the entry (a merged product as the one it is now) – "Unsere Produkte" always."""
+    if OURS in entry:
+        return True
     ix = index()
     if "product" in entry:
         return catalog.REPLACED.get(entry["product"], entry["product"]) in ix.products
@@ -618,7 +732,10 @@ def known(entry: dict) -> bool:
 
 
 def text_of(entry: dict) -> str:
-    """An entry as one comparable text – the rules' filter (notify.rule_filter): "p:panos", "v:paloaltonetworks"."""
+    """An entry as one comparable text – the rules' filter (notify.rule_filter): "p:panos", "v:paloaltonetworks",
+    "ours"."""
+    if OURS in entry:
+        return OURS
     if "product" in entry:
         return f"p:{catalog.REPLACED.get(entry['product'], entry['product'])}"
     vid = vendor_id(entry.get("vendor", ""))
@@ -629,6 +746,9 @@ def of_text(values) -> list[dict]:  # noqa: ANN001
     """notify.rule_filter's texts back as entries (a vendor by its id – vendor_id of an id is the id)."""
     out = []
     for x in values or []:
+        if str(x) == OURS:
+            out.append({OURS: True})
+            continue
         kind, _, ref = str(x).partition(":")
         if ref and kind == "p":
             out.append({"product": ref})
@@ -638,12 +758,16 @@ def of_text(values) -> list[dict]:  # noqa: ANN001
 
 
 def product_keys(values) -> list[str]:  # noqa: ANN001
-    """The catalogue products a rule's systems stand for (a vendor: all of its products as the catalogue has them now)
-    – sorted; with the keys merged into them (a Vendor News event of before a merge)."""
+    """The products a rule's systems stand for (a vendor: all of its products as the catalogue has them now; "Unsere
+    Produkte": the followed ones, also those followed by CPE) – sorted; with the keys merged into them (a Vendor News
+    event of before a merge)."""
     ix = index()
     out: set[str] = set()
     for e in entries(values):
-        if "product" in e:
+        if OURS in e:
+            fol = followed()
+            out |= {k for k in fol.keys if k in ix.products} | set(fol.custom)
+        elif "product" in e:
             k = catalog.REPLACED.get(e["product"], e["product"])
             if k in ix.products:
                 out.add(k)
@@ -685,13 +809,21 @@ def has(want: list[str]) -> ColumnElement:
 
 
 def label(entry: dict, lang: str = "de") -> str:
-    """An entry by its name: the product's label of today, a vendor with "(alle Produkte)" – the audit log, the editor."""
+    """An entry by its name: the product's label of today, a vendor with "(alle Produkte)", "Unsere Produkte (aus Vendor
+    News)" – the audit log, the editor."""
+    if OURS in entry:
+        return "Our products (from Vendor News)" if lang == "en" else "Unsere Produkte (aus Vendor News)"
     ix = index()
     if "product" in entry:
         p = ix.products.get(catalog.REPLACED.get(entry["product"], entry["product"]))
         return str(p.get("label") or p["key"]) if p else entry["product"]
     v = ix.vendors.get(ix.alias.get(vendor_id(entry.get("vendor", ""))) or "")
     return f"{v['name'] if v else entry.get('vendor', '')} ({'all products' if lang == 'en' else 'alle Produkte'})"
+
+
+def short_label(p: dict) -> str:
+    """A product's label without the parenthesis: "PAN-OS (Firewalls)" → "PAN-OS"."""
+    return _PAREN.sub("", str(p.get("label") or p["key"])).strip()
 
 
 def _within(words: tuple[str, ...], text: list[str]) -> bool:
@@ -713,7 +845,7 @@ def hits(story_systems: list[str], quiet: list[str], want: list[str], text: str 
         if e.startswith(VENDOR):
             return str((ix.vendors.get(ix.alias.get(e[2:], e[2:])) or {}).get("name") or "")
         p = ix.products.get(e.removeprefix(MENTION))
-        return _PAREN.sub("", str(p.get("label") or p["key"])) if p else ""
+        return short_label(p) if p else ""
 
     named = [e for e in got if e.startswith(MENTION)]
     if text and named:
@@ -733,8 +865,9 @@ _seen = [None]  # the catalogue at the last look – the same: nothing to compar
 
 
 def reset() -> None:
-    """Forget the last look (tests: a database of their own each)."""
+    """Forget the last look and the followed products (tests: a database of their own each)."""
     _seen[0] = None
+    _followed[0] = None
 
 
 def _changed(old: dict, new: dict) -> set[str]:

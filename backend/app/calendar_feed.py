@@ -31,7 +31,7 @@ from app import teams
 from app.auth import bruteforce
 from app.config import get_config
 from app.crypto import new_token, token_hash
-from app.deps import Db, Reader, client_ip
+from app.deps import ActiveSession, Db, Reader, client_ip, require_factor
 from app.models import CalendarFeed, PersonNotify, TeamProduct, User, VendorFollow
 
 router = APIRouter(tags=["calendar"])
@@ -215,8 +215,10 @@ async def get_mine(user: Reader, db: Db) -> dict:
 
 
 @api.post("")
-async def make_mine(user: Reader, db: Db) -> dict:
-    """A new address – the old one (if any) stops working at once. The token is in this answer only."""
+async def make_mine(user: Reader, sess: ActiveSession, db: Db) -> dict:
+    """A new address – the old one (if any) stops working at once. The token is in this answer only. A lasting way in to
+    the person's data: from a session on a remembered device only after the second factor (deps.require_factor)."""
+    require_factor(sess, user)
     token = new_token(32)
     now = datetime.now(UTC)
     await db.execute(delete(CalendarFeed).where(CalendarFeed.user_id == user.id))

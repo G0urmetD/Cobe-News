@@ -2,6 +2,47 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.56 – Treffer bestätigen, Gerät merken, Push mit Produkt
+
+### Neu
+- **Treffer bestätigen**: Ein Treffer in Vendor News lässt sich bestätigen – „Nicht betroffen“ (etwa: die betroffene Funktion ist nicht aktiv), „Maßnahme umgesetzt“ oder „Risiko akzeptiert“, mit einer kurzen Begründung (bei „Risiko akzeptiert“ Pflicht). Die Bestätigung gilt für alle: Der Treffer zählt nicht mehr als offen (Karten, Zähler, Seitenleiste, Wochenrückblick, API) und löst keine Benachrichtigung mehr aus – weder über Regeln noch persönlich. Er bleibt sichtbar, abgeblendet mit „Bestätigt · Nicht betroffen“ und wer, wann, warum; „Bestätigte zeigen“ in der Übersicht. Bestätigen und aufheben dürfen Admins und – mit eingeschalteten Teams – das Team, dem das Produkt zugeordnet ist. Anders als Stummschalten (nur für dich, auf Zeit) ist es gemeinsam und dauerhaft.
+- **Bestätigung erlischt von selbst**, wenn sich der Treffer wesentlich ändert: jetzt ausgenutzt, höher eingestuft, neue CVEs, eine eingetragene Version wird (sicherer) als betroffen bewertet, die Meldung zurückgezogen. Die Benachrichtigung dazu sagt „Bestätigung aufgehoben: …“. Eine neue Fix-Version allein ändert nichts.
+- **Zweiten Faktor auf dem Gerät merken**: Ist der Schalter unter *Einstellungen → Anmeldung → Zweiter Faktor* an, kann man beim Code „Auf diesem Gerät merken“ wählen – bis zum Ende der Sitzungsdauer oder 1, 7 bzw. 30 Tage. Danach fragt dieser Browser nur noch das Passwort. **Ab Werk aus**; für Admins nur mit eigenem Schalter, für das Notfallkonto nie. Gemerkte Geräte stehen unter *Meine Sitzungen* (einzeln oder alle vergessen), Admins können sie für eine Person vergessen. Sie verfallen bei einem neuen Passwort oder zweiten Faktor, einer Rollenänderung, Sperre und „Alle Sitzungen beenden“. Heikle Admin-Aktionen fragen den Code weiter ab.
+- **„Unsere Produkte (aus Vendor News)“ unter Systeme**: Statt jedes Produkt einzeln zu wählen, steht ganz oben in der Auswahl ein eigener Eintrag für alle Produkte, denen Cobe News in Vendor News folgt – in Regeln (mit Probelauf), im Systeme-Filter der News (auch in gespeicherten Ansichten, Chip „Systeme: Unsere Produkte ×“), bei den Desktop-Benachrichtigungen und den Security-Meldungen per E-Mail/Teams. Es gilt immer die aktuelle Liste: Ein später gefolgtes Produkt zählt für Meldungen ab dann (ältere kommen nicht nachträglich), ein nicht mehr gefolgtes zählt nicht mehr. „Treffer“ nennt das Produkt („Treffer: PAN-OS“). Folgt ihr keinem Produkt, passt nichts.
+- **Release-Daten auch ohne endoflife.date**: Für Produkte, die endoflife.date nicht kennt, holt Vendor News Versionen aus den GitHub-Releases des Projekts oder von der Release-Notes-Seite des Herstellers. Unter „Versionen“ erscheinen dann die Release-Linien mit der neuesten Version, „Neue Version verfügbar“ und „Neuere Linie nötig“ funktionieren wie gewohnt, darunter steht die Quelle mit dem letzten Abruf („Quelle: GitHub-Releases portainer/portainer, abgerufen vor …“). Ein Support-Ende kennen diese Quellen nicht – dort steht „Support-Ende unbekannt“. Neu mit Release-Daten: Passwork (Release Notes auf passwork.pro, nur der Server), Portainer (mit LTS-Linien), BookStack, BloodHound CE, LibreNMS, Wazuh Manager und Agent, dazu Vaultwarden, Gitea, NetBox, Uptime Kuma, n8n, Semaphore UI, Velociraptor, Passbolt, GLPI, Wiki.js, TeamPass, Security Onion, Apache Guacamole, Oxidized Web, Bitwarden Server und Zammad. Abgerufen wird einmal am Tag und nur für gefolgte Produkte; beim ersten Abruf gibt es keine Meldungen für schon erschienene Versionen.
+
+### Verbessert
+- **Push und Desktop-Benachrichtigungen sagen, worum es geht**: Unter dem Titel stehen Schwere (mit CVSS, wenn bekannt), „ausgenutzt“, die Produkte und die Quelle – „Kritisch (CVSS 9.2) · ausgenutzt · PAN-OS, Prisma Cloud · BSI“. Eine Meldung ohne eigene Schwere zeigt keine (bisher „Info“). Sammel-Benachrichtigungen nennen die höchste Schwere und die Produkte, auch bei „Hersteller-News meiner Produkte“.
+- **Quellen in Regeln und eigenen Benachrichtigungen**: Der Hinweis sagt jetzt „Leer = alle eingeschalteten Quellen“ – so war es schon immer gemeint.
+- **BloodHound (Community Edition) ohne falsche CPE**: Der Katalog nannte die CPE des alten BloodHound (bis 4.x, letzte CVE 2021) – daher „seit 68 Monaten keine CVE-Daten“. Die CVEs von BloodHound CE haben in der NVD noch keine CPE; sie kommen über die Angaben der CNAs (SpecterOps / BloodHound) und die NVD-Stichwortsuche. Die Katalog-Pflege warnt bei einem Produkt ohne CPE nicht mehr, wenn der Katalog solche CNA-Angaben kennt.
+- **Links in Regel-Nachrichten führen zur Stelle**: Mail, Teams, Slack, Webhook und „Cobe News öffnen“ öffnen bei Hersteller-News direkt den Treffer, bei neuen Versionen und Support-Ende den Reiter „Versionen“, bei geänderten Advisories „Änderungen“ – bisher nur das Produkt.
+- **Schwachstellen-Reiter ohne Treffer**: Betrifft keine Schwachstelle eure Versionen, sagt das Fenster das jetzt („Keine Schwachstelle betrifft eure Version“ mit der Zahl der nicht betroffenen) statt „Für dieses Produkt liegt (noch) nichts vor“.
+- **Wichtigstes zuerst**: Push und Desktop-Benachrichtigungen zeigen kritische und ausgenutzte Meldungen einzeln vor den übrigen; die Sammel-Benachrichtigung nennt die höchste Schwere aller Meldungen der Runde, auch der nicht einzeln gezeigten.
+- **Katalog-Pflege prüft die Release-Quellen**: nicht abrufbar, Muster findet keine Version mehr oder seit 18 Monaten keine neue Version – dann „Katalogeintrag braucht Pflege“. Fehler stehen auch in der Quellen-Gesundheit („Release-Quellen“).
+
+### Fixes
+- **Fenster abgedunkelt**: Wurde ein Produkt-Fenster (oder ein Dialog) kurz nach dem Schließen wieder geöffnet, lag die Abdunklung über dem Fenster statt darunter und schluckte jeden Klick. Abdunklung und Fenster werden jetzt gemeinsam eingehängt.
+- **Ein fehlerhaftes Produkt blockiert Vendor News nicht mehr**: Scheiterte die Auswertung eines Produkts, wurden alle danach gefolgten Produkte in jeder Runde übersprungen (und die beobachteten CVEs gleich mit); der eigentliche Fehler ging dabei verloren. Jetzt wird nur dieses Produkt übersprungen und der Fehler protokolliert.
+- **Abwesenheit mit Vertretung**: Konnte die Vertretung eine Nachricht auf keinem ihrer Wege empfangen (Weg vom Admin nicht erlaubt, erst später eingeschaltet, kein Browser angemeldet, keine Adresse), kam sie bei niemandem an – jetzt behält sie die abwesende Person.
+- **„Gesammelt um HH:MM“** bei Security-Meldungen: Kam zur Sammelzeit nichts, ging eine spätere Meldung sofort raus statt zur nächsten Sammelzeit.
+- **Wochenrückblick bei Mailserver-Ausfall**: Fehlversuche kommen mit wachsender Pause statt im Minutentakt (vorher war nach fünf Minuten Schluss); ein Fehler bei einem Team hält die anderen nicht mehr auf.
+- **Security-Meldungen**: Ein Fehler bei einer Person nimmt den anderen ihre Nachrichten nicht mehr weg.
+- **Persönliche Benachrichtigungen bei vielen Bestätigungen** sind schnell (vorher bei großen Teams und vielen bestätigten Treffern bis zu 18 s pro Runde).
+- **Web Push für viele Browser** in einem Bruchteil der Zeit (gleiche Auswahl: eine Abfrage statt vier je Browser).
+
+### Sicherheit
+- **Passwort ändern verlangt den Code**, wenn TOTP eingerichtet ist – auch eine Sitzung über ein gemerktes Gerät kann so niemanden aussperren. Eine Kalender-Adresse aus so einer Sitzung braucht eine erneute Bestätigung.
+- **Konto wieder einschalten** fragt immer nach Bestätigung; ein Verzeichnis-Konto, das ein Admin abgeschaltet hatte, geht an die Synchronisation zurück, eines, das die Synchronisation abgeschaltet hat, bleibt aus (wie bei „Sperren“).
+- **Wiederherstellen** (`cli restore`) beendet danach alle Sitzungen und vergisst gemerkte Geräte aus der Zeit des Backups; als PostgreSQL-Superuser verweigert es den Lauf (`--allow-superuser` für eine eigene Datenbank ohne eigene Rolle).
+- **AD/LDAP**: Die Adresse, mit der die Verbindung tatsächlich steht, wird vor StartTLS und Anmeldung geprüft (kein Umweg über einen DNS-Wechsel auf ein internes Ziel).
+- **Datenbank-Image**: Die Umbauten älterer Installationen laufen mit den Rechten der App-Rolle, die Vorprüfung erkennt mehr eingeschleuste Datenbank-Objekte.
+- **Log und Export**: Steuerzeichen in angefragten Pfaden erscheinen im Log als „?“; der CSV-Export entschärft auch Formeln nach einem Trennzeichen.
+- **Gemerkte Geräte**: Nach einem Passwort-Rehash bleiben alle gültigen Geräte gültig; „Alle Geräte vergessen“ löscht das Geräte-Cookie nur, wenn es zum eigenen Konto gehört.
+
+### Betrieb
+- **Neue ausgehende Hosts** für gefolgte Produkte mit Release-Quelle: `github.com` (Releases-Feed, ohne Token) und Herstellerseiten wie `passwork.pro` – bei einer Egress-Freigabe ergänzen. Die Release-Daten liegen in `./data/vendor_releases.json` (fehlt die Datei, holt der nächste Abruf sie neu).
+- **Migrationen 0043 bis 0046**: drei neue Tabellen (`vendor_confirms`, `remembered_devices`, `vendor_confirm_records` – welche Datensätze eine Bestätigung umfasst) und eine Spalte `vendor_follows.enabled_at` (seit wann einem Produkt gefolgt wird – bestehende bekommen ihr Anlagedatum); bestehende Daten ändern sich sonst nicht. **Zurück auf 0.1.55** wie bei jedem Update (Images der Vorversion, Datenbank aus dem Backup vor dem Update).
+
 ## 0.1.55 – Images ohne behebbare Scanner-Befunde, Scan im Release
 
 ### Neu

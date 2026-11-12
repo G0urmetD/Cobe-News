@@ -1,5 +1,6 @@
 """Quellen-Gesundheit: how well every source is fetched – the news feeds (news_sources), the queries of Vendor News
-(vendor_fetch, grouped by family: nvd, paloalto, fortinet, veeam, kev, eol) and the structured sources (kind
+(vendor_fetch, grouped by family: nvd, paloalto, fortinet, veeam, kev, eol, releases – the release sources of
+products endoflife.date lacks, app/release_sources.py) and the structured sources (kind
 "structured", also in vendor_fetch: csaf – one query per CSAF provider and the BSI aggregator –, cvelist, epss, osv,
 exploit – one query per exploit list, app/exploits.py).
 
@@ -91,6 +92,7 @@ FAMILY_NAMES = {
     "veeam": "Veeam KB",
     "kev": "CISA KEV",
     "eol": "endoflife.date",
+    "releases": "Release-Quellen (GitHub, Herstellerseiten)",
     "csaf": "CSAF-Anbieter",
     "cvelist": "cvelistV5 (CVE-Liste)",
     "epss": "FIRST EPSS",

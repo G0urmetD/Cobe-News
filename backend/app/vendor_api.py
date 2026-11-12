@@ -12,7 +12,7 @@ from pydantic import ConfigDict, Field, field_validator
 from sqlalchemy import and_, select, update
 
 from app import advisory_changes as changes_svc
-from app import advisory_cleanup, audit, catalog_check, exploits, plaintext, reader, teams
+from app import advisory_cleanup, audit, catalog_check, exploits, finding_confirm, plaintext, reader, teams
 from app import catalog_care as care
 from app import vendor as svc
 from app import vendor_catalog as catalog
@@ -166,13 +166,19 @@ async def _overview_row(
     view = await svc.product_view(db, f, vs, kev=kev, euvd=euvd, deadline=deadline)
     score_svc.apply(view)  # Dringlichkeit: once per view and day (app/vendor_score.py)
     p = view["product"]
-    summ = svc.summary(view, vs)
+    fs = view["findings"]
+    # confirmed findings (app/finding_confirm.py) are handled: not in the card's numbers, its state, its worst lines
+    skip = rd.confirms.skip(f.product, fs) if rd is not None and rd.confirms else frozenset()
+    summ = svc.summary(view, vs, skip)
     rel = [{"version_id": str(v.id), **(svc.release_info(p, v.version) or {})} for v in vs]
     for r in rel:
         r.pop("lines", None)
-    fs = view["findings"]
-    top, counts = view.get("_counts") or _counts(fs)
-    view["_counts"] = (top, counts)  # once per view
+    top, counts = _open_counts(view, skip)
+    done = [x for x in fs if x["id"] in skip and x["status"] in reader.RELEVANT]
+
+    def brief(x: dict) -> dict:
+        return {k: x[k] for k in ("id", "ident", "title", "headline", "severity", "exploited", "status", "published_at", "cvss")} | {"score": _brief(x.get("score")), "tlp": x.get("tlp")}
+
     return {
         "product": _product_out(p),
         "follow": {"enabled": f.enabled, "note": f.note, "tags": f.tags or [], "created_at": _iso(f.created_at)},
@@ -183,21 +189,28 @@ async def _overview_row(
         "counts": counts,
         "urgency": svc.urgency(counts, rel),
         # Dringlichkeit as one number: the product's most urgent finding, with its breakdown (app/vendor_score.py)
-        "score": score_svc.top(view),
+        "score": score_svc.top(view, skip),
         # the most relevant first, in the drawer's order (affected before possibly, exploited, CVSS) – not the newest:
         # a "possibly affected" one must never stand at the top of a card whose versions have affected ones
-        "latest": [
-            {k: x[k] for k in ("id", "ident", "title", "headline", "severity", "exploited", "status", "published_at", "cvss")}
-            | {"score": _brief(x.get("score")), "tlp": x.get("tlp")}
-            | ({"unread": rd.unread(f.product, x["id"]), "muted": rd.muted(f.product, x)} if rd is not None else {})
-            for x in top[:3]
-        ],
+        "latest": [brief(x) | ({"unread": rd.unread(f.product, x["id"]), "muted": rd.muted(f.product, x)} if rd is not None else {}) for x in top[:3]],
+        # the confirmed ones of the kinds the card shows – how many, and the worst three ("Mit Bestätigten")
+        "confirmed": len(done),
+        "latest_confirmed": [brief(x) | {"confirmed": finding_confirm.out(rd.confirms.of(f.product, x))} for x in done[:3]] if rd is not None and rd.confirms else [],
         "same_data": [],
     } | _reading_out(rd, f.product, fs, counts)
 
 
 def _brief(s: dict | None) -> dict | None:
     return {"value": s["value"], "level": s["level"]} if s else None
+
+
+def _open_counts(view: dict, skip: frozenset[str]) -> tuple[list[dict], dict]:
+    """The card's findings and numbers without the confirmed ones – kept with the view when none is confirmed."""
+    if skip:
+        return _counts([x for x in view["findings"] if x["id"] not in skip])
+    top, counts = view.get("_counts") or _counts(view["findings"])
+    view["_counts"] = (top, counts)  # once per view
+    return top, counts
 
 
 def _counts(fs: list[dict]) -> tuple[list[dict], dict]:
@@ -292,10 +305,10 @@ async def badge(user: Reader, db: Db) -> dict:
     affected = 0
     exploited = False
     dl = svc.stale_deadline(svc.STALE_WAIT)
+    st = await finding_confirm.standing(db, [f.product for f in fs])  # confirmed findings count as handled
     for f in fs:
         view = await svc.product_view(db, f, vers.get(f.id, []), kev=kev, euvd=euvd, deadline=dl)
-        top, counts = view.get("_counts") or _counts(view["findings"])
-        view["_counts"] = (top, counts)
+        _top, counts = _open_counts(view, st.skip(f.product, view["findings"]) if st else frozenset())
         affected += bool(counts["affected"])
         exploited = exploited or bool(counts["exploited_affected"])
     return {"affected": affected, "exploited": exploited, "enabled": True}
@@ -363,8 +376,13 @@ async def product_detail(
     may = await care.confirmable(db, user)
     rd = await reader.vendor_reading(db, user, [key])
     page = await _with_changes(db, shown[offset : offset + limit])
+    st = rd.confirms if rd.confirms is not None else finding_confirm.Standing()
     for x in page:
         x["unread"], x["muted"] = rd.unread(key, x["id"]), rd.muted(key, x)
+        c, gone = st.of(key, x), st.lapsed(key, x["id"])
+        x["confirmed"] = finding_confirm.out(c) if c else None
+        x["confirm_lapsed"] = finding_confirm.lapsed_out(gone) if gone and not c else None
+    skip = st.skip(key, fs) if st else frozenset()
     until = rd.mutes.products.get(key)
     return {
         "product": _product_out(p),
@@ -373,8 +391,9 @@ async def product_detail(
         "review_days": rv.days,
         "can_confirm": may is None or f.product in may,
         "releases": svc.release_info(p, None),
-        "summary": svc.summary(view, vs),
+        "summary": svc.summary(view, vs, skip),
         "findings": page,
+        "confirmed": sum(1 for x in fs if x["id"] in skip and x["status"] in reader.RELEVANT),
         "unread": rd.count(key, fs),
         "muted": {"until": until.isoformat()} if until else None,
         "now": datetime.now(UTC).isoformat(),
@@ -409,6 +428,71 @@ async def product_changes(key: str, user: Reader, db: Db) -> dict:
     return {"changes": await changes_svc.of_product(db, key)}
 
 
+# ---------------------------------------------------------------- Treffer bestätigen (app/finding_confirm.py)
+
+
+class FindingIn(_M):
+    product: str = Field(min_length=1, max_length=200)
+    finding: str = Field(min_length=1, max_length=400)
+
+
+class ConfirmIn(FindingIn):
+    status: Literal["not_affected", "mitigated", "accepted"]
+    note: str = Field(default="", max_length=finding_confirm.NOTE_MAX)
+
+
+async def _confirmable_finding(db, user, product: str, finding: str) -> tuple[VendorFollow, dict]:  # noqa: ANN001
+    """The followed product and the finding as the drawer shows it now – for someone who may confirm it: an admin, or
+    (Teams on) a member of a team the product belongs to (catalog_care.confirmable, as "Versionen prüfen"); 403 else."""
+    f = await _follow(db, product)
+    may = await care.confirmable(db, user)
+    if may is not None and f.product not in may:
+        raise api_error(403, "forbidden")
+    vs = (await svc.versions_of(db, [f.id])).get(f.id, [])
+    view = await svc.product_view(db, f, vs)
+    x = next((y for y in view["findings"] if y["id"] == finding), None)
+    if x is None:
+        raise api_error(404, "not_found")
+    return f, x
+
+
+@router.post("/vendor/findings/confirm")
+async def confirm_finding(body: ConfirmIn, user: Reader, db: Db) -> dict:
+    """"Bestätigen…": the finding assessed for everybody – it counts as handled and is not notified until it is undone or
+    changes materially. Confirming again changes status and reason (and takes the finding as it is now)."""
+    f, x = await _confirmable_finding(db, user, body.product, body.finding)
+    if x["status"] not in reader.RELEVANT:
+        raise api_error(422, "finding_not_open")  # not affected / unklare Altdaten: nothing to confirm
+    note = plaintext.label(body.note)  # one line, no control or direction characters (as every typed label)
+    if body.status in finding_confirm.NOTE_REQUIRED and not note:
+        raise api_error(422, "note_required")
+    before = await finding_confirm.current(db, f.product, x["id"])
+    was = {"status": before.status, "note": before.note} if before is not None else None
+    c = await finding_confirm.confirm(db, user, f.product, x, body.status, note)
+    details = {"finding": x["id"], "ident": x["ident"], "status": body.status, "note": note} | ({"was": was} if was else {})
+    audit.record(db, user, "vendor.finding_confirmed", _follow_target(f), details)
+    await db.commit()
+    finding_confirm.changed()  # after the commit: API v1's cached lists are made anew from what is stored
+    return {"product": f.product, "finding": x["id"], "confirmed": finding_confirm.out(c)}
+
+
+@router.post("/vendor/findings/unconfirm")
+async def unconfirm_finding(body: FindingIn, user: Reader, db: Db) -> dict:
+    """"Bestätigung aufheben": the finding counts and notifies again from now on (what was held back stays unsent)."""
+    f = await _follow(db, body.product)
+    may = await care.confirmable(db, user)
+    if may is not None and f.product not in may:
+        raise api_error(403, "forbidden")
+    c = await finding_confirm.undo(db, user, f.product, body.finding)
+    if c is None:
+        raise api_error(404, "not_found")
+    ident = body.finding.partition(":")[2] or body.finding
+    audit.record(db, user, "vendor.finding_unconfirmed", _follow_target(f), {"finding": body.finding, "ident": ident, "status": c.status, "note": c.note})
+    await db.commit()
+    finding_confirm.changed()
+    return {"product": f.product, "finding": body.finding, "confirmed": None}
+
+
 # ---------------------------------------------------------------- follow, versions (admins)
 
 
@@ -433,7 +517,7 @@ async def put_follow(key: str, body: FollowIn, request: Request, admin: Admin, d
     now = datetime.now(UTC)
     if f is None:
         p = _catalog_product(key)
-        f = VendorFollow(product=key, enabled=body.enabled, note=body.note, tags=list(dict.fromkeys(body.tags)), created_at=now, updated_at=now)
+        f = VendorFollow(product=key, enabled=body.enabled, note=body.note, tags=list(dict.fromkeys(body.tags)), created_at=now, updated_at=now, enabled_at=now)
         db.add(f)
         audit.record(db, admin, "catalog.followed", _follow_target(f), {"enabled": f.enabled, "tags": f.tags})
         await db.commit()
@@ -445,6 +529,7 @@ async def put_follow(key: str, body: FollowIn, request: Request, admin: Admin, d
             # switched on again: what is found now is the baseline, not news – also for its versions (the events that
             # told the earlier notifications apart were pruned while it was off)
             f.baseline_at = None
+            f.enabled_at = now  # "Unsere Produkte" counts it for the stories from now on (app/systems.py, Followed)
             await db.execute(update(VendorVersion).where(VendorVersion.follow_id == f.id).values(baseline_at=None))
         sent = body.model_fields_set
         before = {"enabled": f.enabled, "note": f.note, "tags": list(f.tags or [])}
@@ -495,7 +580,7 @@ async def add_custom(body: CustomIn, request: Request, admin: Admin, db: Db) -> 
     key = f"custom-{uuid.uuid4().hex[:12]}"
     vendor = cpe.split(":")[1].replace("_", " ")
     now = datetime.now(UTC)
-    f = VendorFollow(product=key, enabled=True, custom={"label": body.label, "vendor": vendor[:1].upper() + vendor[1:], "cpe": cpe, "category": body.category}, created_at=now, updated_at=now)
+    f = VendorFollow(product=key, enabled=True, custom={"label": body.label, "vendor": vendor[:1].upper() + vendor[1:], "cpe": cpe, "category": body.category}, created_at=now, updated_at=now, enabled_at=now)
     db.add(f)
     audit.record(db, admin, "catalog.custom_added", audit.target("product", key, body.label), {"cpe": cpe, "category": body.category})
     await db.commit()

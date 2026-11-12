@@ -31,7 +31,8 @@ that is no account never names the name (it may be a password typed into the nam
 first one as login.locked_unknown (at most UNKNOWN_FIRST_MAX an hour); the rest – and address blocks beyond that many –
 is counted into one summary entry an hour (`flush_floods`). A session ended because its second factor or proof of
 identity was refused too often is logged (sessions.revoked, why "failures"). Sign-ins are logged for admins only
-(login.success, with the method: password, password_totp, ldap, ldap_totp, passkey, entra, entra_totp) – a reader's
+(login.success, with the method: password, password_totp, ldap, ldap_totp, passkey, entra, entra_totp – …_device: the
+TOTP step skipped on a remembered device, app/auth/devices.py; device.remembered / device.forgotten) – a reader's
 last sign-in is on the account; reading the log itself neither. A passkey whose signature counter went back is logged
 every time (passkey.sign_count_warning, actor the system): it takes the passkey's own signature, nobody else can cause it.
 
@@ -107,6 +108,8 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "passkey.removed",
         "passkey.sign_count_warning",
         "sessions.revoked",
+        "device.remembered",
+        "device.forgotten",
     ),
     "signin": (
         "signin.config_changed",
@@ -168,6 +171,10 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "catalog.version_confirmed",
         "catalog.versions_confirmed",
         "catalog.refreshed",
+        # Treffer bestätigen (app/finding_confirm.py): by hand, undone, lapsed by itself
+        "vendor.finding_confirmed",
+        "vendor.finding_unconfirmed",
+        "vendor.finding_confirm_lapsed",
         "suggestion.accepted",
         "suggestion.rejected",
         "suggestion.duplicate",

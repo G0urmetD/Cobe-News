@@ -34,6 +34,8 @@ export const AUDIT_GROUPS = {
     "passkey.removed",
     "passkey.sign_count_warning",
     "sessions.revoked",
+    "device.remembered",
+    "device.forgotten",
   ],
   signin: [
     "signin.config_changed",
@@ -95,6 +97,9 @@ export const AUDIT_GROUPS = {
     "catalog.version_confirmed",
     "catalog.versions_confirmed",
     "catalog.refreshed",
+    "vendor.finding_confirmed",
+    "vendor.finding_unconfirmed",
+    "vendor.finding_confirm_lapsed",
     "suggestion.accepted",
     "suggestion.rejected",
     "suggestion.duplicate",
@@ -442,7 +447,7 @@ export function methodText(t: TFunction, method: string | null | undefined): str
   if (!method) return "—"
   const [way, second] = method.split("_")
   const where = way === "ldap" ? "ldap" : way === "entra" ? "entra" : "local"
-  const how = t(`audit.method.${way}`, { defaultValue: way }) + (second === "totp" ? ` + ${t("audit.method.totp")}` : "")
+  const how = t(`audit.method.${way}`, { defaultValue: way }) + (second === "totp" || second === "device" ? ` + ${t(`audit.method.${second}`)}` : "")
   return `${how} · ${t(`audit.source.${where}`)}`
 }
 

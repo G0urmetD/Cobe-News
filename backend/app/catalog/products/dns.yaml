@@ -66,3 +66,4 @@
   kw: [NetBox]
   example: "4.7.4"
   where: web_about
+  releases: {github: netbox-community/netbox}  # tags v4.7.5, betas left out (checked 2026-11-11)

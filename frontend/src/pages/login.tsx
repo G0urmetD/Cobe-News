@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { AlertTriangle, ArrowLeft, Fingerprint, KeyRound, Loader2, Lock, ShieldCheck, ShieldX, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Field } from "@/components/cobe/form"
+import { Field, ToggleRow } from "@/components/cobe/form"
 import { CodeInput, NewPasswordFields, TotpEnroll } from "@/components/cobe/mfa"
 import { AuthLayout } from "@/pages/auth-layout"
 import { ApiError, api, type LoginStep } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
+import { fmtDateTime } from "@/lib/format"
+import { type RememberInfo, mfaBody, rememberInfo } from "@/lib/remember-device"
 import { passkeyErrorText, suggestedPasskeyName } from "@/components/cobe/security"
 import { type EnrollInfo, enrollPasskey, signInWithPasskey } from "@/lib/security-api"
 import { PasskeyError, passkeySupport } from "@/lib/webauthn"
@@ -104,6 +106,53 @@ export function LoginPage({ resume }: { resume?: Step }) {
     [auth],
   )
 
+  // "Auf diesem Gerät merken" at the TOTP step – only while the admin switch is on (GET /api/auth/state says so). A
+  // browser remembered already lands here only from Microsoft (Entra: the Strict cookie stays behind on that redirect):
+  // the page asks for it itself, a miss (409) just leaves the code to be typed. That ask and a typed code are one at a
+  // time (`second`): the code field waits while the page asks, a code on its way keeps the page from asking – and the
+  // effect runs once per step (handle through a ref: the auth context changing meanwhile neither asks again nor drops
+  // the answer).
+  const [remember, setRemember] = useState<RememberInfo | null>(null)
+  const [rememberOn, setRememberOn] = useState(false)
+  const [deviceBusy, setDeviceBusy] = useState(false)
+  const second = useRef<"device" | "code" | null>(null)
+  const codeBox = useRef<HTMLFieldSetElement>(null)
+  const handleRef = useRef(handle)
+  useEffect(() => {
+    handleRef.current = handle
+  }, [handle])
+  useEffect(() => {
+    if (step !== "mfa") return
+    let alive = true
+    api.get<unknown>("/api/auth/state").then(
+      (r) => {
+        if (!alive) return
+        const info = rememberInfo(r)
+        setRemember(info)
+        if (!info?.device || second.current) return
+        second.current = "device"
+        setDeviceBusy(true)
+        api
+          .post<LoginStep>("/api/auth/mfa/device")
+          .then(
+            (res) => alive && handleRef.current(res),
+            () => undefined,
+          )
+          .finally(() => {
+            if (second.current === "device") second.current = null
+            if (!alive) return
+            setDeviceBusy(false)
+            setTimeout(() => codeBox.current?.querySelector("input")?.focus()) // a miss: back to the code (disabled meanwhile, it lost the focus)
+          })
+      },
+      () => undefined, // only the switch – the code works without it
+    )
+    return () => {
+      alive = false
+      setDeviceBusy(false)
+    }
+  }, [step])
+
   // passkeys: switched on, possible at the configured address – and this page opened at exactly that address in a
   // browser that can (otherwise the button is not shown: the passkeys of this site are bound to that address)
   const pk = auth.config?.passkeys
@@ -141,6 +190,15 @@ export function LoginPage({ resume }: { resume?: Step }) {
       setOtp("")
     } finally {
       setLoading(false)
+    }
+  }
+  const sendCode = async (code: string) => {
+    if (second.current) return // the page is asking for the remembered browser (or a code is on its way)
+    second.current = "code"
+    try {
+      await run(() => api.post<LoginStep>("/api/auth/mfa", mfaBody(code, rememberOn, remember)))
+    } finally {
+      if (second.current === "code") second.current = null
     }
   }
 
@@ -238,12 +296,22 @@ export function LoginPage({ resume }: { resume?: Step }) {
         <div className="space-y-6">
           {back}
           <StepHeader icon={ShieldCheck} title={t("auth.mfaTitle")} text={t("auth.mfaText")} />
-          <div className="flex justify-center">
-            <CodeInput size="lg" value={otp} onChange={setOtp} onComplete={(v) => void run(() => api.post<LoginStep>("/api/auth/mfa", { code: v }))} />
-          </div>
+          {/* before the code: a complete code is sent at once */}
+          {remember && (
+            <ToggleRow
+              label={remember.until ? t("auth.rememberUntil", { until: fmtDateTime(remember.until) }) : t("auth.remember")}
+              description={t("auth.rememberHint")}
+              checked={rememberOn}
+              onCheckedChange={setRememberOn}
+              className="rounded-xl border px-4 py-3"
+            />
+          )}
+          <fieldset ref={codeBox} disabled={deviceBusy} className="flex justify-center">
+            <CodeInput size="lg" value={otp} onChange={setOtp} onComplete={(v) => void sendCode(v)} />
+          </fieldset>
           {errorBox}
-          <Button size="lg" className="h-10 w-full" disabled={otp.length < 6 || loading} onClick={() => void run(() => api.post<LoginStep>("/api/auth/mfa", { code: otp }))}>
-            {loading && <Loader2 className="animate-spin" />} {t("auth.verify")}
+          <Button size="lg" className="h-10 w-full" disabled={otp.length < 6 || loading || deviceBusy} onClick={() => void sendCode(otp)}>
+            {(loading || deviceBusy) && <Loader2 className="animate-spin" />} {t("auth.verify")}
           </Button>
           <p className="text-center text-xs text-muted-foreground">{t("auth.mfaLost")}</p>
         </div>

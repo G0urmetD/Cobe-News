@@ -254,6 +254,42 @@ async def test_a_table_with_someone_elses_trigger_is_not_taken_over(lock_db):
         db.init(DATABASE_URL)
 
 
+@pytest.mark.parametrize(
+    ("planted", "named"),
+    [
+        ("ALTER TABLE audit_log ADD CONSTRAINT zz_check CHECK (public.zz_ok(action))", "zz_check"),
+        ("CREATE INDEX zz_index ON audit_log (action) WHERE public.zz_ok(action)", "zz_ok"),
+        ("ALTER TABLE audit_log ALTER COLUMN actor_display SET DEFAULT public.zz_text()", "zz_text"),
+    ],
+)
+async def test_a_table_with_the_apps_code_in_a_constraint_index_or_default_is_not_taken_over(lock_db, planted, named):
+    """0.1.56 review: a CHECK constraint, an index expression or predicate, a column default calling a function of the
+    app's – evaluated by the hand-over's statements or later as the lock's role – is refused like a trigger."""
+    name = f"cn_lockfn_{secrets.token_hex(3)}"
+    await _admin(f"CREATE DATABASE {name} TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER builtin BUILTIN_LOCALE 'C.UTF-8'")
+    url = APP_URL.set(database=name)
+    try:
+        _psql("app-role.sql", name)
+        await _use(url)
+        await db.migrate()
+        conn = await asyncpg.connect(_dsn(url))
+        try:
+            await conn.execute("CREATE FUNCTION public.zz_ok(text) RETURNS boolean LANGUAGE sql IMMUTABLE AS 'SELECT true'")
+            await conn.execute("CREATE FUNCTION public.zz_text() RETURNS text LANGUAGE sql AS $f$SELECT ''$f$")
+            await conn.execute(planted)
+        finally:
+            await conn.close()
+        out = _psql("audit-lock.sql", name).stdout
+        assert "audit log NOT locked" in out and named in out
+        st = await _state()
+        assert st["reason"] == "pending" and not st["active"]
+    finally:
+        await db.dispose()
+        object.__setattr__(get_config(), "db_url", DATABASE_URL.render_as_string(hide_password=False))
+        await _admin(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)")
+        db.init(DATABASE_URL)
+
+
 # ---------------------------------------------------------------- prune
 
 

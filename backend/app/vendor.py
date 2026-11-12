@@ -175,6 +175,7 @@ def reset() -> None:
     _blocked.clear()
     _locks.clear()
     _evaluated.clear()
+    _eval_failures.clear()
     _last_full[0] = None
     _rated_primed.clear()
     _rated_loaded[0] = False
@@ -887,11 +888,16 @@ async def drop_advisories(db: AsyncSession, ids: list[str], *, withdrawn: bool =
         return 0
     links = (await db.execute(select(VendorAdvisoryProduct.product, VendorAdvisoryProduct.advisory_id).where(VendorAdvisoryProduct.advisory_id.in_(ids)))).all()
     touched = {p for p, _ in links}
+    ended = 0
     if withdrawn:
         # a watched CVE (CVE beobachten): its advisory withdrawn – said before the record goes
         gone = (await db.execute(select(VendorAdvisory.id, VendorAdvisory.source, VendorAdvisory.ident, VendorAdvisory.title, VendorAdvisory.cves).where(VendorAdvisory.id.in_(ids)))).all()
         await cve_watch.withdrawn(db, [tuple(r) for r in gone])
     if withdrawn and links:
+        # a confirmed finding of a withdrawn advisory: the confirmation ends (app/finding_confirm.py)
+        from app import finding_confirm
+
+        ended = await finding_confirm.withdrawn(db, [(p, aid) for p, aid in links], {p: str((catalog.product(p) or {}).get("label") or p) for p, _ in links})
         linked: dict[str, set[str]] = {}
         for p, aid in links:
             linked.setdefault(aid, set()).add(p)
@@ -899,6 +905,10 @@ async def drop_advisories(db: AsyncSession, ids: list[str], *, withdrawn: bool =
     await db.execute(delete(VendorAdvisoryProduct).where(VendorAdvisoryProduct.advisory_id.in_(ids)))
     n = (await db.execute(delete(VendorAdvisory).where(VendorAdvisory.id.in_(ids)))).rowcount or 0
     await db.commit()
+    if ended:
+        from app import finding_confirm
+
+        finding_confirm.changed()  # after the commit (API v1's cached lists)
     if touched:
         bump(touched)
     return int(n)
@@ -1297,6 +1307,9 @@ async def active_keys(db: AsyncSession) -> set[str]:
     if not products:
         return extra | kev
     keys = {"kev", "eol"}
+    from app import release_sources
+
+    keys |= {release_sources.fetch_key(p) for p in release_sources.wanted(products)}
     for p in products:
         keys.update(k[:300] for k in fetch_keys(p, cfg))
         if _keyword_search(p):
@@ -1323,6 +1336,10 @@ async def run_round(*, force: bool = False, only: str | None = None) -> dict:
         if only == "catalog":
             # the admin's "Katalog aktualisieren": also while Vendor News is switched off (the API said "ok")
             await sync_eol(db, eol_every, True)
+            # the release sources of the followed products too (app/release_sources.py) – never of others
+            from app import release_sources
+
+            await release_sources.sync(db, [p for f in await follows(db) if (p := product_of(f))], eol_every, True)
             return {"catalog": 1}
         # the KEV also with nothing followed (or Vendor News off) while the news are on: their topics need it
         if await kev_wanted(db):
@@ -1347,6 +1364,9 @@ async def run_round(*, force: bool = False, only: str | None = None) -> dict:
         ix = await current_index(db)
         key = nvd_key(cfg)
         await sync_eol(db, eol_every, False)
+        from app import release_sources  # release data endoflife.date lacks: GitHub releases, vendors' pages
+
+        out |= await release_sources.sync(db, products, eol_every, force)
         try:
             if (r := await relink_catalog(db)) is not None:
                 out["relink:catalog"] = r
@@ -1732,7 +1752,7 @@ def target_versions(product: dict, groups: list[dict], found: list[dict], versio
     update (`to` in the own line; `open` remain – `newer` a newer line that fixes some of them) | newer_line (only a
     newer line fixes anything) | no_fix."""
     scheme = product.get("scheme") or "generic"
-    rels = catalog.releases(product.get("eol"))
+    rels = catalog.product_releases(product)
     by_id = {g["primary"].id: g for g in groups}
     maintained = [r for r in rels if r.get("isMaintained") or not r.get("isEol")]
     newest = max(maintained or rels, key=lambda r: r.get("releaseDate") or "") if rels else None
@@ -1894,16 +1914,19 @@ def _line(rels: list[dict], v: V) -> dict | None:
 
 def line_of(product: dict, version: str | None) -> dict | None:
     """The release line (endoflife.date) an installed version belongs to, with its release date."""
-    rels = catalog.releases(product.get("eol"))
+    rels = catalog.product_releases(product)
     v = stored_v(product, version) if version and rels else None
     return _line(rels, v) if v is not None else None
 
 
 def release_info(product: dict, version: str | None, today: date | None = None) -> dict | None:
-    """Release line of a version (endoflife.date): latest in the line, a newer line, support and EOL dates."""
-    rels = catalog.releases(product.get("eol"))
+    """Release line of a version (endoflife.date, else the product's release source): latest in the line, a newer
+    line, support and EOL dates (a release source has none – unknown). `source`: where the lines come from; the
+    product's own answer (no version) names a release source also before its first fetch."""
+    rels = catalog.product_releases(product)
     if not rels:
-        return None
+        src_ = catalog.release_source(product) if version is None else None
+        return {"lines": [], "source": src_} if src_ else None
     today = today or datetime.now(UTC).date()
     scheme = product.get("scheme") or "generic"
     v = stored_v(product, version) if version else None
@@ -1921,6 +1944,7 @@ def release_info(product: dict, version: str | None, today: date | None = None) 
     maintained = [r for r in rels if r.get("isMaintained") or not r.get("isEol")]
     newest = max(maintained or rels, key=lambda r: r.get("releaseDate") or "")
     out: dict = {"lines": [{k: r.get(k) for k in ("name", "label", "latest", "latestDate", "releaseDate", "eolFrom", "eoasFrom", "isEol", "isLts", "isMaintained")} | {"eol_state": state(r.get("eolFrom")) if r.get("eolFrom") else ("past" if r.get("isEol") else "unknown")} for r in rels[:30]]}
+    out["source"] = catalog.release_source(product)
     if v is None:
         return out
     if line is None:
@@ -2111,13 +2135,15 @@ async def _refresh(f: VendorFollow, vers: list[VendorVersion], kev: dict, euvd: 
         else:
             view, cves = await _compute_view(f, vers, kev, euvd)
         _failed.pop(f.product, None)
+        _eval_failures.pop(f"view:{f.product}", None)
         if _key(f, vers)[:3] == key[:3]:
             _views[f.product] = _View(key, cves, _shared(cves, kev, euvd), view)  # not when something changed meanwhile
         return view
-    except Exception:
-        # no previous view any more for this product until a computation succeeds: the requests get the error
+    except Exception as exc:
+        # no previous view any more for this product until a computation succeeds: the requests get the error (logged
+        # with its traceback once, then rate-limited – a broken record fails every round and every page request)
         _failed[f.product] = time.monotonic()
-        log.exception("vendor view of %s could not be computed", f.product)
+        _log_failure(f"view:{f.product}", f"vendor view of {f.product} could not be computed", exc)
         raise
     finally:
         run = _flight.get(f.product)
@@ -2228,12 +2254,13 @@ async def _add_exploits(found: list[dict]) -> None:
             x["exploit"] = e
 
 
-def summary(view: dict, vers: list[VendorVersion]) -> dict:
+def summary(view: dict, vers: list[VendorVersion], skip: frozenset[str] = frozenset()) -> dict:
     """The card: per version how many vulnerabilities affect it (critical / exploited ones apart; "unklare Altdaten"
-    apart and not counted), the version to go to, the worst state."""
-    if (hit := view.get("_summary")) is not None:
+    apart and not counted), the version to go to, the worst state. `skip`: the ids of confirmed findings
+    (app/finding_confirm.py) – handled, not counted; then computed anew, not kept with the view."""
+    if not skip and (hit := view.get("_summary")) is not None:
         return hit  # computed once per view (the overview asks for it on every load)
-    fs = view["findings"]
+    fs = [f for f in view["findings"] if f["id"] not in skip] if skip else view["findings"]
 
     def blank() -> dict:
         return {"affected": 0, "possible": 0, "critical": 0, "exploited": 0, "service": 0, "unversioned": 0, "stale": 0}
@@ -2256,7 +2283,9 @@ def summary(view: dict, vers: list[VendorVersion]) -> dict:
     for f in fs:
         if f["status"] not in ("not_affected", "stale") and (worst == "none" or ORDER[f["status"]] > ORDER.get(worst, -1)):
             worst = f["status"]
-    view["_summary"] = out = {"per_version": per, "worst": worst}
+    out = {"per_version": per, "worst": worst}
+    if not skip:
+        view["_summary"] = out
     return out
 
 
@@ -2534,7 +2563,9 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
     """New findings, newer versions and EOL dates of the followed products as events – each once – and "now actively
     exploited" for a finding notified before without it. Returns how many events (not baseline) were created. Only
     products whose view or versions changed since the last evaluation are looked at (all of them hourly); each
-    product's events are read by their scope and written in a short transaction of its own."""
+    product's events are read by their scope and written in a short transaction of its own. A product that fails is
+    logged (rate-limited, _eval_failed_log) and tried again next round – the products after it are evaluated all the
+    same."""
     from app import csaf_providers
 
     now = datetime.now(UTC)
@@ -2564,30 +2595,73 @@ async def evaluate_events(db: AsyncSession, *, full: bool = False) -> int:
     from app import advisory_cleanup
 
     held = await advisory_cleanup.waiting(db)  # a keyword search the cleanup reset: waited for as well
-    for f in fs:
-        p = product_of(f)
-        # held for the keyword search only while the round still asks it (a catalogue change may have ended it)
-        if p is None or not _ready(p, answered) or (p["key"] in held and _keyword_search(p)):
-            continue
-        vs = vers.get(f.id, [])
-        view = await product_view(db, f, vs, kev=kev, euvd=euvd)
-        sig = (view["stamp"], f.baseline_at is None, tuple((v.id, v.version, v.baseline_at is None) for v in vs))
-        quiet = f.product not in primed
-        if not full and not quiet and _evaluated.get(f.product) == sig:
-            continue  # nothing new for this product
+    # one product that fails (a record its view cannot read, an error in its evaluation) never stops the others: its
+    # view and evaluation are tried on their own, the rest goes on. A rollback expires every loaded object, so the loop
+    # works from the ids and names taken here and reads the follows and versions again after one
+    order = [(f.id, f.product) for f in fs]
+    by_id = {f.id: f for f in fs}
+    for fid, key in order:
+        f = by_id.get(fid)
+        if f is None:
+            continue  # removed while the round ran
         try:
+            p = product_of(f)
+            # held for the keyword search only while the round still asks it (a catalogue change may have ended it)
+            if p is None or not _ready(p, answered) or (p["key"] in held and _keyword_search(p)):
+                continue
+            vs = vers.get(fid, [])
+            view = await product_view(db, f, vs, kev=kev, euvd=euvd)
+            sig = (view["stamp"], f.baseline_at is None, tuple((v.id, v.version, v.baseline_at is None) for v in vs))
+            quiet = key not in primed
+            if not full and not quiet and _evaluated.get(key) == sig:
+                _eval_recovered(key)
+                continue  # nothing new for this product
             n = await _evaluate_product(db, f, p, vs, view, now, rated_quiet=quiet)
-        except Exception:  # noqa: BLE001 - logged; this product (not marked evaluated) and the rest come next round
-            await db.rollback()  # expires every loaded object – the loop cannot go on with them
-            log.exception("vendor: evaluating %s failed", f.product)
-            break
-        created += n
-        _evaluated[f.product] = (view["stamp"], False, tuple((v.id, v.version, False) for v in vs))
-        if quiet:
-            await db.execute(pg_insert(Counter).values(name=f"{RATED_PRIMED}:{f.product}", value=1).on_conflict_do_nothing())
-            await db.commit()
-            primed.add(f.product)
+            created += n
+            _evaluated[key] = (view["stamp"], False, tuple((v.id, v.version, False) for v in vs))
+            if quiet:
+                await db.execute(pg_insert(Counter).values(name=f"{RATED_PRIMED}:{key}", value=1).on_conflict_do_nothing())
+                await db.commit()
+                primed.add(key)
+            _eval_recovered(key)
+        except Exception as exc:  # noqa: BLE001 - logged; this product (not marked evaluated) comes again next round
+            await db.rollback()  # expires every loaded object – read again below before the next product
+            _eval_failed_log(key, exc)
+            _evaluated.pop(key, None)
+            try:
+                by_id = {x.id: x for x in await follows(db)}
+                vers = await versions_of(db, list(by_id))
+            except Exception:  # noqa: BLE001 - the database itself is gone: the rest comes next round
+                await db.rollback()
+                log.exception("vendor: reading the followed products again failed")
+                break
     return created
+
+
+EVAL_FAIL_LOG = timedelta(hours=1)  # a product that fails every round: its traceback once, then hourly (or on a new error)
+_eval_failures: dict[str, tuple[str, datetime]] = {}  # "eval:<product>"/"view:<product>" → (the error, logged at)
+
+
+def _log_failure(slot: str, message: str, exc: BaseException) -> None:
+    """A product's evaluation or view failed: logged with the traceback – once, again when the error changes or an hour
+    passed; in between a short warning (it fails every round until the data or the code is fixed)."""
+    now = datetime.now(UTC)
+    what = f"{type(exc).__name__}: {exc}"[:500]
+    seen = _eval_failures.get(slot)
+    if seen is None or seen[0] != what or now - seen[1] >= EVAL_FAIL_LOG:
+        _eval_failures[slot] = (what, now)
+        log.error("%s", message, exc_info=exc)
+    else:
+        log.warning("%s – still (%s)", message, what)
+
+
+def _eval_failed_log(key: str, exc: BaseException) -> None:
+    _log_failure(f"eval:{key}", f"vendor: evaluating {key} failed – the other products go on", exc)
+
+
+def _eval_recovered(key: str) -> None:
+    if _eval_failures.pop(f"eval:{key}", None) is not None:
+        log.info("vendor: evaluating %s works again", key)
 
 
 def _sev_name(rank: int) -> str:
@@ -2597,7 +2671,12 @@ def _sev_name(rank: int) -> str:
 async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list[VendorVersion], view: dict, now: datetime, *, rated_quiet: bool = False) -> int:
     """One product's events (evaluate_events). `rated_quiet`: "now rated higher" only noted, never sent (the first
     evaluation that knows it – the ratings of before are no news)."""
+    from app import finding_confirm
+
     created = 0
+    # a confirmed finding that changed materially: the confirmation ends before the events are made – the event of the
+    # change goes out and says so (app/finding_confirm.py)
+    lapsed = await finding_confirm.check(db, p, view["findings"], now)
     targets = [(v.version, v) for v in vs] or [("*", None)]
     scopes = [f"vuln:{f.product}:{text}" for text, _ in targets]
     said = await _known(db, scopes)
@@ -2644,6 +2723,7 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                 "exploited": fd["exploited"],
                 "published_at": fd["published_at"],
                 **({"tlp": fd["tlp"]} if fd.get("tlp") else {}),
+                **({"confirm_lapsed": lapsed[fd["id"]]} if fd["id"] in lapsed else {}),
             }
             key = f"{scope}:{fd['id']}"[:400]
             rank = SEV_RANK.get(fd["severity"], 0)
@@ -2709,7 +2789,9 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
                 line = info["line"]
                 evs = []
                 if info.get("update_available") and line.get("latest"):
-                    evs.append(("version", f"version:{f.product}:{ver.version}:{line['latest']}", "low", {"latest": line["latest"]}, base, None))
+                    # silent also for a release that was out when the product's release source was first read
+                    quiet_rel = catalog.release_baseline(p, line["latest"])
+                    evs.append(("version", f"version:{f.product}:{ver.version}:{line['latest']}", "low", {"latest": line["latest"]}, base or quiet_rel, None))
                 stage = eol_stage(line.get("eol_from"), now.date())
                 if stage is not None:
                     # the pre-warning of this version (90, 30 days, ended) – it says more than "Support endet bald" of
@@ -2759,6 +2841,8 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
     for ev in made:
         ev.created_at = at
     await db.commit()
+    if lapsed:
+        finding_confirm.changed()  # after the commit (API v1's cached lists)
     return created
 
 
@@ -2888,7 +2972,12 @@ class VendorLoop:
                     cfg = await config(db)
                     if cfg.get("enabled", True):
                         await after_round(db, cfg, force)
-                        n = await evaluate_events(db)
+                        try:
+                            n = await evaluate_events(db)
+                        except Exception:  # noqa: BLE001 - logged; the CVE watch and the wake of the news loop still come
+                            await db.rollback()
+                            log.exception("vendor: evaluating the events failed")
+                            n = 1  # events of the products before the error may wait: the news loop looks anyway
                         try:
                             # CVE beobachten: what changed for a watched CVE since the last check (stored data only)
                             n += await cve_watch.evaluate_due(db, (gen.value, gen.epoch))

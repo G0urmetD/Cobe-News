@@ -59,7 +59,10 @@ markieren“, „Artikel öffnen“ (der Originalartikel in einem neuen Tab) und
   einem Produkt folgt ([mehr](#unsere-produkte)) – er gilt zusätzlich zu allen anderen Filtern.
 - **Systeme**: nur Meldungen zu bestimmten Herstellern oder Produkten aus dem ganzen Katalog – dieselbe Auswahl wie bei
   den [Systemen einer Regel](/docs/benachrichtigungen#regel-systeme): nach Hersteller gruppiert, mit Suche, „Alle
-  Produkte von Palo Alto Networks“ (auch später hinzugekommene) oder einzelne Produkte („PAN-OS“). Eine Meldung passt,
+  Produkte von Palo Alto Networks“ (auch später hinzugekommene), einzelne Produkte („PAN-OS“) oder ganz oben **Unsere
+  Produkte (aus Vendor News)** – alle Produkte, denen ihr gerade folgt (Chip „Systeme: Unsere Produkte ×“). Anders als
+  „Betrifft unsere Produkte“ (nur die Details, mit euren Versionen) zählt dabei auch, was Titel oder Teaser nennen.
+  Eine Meldung passt,
   wenn ihre [Details aus der Quelle](#details-aus-der-quelle) das Produkt betreffen oder Titel bzw. Teaser Produkt oder
   Hersteller nennen. Anders als bei einer Regel zählt hier auch, was eine Meldung erst durch eine Neuberechnung bekommen
   hat (etwa nach einem Katalog-Update) – die Liste zeigt, was ein System betrifft, und verschickt nichts. Jedes gewählte

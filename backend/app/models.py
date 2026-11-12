@@ -247,7 +247,7 @@ class UserSession(Base):
     pending: Mapped[dict] = mapped_column(Json, default=dict)
     reauth_at: Mapped[datetime | None] = mapped_column(UTCDateTime)  # last proof of identity (sign-in or re-confirmation)
     # how it was signed in (shown under "Meine Sitzungen"): password | password_totp | ldap | ldap_totp | passkey | entra |
-    # entra_totp
+    # entra_totp | password_device | ldap_device | entra_device (the TOTP step skipped on a remembered device)
     # – None: a session of an older version
     method: Mapped[str | None] = mapped_column(Text)
     # signed in with this passkey: removing the passkey ends the session (app/passkeys_api.py)
@@ -272,6 +272,24 @@ class UserPasskey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     # the counter went back (or stood still) although it counts: maybe a cloned authenticator – shown as a warning
     sign_count_warning_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class RememberedDevice(Base):
+    """"Auf diesem Gerät merken" (app/auth/devices.py): a browser that may skip the TOTP step after the right password.
+    The browser holds a random token in its own cookie, the table its keyed hash – plus `factor`, a keyed fingerprint of
+    the account's password, TOTP secret and role when it was remembered: any change of them makes the row worthless."""
+
+    __tablename__ = "remembered_devices"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(Text, unique=True)
+    factor: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    ip: Mapped[str | None] = mapped_column(Text)
+    user_agent: Mapped[str | None] = mapped_column(Text)
 
 
 class PasswordHistory(Base):
@@ -455,6 +473,9 @@ class VendorFollow(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     # the first evaluation after following (or switching on) is the baseline: what is found then is not notified
     baseline_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # when it was followed or last switched on (migration 0045): "Unsere Produkte" as a rule's system counts it for the
+    # stories from then on (systems.Followed) – none: created_at
+    enabled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class VendorVersion(Base):
@@ -1301,6 +1322,52 @@ class VendorRead(Base):
     finding: Mapped[str] = mapped_column(Text, primary_key=True)
     read_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     unread: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+
+
+class VendorConfirm(Base):
+    """"Treffer bestätigt" (app/finding_confirm.py): a Vendor News finding of a followed product assessed for everybody –
+    not affected, mitigated or the risk accepted, with a reason. One row per period in which a confirmation stood: while
+    it stands (`ended_at` None – at most one per finding – and `facts` still those of the finding) the finding counts as
+    handled and is not notified. It ends by hand ("aufheben", `ended_reason` "undone") or by itself when the finding
+    changes materially (exploited, rated higher, new CVEs, a version's verdict, withdrawn). The row stays after the end:
+    the events made while it stood are never sent later (`held_from`, `held_until`) – a confirmation made again is a new
+    row, so a time in between when none stood is never held."""
+
+    __tablename__ = "vendor_confirms"
+    __table_args__ = (
+        Index("ix_vendor_confirms_finding", "product", "finding"),
+        Index("ux_vendor_confirms_standing", "product", "finding", unique=True, postgresql_where=text("ended_at IS NULL")),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    product: Mapped[str] = mapped_column(Text)
+    finding: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text)  # not_affected | mitigated | accepted
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    user_name: Mapped[str] = mapped_column(Text, default="", server_default="")  # kept for display (account deleted)
+    confirmed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # the finding as it was confirmed (finding_confirm.facts_of) – with the ids of its group's records ("members")
+    facts: Mapped[dict] = mapped_column(Json, default=dict)
+    # its events made in [held_from, held_until) are never sent – while it stands (held_until None) none of them is
+    held_from: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    held_until: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    ended_reason: Mapped[str | None] = mapped_column(Text)  # undone | exploited | severity | cves | verdict | withdrawn
+    ended_by: Mapped[str | None] = mapped_column(Text)  # the name of who undid it (a lapse: none)
+
+
+class VendorConfirmRecord(Base):
+    """The records a confirmation period's finding groups (finding_confirm.members_of): its leading advisory and the
+    NVD, cvelistV5 and OSV records of its CVEs. An event is held back by an index lookup of its product and record (a
+    change's advisory, a vulnerability event's finding) – not by comparing every event with every confirmation."""
+
+    __tablename__ = "vendor_confirm_records"
+    __table_args__ = (Index("ix_vendor_confirm_records_lookup", "product", "record"),)
+
+    confirm_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vendor_confirms.id", ondelete="CASCADE"), primary_key=True)
+    record: Mapped[str] = mapped_column(Text, primary_key=True)
+    product: Mapped[str] = mapped_column(Text)
 
 
 class PersonMute(Base):

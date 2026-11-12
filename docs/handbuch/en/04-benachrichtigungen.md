@@ -51,14 +51,20 @@ What counts is the topic a story has **when it arrives** (from title, teaser, so
 that is added only later – e.g. from the details from the source – triggers no desktop notification any more; for that
 there are [rules](#regel-themen), which send such a story then. The open tab and push with the tab closed filter alike.
 
+**What the notification shows**: under the title come the severity (with the CVSS when the story names one),
+"exploited" when the vulnerability is attacked, the products it is about and the source – e.g. "Critical (CVSS 9.2) ·
+exploited · PAN-OS, Prisma Cloud · BSI". A story without a severity of its own shows none. When several stories come at
+once, the summary names the highest severity and the products.
+
 **Systems, keywords and "Don't show if it contains"** – as in the [rules](#regel-systeme), just for you:
 
-- **Systems**: vendors ("All products of Palo Alto Networks") or single products from the whole catalogue.
+- **Systems**: vendors ("All products of Palo Alto Networks") or single products from the whole catalogue – or at the top
+  [Our products (from Vendor News)](#regel-systeme): every followed product, also ones added later.
 - **Keywords**: your own words as chips (Enter or comma), whole words in the title or teaser, case ignored, plain text
   (at most 30, 2–60 characters each).
 - Systems **or** keywords – one is enough, together with severity, source and topic.
 - **Don't show if it contains**: if such a word is in the title or teaser, no notification comes.
-- The notification then says why it comes: "Critical · heise online · Match: PAN-OS".
+- The notification then says why it comes: "Critical · Match: PAN-OS · heise online".
 - What the story has **when it arrives** counts – above all what its title and teaser name. A system that comes only
   later from the details from the source triggers no desktop notification any more (as a topic); a
   [rule](#regel-systeme) sends such a story then.
@@ -92,8 +98,9 @@ no tab is open – as long as the browser is running.
 - Signing out switches push off for this browser. A deactivated account gets nothing. A session that merely expired
   does not end push.
 
-For both ways: up to three stories of a round come one by one, more as one summary ("N more new stories"). "Critical"
-stays on screen until you dismiss it. Desktop notifications only show security stories of the news feed; Vendor News and
+For both ways: up to three stories of a round come one by one, more as one summary ("N more new stories"). The ones on
+their own are the critical and the actively exploited first, then the newest; the summary's highest severity counts all
+the other stories of the round. "Critical" stays on screen until you dismiss it. Desktop notifications only show security stories of the news feed; Vendor News and
 the state of the sources come through channels and rules – the Vendor News of your own products also through
 [Vendor news of my products](#meine-produkte).
 
@@ -189,7 +196,8 @@ Teams takes the messages through a **workflow** you create yourself. It posts in
 - **Only these systems.** Below the severity you can pick vendors or products among your products – then only their
   vendor news comes ("All products of Palo Alto Networks" also covers products assigned to you later). Empty means: all
   your products. As with a rule's systems for Vendor News, the event's product counts – it is in every message anyway.
-  There are no keywords here; they apply to security stories ([desktop notifications](#desktop-einschalten)). Watched
+  There are no keywords here; they apply to security stories ([desktop notifications](#desktop-einschalten)). "Our
+  products" is not offered here – vendor news exist for followed products only, it would be the same as empty. Watched
   CVEs always come.
 - **Filter.** What your filter (kind, severity, systems) left out once does not come later after the filter is changed
   either.
@@ -438,6 +446,9 @@ for **7 days**, **30 days** or **until a date** (at most a year).
 **Where:** in the **⋯** menu of a story or a product tile, at the bottom of a story or product drawer, on a finding and
 in the list of [watched CVEs](#cves-liste) (an opened row).
 
+**Confirm instead of mute?** When a finding is settled for everybody (e.g. the affected feature is not in use),
+[confirm](/docs/vendor-news#treffer-bestaetigen) it – that applies to everybody and lasts.
+
 **What it does – only for you:**
 
 - **No personal notifications** about it on your ways (e-mail, desktop push, your own Teams webhook): vendor news of a
@@ -597,8 +608,10 @@ no tracking pixels.
   without summaries.
 - **Button "Open Cobe News".** With one story it opens exactly that story. With several it opens the news list filtered
   to exactly the message's stories – also those under "… and N more" (chip "From the notification (N)", up to 50 stories;
-  more: the whole list). Vendor News findings of one product open that product, of several products Vendor News. The
-  same goes for the button in Slack and Teams, the click on ntfy, Gotify and desktop push messages and the personal
+  more: the whole list). A Vendor News story opens its product right where it matters: a vulnerability at the finding,
+  a new version or an end of support at "Versions", a revised advisory at "Changes", a watched CVE in the list of
+  watched CVEs – "Open in Cobe News" as well. Several stories of one product open the product (at the tab they share,
+  if any), of several products Vendor News. The same goes for the button in Slack and Teams, the click on ntfy, Gotify and desktop push messages and the personal
   messages; a forwarded story opens itself.
 - **Time.** Local time with the zone's abbreviation, so it is unambiguous: "2026-11-04 11:19 CET" (summer: CEST; in
   German "MEZ"/"MESZ") – likewise in the chat cards, push texts and forwards. Channels use Europe/Berlin; [personal messages](#meine-produkte) the person's time zone (from
@@ -1368,6 +1381,12 @@ exactly what concerns you. Example "only Palo Alto, only critical":
   - A story that names **only the vendor** ("Zyxel warns of attacks") matches "All products of Zyxel", not a single
     Zyxel product. A name several products of a vendor share counts for the product it is the name of: "PAN-OS" is
     PAN-OS, not Panorama; the longer name wins ("NGINX Plus" is not nginx as well).
+- **Our products (from Vendor News)** is at the very top of the picker: every product Cobe News follows in
+  [Vendor News](/docs/vendor-news) – as if each were chosen on its own (details or title/teaser), plus own products
+  added by CPE through their details. The list of now counts: a product followed later counts for stories that arrive
+  **from then on** (or get it from then on, through details that arrive later, say) – older stories about it are not
+  sent afterwards. A product you no longer follow (switched off or removed) no longer counts. Following no product:
+  nothing matches. "Match" names the product ("Match: PAN-OS").
 - **One vendor is one**, however the catalogue spells it: "VMware" and "Broadcom (VMware)", "Apache" and "Apache
   Software Foundation", "LANCOM" and "LANCOM Systems" show as one group, "All products" covers all of them. An owner in
   parentheses makes none: "CyberArk (Palo Alto Networks)" does not belong to Palo Alto Networks.
@@ -1378,8 +1397,8 @@ exactly what concerns you. Example "only Palo Alto, only critical":
   empty: no restriction, as before.
 - **Do not send if it contains:** if the title or teaser has one of these words, this rule never sends the story –
   whatever else matches.
-- **Vendor News:** systems apply to vulnerabilities, new versions and revised advisories as well (by their product).
-  Keywords and exclusions apply to security stories only; source health knows none of them.
+- **Vendor News:** systems apply to vulnerabilities, new versions and revised advisories as well (by their product;
+  "Our products": every followed product). Keywords and exclusions apply to security stories only; source health knows none of them.
 - **Details come later:** a story that matches only through details that arrive later comes then – once. When the
   **catalogue** learns a product or a name (a catalogue update), older stories are not sent because of it.
 - A product the catalogue no longer knows shows as "no longer in the catalogue" in the rule and matches nothing – never

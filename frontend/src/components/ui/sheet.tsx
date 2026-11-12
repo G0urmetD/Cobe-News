@@ -6,6 +6,7 @@ import { cn } from "cn"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
+import { LayerPortal } from "@/components/ui/layer-portal"
 import { focusContentOnOpen } from "@/lib/focus"
 import { XIcon } from "lucide-react"
 
@@ -19,10 +20,6 @@ function SheetTrigger({ ...props }: React.ComponentProps<typeof SheetPrimitive.T
 
 function SheetClose({ ...props }: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
-}
-
-function SheetPortal({ ...props }: React.ComponentProps<typeof SheetPrimitive.Portal>) {
-  return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
 }
 
 function SheetOverlay({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Overlay>) {
@@ -55,7 +52,7 @@ function SheetContent({
   showCloseButton?: boolean
 }) {
   return (
-    <SheetPortal>
+    <LayerPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
@@ -80,7 +77,7 @@ function SheetContent({
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Content>
-    </SheetPortal>
+    </LayerPortal>
   )
 }
 

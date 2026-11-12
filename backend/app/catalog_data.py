@@ -18,7 +18,9 @@ Layout (docs/BETRIEB.md „Katalog pflegen“):
 
 A product entry on top of endoflife.date's product list: display name, vendor, CPEs ("part:vendor:product" of the NVD CPE
 dictionary), the version scheme (app/vendor_versions.py), the vendor's own advisory source (adv), the names products
-have in vendor advisories (names) and in the CNA data of CVE records (cna), words that find related news (kw), a hint, …
+have in vendor advisories (names) and in the CNA data of CVE records (cna), words that find related news (kw), a hint,
+where release data come from when endoflife.date has none (releases: GitHub releases or a release notes page –
+app/release_sources.py), …
 An entry whose key is an endoflife.date product patches that product (its CPEs are added to the ones endoflife.date
 names); an entry without a label only moves such a product into its category (and may add CPEs, a scheme, a hint or its
 vendor – endoflife.date names none, the catalogue would take the first word of the label or the CPE's vendor).
@@ -97,6 +99,27 @@ class Edition(_Strict):
     cpe: Text | None = Field(None, description="The edition in NVD's CPE (version or sw_edition field), e.g. 2019 or subscription.")
 
 
+HOST = r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+HttpsUrl = Annotated[str, StringConstraints(pattern=r"^https://[a-z0-9.-]+(?::\d{2,5})?/[^\s]{0,300}$", max_length=320)]
+GithubRepo = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$")]
+
+
+class ReleaseSource(_Strict):
+    """Where a product's release data come from when endoflife.date has none (app/release_sources.py): GitHub releases
+    (the repository's public Atom feed) or the vendor's release notes page – exactly one of the two."""
+
+    github: GithubRepo | None = Field(None, description="owner/repo on github.com – its releases (github.com/<owner>/<repo>/releases.atom).")
+    tag: Regex | None = Field(
+        None,
+        description="GitHub: regular expression (Python, whole tag) with a group 'version'; default ^v?(?P<version>\\d+(?:\\.\\d+){1,3})$. Tags it does not match are left out.",
+    )
+    page: HttpsUrl | None = Field(None, description="The vendor's release notes page (HTML, read as text – no JavaScript).")
+    pattern: Regex | None = Field(None, description="Page: regular expression (Python, searched in the page's text) with a group 'version' and optionally 'date'.")
+    prerelease: bool | None = Field(None, description="Also pre-releases (rc, beta, alpha, preview, dev …); default false.")
+    lines: int | None = Field(None, ge=1, le=4, description="Parts of a version that name its release line (default 2: 7.6.2 → line 7.6; 1: 26.10.2 → 26).")
+    lts: Regex | None = Field(None, description="Regular expression on the release title: a match marks its line LTS (Portainer 'Release 2.45.3 LTS').")
+
+
 class Product(_Strict):
     """One product of the catalogue (or, without label, a patch of an endoflife.date product)."""
 
@@ -149,6 +172,10 @@ class Product(_Strict):
     cpe_editions: list[Annotated[list[Text], Field(min_length=2, max_length=2)]] | None = Field(
         None, max_length=8, description="[cpe, sw_edition]: only NVD CPE matches of these editions count for that CPE (Firefox '-' vs 'esr', Jenkins 'lts')."
     )
+    releases: ReleaseSource | None = Field(
+        None,
+        description="Release data where endoflife.date has none: GitHub releases or the vendor's release notes page – release lines and the newest version, no support dates (endoflife.date comes first).",
+    )
 
 
 class Category(_Strict):
@@ -182,10 +209,6 @@ class ProductsFile(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
     products: list[Product]
-
-
-HOST = r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
-HttpsUrl = Annotated[str, StringConstraints(pattern=r"^https://[a-z0-9.-]+(?::\d{2,5})?/[^\s]{0,300}$", max_length=320)]
 
 
 class CsafProvider(_Strict):
@@ -399,6 +422,8 @@ def load(directory: Path | None = None) -> Catalog:
                 if eco not in OSV_ECOSYSTEMS:
                     raise CatalogError(f"{where}: osv ecosystem {eco!r} is not one of {', '.join(OSV_ECOSYSTEMS)}")
             _check_rules(p, where, texts)
+            if p.releases is not None:
+                _check_releases(p.releases, where)
             # the shape the code used (P(...) rows): key, label, vendor, category, cpes always; the rest only when set
             row = {"key": p.key, "label": p.label, "vendor": p.vendor, "category": cat, "cpes": list(p.cpes)}
             row |= {k: v for k, v in given.items() if k not in row}
@@ -456,6 +481,29 @@ def _check_rules(p: Product, where: str, texts: TextsFile) -> None:
     for cpe, _ed in p.cpe_editions or []:
         if cpe not in p.cpes:
             raise CatalogError(f"{where}: cpe_editions names {cpe!r}, not one of the product's CPEs")
+
+
+def _check_releases(r: ReleaseSource, where: str) -> None:
+    """A release source: GitHub or a page (one of them), its regular expressions compile and have a group 'version'."""
+    import re
+
+    if (r.github is None) == (r.page is None):
+        raise CatalogError(f"{where}: releases needs exactly one of github or page")
+    if r.page is not None and r.pattern is None:
+        raise CatalogError(f"{where}: releases.page needs a pattern")
+    if r.github is not None and r.pattern is not None:
+        raise CatalogError(f"{where}: releases.pattern is for a page – a GitHub source takes tag")
+    if r.page is not None and r.tag is not None:
+        raise CatalogError(f"{where}: releases.tag is for GitHub – a page takes pattern")
+    for what, rx in (("tag", r.tag), ("pattern", r.pattern), ("lts", r.lts)):
+        if rx is None:
+            continue
+        try:
+            c = re.compile(rx)
+        except re.error as e:
+            raise CatalogError(f"{where}: releases.{what} is no regular expression ({e})") from e
+        if what != "lts" and "version" not in c.groupindex:
+            raise CatalogError(f"{where}: releases.{what} needs a group (?P<version>…)")
 
 
 def _csaf(d: Path, vendors: set[str]) -> list[dict]:

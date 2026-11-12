@@ -3,9 +3,10 @@
 The browser subscribes at its vendor's push service (Chrome/Edge: Google FCM or Microsoft WNS, Firefox: Mozilla, Safari:
 Apple) and hands us an endpoint URL there plus two keys. After each round of feeds the server sends each subscribed
 browser what arrived for its person (the same choice as in the tab: severities, sources, no backlog) – at most three
-stories on their own and one summary, as the tab does. The payload is encrypted end to end for the browser (RFC 8291,
-aes128gcm): the push service only sees its size. The server signs every request with its VAPID key (RFC 8292),
-created once and kept encrypted in the settings.
+stories on their own (critical or exploited ones first, then the newest: api.arrived) and one summary for the rest whose
+line names the highest severity of all of the rest, listed or not – exactly as the tab does. The payload is encrypted
+end to end for the browser (RFC 8291, aes128gcm): the push service only sees its size. The server signs every request
+with its VAPID key (RFC 8292), created once and kept encrypted in the settings.
 
 Only https endpoints on the push services' hosts (PUSH_HOSTS) are taken – a subscription is browser input, it must not
 make the server post anywhere else. Sent through the outbound proxy when one is set, as the other notifications.
@@ -35,7 +36,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from sqlalchemy import delete, select, update
+from sqlalchemy import bindparam, delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -202,10 +203,24 @@ def vapid_headers(endpoint: str, key: Vapid, *, now: float | None = None) -> dic
 # ---------------------------------------------------------------- what is sent
 
 
-SEV_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+SEV_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}  # as api.SEV_RANK
 TEXTS = {
-    "de": {"summary": "{n} neue Security-Meldungen", "summary_text": "In Cobe News öffnen", "test": "Test-Benachrichtigung von Cobe News", "test_text": "Push bei geschlossenem Tab funktioniert."},
-    "en": {"summary": "{n} new security stories", "summary_text": "Open Cobe News", "test": "Test notification from Cobe News", "test_text": "Push with the tab closed works."},
+    "de": {
+        "summary": "{n} neue Security-Meldungen",
+        "summary_text": "In Cobe News öffnen",
+        "summary_top": "Höchste Schwere: {sev}",
+        "exploited": "ausgenutzt",
+        "test": "Test-Benachrichtigung von Cobe News",
+        "test_text": "Push bei geschlossenem Tab funktioniert.",
+    },
+    "en": {
+        "summary": "{n} new security stories",
+        "summary_text": "Open Cobe News",
+        "summary_top": "Highest severity: {sev}",
+        "exploited": "exploited",
+        "test": "Test notification from Cobe News",
+        "test_text": "Push with the tab closed works.",
+    },
 }
 
 
@@ -213,18 +228,38 @@ def _lang(lang: str) -> str:
     return lang if lang in TEXTS else "de"
 
 
+def notice_line(story: dict, lang: str) -> str:
+    """The line under a story's title – the same in the tab (frontend lib/desktop.ts storyBody) and by Web Push:
+    "Kritisch (CVSS 9.8) · ausgenutzt · PAN-OS, Prisma Cloud · BSI". The severity only when the story has one (an
+    unrated story says none), the CVSS and "ausgenutzt" when known, the products it is about – or, when the person chose
+    systems or words, what it matched by ("Treffer: …", api.desktop_hits) – and the source last."""
+    lang = _lang(lang)
+    lb = notify.LABELS[lang]
+    facts = story.get("notice") or {}
+    parts: list[str] = []
+    if facts.get("rated", True):
+        sev = str(lb["sev"].get(story["severity"], story["severity"]))
+        parts.append(f"{sev} (CVSS {facts['cvss']})" if facts.get("cvss") else sev)
+    if facts.get("exploited"):
+        parts.append(TEXTS[lang]["exploited"])
+    hits = [str(x) for x in story.get("hits") or []]
+    if hits:
+        parts.append(f"{lb['hit']}: {notify.names_text(hits)}")
+    elif names := notify.names_text([str(x) for x in facts.get("products") or []]):
+        parts.append(names)
+    parts.append(str(story["source"])[:80])
+    return notify.one_line(" · ".join(p for p in parts if p))
+
+
 def story_payload(story: dict, lang: str) -> dict:
-    """One story: its headline, severity and source – news from public feeds, nothing confidential; the text stays in
-    Cobe News. `hits` (the person chose systems or words): "· Treffer: PAN-OS" – why it came, as a rule's message."""
-    lb = notify.LABELS[_lang(lang)]
-    names = neutral(notify.names_text([str(x) for x in story.get("hits") or []]))
-    why = f" · {lb['hit']}: {names}" if names else ""
+    """One story: its headline and notice_line (severity, products, source) – news from public feeds, nothing
+    confidential; the text stays in Cobe News."""
     return {
         "v": 1,
         "kind": "story",
         "id": story["id"],
         "title": neutral(story["title"])[:200],
-        "body": f"{lb['sev'].get(story['severity'], story['severity'])} · {neutral(story['source'])[:80]}{why}",
+        "body": notice_line(story, lang)[:240],
         "severity": story["severity"],
         "url": f"/?story={story['id']}",
     }
@@ -245,12 +280,36 @@ def vendor_payload(event_id: str, title: str, product: str, severity: str, path:
     }
 
 
-def summary_payload(count: int, lang: str, ids: list[str] | None = None) -> dict:
+def summary_payload(count: int, lang: str, ids: list[str] | None = None, stories: list[dict] | None = None, unlisted_top: str | None = None) -> dict:
     """The rest of a round in one notification: a click opens the news list filtered to exactly these stories
-    (notify.overview_path – at most notify.NEWS_IDS_MAX, else the news list); `ids` unknown or incomplete: the news list."""
+    (notify.overview_path – at most notify.NEWS_IDS_MAX, else the news list); `ids` unknown or incomplete: the news list.
+    `stories` (those of the rest the round read): the line names their products and, with `unlisted_top` (the highest
+    severity of the rest the round did not read, api.arrived), the highest severity of all of the rest."""
     t = TEXTS[_lang(lang)]
     url = notify.overview_path([], count, [("news", i) for i in ids]) if ids and len(ids) == count else notify.NEWS_PATH
-    return {"v": 1, "kind": "summary", "id": f"summary-{int(time.time())}", "title": t["summary"].format(n=count), "body": t["summary_text"], "severity": "info", "url": url}
+    body = summary_line(stories or [], lang, unlisted_top)
+    return {"v": 1, "kind": "summary", "id": f"summary-{int(time.time())}", "title": t["summary"].format(n=count), "body": body, "severity": "info", "url": url}
+
+
+def summary_line(stories: list[dict], lang: str, unlisted_top: str | None = None) -> str:
+    """ "Höchste Schwere: Kritisch · PAN-OS, FortiOS, Exchange +2" – what a summary is about; "In Cobe News öffnen"
+    when nothing is known of them. The severity: the highest of the rated `stories` and `unlisted_top` (the rest beyond
+    the listed ones) – the tab's summaryBody does the same."""
+    lang = _lang(lang)
+    t, lb = TEXTS[lang], notify.LABELS[lang]
+    sevs = [s["severity"] for s in stories if (s.get("notice") or {}).get("rated", True)] + ([unlisted_top] if unlisted_top else [])
+    parts: list[str] = []
+    if sevs:
+        top = max(sevs, key=lambda x: SEV_RANK.get(x, 0))
+        parts.append(t["summary_top"].format(sev=lb["sev"].get(top, top)))
+    names: list[str] = []
+    for s in stories:
+        for n in [*(s.get("hits") or []), *((s.get("notice") or {}).get("products") or [])]:
+            if n not in names:
+                names.append(str(n))
+    if text := notify.names_text(names):
+        parts.append(text)
+    return notify.one_line(" · ".join(parts))[:240] if parts else t["summary_text"]
 
 
 def test_payload(lang: str) -> dict:
@@ -332,8 +391,41 @@ async def settle(db: AsyncSession, sub: PushSubscription, outcome: notify.Notify
     return sent
 
 
+def _choice_key(prefs: dict | None) -> str:
+    """A person's desktop choice as one text – people with the same choice get the same stories (api.desktop_filter and
+    api.desktop_hits read nothing else of them), so a round asks the database once for all of them."""
+    return json.dumps(prefs or {}, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def _round_payloads(rows: list, total: int, unlisted_top: str | None, hit, lang: str, seen: dict) -> list[dict]:  # noqa: ANN001
+    """What one browser gets of a round: the first SINGLE stories of api.arrived (critical or exploited first, then the
+    newest) on their own – shown in reverse, the most important last (on top), as the tab – and one summary for the
+    rest. `seen`: what each story says (api._item_out, api.notice_facts), worked out once per round."""
+    from app import api
+
+    def facts(i, s) -> tuple[dict, dict]:  # noqa: ANN001
+        if i.id not in seen:
+            seen[i.id] = (api._item_out(i, s, None), api.notice_facts(i))
+        return seen[i.id]
+
+    payloads = []
+    for i, s in rows[:SINGLE][::-1]:
+        x, notice = facts(i, s)
+        payloads.append(story_payload({"id": x["id"], "title": x["title"], "severity": x["severity"], "source": x["source"]["name"], "hits": hit(i) if hit else [], "notice": notice}, lang))
+    if total > len(payloads):
+        # the rest by id when the round knows them all (rows holds at most RECENT_MAX)
+        rest = [str(i.id) for i, _s in rows[SINGLE:]] if total == len(rows) else None
+        others = [{"severity": i.severity, "hits": hit(i) if hit else [], "notice": facts(i, s)[1]} for i, s in rows[SINGLE:]]
+        payloads.append(summary_payload(total - len(payloads), lang, rest, others, unlisted_top))
+    return payloads
+
+
 async def dispatch(db: AsyncSession) -> dict[str, int]:
-    """After each round of feeds: every browser gets what arrived for its person since its cursor."""
+    """After each round of feeds: every browser gets what arrived for its person since its cursor.
+
+    One query for the people, one ask of the database (api.arrived) per desktop choice and cursor – the browsers of one
+    person, and people who chose the same, share it –, what a story says worked out once per round, and the browsers'
+    new state written in a few statements (all that went out in one, a failure each on its own: its own backoff)."""
     from app import api
     from app import news as news_svc
     from app.models import NewsItem
@@ -350,29 +442,33 @@ async def dispatch(db: AsyncSession) -> dict[str, int]:
     if not subs:
         return {}
     top = await news_svc.last_seq(db)
+    due = [s for s in subs if s.cursor < top]
+    users = {u.id: u for u in await db.scalars(select(User).where(User.id.in_({s.user_id for s in due})))} if due else {}
     sent = failed = 0
     jobs: list[tuple[PushSubscription, list[dict]]] = []
     skip: list[PushSubscription] = []  # nothing to send: their cursor moves on – written after the sending, not before
-    for sub in subs:
-        if sub.cursor >= top:
-            continue
-        user = await db.get(User, sub.user_id)
+    groups: dict[tuple[str, int], list[PushSubscription]] = {}
+    for sub in due:
+        user = users.get(sub.user_id)
         if user is None or not user.is_active or not (user.desktop or {}).get("enabled"):
             skip.append(sub)  # switched off (the account or its notifications): nothing piles up for later
             continue
-        where = [*api.fresh_filter(), NewsItem.seq > sub.cursor, NewsItem.seq <= top, *api.desktop_filter(user.desktop)]
-        rows, total = await api.arrived(db, where)
+        groups.setdefault((_choice_key(user.desktop), sub.cursor), []).append(sub)
+    seen: dict = {}
+    for (_choice, cursor), members in groups.items():
+        prefs = users[members[0].user_id].desktop
+        await api.load_desktop(db, prefs)
+        where = [*api.fresh_filter(), NewsItem.seq > cursor, NewsItem.seq <= top, *api.desktop_filter(prefs)]
+        rows, total, unlisted_top = await api.arrived(db, where)
         if not rows:
-            skip.append(sub)
+            skip += members
             continue
-        hit = api.desktop_hits(user.desktop)  # "Treffer" when the person chose systems or words
-        single = [api._item_out(i, s, None) | ({"hits": hit(i)} if hit else {}) for i, s in rows[:SINGLE]][::-1]  # the oldest of the newest first, as the tab
-        payloads = [story_payload({"id": x["id"], "title": x["title"], "severity": x["severity"], "source": x["source"]["name"], "hits": x.get("hits") or []}, sub.lang) for x in single]
-        if total > len(single):
-            # the rest by id when the round knows them all (rows holds the newest RECENT_MAX)
-            rest = [str(i.id) for i, _s in rows[SINGLE:]] if total == len(rows) else None
-            payloads.append(summary_payload(total - len(single), sub.lang, rest))
-        jobs.append((sub, payloads))
+        hit = api.desktop_hits(prefs)  # "Treffer" when the person chose systems or words
+        by_lang: dict[str, list[dict]] = {}
+        for sub in members:
+            if sub.lang not in by_lang:
+                by_lang[sub.lang] = _round_payloads(rows, total, unlisted_top, hit, sub.lang, seen)
+            jobs.append((sub, by_lang[sub.lang]))
     gate = asyncio.Semaphore(CONCURRENCY)
 
     async def one(sub: PushSubscription, payloads: list[dict]) -> notify.NotifyError | PushError | None:
@@ -389,18 +485,35 @@ async def dispatch(db: AsyncSession) -> dict[str, int]:
             t.cancel()
         await asyncio.gather(*late, return_exceptions=True)
     results = [t.result() if not t.cancelled() and t.exception() is None else notify.NotifyError("timeout") for t in tasks]
-    # written row by row with Core statements, not through the loaded objects: a browser unsubscribed (or taken over,
-    # or its person deleted) while the round was sending is simply no longer there (0 rows) – with the ORM its missing
-    # row failed the whole commit and rolled back every other browser's cursor (they got the same pushes again)
-    if skip:
-        await db.execute(update(PushSubscription).where(PushSubscription.id.in_([s.id for s in skip])).values(cursor=top))
+    # written with Core statements by id, not through the loaded objects: a browser unsubscribed (or taken over, or its
+    # person deleted) while the round was sending is simply no longer there (0 rows) – with the ORM its missing row
+    # failed the whole commit and rolled back every other browser's cursor (they got the same pushes again)
+    ok_ids, gone_ids, backoff = [], [], []
     for (sub, _), outcome in zip(jobs, results, strict=True):
         ok, values = _after(sub, outcome)
-        if values is None:
-            await db.execute(delete(PushSubscription).where(PushSubscription.id == sub.id))
+        if ok:
+            ok_ids.append(sub.id)
+        elif values is None:
+            gone_ids.append(sub.id)
         else:
-            await db.execute(update(PushSubscription).where(PushSubscription.id == sub.id).values(**values, **({"cursor": top} if ok else {})))
+            backoff.append({"b_id": sub.id, **{f"b_{k}": v for k, v in values.items()}})
         sent, failed = sent + ok, failed + (not ok)
+    if skip:
+        await db.execute(update(PushSubscription).where(PushSubscription.id.in_([s.id for s in skip])).values(cursor=top))
+    if ok_ids:
+        await db.execute(
+            update(PushSubscription).where(PushSubscription.id.in_(ok_ids)).values(failures=0, last_error=None, next_try_at=None, last_ok_at=datetime.now(UTC), cursor=top)
+        )
+    if gone_ids:
+        await db.execute(delete(PushSubscription).where(PushSubscription.id.in_(gone_ids)))
+    if backoff:
+        t = PushSubscription.__table__
+        await db.execute(
+            update(t)
+            .where(t.c.id == bindparam("b_id"))
+            .values(failures=bindparam("b_failures"), last_error=bindparam("b_last_error"), last_error_at=bindparam("b_last_error_at"), next_try_at=bindparam("b_next_try_at")),
+            backoff,
+        )
     await db.commit()
     for sub in subs:
         if sub in db:

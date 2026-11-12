@@ -8,8 +8,13 @@ import { type VendorProduct, useVendorCatalog } from "@/lib/vendor-api"
 // editor and the rules list, the News page's "Systeme" filter and a person's own notifications (backend app/concerns.py,
 // app/systems.py, app/keywords.py; tested in rule-filters.test.ts).
 
-/** A system of a rule: a catalogue vendor (all of its products, also those added later) or one product. */
-export type RuleSystem = { vendor: string } | { product: string }
+/** A system of a rule: a catalogue vendor (all of its products, also those added later), one product, or "Unsere
+ *  Produkte (aus Vendor News)" – the products followed when a story is judged (also one followed later). */
+export type RuleSystem = { vendor: string } | { product: string } | { ours: true }
+
+/** "Unsere Produkte" (backend app/systems.py OURS). */
+export const OURS: RuleSystem = { ours: true }
+export const isOurs = (s: RuleSystem): s is { ours: true } => "ours" in s
 
 /** The kinds a rule's severities apply to (versions, EOL and source health have their own). */
 export const SEVERITY_KINDS: RuleKind[] = ["news", "vendor_vuln", "vendor_change"]
@@ -40,10 +45,14 @@ export const fold = (s: string) =>
 /** A vendor as the server compares it ("Red Hat" and "Redhat" are one): folded, letters and digits only. */
 export const vendorId = (name: string) => fold(name).replace(/[^a-z0-9]/g, "")
 
-/** The value of a system in the picker – "v:<vendor>" or "p:<key>". */
-export const systemValue = (s: RuleSystem) => ("vendor" in s ? `v:${s.vendor}` : `p:${s.product}`)
+/** The value of a system in the picker and in an address – "v:<vendor>", "p:<key>" or "ours". */
+export const systemValue = (s: RuleSystem) => (isOurs(s) ? "ours" : "vendor" in s ? `v:${s.vendor}` : `p:${s.product}`)
+
+/** What a stored or chosen system is called when it is no longer known: the vendor's name or the product's key. */
+export const systemRef = (s: RuleSystem) => (isOurs(s) ? "ours" : "vendor" in s ? s.vendor : s.product)
 
 export function systemOf(value: string): RuleSystem | null {
+  if (value === "ours") return OURS
   if (value.startsWith("v:") && value.length > 2) return { vendor: value.slice(2) }
   if (value.startsWith("p:") && value.length > 2) return { product: value.slice(2) }
   return null
@@ -55,10 +64,12 @@ const PRODUCT_KEY = /^[a-z0-9][a-z0-9._+-]{0,63}$/
 const CONTROL = /[\u0000-\u001f\u007f\u2028\u2029]/
 export const VENDOR_MAX = 120
 
-/** A system of an address (`system=v:Palo Alto Networks`, `system=p:panos`) – null: malformed (a crafted link). */
+/** A system of an address (`system=v:Palo Alto Networks`, `system=p:panos`, `system=ours`) – null: malformed (a
+ *  crafted link). */
 export function systemParam(value: string): RuleSystem | null {
   const s = systemOf(value.trim())
   if (!s) return null
+  if (isOurs(s)) return s
   if ("product" in s) return PRODUCT_KEY.test(s.product) ? s : null
   const v = s.vendor.trim()
   return v && v.length <= VENDOR_MAX && !CONTROL.test(v) ? { vendor: v } : null
@@ -139,8 +150,10 @@ export const vendorOf = (vendors: CatalogVendor[], name: string) => {
 
 type T = (key: string, opts?: Record<string, unknown>) => string
 
-/** A system by its name: the product's label, a vendor "(alle)" – null: the catalogue no longer knows it. */
+/** A system by its name: the product's label, a vendor "(alle)", "Unsere Produkte" – null: the catalogue no longer
+ *  knows it. */
 export function systemName(t: T, s: RuleSystem, vendors: CatalogVendor[] | undefined): string | null {
+  if (isOurs(s)) return t("notify.systemsOursChip")
   if (!vendors) return "vendor" in s ? s.vendor : s.product
   if ("vendor" in s) {
     const v = vendorOf(vendors, s.vendor)

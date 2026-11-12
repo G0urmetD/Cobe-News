@@ -472,6 +472,9 @@ async def enroll_passkey(body: RegistrationIn, got: EnrollSession, response: Res
     sess, user = got
     row = await _add(db, await _enroll_allowed(db, user), user, sess, body, at_signin=True)
     sess.passkey_id = row.id  # removing this passkey ends the session it completed
+    # the sign-in ends with the passkey just made (user verification – two factors), as a passkey sign-in: "passkey" –
+    # not "password" (no second factor), which a later check of the method would take at its word
+    sess.method = "passkey"
     log.info("passkey %s registered for %s at the sign-in", row.id, user.username)
     return await _finish(db, sess, user, "active", response)
 

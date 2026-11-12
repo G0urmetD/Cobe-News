@@ -1,5 +1,7 @@
 """The Vendor News product catalogue: endoflife.date's product list (release lines, support and EOL dates, CPE
 identifiers) plus the curated overlay (the data files in app/catalog/, loaded and checked by app/catalog_data.py).
+Products endoflife.date does not know may name a release source in the overlay (GitHub releases, a vendor's release
+notes page): their lines come from app/release_sources.py – `product_releases` gives either, endoflife.date first.
 
 Built from data, not written by hand: `build(eol)` takes endoflife.date's full dump (`/api/v1/products/full`, one
 request) and returns the catalogue. A copy is bundled (app/data/vendor_catalog.json – `python -m app.vendor_catalog
@@ -310,7 +312,46 @@ def want_depth(product: dict) -> int | None:
     show. None: nothing says so (no release data) – then no version counts as short ("ungenau")."""
     if product.get("depth"):
         return int(product["depth"])
-    return depth(product.get("eol")) or None
+    if releases(product.get("eol")) or not product.get("releases"):
+        return depth(product.get("eol")) or None
+    key = f"releases:{product.get('key')}"  # a release source's lines (dropped from the cache when they change)
+    d = _depths.get(key)
+    if d is None:
+        d = full_depth(product_releases(product))
+        if d:
+            _depths[key] = d
+    return d or None
+
+
+def product_releases(product: dict) -> list[dict]:
+    """A product's release lines: endoflife.date's first; without them those of its release source (GitHub releases or
+    the vendor's page – app/release_sources.py, same shape, no support dates)."""
+    rels = releases(product.get("eol"))
+    if rels or not product.get("releases"):
+        return rels
+    from app import release_sources
+
+    return release_sources.lines(product)
+
+
+def release_source(product: dict) -> dict | None:
+    """Where the product's release lines come from: {"kind": "eol"}, a release source ({"kind": "github"|"page", "ref",
+    "url", "fetched_at"}) or None (no release data)."""
+    if releases(product.get("eol")):
+        return {"kind": "eol"}
+    from app import release_sources
+
+    return release_sources.info(product)
+
+
+def release_baseline(product: dict, version: str | None) -> bool:
+    """A newest version that was already out when the product's release source was first read (its baseline): the
+    "neue Version" event for it is silent – endoflife.date's lines have no such baseline (they come with the catalogue)."""
+    if releases(product.get("eol")) or not product.get("releases"):
+        return False
+    from app import release_sources
+
+    return release_sources.is_base(product, version)
 
 
 def depth(eol_key: str | None) -> int:

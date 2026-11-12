@@ -26,7 +26,7 @@ Die Seite zeigt die gefolgten Produkte mit ihrem Stand. Von oben nach unten:
   genau die angezeigten Produkte (siehe [Gelesen, stumm und Ansichten](#vendor-lesen)).
 
 Unter **Filter** stehen die Schalter „Nur ungelesene“ (mit der Zahl der ungelesenen Befunde), „Stummgeschaltete
-zeigen“, „Versionen zu prüfen“ (mit ihrer Zahl, wenn [Versionen prüfen](#versionen-pruefen) eingeschaltet ist) und
+zeigen“, „Bestätigte zeigen“ ([Treffer bestätigen](#treffer-bestaetigen)), „Versionen zu prüfen“ (mit ihrer Zahl, wenn [Versionen prüfen](#versionen-pruefen) eingeschaltet ist) und
 „Mein Team | Alle“ (siehe [Mein Team](#mein-team)).
 
 Der **Katalog** – alle Produkte, denen man folgen kann (über 900, in Kategorien) – öffnet sich über **⋯ → Produkt
@@ -350,8 +350,31 @@ Für jede eingetragene Version rechnet Vendor News aus, was zu tun ist:
   für …“.
 - Ist die Zielversion selbst von einer anderen Lücke betroffen, steht das dabei.
 
-**Update verfügbar** heißt: In eurer Release-Linie gibt es einen neueren Patch (laut endoflife.date) – ein Update
-innerhalb der Linie, kein Linienwechsel. „Aktuell“ heißt: ihr habt den neuesten Patch der Linie.
+**Update verfügbar** heißt: In eurer Release-Linie gibt es einen neueren Patch (laut endoflife.date oder der
+[Release-Quelle](#release-daten) des Produkts) – ein Update innerhalb der Linie, kein Linienwechsel. „Aktuell“ heißt:
+ihr habt den neuesten Patch der Linie.
+
+### Woher die Release-Daten kommen {#release-daten}
+
+Release-Linien, die aktuellste Version je Linie und das Support-Ende kommen von **endoflife.date** – wenn es das
+Produkt kennt, gilt immer das. Viele selbst betriebene Produkte kennt endoflife.date nicht (Passwork, Portainer,
+BookStack, BloodHound CE, LibreNMS, Wazuh …). Für sie nennt der Katalog eine **Release-Quelle**:
+
+- **GitHub-Releases** des Projekts (z. B. `portainer/portainer`) – Cobe News liest den öffentlichen Feed der Releases,
+  ohne Token. Vorabversionen (rc, beta, alpha …) zählen nicht.
+- die **Release Notes des Herstellers** (z. B. passwork.pro) – nur die Einträge des Produkts selbst; bei Passwork zählt
+  „Passwork 7.7.0“, nicht „Desktop app 1.4.1“ oder „Browser extension 2.0.37“.
+
+Daraus entstehen die Linien (meist die ersten zwei Stellen: 7.6, 7.7; bei Portainer mit LTS-Kennzeichen), die neueste
+Version je Linie und die neueste überhaupt – „Update verfügbar“, „Neuere Linie“ und die Zielversionen funktionieren
+damit genauso. **Ein Support-Ende kennen diese Quellen nicht:** dort steht „Support-Ende unbekannt“, und es gibt nie
+eine Meldung „Support endet bald“ aus ihnen. Unter den Linien steht die Quelle mit dem letzten Abruf („Quelle:
+GitHub-Releases portainer/portainer, abgerufen vor 3 Stunden“).
+
+Abgerufen wird wie endoflife.date einmal am Tag (Einstellung „Versionen & KEV alle“) und **nur für gefolgte
+Produkte**. Beim ersten Abruf eines Produkts gibt es keine Meldungen für Versionen, die schon erschienen waren – erst
+eine danach erscheinende Version meldet „Neue Version verfügbar“. Fehlt eine Quelle oder findet sie nichts mehr, steht
+das in der [Quellen-Gesundheit](/docs/news-quellen#quellen-gesundheit) und in der [Katalog-Pflege](#was-geprueft-wird).
 
 **Support-Ende** ([EOL](term:eol)) kommt von endoflife.date:
 
@@ -664,6 +687,42 @@ Produkt).
   endet / beendet“ der früheren Zusammenfassung erscheinen als Chip, `?tab=catalog` und `?tab=suggestions` öffnen
   Katalog und Vorschläge.
 
+## Treffer bestätigen {#treffer-bestaetigen}
+
+Manche Treffer betreffen die eigene Installation nicht, obwohl die Version im betroffenen Bereich liegt – etwa ein
+PAN-OS-Advisory, das nur zählt, wenn eine bestimmte Funktion (z. B. Brotli) eingeschaltet ist. Dafür gibt es am Befund in
+der Schublade **Bestätigen …**: eine Bewertung für **alle**, mit Begründung.
+
+- **Bewertungen:** *Nicht betroffen* (Funktion oder Konfiguration nicht im Einsatz), *Maßnahme umgesetzt* (Workaround
+  oder Gegenmaßnahme) und *Risiko akzeptiert* – diese nur mit Begründung. Die Begründung ist kurz (bis 500 Zeichen).
+- **Wirkung:** Ein bestätigter Treffer zählt als erledigt – nicht in den Zahlen der Kachel, ihrem Zustand, der Zahl an
+  „Vendor News“, den ungelesenen, dem [Wochenrückblick](/docs/benachrichtigungen#wochenrueckblick) und den Zahlen der
+  [API](/docs/api) – und meldet sich nicht mehr: weder über die Regeln noch über die persönlichen Wege, auch keine
+  Änderung an einem seiner Einträge (Herstellerhinweis, NVD, cvelistV5, OSV). Was in der Zeit entsteht oder beim
+  Bestätigen noch nicht versendet war (etwa ein Kanal in seiner Pause), kommt auch später nicht nach, wenn jemand die
+  Bestätigung aufhebt. Im Wochenrückblick steht der Treffer wieder, sobald er nicht mehr bestätigt ist. Eine CVE, die du selbst
+  [beobachtest](/docs/benachrichtigungen#cves-liste), meldet sich bei dir weiter – das ist deine eigene Wahl.
+- **Sichtbar bleibt er:** in der Schublade blass mit „Bestätigt · Nicht betroffen“, wer, wann und warum stehen darunter
+  und beim Darüberfahren. Die Kachel nennt „2 bestätigt“; unter *Filter* zeigt **Bestätigte zeigen** (Chip „Mit
+  Bestätigten“) sie auch in den Zeilen der Kachel.
+- **Von selbst aufgehoben** wird die Bestätigung, wenn sich der Treffer wesentlich ändert: jetzt aktiv ausgenutzt,
+  höher eingestuft, neue CVEs, mehr eingetragene Versionen (sicherer) betroffen als beim Bestätigen – etwa eine später
+  eingetragene oder ein erweiterter Bereich –, das Advisory zurückgezogen, oder ein anderer Hinweis führt den Treffer
+  jetzt an (z. B. kommt nach dem NVD-Eintrag der Herstellerhinweis: „neu zugeordnet“, bitte neu bewerten). Dann zählt und
+  meldet er sich wieder; die Meldung sagt „Bestätigung aufgehoben: jetzt ausgenutzt“, die Schublade ebenso. Was in den
+  24 Stunden davor entstand (etwa die Advisory-Änderung, die es auslöste), geht dann doch noch hinaus. Eine neue
+  Fix-Version allein hebt sie nicht auf, ebenso wenig eine geänderte Version mit derselben Bewertung (11.2.4-h23 →
+  11.2.4-h25, beide betroffen) oder eine entfernte.
+- **Wer darf:** Admins immer, bei eingeschalteten Teams auch die Mitglieder eines Teams, dem das Produkt zugeordnet ist
+  (dieselben, die seine [Versionen prüfen](#versionen-pruefen)). Alle anderen sehen die Bestätigung nur.
+  **Bestätigung aufheben** macht sie rückgängig. Bestätigen, Aufheben und das Aufheben von selbst stehen im Protokoll.
+  Die Bestätigung eines Teammitglieds – auch „Risiko akzeptiert“ – schaltet den Treffer für alle still, auch für die
+  Kanäle der Admin-Regeln; wer wann warum bestätigt hat, steht am Treffer und im Protokoll.
+
+**Bestätigen oder stummschalten?** [Stummschalten](/docs/benachrichtigungen#stummschalten) ist deins und auf Zeit: nur
+deine Meldungen und Zahlen, bis zu einem Datum. Bestätigen gilt für alle und bleibt, bis jemand es aufhebt oder der
+Treffer sich ändert – es ist die Bewertung der Installation.
+
 ## Mein Team {#mein-team}
 
 Hat ein Admin *Teams* eingeschaltet und gehörst du zu einem Team, steht unter **Filter** die Wahl
@@ -734,6 +793,7 @@ Ein Vorschlag wird genau einmal beantwortet. Adressen werden nur als Text und Li
 | [NVD](term:nvd) | alle Produkte mit CPE: CVEs mit Versionsbereichen und den Angaben des Herstellers (Microsoft: Build-Bereiche), [CVSS](term:cvss); neue, noch nicht analysierte CVEs per Stichwortsuche der letzten 30 Tage |
 | CISA [KEV](term:kev) | „aktiv ausgenutzt“ |
 | endoflife.date | Release-Linien, aktuellste Version je Linie, Support-Ende |
+| GitHub-Releases, Release Notes der Hersteller | Release-Linien und aktuellste Version für Produkte ohne endoflife.date ([Release-Daten](#release-daten)) – kein Support-Ende |
 | ENISA [EUVD](term:euvd) | „aktiv ausgenutzt“ – aus den News, wenn die Quelle eingeschaltet ist |
 | CSAF-Anbieter (Siemens, Cisco, Schneider Electric, Open-Xchange) | die [CSAF](term:csaf)-Hinweise direkt vom Hersteller: betroffene Bereiche und Fix-Versionen je Produkt |
 | CVE-Liste (cvelistV5) | die Angaben des Herstellers zu einer CVE und die Einstufung der CISA ([SSVC](term:ssvc)) – vor allem, solange die NVD eine CVE noch nicht analysiert hat |
@@ -751,7 +811,7 @@ die gefolgten Produkte. Der Abruf läuft im Hintergrund, unabhängig von den New
 | Was | Standard | einstellbar |
 |---|---|---|
 | Hersteller-Hinweise und NVD („Hinweise & NVD alle“) | 6 Stunden | 1 bis 48 Stunden |
-| endoflife.date und KEV („Versionen & KEV alle“) | 24 Stunden | 6 bis 168 Stunden |
+| endoflife.date, Release-Quellen und KEV („Versionen & KEV alle“) | 24 Stunden | 6 bis 168 Stunden |
 
 Je CPE holt Vendor News zuerst die neuesten 2000 CVEs, danach nur, was die NVD seit dem letzten Abruf geändert hat.
 Nach Fehlern wird mit wachsenden Pausen erneut gefragt; lehnt die NVD ab („zu viele Anfragen“), pausieren alle
@@ -810,7 +870,8 @@ Katalog. Oben stehen „Letzte Prüfung“, die Katalogversion und wie viele CPE
 | CVEs zur CPE in den letzten 3 Jahren? | keine oder nur ältere: Warnung (nicht bei Cloud-Diensten) |
 | Kennt endoflife.date den Schlüssel noch? | unbekannt: **Fehler**; anderer Hersteller: Warnung |
 | Letzter Hinweis des Herstellers (Palo Alto, Fortinet, Veeam) | älter als 2 Jahre: Warnung |
-| Gefolgt, aber ohne CPE | Warnung – Schwachstellen kommen nur aus Hersteller-Hinweisen und News |
+| Gefolgt, aber ohne CPE | Warnung – Schwachstellen kommen nur aus Hersteller-Hinweisen und News (nicht, wenn der Katalog die CNA-Namen des Produkts kennt: dann bringen Stichwortsuche und CVE-Liste die CVEs) |
+| Release-Quelle (GitHub, Hersteller-Seite) eines gefolgten Produkts | nicht abrufbar, Muster findet keine Version mehr oder seit 18 Monaten keine neue Version: Warnung |
 
 **Grenzen:** Gefragt wird nur die NVD, über dieselbe Bremse wie der Vendor-News-Abruf, und nur, wenn Vendor News an ist,
 einem Produkt gefolgt wird und gerade keine Vendor-News-Runde läuft. Gefolgte Produkte werden **wöchentlich** geprüft,

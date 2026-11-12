@@ -128,6 +128,8 @@ export interface VendorUrlFilter {
   q: string
   unread: boolean
   muted: boolean
+  /** "Mit Bestätigten": the confirmed findings (lib/finding-confirm.ts) on the cards too */
+  confirmed: boolean
 }
 
 const SUMMARY: OverviewFilter[] = ["now", "exploited", "support", "review"]
@@ -142,6 +144,7 @@ export function readVendorFilter(p: URLSearchParams): VendorUrlFilter {
     q: (p.get("q") ?? "").slice(0, 80),
     unread: on(p.get("unread")),
     muted: on(p.get("muted")),
+    confirmed: on(p.get("confirmed")),
   }
 }
 
@@ -157,6 +160,7 @@ export function writeVendorFilter(p: URLSearchParams, f: Partial<VendorUrlFilter
   put("q", f.q === undefined ? undefined : f.q.trim().slice(0, 80))
   put("unread", f.unread === undefined ? undefined : f.unread ? "1" : null)
   put("muted", f.muted === undefined ? undefined : f.muted ? "1" : null)
+  put("confirmed", f.confirmed === undefined ? undefined : f.confirmed ? "1" : null)
   return next
 }
 

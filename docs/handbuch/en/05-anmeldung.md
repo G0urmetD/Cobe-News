@@ -106,6 +106,43 @@ With it on, every sign-in needs a second factor – not only the admins':
   is required …").
 - Switching it off takes nothing away: apps and passkeys set up stay.
 
+### Remember the second factor on the device {#geraet-merken}
+
+[Settings → Sign-in](/settings/auth), card *Second factor*, switch "Remember the second factor on the device" –
+**off by default**: it weakens the second factor, the admin decides. Saving requires
+[confirmation](#erneut-bestaetigen) and is in the [audit log](/docs/betrieb#protokoll).
+
+While it is on, the code step shows the switch "Remember on this device (until …)". Whoever switches it on enters only
+the **password** in this browser until then – the code is skipped.
+
+| Setting | Choice | Default |
+|---|---|---|
+| Remember for | session lifetime (the maximum under [Time limits](#sitzungen-zeitlimits)), 1, 7 or 30 days | session lifetime |
+| For admins too | on / off | off – admins enter the code at every sign-in |
+
+- **Only the code** is skipped, never the password. A [temporary password](#benutzer-anlegen) is still replaced, a due
+  set-up still asked. Locks after wrong passwords apply as always.
+- **The emergency account** is never remembered.
+- **Entra accounts:** only where Cobe News asks its own TOTP ([MFA proof](#entra-mfa-nachweis)). The second factor at
+  Microsoft is Microsoft's business.
+- **Sensitive changes** still ask for the code: a sign-in on a remembered device does not count as
+  [confirmation](#erneut-bestaetigen). Changing your own password always asks the code when TOTP is set up; creating a
+  [calendar address](/docs/benachrichtigungen#kalender-ical) in such a session asks the confirmation first.
+- **How it is stored:** the browser holds a random token in a cookie of its own (HttpOnly, Secure like the session
+  cookie, SameSite=Strict, only for `/api/auth`), the server only its hash. It counts only for the account it was
+  remembered for.
+- **It stops counting** once the account's password, TOTP or role change, the time is up (a shorter time applies at once
+  to devices remembered already), the switch is off or admins are excluded.
+- **Forgotten** are remembered devices under [My sessions](#meine-sitzungen) (one or all), by an admin ("Sessions &
+  passkeys" → "Forget remembered devices"), with "Sign out all others" / "End all sessions", on blocking, disabling and
+  resetting, and all of them after a [restore](/docs/sicherung#wiederherstellung). Switching it off forgets all of them –
+  switching it on again brings none back.
+- **One browser, two accounts:** the browser keeps one device only – the one remembered last. The other account's
+  device stays in that account's list but no longer counts in this browser (the sign-in there asks for the code again);
+  "Forget" clears it away. One account's "Forget all devices" leaves the other account's remembered device alone.
+- In the [audit log](/docs/betrieb#protokoll): "Device remembered for the second factor", "Remembered devices
+  forgotten"; an admin's sign-in on a remembered device with the method "Password + remembered device".
+
 ### Manage {#benutzer-verwalten}
 
 In each row of the user list:
@@ -115,7 +152,7 @@ In each row of the user list:
 | Change role | *Role* selection | Local accounts only – for AD/Entra the role follows the group. Requires confirmation. All sessions of the account end. |
 | Approve / Decline | buttons in the row (*Waiting for approval*) | Only while [automatic sign-in](#freigabe) is off. "Approve" switches the account on – as admin with confirmation; switching *Active* on is the same. "Decline" keeps it off like *Block permanently*. |
 | Approve raise / Stays reader | buttons in the row (*Raise to admin waits for approval*) | "Approve raise" makes the reader an admin (confirmation, all sessions end). "Stays reader": not asked again while the account is in the admin group. |
-| Disable / enable | *Active* switch | Sessions end at once. For an admin account with confirmation. A directory account you disabled is never switched on again by the directory sync. |
+| Disable / enable | *Active* switch | **Switching off:** sessions end at once; for an admin account with [confirmation](#erneut-bestaetigen). A directory account you switched off is never switched on again by the directory sync. **Switching on:** always with confirmation. A local account is active again at once. A directory account you had switched off goes back to the sync: it stays off for now (note "goes back to the directory sync") and becomes active as soon as the next sign-in or the hourly sync finds it in a mapped group (or a team). A directory account the sync switched off (no longer in a mapped group, disabled or deleted in the directory) only the directory switches on again – the switch says so and leaves it off. |
 | Block permanently | "More actions" → "Block permanently" | Also for an account the sync or Teams has switched off already (its switch is off already). Afterwards it shows *Blocked by an admin*: neither the sync nor Teams nor a sign-in switches the account on again. Requires confirmation, all sessions end. |
 | Lift the permanent block | "More actions" → "Lift the permanent block" | Directory account: the sync decides again (*Waiting for the sync*) – active as soon as a sign-in or the next sync finds a mapped group or a team. Local account: active again at once. Requires confirmation. |
 | Unlock | "More actions" menu → "Unlock" | Only available when the account is locked after failed attempts (marked *Locked (… min)*). |
@@ -300,7 +337,9 @@ domain controller, reads the groups and derives the role from them. Admins from 
 
 Domain controllers may be in the company network (private addresses are allowed). Never allowed are loopback,
 link-local, Cobe News' own Docker networks and the Docker host itself (e.g. `host.docker.internal`, with Docker Desktop
-the network `192.168.65.0/24`). "Test connection" then reports "Target not allowed …". On errors Cobe News only shows
+the network `192.168.65.0/24`). "Test connection" then reports "Target not allowed …". The name is checked and – when
+connecting – the address actually reached, before StartTLS or any password (a name that then points at a forbidden
+target does not help). On errors Cobe News only shows
 their kind, never answers from the server.
 
 ### Errors when testing {#ad-fehler}
@@ -929,10 +968,14 @@ session is gone at once – that browser's next request is refused.
 Sessions also end by themselves on: a password change (all others), a password or TOTP reset by an admin, a role
 change, disabling or blocking (all), and removing a passkey (those signed in with it).
 
+While [Remember the second factor on the device](#geraet-merken) is on, *Remembered devices* follow below: where the
+sign-in asks for no code after the password – with "This device", since when, until when, last used. "Forget" for one,
+"Forget all devices" for all. "Sign out all others" forgets them as well.
+
 ### Confirm it is you {#erneut-bestaetigen}
 
-Sensitive changes require that you proved who you are within the last **10 minutes** – the sign-in itself counts. This
-applies to:
+Sensitive changes require that you proved who you are within the last **10 minutes** – the sign-in itself counts (not
+one on a [remembered device](#geraet-merken) without the code). This applies to:
 
 - **Sign-in and accounts:** sign-in settings (AD, Entra, sessions), role mappings, creating an admin, changing a role,
   enabling or disabling an admin account or changing its e-mail address, resetting someone else's password or TOTP,

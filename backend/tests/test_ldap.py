@@ -165,6 +165,54 @@ def test_plain_ldap_needs_the_explicit_switch():
     _ = PASSWORD
 
 
+def test_the_address_reached_at_connect_is_checked_again(monkeypatch):
+    """0.1.56 review: ldap3 resolves the server's name again when it connects – a name that passed the check and then
+    points at a forbidden address (DNS rebinding) is refused at the socket, before StartTLS or any bind."""
+    import socket
+    import threading
+
+    from app import netaddr
+
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+    seen: list[bytes] = []
+
+    def accept() -> None:
+        try:
+            c, _ = srv.accept()
+            c.settimeout(2)
+            try:
+                seen.append(c.recv(100))
+            except OSError:
+                pass
+            c.close()
+        except OSError:
+            pass
+
+    t = threading.Thread(target=accept, daemon=True)
+    t.start()
+    real = netaddr.check_host
+    calls: list[str] = []
+
+    def check(host: str) -> None:  # the name's check passes (as when DNS answered a company address)…
+        calls.append(host)
+        if len(calls) > 1:
+            real(host)  # … the address reached at connect is the real one: loopback
+
+    monkeypatch.setattr(netaddr, "check_host", check)
+    binds: list[int] = []
+    monkeypatch.setattr(Connection, "bind", lambda self, *a, **k: binds.append(1) or True)
+    try:
+        with pytest.raises(ldap_dir.LdapError, match="forbidden_target"):
+            ldap_dir.connection({"servers": [f"127.0.0.1:{port}"], "encryption": "starttls", "timeout": 2}, SVC, "secret-pw")
+    finally:
+        srv.close()
+        t.join(3)
+    assert calls[-1] == "127.0.0.1" and not binds and seen in ([], [b""])  # nothing sent: no StartTLS, no bind
+
+
 async def test_a_locked_account_is_never_bound_however_its_name_is_typed(ad, admin_client, monkeypatch):
     """Bug hunt 0.1.16 M12: locked in Cobe News (counted per objectGUID), typed as UPN (with another case than the
     stored mail): refused before the DC is asked – every bind with a wrong password would count on the DC's own lockout."""

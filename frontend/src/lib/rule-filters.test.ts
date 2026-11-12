@@ -3,6 +3,7 @@ import de from "@/i18n/de"
 import en from "@/i18n/en"
 import { type DryRunItem, dryRunBody, matchParts } from "@/lib/delivery-log"
 import {
+  OURS,
   applicable,
   catalogVendors,
   fold,
@@ -14,6 +15,7 @@ import {
   systemName,
   systemOf,
   systemParam,
+  systemRef,
   systemValue,
   vendorId,
   vendorOf,
@@ -163,6 +165,9 @@ describe("the rules list's line", () => {
   const vendors = catalogVendors(products)
   const ctx = { sourceName: (id: string) => ({ s1: "heise", s2: "BSI" })[id], teamNames: [], vendors }
   const rule = { kinds: ["news" as const], severities: ["critical" as const], sources: ["s1"], topics: [], lang: "de" as const, systems: [], keywords: [], exclude: [] }
+  it('names "Unsere Produkte" as such', () => {
+    expect(ruleSummary(t, { ...rule, systems: [OURS] }, ctx)).toContain('notify.concernsList{"names":"⁨notify.systemsOursChip⁩"}')
+  })
   it("a news rule: severity, sources, what it concerns and keeps away", () => {
     const line = ruleSummary(t, { ...rule, systems: [{ vendor: "Palo Alto Networks" }, { product: "gone" }], keywords: ["Bleed"], exclude: ["Webinar"] }, ctx)
     expect(line).toBe(
@@ -225,6 +230,25 @@ describe("systems beyond the rules (News filter, own notifications)", () => {
     expect(systemParam(" v:Palo Alto Networks ")).toEqual({ vendor: "Palo Alto Networks" })
     for (const bad of ["p:PAN OS", "p:-x", "p:", "v:", "v: ", "x:panos", "panos", "v:a\u0000b", "v:" + "x".repeat(121)]) expect(systemParam(bad), bad).toBeNull()
     expect(readSystems(["p:panos", "p:panos", "v:Fortinet", "bad"])).toEqual([{ product: "panos" }, { vendor: "Fortinet" }])
+  })
+  it('"Unsere Produkte" is its own system – `system=ours`, named without the catalogue', () => {
+    expect(systemValue(OURS)).toBe("ours")
+    expect(systemOf("ours")).toEqual({ ours: true })
+    expect(systemParam(" ours ")).toEqual({ ours: true })
+    for (const bad of ["OURS", "ours:x", "o:ours", "p:ours "]) expect(systemParam(bad), bad).not.toEqual({ ours: true })
+    expect(readSystems(["ours", "p:panos", "ours"])).toEqual([{ ours: true }, { product: "panos" }])
+    expect(systemName(t, OURS, undefined)).toBe("notify.systemsOursChip")
+    expect(systemName(t, OURS, catalogVendors(products))).toBe("notify.systemsOursChip")
+    expect(systemRef(OURS)).toBe("ours")
+    expect(systemRef({ vendor: "Fortinet" })).toBe("Fortinet")
+  })
+  it("its texts in both languages", () => {
+    expect(de["notify.systemsOursChip"]).toBe("Unsere Produkte")
+    expect(de["notify.systemsOurs"]).toBe("Unsere Produkte (aus Vendor News)")
+    expect(en["notify.systemsOurs"]).toBe("Our products (from Vendor News)")
+    expect(de["notify.systemsOursHint"]).toContain("auch später hinzugefügte")
+    expect(de["notify.sourcesHint"]).toBe("Leer = alle eingeschalteten Quellen.")
+    expect(en["notify.sourcesHint"]).toBe("Empty = all switched-on sources.")
   })
   it("a person's picker offers only the vendors and products among their own", () => {
     const mine = vendorsOf(catalogVendors(products), ["panos", "rhel"])!

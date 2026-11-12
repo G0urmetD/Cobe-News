@@ -214,7 +214,7 @@ All endpoints are `GET`, the answers JSON. The OpenAPI file in the **"Reference"
 | `/api/v1/news/{id}` | one story, with the [EPSS](term:epss) of its CVEs and the [public exploits](/docs/vendor-news#oeffentlicher-exploit) (`exploits`) | – |
 | `/api/v1/vendor/products` | the followed products with versions, number of findings of each kind and urgency | – |
 | `/api/v1/vendor/products/{key}` | one followed product with its findings | `status` (repeatable; default: all but `not_affected`), `offset`, `limit` (1–500, default 100) |
-| `/api/v1/vendor/findings` | findings across all followed products, the most relevant first | `status` (repeatable; default: `affected` and `possible`), `severity` (repeatable), `exploited=true`, `offset`, `limit` (1–500, default 100) |
+| `/api/v1/vendor/findings` | findings across all followed products, the most relevant first | `status` (repeatable; default: `affected` and `possible`), `severity` (repeatable), `exploited=true`, `confirmed` (`false`: without the confirmed ones, `true`: only those; default: all), `offset`, `limit` (1–500, default 100) |
 
 Notes:
 
@@ -224,6 +224,9 @@ Notes:
   `unversioned` (product followed without a version), `stale` (unclear old data), `not_affected` – see
   [Verdicts](/docs/vendor-news#bewertung).
 - A token sees the same as every signed-in reader on the shared pages – in Vendor News the "All" view.
+- A [confirmed finding](/docs/vendor-news#treffer-bestaetigen) carries `confirmed` (`status`, `note`, `by`, `at`) and
+  is not counted in the numbers of `/api/v1/vendor/products`; `/api/v1/vendor/products/{key}` counts it in `confirmed`,
+  not in `by_status`.
 
 ## Errors and limits {#fehler}
 

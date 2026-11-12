@@ -295,6 +295,7 @@ function PersonalForm({ initial }: { initial: PersonalNotify }) {
                   label={vendors ? t("personal.allSystems") : undefined}
                   goneLabel={t("personal.systemGone")}
                   goneName={(name) => t("personal.systemGoneName", { name })}
+                  ours={false}
                 />
               </Field>
             </div>

@@ -197,13 +197,48 @@ async def test_web_push_by_the_same_choice_says_what_matched(reader_client, serv
         assert await webpush.dispatch(s) == {"sent": 1, "failed": 0}
     got = [b.read(r.content) for r in service.requests]
     assert [g["title"] for g in got] == ["Palo Alto Networks: Kritische Lücke in PAN-OS"]
-    assert got[0]["body"] == "Kritisch · Example Feed · Treffer: PAN-OS, Palo Alto Networks"
+    assert got[0]["body"] == "Kritisch · Treffer: PAN-OS, Palo Alto Networks · Example Feed"
+
+
+async def test_web_push_names_the_product_without_a_choice_of_systems(reader_client, service):
+    """The person chose only severities: the message still says which product a story is about (and no "Treffer"),
+    the rest of a round in the summary by its highest severity and products."""
+    b = Browser()
+    async with db.session() as s:
+        u = await s.get(User, reader_client.user.id)
+        u.desktop = {"enabled": True, "severities": [], "sources": []}
+        await s.commit()
+    src = await _source()
+    await reader_client.post("/api/me/push", json={"endpoint": FCM, "keys": b.keys(), "lang": "de"})
+    await _news(src, "Palo Alto Networks: Kritische Lücke in PAN-OS")
+    async with db.session() as s:
+        assert await webpush.dispatch(s) == {"sent": 1, "failed": 0}
+    [got] = [b.read(r.content) for r in service.requests]
+    assert got["body"] == "Kritisch · PAN-OS, Palo Alto Networks · Example Feed"
+    # the recent list of the tab carries the same facts
+    cursor = 0
+    every = (await reader_client.get("/api/news/recent", params={"after": cursor})).json()
+    assert every["items"][0]["notice"] == {"rated": True, "cvss": None, "exploited": False, "products": ["PAN-OS", "Palo Alto Networks"]}
 
 
 def test_push_payload_hits_are_one_plain_line():
     p = webpush.story_payload({"id": "x", "title": "T", "severity": "high", "source": "F", "hits": ["A\nB", "C", "D", "E"]}, "en")
-    assert p["body"] == "High · F · Match: A B, C, D +1"
+    assert p["body"] == "High · Match: A B, C, D +1 · F"
     assert webpush.story_payload({"id": "x", "title": "T", "severity": "high", "source": "F"}, "de")["body"] == "Hoch · F"
+
+
+def test_push_line_severity_only_when_given_with_cvss_exploited_and_products():
+    notice = {"rated": True, "cvss": "9.2", "exploited": True, "products": ["PAN-OS", "Prisma Cloud", "Panorama", "Cortex XDR"]}
+    p = webpush.story_payload({"id": "x", "title": "T", "severity": "critical", "source": "BSI", "notice": notice}, "de")
+    assert p["body"] == "Kritisch (CVSS 9.2) · ausgenutzt · PAN-OS, Prisma Cloud, Panorama +1 · BSI"
+    unrated = {"rated": False, "cvss": None, "exploited": False, "products": ["Exchange Server"]}
+    assert webpush.story_payload({"id": "x", "title": "T", "severity": "info", "source": "heise", "notice": unrated}, "en")["body"] == "Exchange Server · heise"
+    # the summary: the highest severity of the rated ones, the products of all
+    rest = [{"severity": "high", "notice": {**unrated, "rated": True, "products": ["FortiOS"]}}, {"severity": "info", "notice": unrated}, {"severity": "medium", "hits": ["PAN-OS"]}]
+    assert webpush.summary_payload(3, "de", None, rest)["body"] == "Höchste Schwere: Hoch · FortiOS, Exchange Server, PAN-OS"
+    assert webpush.summary_payload(3, "en")["body"] == "Open Cobe News"
+    # one line, whatever a feed's name or a product label carries
+    assert webpush.story_payload({"id": "x", "title": "T", "severity": "high", "source": "Feed\nB", "notice": {**notice, "products": ["A\tB"]}}, "de")["body"] == "Hoch (CVSS 9.2) · ausgenutzt · A B · Feed B"
 
 
 # ---------------------------------------------------------------- "Hersteller-News meiner Produkte" by system

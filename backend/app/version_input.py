@@ -193,7 +193,7 @@ def known_majors(product: dict) -> tuple[set[int], list[str]]:
     from app import vendor_catalog
 
     scheme = product.get("scheme") or "generic"
-    rels = vendor_catalog.releases(product.get("eol"))
+    rels = vendor_catalog.product_releases(product)
     names = [str(r.get("name") or "") for r in rels]
 
     def major(text: str) -> int | None:
@@ -216,7 +216,7 @@ def example_for(product: dict) -> str:
     if product.get("example"):
         return str(product["example"])
     scheme = product.get("scheme") or "generic"
-    for r in vendor_catalog.releases(product.get("eol")):
+    for r in vendor_catalog.product_releases(product):
         latest = str(r.get("latest") or "")
         if latest and parse(scheme, latest) is not None:
             return latest
@@ -243,7 +243,7 @@ def own_lines(product: dict) -> tuple[list[tuple[int, ...]], list[str], tuple[in
     if mode not in ("lts", "all"):
         return [], [], None
     scheme = product.get("scheme") or "generic"
-    rels = vendor_catalog.releases(product.get("eol"))
+    rels = vendor_catalog.product_releases(product)
     keys, names, every = [], [], []
     for r in rels:
         k = _line_key(scheme, str(r.get("name") or ""))

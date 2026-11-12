@@ -4,7 +4,9 @@ AD/LDAP accounts (password → TOTP), Entra ID (OIDC + PKCE), sessions, the own 
 Stages of a session: mfa (TOTP code asked) → password (a temporary password is replaced) → enroll (an admin without
 TOTP sets it up; a reader too while "Zweiter Faktor für alle" is on – or, local, registers a passkey) → active.
 Entra accounts: Microsoft's MFA (Conditional Access) – proven by the token, or else Cobe News' own TOTP where a second
-factor is required (factor_required, entra_stage; app/auth/entra.py mfa_proven)."""
+factor is required (factor_required, entra_stage; app/auth/entra.py mfa_proven).
+"Zweiten Faktor auf dem Gerät merken" (app/auth/devices.py, admin switch off by default): a browser remembered at the
+TOTP step skips that step – and only that – after the right password (or Microsoft's sign-in: POST /auth/mfa/device)."""
 
 import asyncio
 import hmac
@@ -28,7 +30,7 @@ from app import audit, concerns, netaddr
 from app import systems as systems_svc
 from app import db as dbm
 from app import settings as settings_store
-from app.auth import bruteforce, directory, entra, ldap_dir, lock_store, passwords, sessions, totp, webauthn
+from app.auth import bruteforce, devices, directory, entra, ldap_dir, lock_store, passwords, sessions, totp, webauthn
 from app.config import get_config
 from app.crypto import decrypt_str, encrypt_str, human_code, normalize_code, token_hash
 from app.deps import ActiveSession, Db, NoNul, PeekedSession, Reader, api_error, client_ip, optional_session, session_in_stage, user_agent
@@ -170,7 +172,15 @@ async def state(request: Request, db: Db) -> dict:
     sess, user = got
     if sess.stage == "active":
         return {"stage": "active", "user": user_out(user), "session": sessions.timing(sess, await settings_store.get(db, "sessions"), sessions.now())}
-    return {"stage": sess.stage, **({"enroll": await enroll_info(db, user)} if sess.stage == "enroll" else {})}
+    extra: dict = {}
+    if sess.stage == "enroll":
+        extra["enroll"] = await enroll_info(db, user)
+    elif sess.stage == "mfa" and (offer := await devices.offer(db, user))["offer"]:
+        # the switch "Auf diesem Gerät merken" (and until when) – not there while the admin switch is off or the rule
+        # leaves this account out – and whether this browser is remembered already (an Entra sign-in comes back from
+        # Microsoft without the SameSite=Strict cookie: the page then asks POST /auth/mfa/device itself). Read only
+        extra["remember"] = {**offer, "device": await devices.recognised(db, user, devices.cookie(request), use=False)}
+    return {"stage": sess.stage, **extra}
 
 
 @router.get("/auth/session")
@@ -221,36 +231,61 @@ async def enroll_info(db, user: User) -> dict:  # noqa: ANN001
 async def next_after_mfa(db, sess: UserSession, user: User) -> str:  # noqa: ANN001
     """After the password (and the TOTP code, when set up) or a passkey: a temporary password replaced first, then –
     where a second factor is required and this sign-in had none – its set-up. Admins keep TOTP (also with a passkey);
-    a reader's passkey sign-in or TOTP code counts. Entra: the callback decided already (entra_stage)."""
+    a reader's passkey sign-in or TOTP code counts – or a remembered device (…_device: its TOTP code was given there).
+    Entra: the callback decided already (entra_stage)."""
     if user.must_change_password and user.auth_source == "local":
         return "password"
     if user.auth_source == "entra" or not await factor_required(db, user):
         return "active"
     if user.role == "admin":
         return "active" if user.totp_secret_enc else "enroll"
-    return "active" if sess.method in ("password_totp", "ldap_totp", "passkey") else "enroll"
+    return "active" if sess.method in ("password_totp", "ldap_totp", "passkey", "password_device", "ldap_device") else "enroll"
 
 
-async def _next_after_password(db, sess: UserSession, user: User) -> str:  # noqa: ANN001
-    return "mfa" if user.totp_secret_enc else await next_after_mfa(db, sess, user)
+async def _next_after_password(db, sess: UserSession, user: User, request: Request, remembered: bool | None = None) -> str:  # noqa: ANN001
+    """After the right password: the TOTP step – unless this browser is a remembered device of the account
+    (app/auth/devices.py); then on as after the code (a temporary password or a due set-up still come). `remembered`:
+    checked already by the caller (before the password hash was renewed – login)."""
+    if not user.totp_secret_enc:
+        return await next_after_mfa(db, sess, user)
+    if remembered is None:
+        remembered = await devices.recognised(db, user, devices.cookie(request))
+    if remembered:
+        sessions.with_device(sess)
+        return await next_after_mfa(db, sess, user)
+    return "mfa"
 
 
-async def _finish(db, sess: UserSession, user: User, stage: str, response: Response, **extra) -> dict:
+async def _finish(db, sess: UserSession, user: User, stage: str, response: Response, *, remember: bool = False, request: Request | None = None, **extra) -> dict:
+    """The next stage with a new token; a completed sign-in noted (counters, last sign-in, the admin's audit entry).
+    `remember`: the TOTP code was just given with "Auf diesem Gerät merken" – the device is remembered once the sign-in
+    is complete (after a temporary password is replaced: it stands on the new password), kept in `pending` until then."""
+    remember = remember or bool((sess.pending or {}).get("remember"))
     token = await sessions.promote(db, sess, stage)
+    device = None
     if stage == "active":
+        if (sess.method or "").endswith("_device"):
+            sess.reauth_at = None  # only the password was asked: sensitive actions want the code (/auth/reauth)
         failed = bruteforce.failures(bruteforce.lock_key(user))
         bruteforce.register_success(bruteforce.lock_key(user))
         user.last_login_at = datetime.now(UTC)
         user.last_login_ip = sess.ip
         await _signed_in(db, user, sess.ip, sess, failed)
+        if remember and (sess.method or "").endswith("_totp"):
+            device = await devices.remember(db, user, sess.ip, sess.user_agent, devices.cookie(request) if request is not None else None)
+    elif remember:
+        sess.pending = {"remember": True}
     await db.commit()
     sessions.set_cookie(response, token)
+    if device is not None:
+        devices.set_cookie(response, *device)
     return {"next": "done" if stage == "active" else stage, **({"user": user_out(user)} if stage == "active" else {}), **extra}
 
 
 async def _signed_in(db, user: User, ip: str | None, sess: UserSession, failed: int = 0) -> None:  # noqa: ANN001
     """An admin's sign-in in the audit log (a reader's last sign-in is on the account – every one would flood the log),
-    with how it was signed in (sessions.METHODS: password, password_totp, ldap, ldap_totp, passkey, entra), its new
+    with how it was signed in (sessions.METHODS: password, password_totp, ldap, ldap_totp, passkey, entra, entra_totp –
+    …_device: the TOTP step skipped on a remembered device), its new
     session and the anomalies of a sign-in (audit.signin_anomalies: the emergency account at night or at the weekend, a
     new address, failed attempts right before it)."""
     if user.role == "admin":
@@ -378,10 +413,16 @@ async def login(body: LoginIn, request: Request, response: Response, db: Db):
             # python -m app.cli reset-emergency) – no session, and not counted (nothing was guessed)
             log.info("sign-in of %s refused: temporary password expired", user.username)
             raise api_error(401, "temp_password_expired")
+        # the remembered device is checked against the account as it is – before a renewed hash changes its fingerprint
+        # (devices.factor); one that was valid moves on to the new hash, nothing else is accepted
+        remembered = bool(user.totp_secret_enc) and await devices.recognised(db, user, devices.cookie(request))
         if user.password_hash and passwords.needs_rehash(user.password_hash):
+            old_factor = devices.factor(user)
             user.password_hash = await passwords.ahash_password(body.password)
+            if remembered:
+                await devices.rebind(db, user, old_factor)
         sess, _ = await sessions.create(db, user, "pre", ip, user_agent(request), method="password")
-        return await _finish(db, sess, user, await _next_after_password(db, sess, user), response)
+        return await _finish(db, sess, user, await _next_after_password(db, sess, user, request, remembered), response)
 
 
 async def _login_ldap(db, username: str, password: str, ip: str, request: Request, response: Response):
@@ -434,7 +475,7 @@ async def _login_ldap(db, username: str, password: str, ip: str, request: Reques
             await db.rollback()
             return await _fail(db, account, ip)
         sess, _ = await sessions.create(db, user, "pre", ip, user_agent(request), method="ldap")
-        return await _finish(db, sess, user, await _next_after_password(db, sess, user), response)
+        return await _finish(db, sess, user, await _next_after_password(db, sess, user, request), response)
 
 
 async def _provision(db, du: directory.DirectoryUser) -> User:
@@ -462,6 +503,10 @@ class CodeIn(_M):
     code: str = Field(min_length=6, max_length=12)
 
 
+class MfaIn(CodeIn):
+    remember: bool = False  # "Auf diesem Gerät merken" – only honoured while the admin switch allows it (devices.applies)
+
+
 async def _check_totp(db, user: User, code: str) -> bool:
     if not user.totp_secret_enc:
         return False
@@ -482,7 +527,7 @@ async def _check_totp(db, user: User, code: str) -> bool:
 
 
 @router.post("/auth/mfa")
-async def mfa(body: CodeIn, got: MfaSession, request: Request, response: Response, db: Db):
+async def mfa(body: MfaIn, got: MfaSession, request: Request, response: Response, db: Db):
     sess, user = got
     ip = client_ip(request)
     key = bruteforce.lock_key(user)
@@ -494,12 +539,36 @@ async def mfa(body: CodeIn, got: MfaSession, request: Request, response: Respons
         if not await _check_totp(db, user, body.code):
             return await _fail(db, key, ip, "invalid_code", emergency=user.is_emergency, sess=sess, stage="mfa")
         sessions.with_totp(sess)
-        return await _finish(db, sess, user, await next_after_mfa(db, sess, user), response)
+        return await _finish(db, sess, user, await next_after_mfa(db, sess, user), response, remember=body.remember, request=request)
+
+
+@router.post("/auth/mfa/device")
+async def mfa_device(got: MfaSession, request: Request, response: Response, db: Db):
+    """The TOTP step skipped because this browser is a remembered device – for a sign-in whose first step could not see
+    the SameSite=Strict cookie (Entra: the answer comes from Microsoft). The first step (password, Microsoft) is done:
+    the session is in stage "mfa". Not remembered (any more): 409 device_unknown, the cookie goes – the code is asked.
+    The token cannot be guessed (32 random bytes), so a miss is not counted; the account's lock still applies."""
+    sess, user = got
+    await _guard(bruteforce.lock_key(user), client_ip(request), emergency=user.is_emergency)
+    # the row locked and read again: a second request of the same moment waits here and then finds the session promoted
+    # already – it must not promote it a second time (a second token for the same session)
+    await db.refresh(sess, with_for_update=True)
+    if (stage := sess.stage) != "mfa":
+        await db.rollback()
+        raise api_error(403, "wrong_stage", stage=stage)
+    if not await devices.recognised(db, user, devices.cookie(request)):
+        await db.commit()  # a row of this account that no longer counts is gone
+        resp = JSONResponse({"detail": {"code": "device_unknown"}}, status_code=409)
+        devices.clear_cookie(resp)
+        return resp
+    sessions.with_device(sess)
+    return await _finish(db, sess, user, await next_after_mfa(db, sess, user), response)
 
 
 class NewPasswordIn(_M):
     new_password: str = Field(min_length=1, max_length=256)
     current_password: str | None = Field(default=None, max_length=256)
+    code: str | None = Field(default=None, max_length=12)  # the own change with TOTP set up: the current code too
 
 
 async def _set_password(db, user: User, pw: str) -> None:
@@ -516,11 +585,11 @@ async def _set_password(db, user: User, pw: str) -> None:
 
 
 @router.post("/auth/password")
-async def change_temp_password(body: NewPasswordIn, got: PasswordSession, response: Response, db: Db):
+async def change_temp_password(body: NewPasswordIn, got: PasswordSession, request: Request, response: Response, db: Db):
     sess, user = got
     await _set_password(db, user, body.new_password)
     audit.record(db, user, "account.password_changed", audit.user_target(user), {"temporary_replaced": True})
-    return await _finish(db, sess, user, await next_after_mfa(db, sess, user), response)
+    return await _finish(db, sess, user, await next_after_mfa(db, sess, user), response, request=request)
 
 
 def _enroll_start(sess: UserSession, user: User) -> dict:
@@ -804,12 +873,18 @@ async def my_password(body: NewPasswordIn, user: Reader, sess: ActiveSession, re
         raise api_error(403, "ip_blocked")
     # like /auth/reauth: no account-lock check (anyone can lock a name from outside – the signed-in owner must still be
     # able to change the password); guessing is held by the session's own counter instead – 5 misses end it
+    # with TOTP set up the current code as well: the password alone is what a session on a remembered device proved
+    # (app/auth/devices.py) – it must not be able to take the account over (the new password ends every other session)
+    if user.totp_secret_enc and not body.code:
+        raise api_error(400, "code_required")
     key = bruteforce.lock_key(user)
     async with bruteforce.gate(f"reauth:{sess.id}", ip) as free, _brake(user.is_emergency) as go:
         if not free or not go:
             raise api_error(429, "too_many_attempts")
         if not await passwords.averify_password(user.password_hash, body.current_password or ""):
             return await _fail(db, key, ip, emergency=user.is_emergency, lock=False, sess=sess, stage="password_change")
+        if user.totp_secret_enc and not await _check_totp(db, user, body.code or ""):
+            return await _fail(db, key, ip, "invalid_code", emergency=user.is_emergency, lock=False, sess=sess, stage="password_change")
     await _set_password(db, user, body.new_password)
     await sessions.revoke_all(db, user.id, except_id=sess.id)  # other browsers sign in again
     audit.record(db, user, "account.password_changed", audit.user_target(user), {"other_sessions_ended": True})

@@ -58,7 +58,9 @@ tab) and "Close".
   Vendor News ([more](#unsere-produkte)) – it applies on top of all other filters.
 - **Systems**: only stories about certain vendors or products from the whole catalogue – the same picker as a
   [rule's systems](/docs/benachrichtigungen#regel-systeme): grouped by vendor, with search, "All products of Palo Alto
-  Networks" (also ones added later) or single products ("PAN-OS"). A story matches when its
+  Networks" (also ones added later), single products ("PAN-OS") or, at the top, **Our products (from Vendor News)** –
+  every product you follow right now (chip "Systems: Our products ×"). Unlike "Concerns our products" (details only, with
+  your versions) what the title or teaser names counts too. A story matches when its
   [details from the source](#details-aus-der-quelle) concern the product or its title or teaser names the product or
   the vendor. Unlike in a rule, what a story got only by a recompute (after a catalogue update, say) counts here too –
   the list shows what concerns a system and sends nothing. Each chosen system shows as a chip below the filter bar

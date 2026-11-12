@@ -449,8 +449,8 @@ docker compose start app
 **5. Prüfen** – anmelden, *Version & Changelog* ansehen, unter *Einstellungen → Sicherung & Export* steht die
 Pre-Restore-Sicherung als letzte Sicherung, einen Kanal testen.
 
-Wer sich erst nach dem Zeitpunkt der Sicherung angemeldet hat, meldet sich neu an; Anmeldungen, die es zur Zeit der
-Sicherung gab, gelten wieder. Eine Sicherung einer älteren Version wird auf den Stand dieser Version gebracht; die einer
+Danach melden sich alle neu an: Die Sitzungen und [gemerkten Geräte](/docs/anmeldung#geraet-merken) aus der Sicherung
+werden gelöscht (seit 0.1.56 – kein Browser von damals ist damit wieder drin; `backup.restored` nennt ihre Zahl). Eine Sicherung einer älteren Version wird auf den Stand dieser Version gebracht; die einer
 **neueren** Version wird abgelehnt.
 
 Die Befehle für die neueste Sicherung stehen auch in der App: „Befehle zum Wiederherstellen kopieren“.

@@ -24,6 +24,7 @@ import {
   Search,
   Settings2,
   ShieldAlert,
+  ShieldCheck,
   Stethoscope,
   Trash2,
 } from "lucide-react"
@@ -52,6 +53,7 @@ import { confirmAction } from "@/components/cobe/confirm"
 import { ChangedBadge, ProductChanges } from "@/components/cobe/advisory-changes"
 import { CveChips, WatchAllButton } from "@/components/cobe/watch-all"
 import { MuteButton } from "@/components/cobe/mute-menu"
+import { ConfirmActions, ConfirmedPill, LapsedPill } from "@/components/cobe/finding-confirm"
 import { useDefaultView } from "@/components/cobe/views-menu"
 import { IN_PAGE, badgeText, readVendorFilter, readerVisible, useVendorRead } from "@/lib/reader-api"
 import { type VendorPlace, placeLink, placeOf } from "@/lib/vendor-filters"
@@ -64,7 +66,7 @@ import { ApiError, api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
 import { restoreFocus } from "@/lib/focus"
-import { fmtDayFrom } from "@/lib/format"
+import { fmtDate, fmtDayFrom } from "@/lib/format"
 import { reasonText } from "@/lib/vendor-reason"
 import { NEWS_SEV_COLOR, type NewsSeverity } from "@/lib/news-api"
 import { careReason } from "@/lib/catalog-care"
@@ -1124,7 +1126,19 @@ const Vulns = memo(function Vulns({
           )}
         </div>
       )}
-      {d.follow && shown.length === 0 && rest === 0 && <EmptyState icon={ShieldAlert} title={t("vendor.noFindings")} text={t("vendor.noFindingsText")} />}
+      {d.follow &&
+        shown.length === 0 &&
+        rest === 0 &&
+        // data, but none of it concerns the versions entered (hidden behind the switch) – not "nothing yet"
+        (counts.not_affected > 0 ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title={t("vendor.noneAffect", { count: versions.length })}
+            text={t("vendor.noneAffectText", { count: counts.not_affected, yours: t("vendor.yourVersion", { count: versions.length }) })}
+          />
+        ) : (
+          <EmptyState icon={ShieldAlert} title={t("vendor.noFindings")} text={t("vendor.noFindingsText")} />
+        ))}
       {groups.map(({ g, items }) =>
         // "unklare Altdaten": folded – open by itself only when the card pointed at one of them
         g === "stale" && !staleOpen ? (
@@ -1145,7 +1159,15 @@ const Vulns = memo(function Vulns({
             </h3>
             <ul className="space-y-3">
               {items.map((f) => (
-                <FindingRow key={f.id} f={f} versions={versions} marked={f.id === focus} productKey={d.follow ? d.product.key : null} fresh={fresh.has(f.id)} />
+                <FindingRow
+                  key={f.id}
+                  f={f}
+                  versions={versions}
+                  marked={f.id === focus}
+                  productKey={d.follow ? d.product.key : null}
+                  fresh={fresh.has(f.id)}
+                  mayConfirm={!!d.can_confirm}
+                />
               ))}
             </ul>
             {g === "stale" && (
@@ -1170,6 +1192,8 @@ const Vulns = memo(function Vulns({
 })
 
 const SOURCE_LABEL = ADVISORY_SOURCE_LABEL
+/** The kinds a confirmation is for (the server's reader.RELEVANT – not "not affected", not "unklare Altdaten"). */
+const CONFIRMABLE: Status[] = ["affected", "possible", "service", "unversioned"]
 
 const FindingRow = memo(function FindingRow({
   f,
@@ -1177,6 +1201,7 @@ const FindingRow = memo(function FindingRow({
   marked = false,
   productKey = null,
   fresh = false,
+  mayConfirm = false,
 }: {
   f: Finding
   versions: FollowedVersion[]
@@ -1185,6 +1210,8 @@ const FindingRow = memo(function FindingRow({
   fresh?: boolean
   /** the followed product – "An mein Team weiterleiten" needs it (none: not followed, nothing to forward) */
   productKey?: string | null
+  /** the viewer may confirm the product's findings ("Treffer bestätigen": admins, its team's members) */
+  mayConfirm?: boolean
 }) {
   const { t } = useTranslation()
   const counts = affectedVersions(f)
@@ -1200,7 +1227,7 @@ const FindingRow = memo(function FindingRow({
         "scroll-mt-4 space-y-2 rounded-xl border p-3.5",
         f.exploited && f.status === "affected" && "border-sev-critical/40",
         marked && "ring-2 ring-primary/60",
-        f.muted && !f.exploited && "opacity-60",
+        ((f.muted && !f.exploited) || f.confirmed) && "opacity-60",
       )}
     >
       <div className="flex flex-wrap items-center gap-1.5">
@@ -1209,6 +1236,8 @@ const FindingRow = memo(function FindingRow({
             {t("reader.new")}
           </Pill>
         )}
+        {f.confirmed && <ConfirmedPill c={f.confirmed} />}
+        {!f.confirmed && f.confirm_lapsed && <LapsedPill l={f.confirm_lapsed} />}
         {f.muted && <Pill color="--muted-foreground">{t("reader.mute.badge")}</Pill>}
         {f.score && f.status !== "not_affected" && <ScorePill score={f.score} />}
         {unconfirmed.length > 0 && (
@@ -1271,6 +1300,20 @@ const FindingRow = memo(function FindingRow({
           <MoreText>{f.summary}</MoreText>
         </p>
       )}
+      {f.confirmed && (
+        <p className="flex items-start gap-1.5 text-xs text-success-fg">
+          <ShieldCheck className="mt-px size-3.5 shrink-0" />
+          <span>
+            {t("confirm.inline", { status: t(`confirm.status.${f.confirmed.status}`), by: f.confirmed.by || t("confirm.someone"), date: fmtDate(f.confirmed.at) })}
+            {f.confirmed.note && (
+              <>
+                {" "}
+                – <bdi>{f.confirmed.note}</bdi>
+              </>
+            )}
+          </span>
+        </p>
+      )}
       {counts.total > 1 && (counts.affected > 0 || counts.possible > 0) && (
         <p className="text-xs font-medium">
           {counts.affected > 0 && t("vendor.affectsOf", { count: counts.affected, total: counts.total })}
@@ -1318,6 +1361,9 @@ const FindingRow = memo(function FindingRow({
         {productKey && <WatchAllButton cves={f.cves} origin={{ kind: "finding", product: productKey, advisory: f.id }} order="list" />}
         <span className="ml-auto flex flex-wrap items-center gap-3">
           {productKey && !f.unread && <FindingUnread product={productKey} finding={f.id} />}
+          {productKey && (f.confirmed || CONFIRMABLE.includes(f.status)) && (
+            <ConfirmActions product={productKey} finding={f.id} title={`${f.ident} ${f.headline || f.title}`} confirmed={f.confirmed} may={mayConfirm} />
+          )}
           {f.cves.length > 0 && <MuteButton targets={f.cves.slice(0, 6).map((c) => ({ kind: "cve" as const, key: c, label: c }))} size="xs" variant="link" />}
           {productKey && <ForwardButton thing={{ product: productKey, finding: f.id }} title={`${f.ident} ${f.headline || f.title}`} size="xs" variant="link" />}
           <Button variant="link" size="xs" className="h-auto px-0" asChild>

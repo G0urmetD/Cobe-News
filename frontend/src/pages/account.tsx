@@ -14,13 +14,13 @@ import { HelpLink } from "@/components/cobe/doc-markdown"
 import { Field } from "@/components/cobe/form"
 import { Term } from "@/components/cobe/glossary"
 import { CodeInput, NewPasswordFields, TotpEnroll } from "@/components/cobe/mfa"
-import { PasskeyList, SessionList, passkeyErrorText, suggestedPasskeyName } from "@/components/cobe/security"
+import { DeviceList, PasskeyList, SessionList, passkeyErrorText, suggestedPasskeyName } from "@/components/cobe/security"
 import { SubTabs } from "@/components/cobe/sub-tabs"
 import { api, type ApiUser } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { errorText } from "@/lib/errors"
 import { withReauth } from "@/lib/reauth"
-import { type Passkey, type SessionRow, registerPasskey, useMyPasskeys, useMySessions } from "@/lib/security-api"
+import { type Passkey, type RememberedDevice, type SessionRow, registerPasskey, useMyDevices, useMyPasskeys, useMySessions } from "@/lib/security-api"
 import { useTheme } from "@/lib/theme"
 import { passkeySupport } from "@/lib/webauthn"
 import { Loading } from "@/pages/settings-shared"
@@ -42,7 +42,16 @@ export function ProfileSettings() {
   return (
     <>
       <SubTabs parts={parts} active={tab} to={(k) => (k === "profile" ? "?" : `?tab=${k}`)} label={t("settings.nav.profile")} />
-      {tab === "security" ? <SecurityPane /> : tab === "sessions" ? <MySessions /> : <ProfilePane />}
+      {tab === "security" ? (
+        <SecurityPane />
+      ) : tab === "sessions" ? (
+        <>
+          <MySessions />
+          <MyDevices />
+        </>
+      ) : (
+        <ProfilePane />
+      )}
     </>
   )
 }
@@ -387,7 +396,10 @@ function MySessions() {
   const qc = useQueryClient()
   const q = useMySessions()
   const [busy, setBusy] = useState<string | null>(null)
-  const refresh = () => void qc.invalidateQueries({ queryKey: ["me", "sessions"] })
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["me", "sessions"] })
+    void qc.invalidateQueries({ queryKey: ["me", "devices"] }) // "alle anderen abmelden" forgets them too
+  }
   const endOne = async (s: SessionRow) => {
     setBusy(s.id)
     try {
@@ -431,20 +443,62 @@ function MySessions() {
   )
 }
 
+/** Gemerkte Geräte: where the sign-in skips the TOTP step ("Zweiten Faktor auf dem Gerät merken") – forget one or all.
+ *  Shown only when there is one. */
+function MyDevices() {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const q = useMyDevices()
+  const [busy, setBusy] = useState<string | null>(null)
+  const run = async (key: string, fn: () => Promise<unknown>, done: string) => {
+    setBusy(key)
+    try {
+      await fn()
+      toast.success(done)
+    } catch (e) {
+      toast.error(errorText(t, e))
+    } finally {
+      setBusy(null)
+      void qc.invalidateQueries({ queryKey: ["me", "devices"] })
+    }
+  }
+  const forgetOne = (d: RememberedDevice) => void run(d.id, () => api.del(`/api/auth/devices/${d.id}`), t("security.forgotten"))
+  const forgetAll = async () => {
+    if (!(await confirmAction({ title: t("security.forgetAllTitle"), text: t("security.forgetAllText"), confirm: t("security.forgetAll") }))) return
+    await run("all", () => api.post("/api/auth/devices/forget-all"), t("security.forgottenAll"))
+  }
+  if (!q.data?.length) return null
+  return (
+    <Section title={t("security.devices")} description={t("security.devicesHint")}>
+      <DeviceList rows={q.data} onForget={forgetOne} busy={busy} />
+      <div className="flex flex-wrap items-center justify-end gap-3 border-t px-5 py-3">
+        <Button size="sm" variant="outline" disabled={busy === "all"} onClick={() => void forgetAll()}>
+          {busy === "all" ? <Loader2 className="animate-spin" /> : <ShieldOff />} {t("security.forgetAll")}
+        </Button>
+      </div>
+    </Section>
+  )
+}
+
 function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { t } = useTranslation()
+  // with TOTP set up the current code too (0.1.56): the password alone is what a remembered device proved
+  const totp = !!useAuth().user?.totp
   const [current, setCurrent] = useState("")
+  const [code, setCode] = useState("")
   const [next, setNext] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const change = async () => {
     setBusy(true)
     try {
-      await api.post("/api/me/password", { current_password: current, new_password: next })
+      await api.post("/api/me/password", { current_password: current, new_password: next, ...(totp ? { code } : {}) })
       toast.success(t("account.pwChanged"))
       setCurrent("")
+      setCode("")
       onOpenChange(false)
     } catch (e) {
       toast.error(errorText(t, e))
+      setCode("") // a code counts once
     } finally {
       setBusy(false)
     }
@@ -459,14 +513,19 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               <DialogDescription>{t("account.pwOthersOut")}</DialogDescription>
             </DialogHeader>
             <Field label={t("account.currentPassword")} htmlFor="cur-pw">
-              <Input id="cur-pw" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+              <Input id="cur-pw" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} autoFocus />
             </Field>
             <NewPasswordFields onValid={setNext} autoFocus={false} />
+            {totp && (
+              <Field label={t("account.reauthCode")} hint={t("account.pwCodeHint")}>
+                <CodeInput value={code} onChange={setCode} autoFocus={false} />
+              </Field>
+            )}
             <DialogFooter>
               <Button variant="ghost" onClick={() => onOpenChange(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button disabled={!current || !next || busy} onClick={() => void change()}>
+              <Button disabled={!current || !next || (totp && code.length < 6) || busy} onClick={() => void change()}>
                 {busy && <Loader2 className="animate-spin" />} {t("common.save")}
               </Button>
             </DialogFooter>

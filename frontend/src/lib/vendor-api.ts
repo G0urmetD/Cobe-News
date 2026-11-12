@@ -1,4 +1,5 @@
 import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query"
+import type { ConfirmLapse, Confirmation } from "@/lib/finding-confirm"
 import { api, DETAIL_TIMEOUT_MS, detailRetry } from "@/lib/api"
 import { polled } from "@/lib/poll"
 import type { AdvisoryChange } from "@/lib/advisory-changes"
@@ -156,6 +157,9 @@ export interface Finding {
   status: Status
   versions: VersionVerdict[]
   score?: Score | null
+  /** confirmed for everybody ("Treffer bestätigen", lib/finding-confirm.ts) – handled; or lapsed lately by itself */
+  confirmed?: Confirmation | null
+  confirm_lapsed?: ConfirmLapse | null
 }
 
 export interface ReleaseLine {
@@ -174,8 +178,16 @@ export interface ReleaseLine {
 
 export type EolState = "ok" | "soon" | "past" | "unknown"
 
+/**
+ * Where a product's release lines come from: endoflife.date (with support dates) or – for products it lacks – a release
+ * source of the catalogue (GitHub releases, the vendor's release notes page: lines and newest versions, no support
+ * dates). `fetched_at` null: not fetched yet (fetched for followed products only).
+ */
+export type ReleaseSource = { kind: "eol" } | { kind: "github" | "page"; ref: string; url: string; fetched_at: string | null }
+
 export interface ReleaseInfo {
   lines?: ReleaseLine[]
+  source?: ReleaseSource | null
   line?: {
     name: string
     label: string | null
@@ -291,6 +303,9 @@ export interface OverviewItem {
     unread?: boolean
     muted?: boolean
   })[]
+  /** confirmed findings of the kinds the card shows (not in `counts`) – how many, and the worst three with theirs */
+  confirmed?: number
+  latest_confirmed?: (OverviewItem["latest"][number] & { confirmed: Confirmation })[]
   /** my read state and mutes (app/reader.py): unread findings, muted until, an exploited one while muted */
   unread?: number
   /** unread findings including the muted ones (what "Alle N als gelesen" marks while muted ones are shown) */
@@ -352,6 +367,8 @@ export interface ProductDetail {
   unread?: number
   muted?: { until: string } | null
   now?: string
+  /** how many of its open kinds are confirmed (not in `summary`) */
+  confirmed?: number
 }
 
 /** A reason of the catalogue self-test (backend app/catalog_check.py) – worded by lib/catalog-care.ts */
@@ -367,6 +384,8 @@ export interface CareReason {
   cve?: string
   source?: string
   last?: string
+  /** releases_failed: the release source's last error */
+  error?: string
 }
 
 export interface CatalogCheckVerdict {

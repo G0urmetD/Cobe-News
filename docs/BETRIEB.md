@@ -314,6 +314,12 @@ abgelehnte AD-Anmeldung sperrt nie das gleichnamige lokale Konto. AD-Sperren sie
 Laufende Konto-Sperren und Adress-Sperren überstehen einen Neustart (Tabelle `auth_locks`); die Zähler bis dahin nicht.
 Optional **„Zweiter Faktor für alle Pflicht“** (aus ab Werk): dann richten auch Leser bei der nächsten Anmeldung TOTP
 (lokal wahlweise einen Passkey) ein. Ein neues Passwort darf keines der letzten fünf sein (nur lokale Konten).
+Optional **„Zweiten Faktor auf dem Gerät merken“** (aus ab Werk; Dauer: Sitzungsdauer, 1, 7 oder 30 Tage; Admins nur mit
+„Auch für Admins“, das Notfall-Konto nie): beim Code „Auf diesem Gerät merken“ – danach fragt dieser Browser nur noch das
+Passwort. Cookie `__Secure-cobe_news_device` (ohne HTTPS `cobe_news_device`; HttpOnly, SameSite=Strict, Path=/api/auth),
+in der Tabelle `remembered_devices` nur der Hash des Tokens und ein Fingerabdruck von Passwort, TOTP und Rolle – ändert
+sich davon etwas, gilt das Gerät nicht mehr. Ausschalten vergisst alle gemerkten Geräte; abgelaufene löscht der stündliche
+Aufräumlauf (Handbuch *Anmeldung → Zweiten Faktor auf dem Gerät merken*).
 Sitzungs- und CSRF-Cookie heißen mit HTTPS `__Host-cobe_news_session` / `__Host-cobe_news_csrf` (nur diese Origin, nur
 über HTTPS – keine Subdomain und keine http-Seite kann sie setzen). Ein kürzeres absolutes Timeout gilt sofort auch für
 laufende Sitzungen. Zweiten Faktor ersetzen oder entfernen verlangt den aktuellen Code (ohne TOTP: das Passwort).
@@ -835,6 +841,7 @@ Versionen** betreffen, neue Versionen, Support-Ende und passende News.
 | NVD API 2.0 (`services.nvd.nist.gov`) | alle Produkte mit CPE: CVEs mit CPE-Versionsbereichen und den Angaben des CNA (Microsoft: Build-Bereiche bis zum Security Update), CVSS, „von CISA als ausgenutzt gelistet“; neue, noch nicht analysierte CVEs per Stichwortsuche der letzten 30 Tage | je CPE die neuesten 2000 CVEs, danach nur Geänderte (`lastModStartDate`); ohne Schlüssel höchstens 5 Anfragen / 30 s |
 | CISA KEV (`www.cisa.gov`) | ganzer Katalog ausgenutzter Schwachstellen | täglich, bedingt |
 | endoflife.date (`/api/v1/products/full`) | Katalog, Release-Linien, aktuellste Version je Linie, Support- und EOL-Daten | täglich, eine Anfrage, bedingt |
+| Release-Quellen (`github.com/<owner>/<repo>/releases.atom`, Release-Notes-Seiten der Hersteller wie `passwork.pro/blog/release-notes/`) | für Produkte ohne endoflife.date-Daten (`releases` im Katalog): Versionen → Release-Linien, neueste Version je Linie; **keine** Support-/EOL-Daten. Der GitHub-Feed nennt nur die neuesten 10 Releases – was gesehen wurde, bleibt gespeichert (`./data/vendor_releases.json`) | nur gefolgte Produkte; täglich (wie endoflife.date), eine Anfrage je Produkt (ein gemeinsamer Feed einmal je Runde), bedingt; Fehler in der Quellen-Gesundheit (Familie „Release-Quellen“, Schlüssel `releases:<produkt>`) |
 | ENISA EUVD | „aktiv ausgenutzt“ – aus den News (wenn die Quelle eingeschaltet ist) | – |
 | CSAF-Anbieter (Siemens, Cisco, Schneider Electric, Open-Xchange) | die CSAF-Hinweise des Herstellers: Produkte mit Bereichen und Fix-Versionen | nur mit gefolgtem Produkt des Herstellers; alle 6 Stunden, Liste bedingt, je Runde höchstens 25 Dokumente – [Weitere Quellen](#weitere-quellen-csaf-anbieter-cvelistv5-epss-osv) |
 | cvelistV5 (GitHub) | CVE-Einträge, wie der Hersteller (CNA) sie meldet, und die Einstufung der CISA (CVSS, SSVC, KEV) – vor allem für CVEs, die die NVD noch nicht analysiert hat | dreimal am Tag die Änderungen des Tages, einmal der Tagesabschluss des Vortags; einzelne ältere Einträge bei Bedarf |
@@ -883,9 +890,35 @@ einmal pro Woche wieder die neuesten 2000: was die NVD für die CPE nicht mehr l
 verliert dann die Zuordnung. Eine geänderte Version wird sofort neu bewertet – ohne neuen Abruf. Ereignisse entfernter
 Versionen und nicht mehr gefolgter Produkte werden gelöscht.
 
+**Bestätigte Treffer** (`backend/app/finding_confirm.py`, Tabellen `vendor_confirms` und `vendor_confirm_records`,
+Migrationen 0043 und 0046): je Produkt und Befund die Bewertung für alle (nicht betroffen, Maßnahme umgesetzt, Risiko
+akzeptiert), Begründung, wer (Name bleibt, auch wenn das Konto gelöscht wird) und wann, dazu die Fakten, auf die
+bestätigt wurde. Admins und – bei eingeschalteten Teams – die Mitglieder eines Teams des Produkts dürfen bestätigen
+(`POST /api/vendor/findings/confirm`, `…/unconfirm`); die Bestätigung gilt für alle, auch für die Kanäle der
+Admin-Regeln, und steht im Protokoll. Solange sie steht, zählt der Befund nicht (Kacheln, Badge, ungelesen,
+Wochenrückblick, API v1) und keine Regel und kein persönlicher Weg sendet seine Ereignisse. Sie endet von selbst, wenn
+der Befund jetzt ausgenutzt, höher eingestuft wird, neue CVEs bekommt, mehr eingetragene Versionen (sicherer) betrifft
+als beim Bestätigen (verglichen werden die Bewertungen, nicht die Versionstexte), zurückgezogen wird oder ein anderer
+Eintrag ihn jetzt anführt („regrouped“) – geprüft bei jeder Bewertung der Ereignisse, vor dem Anlegen (Zeilen, die
+gerade aufgehoben werden, überspringt die Prüfung: `FOR UPDATE SKIP LOCKED`); Protokoll
+`vendor.finding_confirm_lapsed`. Die Ereignisse des letzten Tages davor (die Advisory-Änderung, die es auslöste) gehen
+dann doch hinaus. Eine Zeile je Zeitraum, in dem eine Bestätigung stand: er hält die Ereignisse des Befunds ab dem Ende
+des vorigen Zeitraums (der erste: von Anfang an – was beim Bestätigen noch auf einen Kanal wartete, bleibt ungesendet)
+bis zu seinem Ende zurück, solange er steht alle. Zurückgehalten werden die Schwachstellen-Ereignisse des Befunds und die
+Advisory-Änderungen aller seiner Einträge (Herstellerhinweis, NVD-, cvelistV5-, OSV-Eintrag seiner CVEs –
+`vendor_confirm_records`, je Ereignis ein Indexzugriff über Produkt und Eintrag). Der Wochenrückblick fragt nur, was jetzt
+bestätigt ist. Undo und Ablauf lassen die Benachrichtigungsrunde sofort alles neu ansehen. Die Zeilen bleiben nach dem Ende
+stehen; mit dem Produkt, dem niemand mehr folgt, gehen sie (stündlicher Prune mit den Lesemarken). Ein späteres
+Zusammenlegen von Katalog-Schlüsseln muss `vendor_confirms` und `vendor_confirm_records` mit umziehen (wie
+`vendor_reads`).
+
 **Ausgehende Hosts** (nur bei gefolgten Produkten): `services.nvd.nist.gov`, `endoflife.date`, `www.cisa.gov`;
 mit Palo-Alto-Produkten `security.paloaltonetworks.com`, mit Fortinet-Produkten `filestore.fortinet.com`, mit
-Veeam-Produkten `www.veeam.com`; dazu die [weiteren Quellen](#weitere-quellen-csaf-anbieter-cvelistv5-epss-osv).
+Veeam-Produkten `www.veeam.com`; mit Produkten ohne endoflife.date-Daten deren Release-Quelle: `github.com` (Portainer,
+BookStack, BloodHound CE, LibreNMS, Wazuh, Vaultwarden, Gitea, NetBox …) bzw. die Seite des Herstellers (`passwork.pro`);
+dazu die [weiteren Quellen](#weitere-quellen-csaf-anbieter-cvelistv5-epss-osv). Eine Egress-Freigabe (Firewall,
+Proxy-Allow-List) braucht diese Hosts, für Passwork also `passwork.pro`. Die Liste aller Hosts je Produkt steht im
+Katalog (`releases:` in `backend/app/catalog/products/*.yaml`).
 
 ### Weitere Quellen (CSAF-Anbieter, cvelistV5, EPSS, OSV)
 
@@ -1093,7 +1126,13 @@ dann `scheme: cloud`), `filter` (ein Wort, das eine CVE nennen muss; mehrere Alt
 Controller `Active Directory Domain Services|Kerberos|Netlogon|…`), `replaces` (Schlüssel, die in diesem Produkt
 aufgegangen sind – ein endoflife.date-Produkt dieses Schlüssels fällt weg, sein Name bleibt als Suchname; die Daten
 zieht eine Migration um, z. B. 0025: `db2` → `ibm-db2`; ein Test prüft, dass Katalog und Migration dasselbe sagen),
-`depth` (aus wie vielen Teilen eine vollständige
+`releases` (Release-Daten, wo endoflife.date keine hat – `app/release_sources.py`: `{github: owner/repo}` mit optional
+`tag` – regulärer Ausdruck auf den ganzen Tag mit Gruppe `version`, Standard `^v?(?P<version>\d+(?:\.\d+){1,3})$` –,
+oder `{page: https://…, pattern: …}` – regulärer Ausdruck mit Gruppe `version` und optional `date`, im Text der Seite
+gesucht; dazu `lines` (Teile, die die Linie nennen, Standard 2; 1 bei Rolling Releases wie LibreNMS), `lts` (Ausdruck
+auf den Release-Titel, z. B. `\bLTS\b` bei Portainer) und `prerelease: true`, wenn Vorabversionen zählen sollen;
+endoflife.date geht vor, ein Support-Ende kennen diese Quellen nicht; den ersten Abruf eines Produkts meldet Vendor News
+nicht – erst danach erscheinende Versionen), `depth` (aus wie vielen Teilen eine vollständige
 Version besteht, wenn endoflife.date es nicht oder falsch zeigt – weniger Teile gelten als „ungenau“; ohne Release-Daten
 und ohne `depth` ist keine Version ungenau). Regeln für eingetragene Versionen (`app/version_input.py`): `pattern`
 (regulärer Ausdruck, dem eine Version genügen muss, z. B. nur Builds) mit `pattern_hint` (Text aus texts.yaml),
@@ -1158,7 +1197,8 @@ Produkte mit einem Problem zeigen es zusätzlich in ihrer Schublade. Geprüft wi
 | CVEs zur CPE in den letzten 3 Jahren | gefolgte Produkte: die schon geholten NVD-Daten; sonst NVD (Anzahl und neueste CVE, zwei Anfragen) | keine oder älter: Warnung (nicht bei Cloud-Diensten) |
 | endoflife.date-Schlüssel | die zuletzt geholte endoflife.date-Liste (keine eigene Anfrage) | unbekannt: **Fehler**; anderer Hersteller in den CPEs: Warnung |
 | letzter Hinweis des Herstellers (Palo Alto, Fortinet, Veeam) | gespeicherte Hinweise gefolgter Produkte | älter als 2 Jahre: Warnung |
-| gefolgt, aber ohne CPE | Katalog | Warnung (nur Hinweise und News) |
+| gefolgt, aber ohne CPE | Katalog | Warnung (nur Hinweise und News) – nicht mit `cna`: dann bringen NVD-Stichwortsuche und cvelistV5 die CVEs |
+| Release-Quelle (`releases`) eines gefolgten Produkts | der letzte Abruf (`vendor_fetch` `releases:<produkt>`) und `./data/vendor_releases.json`, keine eigene Anfrage | nicht abrufbar, Muster findet keine Version, oder neueste Version älter als 18 Monate: Warnung |
 
 Anfragen an die NVD laufen über dieselbe Bremse wie Vendor News (6,5 s Abstand ohne Schlüssel, gemeinsame Pause nach
 429) und nur, wenn Vendor News an ist, einem Produkt gefolgt wird und die Vendor-News-Runde gerade nicht läuft:
@@ -1512,6 +1552,8 @@ Runde, mehr als eine Zusammenfassung; „Kritisch“ bleibt stehen, bis man sie 
 - **`./data/backups/`**: die Sicherungen (siehe [Sicherung](#sicherung-wiederherstellung-export))
 - **`./data/vendor_catalog.json`**: der zuletzt von endoflife.date neu gebaute Vendor-News-Katalog (fehlt er, gilt
   der mitgelieferte `backend/app/data/vendor_catalog.json`)
+- **`./data/vendor_releases.json`**: die Release-Daten der Produkte ohne endoflife.date (GitHub-Releases,
+  Hersteller-Seiten); fehlt sie, holt der nächste Abruf sie neu (ohne Meldungen für schon erschienene Versionen)
 - **`./data/secret.key`**: Schlüssel für gespeicherte Geheimnisse (fehlt er, müssen Webhook-URLs, SMTP-/Bind-Passwort
   und Entra-Geheimnis neu eingegeben werden). Besser: `SECRET_KEY` in der `.env` setzen und **getrennt** von der
   Datensicherung aufbewahren – eine Sicherung ohne Passphrase enthält dann keine lesbaren Geheimnisse. `SECRET_KEY`:
@@ -1808,8 +1850,14 @@ Ablauf:
    beiden Prüfungen; die Vergleichsbasis entsteht ebenso neben der gesperrten Tabelle. Alles in derselben Transaktion:
    scheitert etwas, stehen auch die Einträge wieder, wo sie waren. Danach ist die Sperre weiter aktiv; die Ausgabe nennt
    die beiseitegelegten Einträge, `backup.restored` trägt ihre Zahl (`set_aside`).
-5. Das Schema auf den Stand dieser Version bringen. Anmeldungen, die es zur Zeit der Sicherung gab, gelten wieder;
-   spätere nicht.
+5. Das Schema auf den Stand dieser Version bringen. Die Sitzungen und gemerkten Geräte („Zweiten Faktor auf dem Gerät
+   merken“) aus der Sicherung werden gelöscht (seit 0.1.56; `backup.restored`: `sessions_ended`, `devices_forgotten`) –
+   alle melden sich neu an, mit Code.
+
+Als **Superuser** verbunden (statt als `cobe_news_app`): Abbruch, bevor etwas geändert ist (seit 0.1.56; vorher nur eine
+Warnung) – als Superuser könnte ein präparierter Dump beliebige Programme auf dem Datenbank-Server starten. Der
+beschriebene Weg nutzt nie den Superuser. Wer Cobe News an einem eigenen PostgreSQL ohne eigene Rolle betreibt, gibt
+`--allow-superuser` mit (dann wieder nur die Warnung).
 
 Anderer Schlüssel: Abbruch mit Erklärung – `--use-backup-key` übernimmt den Schlüssel aus einer verschlüsselten
 Sicherung nach `data/secret.key` (der alte bleibt daneben; mit `SECRET_KEY` in der `.env` dort eintragen),
@@ -1993,7 +2041,9 @@ Abschluss – führt er `audit-lock.sql` einmal aus (`db-init: audit_log is ther
 locked`; bekommt er die Tabelle nicht binnen 5 Sekunden, versucht er es 10 Sekunden später noch einmal). Neue
 Installationen sind also wenige Sekunden nach dem ersten Start der App gesperrt; kam die App in den 30 Minuten nicht,
 folgt die Sperre beim nächsten Start des Datenbank-Containers (`docker compose restart db`). `pending` gilt auch, wenn
-`audit-lock.sql` die Übernahme abgelehnt hat (ein fremder Trigger, eine Regel oder Zeilensicherheit auf `audit_log` –
+`audit-lock.sql` die Übernahme abgelehnt hat (ein fremder Trigger, eine Regel oder Zeilensicherheit auf `audit_log`,
+seit 0.1.56 auch ein CHECK- oder Exclusion-Constraint, eine Spalte eines Typs außerhalb von `pg_catalog` oder ein Index
+oder Spalten-Vorgabe, die eine Funktion außerhalb von `pg_catalog` aufruft –
 Zeile `db-init: WARNING – audit log NOT locked …` im Log der Datenbank); `superuser` – die App verbindet sich als
 Superuser, den hält keine Sperre auf; `incomplete` – ein Teil fehlt oder die App hat ein Recht zu viel (Log prüfen,
 Datenbank neu starten).
@@ -2100,6 +2150,7 @@ cd frontend && NEWS_API=http://127.0.0.1:8611 npx vite --port 5611
 cd frontend && BASE_URL=http://localhost:5611 CREDS=/tmp/cn-e2e/creds.json \
   PLAYWRIGHT=/pfad/zu/node_modules/playwright/index.mjs node e2e/select-in-sheet.mjs   # creds.json: {"user","password","totp"}
 # ebenso: node e2e/signin-settings.mjs (speichert AD/LDAP der Wegwerf-Instanz mit Namen unter corp.example)
+# ebenso: node e2e/drawer-reopen.mjs (Schublade gleich wieder geöffnet: Abdunklung unter, nicht über ihr; PRODUCT=<Katalog-Key>)
 ```
 
 **Basis-Images** sind mit ihrem Digest festgeschrieben (`Dockerfile`: `node:24-slim@sha256:…`, `python:3.13-slim@sha256:…`;

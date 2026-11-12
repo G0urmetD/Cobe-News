@@ -558,6 +558,7 @@ def test_personal_teams_card_and_push_summary_follow_the_mails_order():
     assert "Ausgenutzt" in push["body"] and push["url"] == "/vendor?product=panos"
     [push] = personal.push_payloads([*events, _vendor(99, "fortios")], "de")
     assert push["url"] == "/vendor"
+    assert push["body"].startswith("Höchste Schwere: ") and "PAN-OS" in push["body"] and "FortiOS" in push["body"]
 
 
 def test_web_push_summary_opens_the_rest_of_the_round():

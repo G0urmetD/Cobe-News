@@ -24,7 +24,7 @@ import { ViewsMenu, useDefaultView } from "@/components/cobe/views-menu"
 import { FilterChip } from "@/components/cobe/filter-chip"
 import { SystemsPicker } from "@/components/cobe/systems-picker"
 import { WordsFilter } from "@/components/cobe/words-filter"
-import { systemName, systemValue, useCatalogVendors } from "@/lib/rule-filters"
+import { systemName, systemRef, systemValue, useCatalogVendors } from "@/lib/rule-filters"
 import { NewsRangeControl } from "@/components/cobe/news-range"
 import { NO_RANGE, rangeActive, rangeChip } from "@/lib/news-range"
 import { IN_PAGE, type NewsUrlFilter, readNewsFilter, writeNewsFilter } from "@/lib/reader-api"
@@ -415,7 +415,7 @@ export function NewsPage() {
           )}
           {systemsOn &&
             filter.systems.map((sys) => {
-              const name = systemName(t, sys, vendors) ?? t("notify.systemGoneName", { name: "vendor" in sys ? sys.vendor : sys.product })
+              const name = systemName(t, sys, vendors) ?? t("notify.systemGoneName", { name: systemRef(sys) })
               return (
                 <FilterChip
                   key={systemValue(sys)}

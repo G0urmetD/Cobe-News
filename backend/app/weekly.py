@@ -4,11 +4,14 @@ off by default), with an active account and an e-mail address, get one mail a we
 
 - **Content** of the seven days before: new vulnerabilities by severity (the most severe listed), own versions affected
   now, advisory changes with an effect on them, EOL within 90 days, new versions – each with a link into Cobe News.
+  A confirmed finding (app/finding_confirm.py) is handled: neither among the new ones nor counted as affecting.
   HTML and a text alternative as the other mails; every value from the feeds is escaped (Jinja autoescape) or plain text.
 - **Exactly once** per team, person and ISO week (team_weekly_sends, keyed): queued once per week (team_weekly.last_week),
   claimed (pending → sending) and committed before the mail goes out – a restart or a crash in between never sends it
   twice (a row left at "sending" is marked failed after an hour). Retried only after a failure that certainly delivered
-  nothing (teams.WELCOME_RETRY), at most TRIES times.
+  nothing (teams.WELCOME_RETRY), at most TRIES times – after the channels' growing pause (notify._failure; a pending
+  row's claimed_at is then when it may be tried again), not every round. An error of one review (its content, a
+  write) is that row's alone: before the mail server was asked it comes again (a try), after it never twice.
 - **No catching up**: only the newest weekly time at or before now is ever looked at – after an outage of three weeks
   the last one comes (late), the others never; a week still open when a newer one is queued is skipped.
 - **No SMTP, no attempt**: without a mail server (host and sender) nothing is queued or tried; the team drawer says so.
@@ -226,10 +229,13 @@ async def queue(db: AsyncSession, now: datetime) -> int:
 
 
 async def _claim(db: AsyncSession, n: int) -> list[tuple]:
+    """The next `n` pending rows, claimed and committed – not one waiting for its next try (a pending row's claimed_at
+    is when it may be claimed again: the pause after a mail server failure, _pause)."""
     res = await db.execute(
         text(
             "UPDATE team_weekly_sends s SET status = 'sending', tries = s.tries + 1, claimed_at = :now "
-            "FROM (SELECT team_id, user_id, week FROM team_weekly_sends WHERE status = 'pending' ORDER BY created_at, team_id, user_id LIMIT :n FOR UPDATE SKIP LOCKED) o "
+            "FROM (SELECT team_id, user_id, week FROM team_weekly_sends WHERE status = 'pending' AND (claimed_at IS NULL OR claimed_at <= :now) "
+            "ORDER BY created_at, team_id, user_id LIMIT :n FOR UPDATE SKIP LOCKED) o "
             "WHERE s.team_id = o.team_id AND s.user_id = o.user_id AND s.week = o.week RETURNING s.team_id, s.user_id, s.week, s.tries, s.created_at"
         ),
         {"now": datetime.now(UTC), "n": n},
@@ -249,6 +255,21 @@ async def _done(db: AsyncSession, team_id: uuid.UUID, user_id: uuid.UUID, week: 
     await db.commit()
 
 
+async def _pause(db: AsyncSession, tries: int, exc: notify.NotifyError, now: datetime) -> datetime:
+    """A failure of the mail server that certainly delivered nothing: every pending row waits the channels' growing
+    pause (notify._failure, by the tries of the row that failed: 2 min, 4 min … 6 h) – a round a minute no longer uses
+    up a try of each row, one after the other."""
+    until = notify._failure(max(tries - 1, 0), exc, now)["next_try_at"]
+    await db.execute(
+        update(TeamWeeklySend)
+        .where(TeamWeeklySend.status == "pending", (TeamWeeklySend.claimed_at.is_(None)) | (TeamWeeklySend.claimed_at < until))
+        .values(claimed_at=until)
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+    return until
+
+
 async def send(db: AsyncSession, smtp: dict) -> int:
     sent = 0
     deadline = time.monotonic() + ROUND_S
@@ -257,63 +278,106 @@ async def send(db: AsyncSession, smtp: dict) -> int:
         batch = await _claim(db, min(CLAIM, PER_ROUND - sent))
         if not batch:
             break
-        stop = False
+        stop, paused = False, None
         for k, (team_id, user_id, week, tries, queued) in enumerate(batch):
             if stop or time.monotonic() >= deadline:
-                # claimed, certainly not sent: back in line without counting the try
+                # claimed, certainly not sent: back in line without counting the try (and after a pause, its end)
                 for tid, uid, wk, *_ in batch[k:]:
-                    await _done(db, tid, uid, wk, status="pending", tries=func.greatest(TeamWeeklySend.tries - 1, 0), claimed_at=None)
+                    await _done(db, tid, uid, wk, status="pending", tries=func.greatest(TeamWeeklySend.tries - 1, 0), claimed_at=paused)
                 stop = True
                 break
-            row = (
-                await db.execute(
-                    select(User.email, User.is_active, PersonNotify.weekly_on, PersonNotify.lang, Team.name, TeamMember.user_id)
-                    .join(PersonNotify, PersonNotify.user_id == User.id)
-                    .join(Team, Team.id == team_id)
-                    .outerjoin(TeamMember, (TeamMember.team_id == team_id) & (TeamMember.user_id == User.id))
-                    .where(User.id == user_id)
-                )
-            ).first()
-            if row is None or not row[1] or not row[2] or row[5] is None or not row[0] or not teams.MAIL.fullmatch(row[0]):
-                await _done(db, team_id, user_id, week, status="skipped", error="not_wanted")  # left, switched off, no address
-                continue
-            email, _active, _on, lang, team_name, _m = row
-            lang = lang if lang in TEXTS else "de"
-            key = (team_id, week, lang)
-            if key not in cache:
-                c = await content(db, team_id, min(queued, datetime.now(UTC)))
-                cache[key] = render(team_name, week, c, lang)
-            subject, text_, html = cache[key]
-            await dbm.release(db)  # nothing open while the mail server answers
-            # the delivery log: the team, the person and the week – never the mail; its tries are attempts of one delivery
-            logged = {
-                "kind": "weekly",
-                "channel_type": "email",
-                "ref": delivery_log.ref_of(f"weekly:{team_id}:{user_id}:{week}"),
-                "items": [{"kind": "weekly", "id": week, "title": subject, "severity": ""}],
-                "total": 1,
-                "lang": lang,
-                "team_id": team_id,
-                "team_name": team_name,
-                "user_id": user_id,
-            }
-            started = time.monotonic()
             try:
-                await notify.send_mail(smtp, [email], subject, text_, html)
-            except notify.NotifyError as exc:
-                await delivery_log.record(db, error=exc, started=started, **logged)
-                again = exc.category in teams.WELCOME_RETRY and tries < TRIES
-                await _done(db, team_id, user_id, week, status="pending" if again else "failed", error=exc.category)
-                log.info("weekly: not sent (%s)", exc.category)
-                if exc.category != "rejected":
-                    stop = True  # the mail server is the problem – the rest waits for the next round
+                got = await _one(db, smtp, cache, team_id, user_id, week, tries, queued)
+            except Exception:  # noqa: BLE001 - one review's error (its content, a write) never strands the batch claimed with it
+                await db.rollback()
+                log.exception("weekly: the review of a team for a person failed")
+                try:
+                    # not sent (the error came before the mail server was asked): again after a growing pause, as a try
+                    later = notify._failure(max(tries - 1, 0), notify.NotifyError("error"), datetime.now(UTC))["next_try_at"]
+                    await _done(db, team_id, user_id, week, status="pending" if tries < TRIES else "failed", error="error", claimed_at=later)
+                except Exception:  # noqa: BLE001 - the database itself: the row is marked failed ("interrupted") later
+                    await db.rollback()
+                    log.exception("weekly: state not written")
                 continue
-            await delivery_log.record(db, started=started, **logged)
-            await _done(db, team_id, user_id, week, status="sent", error=None, sent_at=datetime.now(UTC))
-            sent += 1
+            if got is True:
+                sent += 1
+            elif isinstance(got, tuple):
+                paused, stop = got[1], True  # the mail server is the problem – the rest waits for its pause
+            elif got == "stop":
+                stop = True  # the rest waits for the next round
         if stop:
             break
     return sent
+
+
+async def _one(db: AsyncSession, smtp: dict, cache: dict, team_id: uuid.UUID, user_id: uuid.UUID, week: str, tries: int, queued: datetime) -> bool | str | tuple[str, datetime]:
+    """One claimed review: True sent; False not (skipped, refused); "stop" – the rest waits for the next round; ("pause",
+    until) – the mail server failed, the rest waits until then. Raises only before the mail server was asked (send() puts the row
+    back); after that every error leaves what was written – at worst the row at "sending", failed ("interrupted") after
+    STALE: never twice."""
+    row = (
+        await db.execute(
+            select(User.email, User.is_active, PersonNotify.weekly_on, PersonNotify.lang, Team.name, TeamMember.user_id)
+            .join(PersonNotify, PersonNotify.user_id == User.id)
+            .join(Team, Team.id == team_id)
+            .outerjoin(TeamMember, (TeamMember.team_id == team_id) & (TeamMember.user_id == User.id))
+            .where(User.id == user_id)
+        )
+    ).first()
+    if row is None or not row[1] or not row[2] or row[5] is None or not row[0] or not teams.MAIL.fullmatch(row[0]):
+        await _done(db, team_id, user_id, week, status="skipped", error="not_wanted")  # left, switched off, no address
+        return False
+    email, _active, _on, lang, team_name, _m = row
+    lang = lang if lang in TEXTS else "de"
+    key = (team_id, week, lang)
+    if key not in cache:
+        c = await content(db, team_id, min(queued, datetime.now(UTC)))
+        cache[key] = render(team_name, week, c, lang)
+    subject, text_, html = cache[key]
+    await dbm.release(db)  # nothing open while the mail server answers
+    # the delivery log: the team, the person and the week – never the mail; its tries are attempts of one delivery
+    logged = {
+        "kind": "weekly",
+        "channel_type": "email",
+        "ref": delivery_log.ref_of(f"weekly:{team_id}:{user_id}:{week}"),
+        "items": [{"kind": "weekly", "id": week, "title": subject, "severity": ""}],
+        "total": 1,
+        "lang": lang,
+        "team_id": team_id,
+        "team_name": team_name,
+        "user_id": user_id,
+    }
+    started = time.monotonic()
+    try:
+        await notify.send_mail(smtp, [email], subject, text_, html)
+    except notify.NotifyError as exc:
+        try:
+            await delivery_log.record(db, error=exc, started=started, **logged)
+            again = exc.category in teams.WELCOME_RETRY and tries < TRIES
+            await _done(db, team_id, user_id, week, status="pending" if again else "failed", error=exc.category)
+            log.info("weekly: not sent (%s)", exc.category)
+            until = await _pause(db, tries, exc, datetime.now(UTC)) if exc.category in teams.WELCOME_RETRY else None
+        except Exception:  # noqa: BLE001 - the state could not be written: left at "sending" (failed after STALE)
+            await db.rollback()
+            log.exception("weekly: state not written")
+            return "stop"
+        if exc.category != "rejected":
+            return ("pause", until) if until else "stop"  # the mail server is the problem – the rest waits (for its pause)
+        return False
+    except Exception:  # noqa: BLE001 - not a known answer of the mail server: it may have arrived – never twice
+        log.exception("weekly: sending failed")
+        try:
+            await _done(db, team_id, user_id, week, status="failed", error="error")
+        except Exception:  # noqa: BLE001 - left at "sending" (failed after STALE)
+            await db.rollback()
+        return False
+    try:
+        await delivery_log.record(db, started=started, **logged)
+        await _done(db, team_id, user_id, week, status="sent", error=None, sent_at=datetime.now(UTC))
+    except Exception:  # noqa: BLE001 - sent: never again – left at "sending" (failed "interrupted" after STALE)
+        await db.rollback()
+        log.exception("weekly: sent, state not written")
+    return True
 
 
 async def prune(db: AsyncSession, days: int = 90) -> int:
@@ -326,17 +390,19 @@ async def prune(db: AsyncSession, days: int = 90) -> int:
 
 async def _affected(db: AsyncSession, follows: list[VendorFollow]) -> list[dict]:
     """Per own version how many vulnerabilities affect it now (the product page's card)."""
+    from app import finding_confirm
     from app import vendor as vendor_svc
 
     out = []
     vers = await vendor_svc.versions_of(db, [f.id for f in follows])
+    st = await finding_confirm.standing(db, [f.product for f in follows])  # confirmed findings are handled: not counted
     for f in follows:
         vs = vers.get(f.id, [])
         if not vs or vendor_svc.product_of(f) is None:
             continue
         try:
             view = await vendor_svc.product_view(db, f, vs)
-            per = vendor_svc.summary(view, vs)["per_version"]
+            per = vendor_svc.summary(view, vs, st.skip(f.product, view["findings"]) if st else frozenset())["per_version"]
         except Exception:  # noqa: BLE001 - one product's view must not stop the review
             log.exception("weekly: view of %s failed", f.product)
             continue
@@ -371,7 +437,7 @@ async def _eol(db: AsyncSession, follows: list[VendorFollow], today: date) -> li
 
 async def content(db: AsyncSession, team_id: uuid.UUID, until: datetime) -> dict:
     """What the review of a team says for the seven days before `until`."""
-    from app import personal
+    from app import finding_confirm, personal
     from app import vendor as vendor_svc
 
     since = until - WINDOW
@@ -382,7 +448,14 @@ async def content(db: AsyncSession, team_id: uuid.UUID, until: datetime) -> dict
     events = list(
         await db.scalars(
             select(VendorEvent)
-            .where(VendorEvent.product.in_(list(labels)), VendorEvent.baseline.is_(False), VendorEvent.kind.in_(("vuln", "version", "change")), VendorEvent.created_at >= since, VendorEvent.created_at < until)
+            .where(
+                VendorEvent.product.in_(list(labels)),
+                VendorEvent.baseline.is_(False),
+                VendorEvent.kind.in_(("vuln", "version", "change")),
+                VendorEvent.created_at >= since,
+                VendorEvent.created_at < until,
+                ~finding_confirm.held(standing_only=True),  # confirmed now (app/finding_confirm.py): handled, not in the review
+            )
             .order_by(rank.desc(), VendorEvent.created_at.desc())
             .limit(2000)
         )

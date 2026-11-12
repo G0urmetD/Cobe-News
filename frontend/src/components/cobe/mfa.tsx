@@ -67,7 +67,20 @@ export function NewPasswordFields({ onValid, autoFocus = true }: { onValid: (pw:
   )
 }
 
-export function CodeInput({ value, onChange, onComplete, size = "md" }: { value: string; onChange: (v: string) => void; onComplete?: (v: string) => void; size?: "md" | "lg" }) {
+export function CodeInput({
+  value,
+  onChange,
+  onComplete,
+  size = "md",
+  autoFocus = true,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onComplete?: (v: string) => void
+  size?: "md" | "lg"
+  /** false where the code is not the first field (the password change: the current password comes first) */
+  autoFocus?: boolean
+}) {
   const cls = size === "lg" ? "size-11 text-base" : "size-10"
   return (
     <InputOTP
@@ -77,7 +90,7 @@ export function CodeInput({ value, onChange, onComplete, size = "md" }: { value:
         onChange(v)
         if (v.length === 6) onComplete?.(v)
       }}
-      autoFocus
+      autoFocus={autoFocus}
     >
       <InputOTPGroup>
         {[0, 1, 2].map((i) => (

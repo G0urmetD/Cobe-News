@@ -53,8 +53,9 @@ DEFAULTS: dict[str, dict] = {
     # require – a proof in the token or the own TOTP, for everybody
     "entra": {"enabled": False, "tenant_id": "", "client_id": "", "client_secret_enc": "", "mfa_mode": "entra", "auth_context": ""},
     # a second factor for everybody (auth_api.factor_required): off – readers keep signing in as before; on: local and
-    # AD/LDAP readers set up TOTP (or, local, a passkey) at their next sign-in, Entra readers need a proof or the TOTP
-    "mfa": {"required_all": False},
+    # AD/LDAP readers set up TOTP (or, local, a passkey) at their next sign-in, Entra readers need a proof or the TOTP.
+    # remember…: "Zweiten Faktor auf dem Gerät merken" (app/auth/devices.py) – off; days 0 = the session lifetime
+    "mfa": {"required_all": False, "remember": False, "remember_days": 0, "remember_admins": False},
     # Teams (app/teams.py): off – while off nothing changes for anyone; the welcome e-mail to loaded members and the
     # personal notifications (e-mail, desktop, Microsoft Teams – app/personal.py) off as well; `personal_news`: a person's
     # own security stories by e-mail / their Teams webhook (app/personal_news.py) – off, and only on the ways allowed

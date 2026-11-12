@@ -45,6 +45,7 @@
   example: "1.23.1"
   version_cmd: gitea --version
   where: web_about
+  releases: {github: go-gitea/gitea}  # tags v28.3.0, v1.27.3; v29.0.0-dev left out (checked 2026-11-11)
 
 # ---------------------------------------------------------------- endoflife.date products: their vendor
 # (endoflife.date names none – the catalogue would show the first word of the label or the CPE's vendor)

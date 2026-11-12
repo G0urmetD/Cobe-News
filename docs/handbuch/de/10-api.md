@@ -218,7 +218,7 @@ Alle Endpunkte sind `GET`, die Antworten JSON. Die Felder im Einzelnen beschreib
 | `/api/v1/news/{id}` | eine Meldung, dazu [EPSS](term:epss) ihrer CVEs und die [öffentlichen Exploits](/docs/vendor-news#oeffentlicher-exploit) (`exploits`) | – |
 | `/api/v1/vendor/products` | die gefolgten Produkte mit Versionen, Anzahl der Befunde je Art und Dringlichkeit | – |
 | `/api/v1/vendor/products/{key}` | ein gefolgtes Produkt mit seinen Befunden | `status` (mehrfach; Standard: alle außer `not_affected`), `offset`, `limit` (1–500, Standard 100) |
-| `/api/v1/vendor/findings` | Befunde über alle gefolgten Produkte, die wichtigsten zuerst | `status` (mehrfach; Standard: `affected` und `possible`), `severity` (mehrfach), `exploited=true`, `offset`, `limit` (1–500, Standard 100) |
+| `/api/v1/vendor/findings` | Befunde über alle gefolgten Produkte, die wichtigsten zuerst | `status` (mehrfach; Standard: `affected` und `possible`), `severity` (mehrfach), `exploited=true`, `confirmed` (`false`: ohne die bestätigten, `true`: nur sie; Standard: alle), `offset`, `limit` (1–500, Standard 100) |
 
 Hinweise:
 
@@ -228,6 +228,9 @@ Hinweise:
   betroffen), `unversioned` (Produkt ohne Version gefolgt), `stale` (unklare Altdaten), `not_affected` (nicht
   betroffen) – siehe [Bewertung](/docs/vendor-news#bewertung).
 - Ein Token sieht dasselbe wie jeder angemeldete Leser auf den gemeinsamen Seiten – bei Vendor News die Ansicht „Alle“.
+- Ein [bestätigter Treffer](/docs/vendor-news#treffer-bestaetigen) trägt `confirmed` (`status`, `note`, `by`, `at`) und
+  zählt in den Zahlen von `/api/v1/vendor/products` nicht mit; `/api/v1/vendor/products/{key}` zählt ihn nicht in
+  `by_status`, sondern in `confirmed`.
 
 ## Fehler und Grenzen {#fehler}
 

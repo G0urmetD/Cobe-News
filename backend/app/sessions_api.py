@@ -13,17 +13,22 @@ the same for any account (re-confirmed).
   owner could not undo by signing in again. An admin ending someone's sessions is re-confirmed (deps.require_reauth).
 - Audit log: every ending that ended something is `sessions.revoked` on the account – {scope: one | others | all,
   count, by_admin}, in the transaction of the deletion.
+- Remembered devices ("Zweiten Faktor auf dem Gerät merken", app/auth/devices.py) are listed here too: forget one or
+  all (the person; an admin re-confirmed). "Andere/Alle Sitzungen beenden" forgets them all as well – it is the button
+  for "somebody else may have been in": every browser asks for the second factor again. The own list is served under
+  /api/auth/devices – the device cookie (Path=/api/auth) comes along there, so the page can mark "dieses Gerät".
+  Logged: device.forgotten {scope: one | all, count, by_admin}.
 """
 
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 from sqlalchemy import delete, select
 
 from app import audit
 from app import settings as settings_store
-from app.auth import sessions
+from app.auth import devices, sessions
 from app.deps import ActiveSession, Admin, Db, Reader, api_error, require_reauth
 from app.models import User, UserPasskey, UserSession
 
@@ -85,8 +90,15 @@ async def _end_all(db, actor: User, account: User, current: uuid.UUID, *, by_adm
     res = await db.execute(delete(UserSession).where(UserSession.user_id == account.id, UserSession.id != current))
     n = res.rowcount or 0
     _log(db, actor, account, "all" if by_admin else "others", n, by_admin)
+    _forgotten(db, actor, account, "all", await devices.forget_all(db, account.id), by_admin)  # every browser asks again
     await db.commit()
     return n
+
+
+def _forgotten(db, actor: User, account: User, scope: str, n: int, by_admin: bool, device: str | None = None) -> None:  # noqa: ANN001
+    """device.forgotten on the account – only when something was forgotten."""
+    if n:
+        audit.record(db, actor, "device.forgotten", audit.user_target(account), {"scope": scope, "count": n, "by_admin": by_admin, **({"device": device} if device else {})})
 
 
 # ---------------------------------------------------------------- own
@@ -106,6 +118,39 @@ async def end_my_session(sid: uuid.UUID, user: Reader, sess: ActiveSession, db: 
 @router.post("/me/sessions/end-others")
 async def end_my_other_sessions(user: Reader, sess: ActiveSession, db: Db) -> dict:
     return {"ok": True, "ended": await _end_all(db, user, user, sess.id, by_admin=False)}
+
+
+# ---------------------------------------------------------------- own remembered devices (under /api/auth: the cookie's path)
+
+
+@router.get("/auth/devices")
+async def my_devices(user: Reader, sess: ActiveSession, request: Request, db: Db) -> list[dict]:
+    return await devices.listing(db, user, devices.cookie(request))
+
+
+@router.delete("/auth/devices/{did}")
+async def forget_my_device(did: uuid.UUID, user: Reader, sess: ActiveSession, request: Request, response: Response, db: Db) -> dict:
+    row = await devices.forget_one(db, user.id, did)
+    if row is None:
+        raise api_error(404, "not_found")  # unknown, forgotten already – or another person's
+    _forgotten(db, user, user, "one", 1, False, devices.label(row.user_agent))
+    await db.commit()
+    if (mine := devices.cookie(request)) and await devices.find(db, mine) is None:
+        devices.clear_cookie(response)  # it was this browser's
+    return {"ok": True}
+
+
+@router.post("/auth/devices/forget-all")
+async def forget_my_devices(user: Reader, sess: ActiveSession, request: Request, response: Response, db: Db) -> dict:
+    # the cookie of this browser goes only when it is this account's – a browser shared with another account keeps
+    # that account's (its "merken" replaced this one's cookie; this account's row is forgotten here all the same)
+    mine = await devices.find(db, devices.cookie(request))
+    n = await devices.forget_all(db, user.id)
+    _forgotten(db, user, user, "all", n, False)
+    await db.commit()
+    if mine is not None and mine.user_id == user.id:
+        devices.clear_cookie(response)
+    return {"ok": True, "forgotten": n}
 
 
 # ---------------------------------------------------------------- admins
@@ -138,3 +183,20 @@ async def end_user_sessions(uid: uuid.UUID, admin: Admin, sess: ActiveSession, d
     require_reauth(sess, admin)
     u = await _target(db, uid)
     return {"ok": True, "ended": await _end_all(db, admin, u, sess.id, by_admin=True)}
+
+
+@admin_router.get("/users/{uid}/devices")
+async def user_devices(uid: uuid.UUID, admin: Admin, db: Db) -> list[dict]:
+    return await devices.listing(db, await _target(db, uid), None)
+
+
+@admin_router.post("/users/{uid}/devices/forget-all")
+async def forget_user_devices(uid: uuid.UUID, admin: Admin, sess: ActiveSession, db: Db) -> dict:
+    """"Gemerkte Geräte vergessen": every browser of the account asks for its second factor again – re-confirmed, as
+    ending its sessions."""
+    require_reauth(sess, admin)
+    u = await _target(db, uid)
+    n = await devices.forget_all(db, u.id)
+    _forgotten(db, admin, u, "all", n, True)
+    await db.commit()
+    return {"ok": True, "forgotten": n}
