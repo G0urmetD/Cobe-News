@@ -635,6 +635,45 @@ async def test_epss_for_findings_and_stories_once_a_day(net, structured_on, admi
     assert (await reader_client.get(f"/api/news/{story['id']}")).json()["epss"][0]["cve"] == "CVE-2021-44228"
 
 
+async def test_epss_score_gone_or_pruned_leaves_no_old_score_in_the_views(net, structured_on, admin_client, reader_client):
+    """0.1.57: a score FIRST no longer gives (a withdrawn CVE) and a score the prune removes left the old score in the
+    cached views (no invalidate / bump) until something else recomputed them."""
+    from sqlalchemy import update
+
+    await _follow(admin_client, "panos", "10.2.7")
+    async with db.session() as s:
+        await vendor.store(s, [cvelist.parse_one(fx("cve_CVE-2024-3400.json"))], await vendor.current_index(s))
+    net.add("https://api.first.org/data/v1/epss*", fx("epss.json"))
+    async with db.session() as s:
+        assert await epss.refresh(s, force=True) == 1
+
+    async def shown() -> dict | None:
+        f = (await reader_client.get("/api/vendor/products/panos")).json()["findings"]
+        return next(x for x in f if "CVE-2024-3400" in x["cves"])["epss"]
+
+    assert (await shown())["score"] == 0.99999
+    # the next day FIRST no longer knows it
+    net.add("https://api.first.org/data/v1/epss*", {"status": "OK", "data": []})
+    async with db.session() as s:
+        await s.execute(update(EpssScore).values(fetched_at=datetime.now(UTC) - timedelta(days=2)))
+        await s.commit()
+        assert await epss.refresh(s, force=True) == 1
+        assert (await s.get(EpssScore, "CVE-2024-3400")).score is None
+    assert await shown() is None
+    # a score again – then not asked for a month: the prune removes it, the view with it
+    net.add("https://api.first.org/data/v1/epss*", fx("epss.json"))
+    async with db.session() as s:
+        await s.execute(update(EpssScore).values(fetched_at=datetime.now(UTC) - timedelta(days=2)))
+        await s.commit()
+        assert await epss.refresh(s, force=True) == 1
+    assert (await shown())["score"] == 0.99999
+    async with db.session() as s:
+        await s.execute(update(EpssScore).values(fetched_at=datetime.now(UTC) - epss.KEEP - timedelta(days=1)))
+        await s.commit()
+        assert await epss._prune(s) == 1
+    assert await shown() is None
+
+
 async def test_findings_sorted_by_epss(net, structured_on, admin_client, reader_client):
     await _follow(admin_client, "panos")
     recs = [cvelist.parse_record(record(f"CVE-2026-9000{i}", "Palo Alto Networks", "PAN-OS", [{"version": "10.0.0", "lessThan": "12.0", "status": "affected"}])) for i in range(3)]
