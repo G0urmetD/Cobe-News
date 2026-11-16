@@ -10,7 +10,8 @@ products that name their packages in the catalogue (`osv: [[Maven, org.apache.to
 - Stored as a Vendor News advisory `osv:<CVE>` (source osv) – grouped under the CVE's other records, judged after the
   vendor, the NVD and cvelistV5 (vendor.cve_verdict): it decides a "possibly affected" and names a missing fix.
 - Each CVE at most once a day while it is young (published in the last 30 days), else once a week; PER_ROUND CVEs a
-  round, ALIASES requests more each.
+  round, ALIASES requests more each. A CVE counts as asked once its record is stored: one whose store failed is due
+  again with the next round (after STORE_TRIES failed rounds in a row it counts as asked).
 """
 
 import asyncio
@@ -164,6 +165,25 @@ async def wanted(db: AsyncSession) -> list[tuple[str, str | None]]:
     return list(out.items())
 
 
+STORE_TRIES = 3  # rounds in a row a CVE's record may fail to be stored before it counts as asked all the same
+
+
+async def _store_failed(db: AsyncSession, cve: str) -> None:
+    """A CVE whose record could not be stored: one failure more (its own lookup row) – asked only after STORE_TRIES."""
+    try:
+        row = await db.get(VendorFetch, PER_CVE + cve)
+        if row is None:
+            row = VendorFetch(key=PER_CVE + cve, failures=0, items=0)
+            db.add(row)
+        row.failures = (row.failures or 0) + 1
+        if row.failures >= STORE_TRIES:
+            row.last_fetch_at, row.failures = datetime.now(UTC), 0
+            log.warning("osv: the record of %s could not be stored %d times – asked again in the usual interval", cve, STORE_TRIES)
+        await db.commit()
+    except Exception:  # noqa: BLE001 - the database itself is away: the CVE stays due, the round's error is the one raised
+        await db.rollback()
+
+
 async def refresh(db: AsyncSession, *, force: bool = False) -> int | None:
     """The OSV records of the wanted CVEs that are due (PER_ROUND a round); returns how many advisories changed."""
     from app import vendor
@@ -213,18 +233,26 @@ async def refresh(db: AsyncSession, *, force: bool = False) -> int | None:
                     records = []
                 else:
                     raise
+            try:
+                adv = to_advisory(cve, records) if records else None
+                if adv is not None:
+                    changed += await vendor.store(db, [adv], ix)
+                elif records:
+                    # withdrawn since it was stored – or no package range any more: the old copy must not decide any longer
+                    changed += await vendor.drop_advisories(db, [f"osv:{cve}"], withdrawn=all(r.get("withdrawn") for r in records))
+            except Exception:
+                # not stored (a timeout, a bug): not "asked" – due again with the next round, not in 1–7 days; after
+                # STORE_TRIES such rounds it counts as asked, so one CVE that always fails does not hold up the others
+                await db.rollback()
+                await _store_failed(db, cve)
+                raise
             row = await db.get(VendorFetch, PER_CVE + cve)
             if row is None:
                 row = VendorFetch(key=PER_CVE + cve, failures=0, items=0)
                 db.add(row)
             row.last_fetch_at = row.last_ok_at = datetime.now(UTC)
+            row.failures = 0
             await db.commit()
-            adv = to_advisory(cve, records) if records else None
-            if adv is not None:
-                changed += await vendor.store(db, [adv], ix)
-            elif records:
-                # withdrawn since it was stored – or no package range any more: the old copy must not decide any longer
-                changed += await vendor.drop_advisories(db, [f"osv:{cve}"], withdrawn=all(r.get("withdrawn") for r in records))
             done += 1
         st = await vendor._state(db, KEY)
         vendor._ok(st, timedelta(minutes=10) if len(todo) > done else timedelta(hours=1), done)
