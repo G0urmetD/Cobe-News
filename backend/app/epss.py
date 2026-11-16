@@ -190,7 +190,10 @@ async def refresh(db: AsyncSession, *, force: bool = False) -> int | None:
             for c in part:
                 r = rows.get(c)
                 values.append({"cve": c, "score": r["score"] if r else None, "percentile": r["percentile"] if r else None, "day": (r["date"] if r else "")[:10], "fetched_at": at})
-                if r and old.get(c) != (r["score"], r["percentile"]):
+                was = old.get(c)
+                if (r and was != (r["score"], r["percentile"])) or (not r and was is not None and was[0] is not None):
+                    # a new or changed score – or one FIRST no longer gives (a CVE it withdrew, a rejected one): the
+                    # views showed the old score until something else recomputed them
                     changed += 1
                     moved.add(c)
             stmt = pg_insert(EpssScore).values(values)
@@ -207,7 +210,7 @@ async def refresh(db: AsyncSession, *, force: bool = False) -> int | None:
         vendor._record(db, st, meter, exc=vendor._fail(st, exc, timedelta(hours=1)))
     await db.commit()
     await _prune(db)
-    if changed:
+    if moved:
         invalidate()
         await vendor.bump_cves(db, moved)  # the findings show the scores – of these CVEs' products only (soft)
     return changed
@@ -217,8 +220,16 @@ KEEP = timedelta(days=30)
 
 
 async def _prune(db: AsyncSession) -> int:
-    """Scores not asked for a month (a CVE of no finding or recent story any more) go – in small batches."""
-    gone = await dbm.delete_batched(db, EpssScore, EpssScore.fetched_at < datetime.now(UTC) - KEEP, batch=2000)
+    """Scores not asked for a month (a CVE of no finding or recent story any more) go – in small batches. A "not
+    affected" finding still shows its score: the views of the products of the CVEs whose score went are recomputed
+    (soft, as for a changed score)."""
+    from app import vendor
+
+    old = EpssScore.fetched_at < datetime.now(UTC) - KEEP
+    shown = set(await db.scalars(select(EpssScore.cve).where(old, EpssScore.score.is_not(None)).limit(MAX_WANTED)))
+    gone = await dbm.delete_batched(db, EpssScore, old, batch=2000)
     if gone:
         invalidate()
+        if shown:
+            await vendor.bump_cves(db, shown)
     return gone

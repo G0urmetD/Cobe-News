@@ -904,7 +904,8 @@ Benachrichtigungen**. Jeder Weg ist **standardmäßig aus**:
 - Ist Teams ausgeschaltet, gibt es keine persönlichen Benachrichtigungen.
 - Für den Teams-Webhook einer Person gelten nur Adressen von Microsoft (`*.logic.azure.com`, `*.powerplatform.com`,
   `*.webhook.office.com`, https, Port 443) und nur öffentliche Ziele. `WEBHOOK_HOSTS` und `WEBHOOK_PRIVATE_NETS` gelten
-  hier nicht.
+  hier nicht. Auch über einen ausgehenden Proxy (`HTTPS_PROXY`) prüft der Server die Adresse selbst, soweit er den
+  Namen auflösen kann – eine private Adresse (etwa Logic Apps über Private Link) ist „Ziel nicht erlaubt“.
 - Die Schalter brauchen keine erneute Bestätigung – sie ändern nicht, wer lesen darf.
 - **Security-Meldungen nach eigener Auswahl** (ab Werk aus): Ist der Schalter an, kann sich **jede Person** – auch ohne
   Team – Security-Meldungen nach eigener Auswahl per E-Mail oder an ihren Teams-Webhook schicken lassen

@@ -1,0 +1,537 @@
+{
+  "document": {
+    "acknowledgments": [
+      {
+        "summary": "This vulnerability was found during internal security testing."
+      }
+    ],
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "notes": [
+      {
+        "category": "summary",
+        "title": "Summary",
+        "text": "A vulnerability in the Web Services Management Agent (WSMA) function of Cisco IOS XE Software could allow an authenticated, remote attacker to execute arbitrary Cisco IOS commands as a privilege level 15 user.\r\n\r\nThe vulnerability occurs because the affected software improperly sanitizes user-supplied input. An attacker could exploit this vulnerability by submitting crafted HTTP requests to the targeted application. A successful exploit could allow the attacker to execute arbitrary commands on  the affected device.\r\n\r\nCisco has released software updates that address this vulnerability. There are no workarounds that address this vulnerability.\r\n\r\n\r\n\r\nThis advisory is part of the March 27, 2019, release of the Cisco IOS and IOS XE Software Security Advisory Bundled Publication, which includes 17 Cisco Security Advisories that describe 19 vulnerabilities. For a complete list of the advisories and links to them, see Cisco Event Response: March 2019 Semiannual Cisco IOS and IOS XE Software Security Advisory Bundled Publication [\"https://sec.cloudapps.cisco.com/security/center/viewErp.x?alertId=ERP-71135\"]."
+      },
+      {
+        "category": "general",
+        "title": "Vulnerable Products",
+        "text": "This vulnerability affects Cisco devices that are running an affected release of Cisco IOS XE Software with the web server feature enabled.\r\n\r\nFor information about which Cisco IOS XE Software releases are vulnerable, see the Fixed Software [\"#fs\"] section of this advisory.\r\n Assessing the HTTP Server Configuration\r\nTo determine whether the HTTP Server feature is enabled for a device, administrators can log in to the device and use the show running-config | include http (secure|server) command in the CLI to check for the presence of the ip http server command or the ip http secure-server command in the global configuration. If either command is present and configured, the HTTP Server feature is enabled for the device.\r\n\r\nThe following example shows the output of the show running-config | include http (secure|server) command for a router that has the HTTP Server feature enabled:\r\n\r\n\r\nRouter# show running-config | include http (secure|server)\n ip http server ip http secure-server\r\n  Determining the Cisco IOS XE Software Release\r\nTo determine which Cisco IOS XE Software release is running on a device, administrators can log in to the device, use the show version command in the CLI, and then refer to the system banner that appears. If the device is running Cisco IOS XE Software, the system banner displays Cisco IOS Software, Cisco IOS XE Software, or similar text.\r\n\r\nThe following example shows the output of the command for a device that is running Cisco IOS XE Software Release 16.2.1 and has an installed image name of CAT3K_CAA-UNIVERSALK9-M:\r\n\r\n\r\nios-xe-device# show version\r\n  Cisco IOS Software, Catalyst L3 Switch Software (CAT3K_CAA-UNIVERSALK9-M), Version Denali 16.2.1, RELEASE SOFTWARE (fc1)  Technical Support: http://www.cisco.com/techsupport  Copyright (c) 1986-2016 by Cisco Systems, Inc.  Compiled Sun 27-Mar-16 21:47 by mcpre  .  .  .\r\n\r\nFor information about the naming and numbering conventions for Cisco IOS XE Software releases, see the Cisco IOS and NX-OS Software Reference Guide [\"https://www.cisco.com/c/en/us/about/security-center/ios-nx-os-reference-guide.html\"]."
+      },
+      {
+        "category": "general",
+        "title": "Products Confirmed Not Vulnerable",
+        "text": "Only products listed in the Vulnerable Products [\"#vp\"] section of this advisory are known to be affected by this vulnerability.\r\n\r\nCisco has confirmed that this vulnerability does not affect Cisco IOS Software, Cisco IOS XR Software, or Cisco NX-OS Software."
+      },
+      {
+        "category": "general",
+        "title": "Workarounds",
+        "text": "There are no workarounds that address this vulnerability."
+      },
+      {
+        "category": "general",
+        "title": "Fixed Software",
+        "text": "Cisco has released free software updates that address the vulnerability described in this advisory. Customers may only install and expect support for software versions and feature sets for which they have purchased a license. By installing, downloading, accessing, or otherwise using such software upgrades, customers agree to follow the terms of the Cisco software license:\r\nhttps://www.cisco.com/c/en/us/products/end-user-license-agreement.html [\"https://www.cisco.com/c/en/us/products/end-user-license-agreement.html\"]\r\n\r\nAdditionally, customers may only download software for which they have a valid license, procured from Cisco directly, or through a Cisco authorized reseller or partner. In most cases this will be a maintenance upgrade to software that was previously purchased. Free security software updates do not entitle customers to a new software license, additional software feature sets, or major revision upgrades.\r\n\r\nWhen considering software upgrades, customers are advised to regularly consult the advisories for Cisco products, which are available from the Cisco Security Advisories and Alerts page [\"https://www.cisco.com/go/psirt\"], to determine exposure and a complete upgrade solution.\r\n\r\nIn all cases, customers should ensure that the devices to be upgraded contain sufficient memory and confirm that current hardware and software configurations will continue to be supported properly by the new release. If the information is not clear, customers are advised to contact the Cisco Technical Assistance Center (TAC) or their contracted maintenance providers.\r\n  Customers Without Service Contracts\r\nCustomers who purchase directly from Cisco but do not hold a Cisco service contract and customers who make purchases through third-party vendors but are unsuccessful in obtaining fixed software through their point of sale should obtain upgrades by contacting the Cisco TAC:\r\nhttps://www.cisco.com/c/en/us/support/web/tsd-cisco-worldwide-contacts.html [\"https://www.cisco.com/c/en/us/support/web/tsd-cisco-worldwide-contacts.html\"]\r\n\r\nCustomers should have the product serial number available and be prepared to provide the URL of this advisory as evidence of entitlement to a free upgrade.\r\n                        Cisco IOS and IOS XE Software\r\nTo help customers determine their exposure to vulnerabilities in Cisco IOS and IOS XE Software, Cisco provides a tool, the Cisco IOS Software Checker [\"https://sec.cloudapps.cisco.com/security/center/softwarechecker.x\"], that identifies any Cisco Security Advisories that impact a specific software release and the earliest release that fixes the vulnerabilities described in each advisory (“First Fixed”). If applicable, the tool also returns the earliest release that fixes all the vulnerabilities described in all the advisories identified (“Combined First Fixed”).\r\n\r\nCustomers can use this tool to perform the following tasks:\r\n\r\nInitiate a search by choosing one or more releases from a drop-down list or uploading a file from a local system for the tool to parse\r\nEnter the output of the show version command for the tool to parse\r\nCreate a custom search by including all previously published Cisco Security Advisories, a specific advisory, or all advisories in the most recent bundled publication\r\n\r\nTo determine whether a release is affected by any published Cisco Security Advisory, use the Cisco IOS Software Checker [\"https://sec.cloudapps.cisco.com/security/center/softwarechecker.x\"] on Cisco.com or enter a Cisco IOS or IOS XE Software release—for example, 15.1(4)M2 or 3.13.8S—in the following field:\r\n\r\n\r\n\r\nBy default, the Cisco IOS Software Checker includes results only for vulnerabilities that have a Critical or High Security Impact Rating (SIR). To include results for Medium SIR vulnerabilities, use the Cisco IOS Software Checker on Cisco.com and check the Medium check box in the Impact Rating drop-down list.\r\n\r\nFor a mapping of Cisco IOS XE Software releases to Cisco IOS Software releases, refer to the Cisco IOS XE 2 Release Notes [\"https://www.cisco.com/c/en/us/td/docs/ios/ios_xe/2/release/notes/rnasr21/rnasr21_gen.html#wp3000032\"], Cisco IOS XE 3S Release Notes [\"https://www.cisco.com/c/en/us/td/docs/ios/ios_xe/3/release/notes/asr1k_rn_3s_rel_notes/asr1k_rn_3s_sys_req.html#wp3069754\"], or Cisco IOS XE 3SG Release Notes [\"https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst4500/release/note/OL_24726.html#pgfId-2570252\"], depending on the Cisco IOS XE Software release.\r\nNote: Starting with Cisco IOS XE Software Release 16.9.1, any upgrade will require Smart Licensing. Customers who plan to upgrade Cisco IOS XE to Release 16.9.1 or later are advised to consider the Smart Licensing requirement. The following documentation provides additional information: Smart Licensing [\"https://www.cisco.com/c/en/us/products/software/smart-accounts/software-licensing.html#~stickynav=3\"]."
+      },
+      {
+        "category": "general",
+        "title": "Vulnerability Policy",
+        "text": "To learn about Cisco security vulnerability disclosure policies and publications, see the Security Vulnerability Policy [\"https://sec.cloudapps.cisco.com/security/center/resources/security_vulnerability_policy.html\"]. This document also contains instructions for obtaining fixed software and receiving security vulnerability information from Cisco."
+      },
+      {
+        "category": "general",
+        "title": "Exploitation and Public Announcements",
+        "text": "The Cisco Product Security Incident Response Team (PSIRT) is not aware of any public announcements or malicious use of the vulnerability that is described in this advisory."
+      },
+      {
+        "category": "general",
+        "title": "Source",
+        "text": "This vulnerability was found during internal security testing."
+      },
+      {
+        "category": "legal_disclaimer",
+        "title": "Legal Disclaimer",
+        "text": "THIS DOCUMENT IS PROVIDED ON AN \"AS IS\" BASIS AND DOES NOT IMPLY ANY KIND OF GUARANTEE OR WARRANTY, INCLUDING THE WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR USE. YOUR USE OF THE INFORMATION ON THE DOCUMENT OR MATERIALS LINKED FROM THE DOCUMENT IS AT YOUR OWN RISK. CISCO RESERVES THE RIGHT TO CHANGE OR UPDATE THIS DOCUMENT AT ANY TIME.\r\n\r\nA standalone copy or paraphrase of the text of this document that omits the distribution URL is an uncontrolled copy and may lack important information or contain factual errors. The information in this document is intended for end users of Cisco products."
+      }
+    ],
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "psirt@cisco.com",
+      "issuing_authority": "Cisco PSIRT",
+      "name": "Cisco",
+      "namespace": "https://cisco.com"
+    },
+    "references": [
+      {
+        "category": "self",
+        "summary": "Cisco IOS XE Software Command Injection Vulnerability",
+        "url": "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-20190327-iosxe-cmdinj"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco Event Response: March 2019 Semiannual Cisco IOS and IOS XE Software Security Advisory Bundled Publication",
+        "url": "https://sec.cloudapps.cisco.com/security/center/viewErp.x?alertId=ERP-71135"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco Security Vulnerability Policy",
+        "url": "https://sec.cloudapps.cisco.com/security/center/resources/security_vulnerability_policy.html"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco IOS and NX-OS Software Reference Guide",
+        "url": "https://www.cisco.com/c/en/us/about/security-center/ios-nx-os-reference-guide.html"
+      },
+      {
+        "category": "external",
+        "summary": "https://www.cisco.com/c/en/us/products/end-user-license-agreement.html",
+        "url": "https://www.cisco.com/c/en/us/products/end-user-license-agreement.html"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco Security Advisories and Alerts page",
+        "url": "https://www.cisco.com/go/psirt"
+      },
+      {
+        "category": "external",
+        "summary": "https://www.cisco.com/c/en/us/support/web/tsd-cisco-worldwide-contacts.html",
+        "url": "https://www.cisco.com/c/en/us/support/web/tsd-cisco-worldwide-contacts.html"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco&nbsp;IOS Software Checker",
+        "url": "https://sec.cloudapps.cisco.com/security/center/softwarechecker.x"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco&nbsp;IOS XE 2 Release Notes",
+        "url": "https://www.cisco.com/c/en/us/td/docs/ios/ios_xe/2/release/notes/rnasr21/rnasr21_gen.html#wp3000032"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco&nbsp;IOS XE 3S Release Notes",
+        "url": "https://www.cisco.com/c/en/us/td/docs/ios/ios_xe/3/release/notes/asr1k_rn_3s_rel_notes/asr1k_rn_3s_sys_req.html#wp3069754"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco&nbsp;IOS XE 3SG Release Notes",
+        "url": "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst4500/release/note/OL_24726.html#pgfId-2570252"
+      },
+      {
+        "category": "external",
+        "summary": "Smart Licensing",
+        "url": "https://www.cisco.com/c/en/us/products/software/smart-accounts/software-licensing.html#~stickynav=3"
+      }
+    ],
+    "title": "Cisco IOS XE Software Command Injection Vulnerability",
+    "tracking": {
+      "current_release_date": "2019-03-27T16:00:00+00:00",
+      "generator": {
+        "date": "2026-11-14T04:31:23+00:00",
+        "engine": {
+          "name": "TVCE"
+        }
+      },
+      "id": "cisco-sa-20190327-iosxe-cmdinj",
+      "initial_release_date": "2019-03-27T16:00:00+00:00",
+      "revision_history": [
+        {
+          "date": "2019-03-27T16:00:00+00:00",
+          "number": "1.0.0",
+          "summary": "Initial public release."
+        }
+      ],
+      "status": "final",
+      "version": "1.0.0"
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "name": "Cisco",
+        "category": "vendor",
+        "branches": [
+          {
+            "name": "Cisco IOS XE Software",
+            "category": "product_family",
+            "branches": [
+              {
+                "name": "16.1",
+                "category": "product_version",
+                "branches": [
+                  {
+                    "name": "16.1.1",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.1.1",
+                      "product_id": "CSAFPID-212436"
+                    }
+                  },
+                  {
+                    "name": "16.1.2",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.1.2",
+                      "product_id": "CSAFPID-213100"
+                    }
+                  },
+                  {
+                    "name": "16.1.3",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.1.3",
+                      "product_id": "CSAFPID-214993"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "16.2",
+                "category": "product_version",
+                "branches": [
+                  {
+                    "name": "16.2.1",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.2.1",
+                      "product_id": "CSAFPID-213809"
+                    }
+                  },
+                  {
+                    "name": "16.2.2",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.2.2",
+                      "product_id": "CSAFPID-217253"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "16.4",
+                "category": "product_version",
+                "branches": [
+                  {
+                    "name": "16.4.1",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.4.1",
+                      "product_id": "CSAFPID-214051"
+                    }
+                  },
+                  {
+                    "name": "16.4.2",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.4.2",
+                      "product_id": "CSAFPID-217257"
+                    }
+                  },
+                  {
+                    "name": "16.4.3",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.4.3",
+                      "product_id": "CSAFPID-231390"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "16.5",
+                "category": "product_version",
+                "branches": [
+                  {
+                    "name": "16.5.1",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.5.1",
+                      "product_id": "CSAFPID-217259"
+                    }
+                  },
+                  {
+                    "name": "16.5.1a",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.5.1a",
+                      "product_id": "CSAFPID-225784"
+                    }
+                  },
+                  {
+                    "name": "16.5.1b",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.5.1b",
+                      "product_id": "CSAFPID-226330"
+                    }
+                  },
+                  {
+                    "name": "16.5.2",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.5.2",
+                      "product_id": "CSAFPID-229187"
+                    }
+                  },
+                  {
+                    "name": "16.5.3",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.5.3",
+                      "product_id": "CSAFPID-232461"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "16.6",
+                "category": "product_version",
+                "branches": [
+                  {
+                    "name": "16.6.1",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.6.1",
+                      "product_id": "CSAFPID-218901"
+                    }
+                  },
+                  {
+                    "name": "16.6.2",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.6.2",
+                      "product_id": "CSAFPID-228706"
+                    }
+                  },
+                  {
+                    "name": "16.6.3",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.6.3",
+                      "product_id": "CSAFPID-231682"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "16.7",
+                "category": "product_version",
+                "branches": [
+                  {
+                    "name": "16.7.1",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.7.1",
+                      "product_id": "CSAFPID-218903"
+                    }
+                  },
+                  {
+                    "name": "16.7.1a",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.7.1a",
+                      "product_id": "CSAFPID-231389"
+                    }
+                  },
+                  {
+                    "name": "16.7.1b",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.7.1b",
+                      "product_id": "CSAFPID-232767"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "16.8",
+                "category": "product_version",
+                "branches": [
+                  {
+                    "name": "16.8.1",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.8.1",
+                      "product_id": "CSAFPID-218905"
+                    }
+                  },
+                  {
+                    "name": "16.8.1a",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.8.1a",
+                      "product_id": "CSAFPID-235307"
+                    }
+                  },
+                  {
+                    "name": "16.8.1b",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.8.1b",
+                      "product_id": "CSAFPID-235858"
+                    }
+                  },
+                  {
+                    "name": "16.8.1s",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.8.1s",
+                      "product_id": "CSAFPID-236834"
+                    }
+                  },
+                  {
+                    "name": "16.8.1c",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.8.1c",
+                      "product_id": "CSAFPID-237460"
+                    }
+                  },
+                  {
+                    "name": "16.8.1d",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.8.1d",
+                      "product_id": "CSAFPID-242834"
+                    }
+                  },
+                  {
+                    "name": "16.8.1e",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "16.8.1e",
+                      "product_id": "CSAFPID-249171"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2019-1755",
+      "ids": [
+        {
+          "system_name": "Cisco Bug ID",
+          "text": "CSCvi36824"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Affected Product Comprehensiveness",
+          "text": "Complete."
+        }
+      ],
+      "product_status": {
+        "known_affected": [
+          "CSAFPID-212436",
+          "CSAFPID-213100",
+          "CSAFPID-213809",
+          "CSAFPID-214051",
+          "CSAFPID-214993",
+          "CSAFPID-217253",
+          "CSAFPID-217257",
+          "CSAFPID-217259",
+          "CSAFPID-218901",
+          "CSAFPID-218903",
+          "CSAFPID-218905",
+          "CSAFPID-225784",
+          "CSAFPID-226330",
+          "CSAFPID-228706",
+          "CSAFPID-229187",
+          "CSAFPID-231389",
+          "CSAFPID-231390",
+          "CSAFPID-231682",
+          "CSAFPID-232461",
+          "CSAFPID-232767",
+          "CSAFPID-235307",
+          "CSAFPID-235858",
+          "CSAFPID-236834",
+          "CSAFPID-237460",
+          "CSAFPID-242834",
+          "CSAFPID-249171"
+        ]
+      },
+      "release_date": "2019-03-27T16:00:00+00:00",
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "details": "Cisco has released software updates that address this vulnerability.",
+          "product_ids": [
+            "CSAFPID-212436",
+            "CSAFPID-213100",
+            "CSAFPID-213809",
+            "CSAFPID-214051",
+            "CSAFPID-214993",
+            "CSAFPID-217253",
+            "CSAFPID-217257",
+            "CSAFPID-217259",
+            "CSAFPID-218901",
+            "CSAFPID-218903",
+            "CSAFPID-218905",
+            "CSAFPID-225784",
+            "CSAFPID-226330",
+            "CSAFPID-228706",
+            "CSAFPID-229187",
+            "CSAFPID-231389",
+            "CSAFPID-231390",
+            "CSAFPID-231682",
+            "CSAFPID-232461",
+            "CSAFPID-232767",
+            "CSAFPID-235307",
+            "CSAFPID-235858",
+            "CSAFPID-236834",
+            "CSAFPID-237460",
+            "CSAFPID-242834",
+            "CSAFPID-249171"
+          ],
+          "url": "https://software.cisco.com"
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "baseScore": 6.5,
+            "baseSeverity": "MEDIUM",
+            "vectorString": "CVSS:3.0/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:H/A:H",
+            "version": "3.0"
+          },
+          "products": [
+            "CSAFPID-212436",
+            "CSAFPID-213100",
+            "CSAFPID-213809",
+            "CSAFPID-214051",
+            "CSAFPID-214993",
+            "CSAFPID-217253",
+            "CSAFPID-217257",
+            "CSAFPID-217259",
+            "CSAFPID-218901",
+            "CSAFPID-218903",
+            "CSAFPID-218905",
+            "CSAFPID-225784",
+            "CSAFPID-226330",
+            "CSAFPID-228706",
+            "CSAFPID-229187",
+            "CSAFPID-231389",
+            "CSAFPID-231390",
+            "CSAFPID-231682",
+            "CSAFPID-232461",
+            "CSAFPID-232767",
+            "CSAFPID-235307",
+            "CSAFPID-235858",
+            "CSAFPID-236834",
+            "CSAFPID-237460",
+            "CSAFPID-242834",
+            "CSAFPID-249171"
+          ]
+        }
+      ],
+      "title": "Cisco IOS XE Software Command Injection Vulnerability"
+    }
+  ]
+}

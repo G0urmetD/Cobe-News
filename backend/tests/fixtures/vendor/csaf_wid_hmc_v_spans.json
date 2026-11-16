@@ -1,0 +1,477 @@
+{
+  "document" : {
+    "aggregate_severity" : {
+      "text" : "mittel"
+    },
+    "category" : "csaf_base",
+    "csaf_version" : "2.0",
+    "distribution" : {
+      "tlp" : {
+        "label" : "WHITE",
+        "url" : "https://www.first.org/tlp/"
+      }
+    },
+    "lang" : "de-DE",
+    "notes" : [ {
+      "category" : "legal_disclaimer",
+      "text" : "Das BSI ist als Anbieter für die eigenen, zur Nutzung bereitgestellten Inhalte nach den allgemeinen Gesetzen verantwortlich. Nutzerinnen und Nutzer sind jedoch dafür verantwortlich, die Verwendung und/oder die Umsetzung der mit den Inhalten bereitgestellten Informationen sorgfältig im Einzelfall zu prüfen."
+    }, {
+      "category" : "description",
+      "text" : "Apache Tomcat ist ein Web-Applikationsserver für verschiedene Plattformen.",
+      "title" : "Produktbeschreibung"
+    }, {
+      "category" : "summary",
+      "text" : "Ein entfernter, anonymer Angreifer kann mehrere Schwachstellen in Apache Tomcat ausnutzen, um Sicherheitsvorkehrungen zu umgehen und Informationen offenzulegen.",
+      "title" : "Angriff"
+    }, {
+      "category" : "general",
+      "text" : "- Linux\n- Sonstiges\n- UNIX\n- Windows",
+      "title" : "Betroffene Betriebssysteme"
+    } ],
+    "publisher" : {
+      "category" : "other",
+      "contact_details" : "csaf-provider@cert-bund.de",
+      "name" : "Bundesamt für Sicherheit in der Informationstechnik",
+      "namespace" : "https://www.bsi.bund.de"
+    },
+    "references" : [ {
+      "category" : "self",
+      "summary" : "WID-SEC-W-2026-2310 - CSAF Version",
+      "url" : "https://wid.cert-bund.de/.well-known/csaf/white/2026/wid-sec-w-2026-2310.json"
+    }, {
+      "category" : "self",
+      "summary" : "WID-SEC-2026-2310 - Portal Version",
+      "url" : "https://wid.cert-bund.de/portal/wid/securityadvisory?name=WID-SEC-2026-2310"
+    }, {
+      "category" : "external",
+      "summary" : "CVERecord vom 2026-07-13",
+      "url" : "https://www.cve.org/CVERecord?id=CVE-2026-59083"
+    }, {
+      "category" : "external",
+      "summary" : "CVERecord vom 2026-07-13",
+      "url" : "https://www.cve.org/CVERecord?id=CVE-2026-59084"
+    }, {
+      "category" : "external",
+      "summary" : "Apache Mailing List vom 2026-07-13",
+      "url" : "https://lists.apache.org/thread/3g63zos2gkjo5vgnrk8kxmosv47w6wbq"
+    }, {
+      "category" : "external",
+      "summary" : "Apache Mailing List vom 2026-07-13",
+      "url" : "https://lists.apache.org/thread/7w9746ootcxo0gvx26xjpw80l31f1qw7"
+    }, {
+      "category" : "external",
+      "summary" : "Apache Tomcat release Notes vom 2026-07-13",
+      "url" : "https://tomcat.apache.org/security-11.html"
+    }, {
+      "category" : "external",
+      "summary" : "Apache Tomcat release Notes vom 2026-07-13",
+      "url" : "https://tomcat.apache.org/security-10.html"
+    }, {
+      "category" : "external",
+      "summary" : "Apache Tomcat release Notes vom 2026-07-13",
+      "url" : "https://tomcat.apache.org/security-9.html"
+    }, {
+      "category" : "external",
+      "summary" : "IBM Security Bulletin 7281795 vom 2026-07-29",
+      "url" : "https://www.ibm.com/support/pages/node/7281795"
+    }, {
+      "category" : "external",
+      "summary" : "SUSE Security Update SUSE-SU-2026:3419-1 vom 2026-07-30",
+      "url" : "https://lists.suse.com/pipermail/sle-security-updates/2026-July/028042.html"
+    }, {
+      "category" : "external",
+      "summary" : "SUSE Security Update SUSE-SU-2026:3418-1 vom 2026-07-30",
+      "url" : "https://lists.suse.com/pipermail/sle-security-updates/2026-July/028043.html"
+    }, {
+      "category" : "external",
+      "summary" : "SUSE Security Update SUSE-SU-2026:3430-1 vom 2026-07-30",
+      "url" : "https://lists.suse.com/pipermail/sle-security-updates/2026-July/028050.html"
+    }, {
+      "category" : "external",
+      "summary" : "openSUSE Security Update OPENSUSE-SU-2026:11400-1 vom 2026-07-31",
+      "url" : "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/BFCEXOUDXV4ZOC4AX6ECCZBOVB77BAST/"
+    }, {
+      "category" : "external",
+      "summary" : "openSUSE Security Update OPENSUSE-SU-2026:11399-1 vom 2026-07-31",
+      "url" : "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/QHZV7FENBWUSIDQIFFEYFFAKUQJYTW6J/"
+    }, {
+      "category" : "external",
+      "summary" : "openSUSE Security Update OPENSUSE-SU-2026:21490-1 vom 2026-07-31",
+      "url" : "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/4FZDQ6QYHG5GJBTE55ILGM6ZS2NE3LQ5/"
+    }, {
+      "category" : "external",
+      "summary" : "SUSE Security Update SUSE-SU-2026:3440-1 vom 2026-08-03",
+      "url" : "https://lists.suse.com/pipermail/sle-security-updates/2026-August/028066.html"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:49952 vom 2026-08-05",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:49952"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:49951 vom 2026-08-05",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:49951"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:67163 vom 2026-09-14",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:67163"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:68680 vom 2026-09-17",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:68680"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:68679 vom 2026-09-17",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:68679"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:68660 vom 2026-09-17",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:68660"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:68677 vom 2026-09-17",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:68677"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:68678 vom 2026-09-17",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:68678"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:68651 vom 2026-09-17",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:68651"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:68659 vom 2026-09-17",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:68659"
+    }, {
+      "category" : "external",
+      "summary" : "Oracle Linux Security Advisory ELSA-2026-68660 vom 2026-09-18",
+      "url" : "https://linux.oracle.com/errata/ELSA-2026-68660.html"
+    }, {
+      "category" : "external",
+      "summary" : "Rocky Linux Security Advisory RLSA-2026:68651 vom 2026-09-19",
+      "url" : "https://errata.build.resf.org/RLSA-2026:68651"
+    }, {
+      "category" : "external",
+      "summary" : "Rocky Linux Security Advisory RLSA-2026:68677 vom 2026-09-19",
+      "url" : "https://errata.build.resf.org/RLSA-2026:68677"
+    }, {
+      "category" : "external",
+      "summary" : "Oracle Linux Security Advisory ELSA-2026-68651 vom 2026-09-18",
+      "url" : "https://linux.oracle.com/errata/ELSA-2026-68651.html"
+    }, {
+      "category" : "external",
+      "summary" : "Rocky Linux Security Advisory RLSA-2026:68660 vom 2026-09-19",
+      "url" : "https://errata.build.resf.org/RLSA-2026:68660"
+    }, {
+      "category" : "external",
+      "summary" : "Oracle Linux Security Advisory ELSA-2026-68677 vom 2026-09-18",
+      "url" : "https://linux.oracle.com/errata/ELSA-2026-68677.html"
+    }, {
+      "category" : "external",
+      "summary" : "IBM Security Bulletin 7288810 vom 2026-09-22",
+      "url" : "https://www.ibm.com/support/pages/node/7288810"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:73981 vom 2026-10-02",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:73981"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:73982 vom 2026-10-01",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:73982"
+    }, {
+      "category" : "external",
+      "summary" : "Debian Security Advisory DLA-4889 vom 2026-11-09",
+      "url" : "https://lists.debian.org/debian-lts-announce/2026/11/msg00014.html"
+    }, {
+      "category" : "external",
+      "summary" : "Red Hat Security Advisory RHSA-2026:99174 vom 2026-11-12",
+      "url" : "https://access.redhat.com/errata/RHSA-2026:99174"
+    }, {
+      "category" : "external",
+      "summary" : "Debian Security Advisory DSA-6623 vom 2026-11-13",
+      "url" : "https://lists.debian.org/debian-security-announce/2026/msg00543.html"
+    }, {
+      "category" : "external",
+      "summary" : "Rocky Linux Security Advisory RLSA-2026:99174 vom 2026-11-13",
+      "url" : "https://errata.build.resf.org/RLSA-2026:99174"
+    } ],
+    "source_lang" : "en-US",
+    "title" : "Apache Tomcat: Mehrere Schwachstellen",
+    "tracking" : {
+      "current_release_date" : "2026-11-12T23:00:00.000+00:00",
+      "generator" : {
+        "date" : "2026-11-13T13:22:08.894+00:00",
+        "engine" : {
+          "name" : "BSI-WID",
+          "version" : "1.7.0"
+        }
+      },
+      "id" : "WID-SEC-W-2026-2310",
+      "initial_release_date" : "2026-07-13T22:00:00.000+00:00",
+      "revision_history" : [ {
+        "date" : "2026-07-13T22:00:00.000+00:00",
+        "number" : "1",
+        "summary" : "Initiale Fassung"
+      }, {
+        "date" : "2026-07-14T22:00:00.000+00:00",
+        "number" : "2",
+        "summary" : "Referenz(en) aufgenommen: EUVD-2026-43640, EUVD-2026-43638"
+      }, {
+        "date" : "2026-07-29T22:00:00.000+00:00",
+        "number" : "3",
+        "summary" : "Neue Updates von IBM aufgenommen"
+      }, {
+        "date" : "2026-07-30T22:00:00.000+00:00",
+        "number" : "4",
+        "summary" : "Neue Updates von SUSE aufgenommen"
+      }, {
+        "date" : "2026-08-02T22:00:00.000+00:00",
+        "number" : "5",
+        "summary" : "Neue Updates von openSUSE aufgenommen"
+      }, {
+        "date" : "2026-08-05T22:00:00.000+00:00",
+        "number" : "6",
+        "summary" : "Neue Updates von Red Hat aufgenommen"
+      }, {
+        "date" : "2026-09-13T22:00:00.000+00:00",
+        "number" : "7",
+        "summary" : "Neue Updates von Red Hat aufgenommen"
+      }, {
+        "date" : "2026-09-17T22:00:00.000+00:00",
+        "number" : "8",
+        "summary" : "Neue Updates von Red Hat aufgenommen"
+      }, {
+        "date" : "2026-09-20T22:00:00.000+00:00",
+        "number" : "9",
+        "summary" : "Neue Updates von Rocky Enterprise Software Foundation und Oracle Linux aufgenommen"
+      }, {
+        "date" : "2026-09-21T22:00:00.000+00:00",
+        "number" : "10",
+        "summary" : "Neue Updates von IBM aufgenommen"
+      }, {
+        "date" : "2026-10-01T22:00:00.000+00:00",
+        "number" : "11",
+        "summary" : "Neue Updates von Red Hat aufgenommen"
+      }, {
+        "date" : "2026-11-09T23:00:00.000+00:00",
+        "number" : "12",
+        "summary" : "Neue Updates von Debian aufgenommen"
+      }, {
+        "date" : "2026-11-11T23:00:00.000+00:00",
+        "number" : "13",
+        "summary" : "Neue Updates von Red Hat aufgenommen"
+      }, {
+        "date" : "2026-11-12T23:00:00.000+00:00",
+        "number" : "14",
+        "summary" : "Neue Updates von Debian aufgenommen"
+      } ],
+      "status" : "final",
+      "version" : "14"
+    }
+  },
+  "product_tree" : {
+    "branches" : [ {
+      "branches" : [ {
+        "branches" : [ {
+          "category" : "product_version_range",
+          "name" : "<9.0.120",
+          "product" : {
+            "name" : "Apache Tomcat <9.0.120",
+            "product_id" : "T056434"
+          }
+        }, {
+          "category" : "product_version",
+          "name" : "9.0.120",
+          "product" : {
+            "name" : "Apache Tomcat 9.0.120",
+            "product_id" : "T056434-fixed",
+            "product_identification_helper" : {
+              "cpe" : "cpe:/a:apache:tomcat:9.0.120"
+            }
+          }
+        }, {
+          "category" : "product_version_range",
+          "name" : "<10.1.57",
+          "product" : {
+            "name" : "Apache Tomcat <10.1.57",
+            "product_id" : "T056435"
+          }
+        }, {
+          "category" : "product_version",
+          "name" : "10.1.57",
+          "product" : {
+            "name" : "Apache Tomcat 10.1.57",
+            "product_id" : "T056435-fixed",
+            "product_identification_helper" : {
+              "cpe" : "cpe:/a:apache:tomcat:10.1.57"
+            }
+          }
+        }, {
+          "category" : "product_version_range",
+          "name" : "<11.0.24",
+          "product" : {
+            "name" : "Apache Tomcat <11.0.24",
+            "product_id" : "T056436"
+          }
+        }, {
+          "category" : "product_version",
+          "name" : "11.0.24",
+          "product" : {
+            "name" : "Apache Tomcat 11.0.24",
+            "product_id" : "T056436-fixed",
+            "product_identification_helper" : {
+              "cpe" : "cpe:/a:apache:tomcat:11.0.24"
+            }
+          }
+        } ],
+        "category" : "product_name",
+        "name" : "Tomcat"
+      } ],
+      "category" : "vendor",
+      "name" : "Apache"
+    }, {
+      "branches" : [ {
+        "category" : "product_name",
+        "name" : "Debian Linux",
+        "product" : {
+          "name" : "Debian Linux",
+          "product_id" : "2951",
+          "product_identification_helper" : {
+            "cpe" : "cpe:/o:debian:debian_linux:-"
+          }
+        }
+      } ],
+      "category" : "vendor",
+      "name" : "Debian"
+    }, {
+      "branches" : [ {
+        "category" : "product_name",
+        "name" : "IBM Integration Bus",
+        "product" : {
+          "name" : "IBM Integration Bus",
+          "product_id" : "T011169",
+          "product_identification_helper" : {
+            "cpe" : "cpe:/a:ibm:integration_bus:-"
+          }
+        }
+      }, {
+        "branches" : [ {
+          "category" : "product_version",
+          "name" : "V10.3.1050.0-V10.3.1064.1",
+          "product" : {
+            "name" : "IBM Power Hardware Management Console V10.3.1050.0-V10.3.1064.1",
+            "product_id" : "T059913",
+            "product_identification_helper" : {
+              "cpe" : "cpe:/a:ibm:hardware_management_console:v10.3.1050.0_-_v10.3.1064.1"
+            }
+          }
+        }, {
+          "category" : "product_version",
+          "name" : "V11.1.1110.0-V11.1.1112.2",
+          "product" : {
+            "name" : "IBM Power Hardware Management Console V11.1.1110.0-V11.1.1112.2",
+            "product_id" : "T059915",
+            "product_identification_helper" : {
+              "cpe" : "cpe:/a:ibm:hardware_management_console:v11.1.1110.0_-_v11.1.1112.2"
+            }
+          }
+        }, {
+          "category" : "product_version",
+          "name" : "V11.2.1120.0",
+          "product" : {
+            "name" : "IBM Power Hardware Management Console V11.2.1120.0",
+            "product_id" : "T059916",
+            "product_identification_helper" : {
+              "cpe" : "cpe:/a:ibm:hardware_management_console:v11.2.1120.0"
+            }
+          }
+        } ],
+        "category" : "product_name",
+        "name" : "Power Hardware Management Console"
+      } ],
+      "category" : "vendor",
+      "name" : "IBM"
+    }, {
+      "branches" : [ {
+        "category" : "product_name",
+        "name" : "Oracle Linux",
+        "product" : {
+          "name" : "Oracle Linux",
+          "product_id" : "T056236",
+          "product_identification_helper" : {
+            "cpe" : "cpe:/o:oracle:linux:-"
+          }
+        }
+      } ],
+      "category" : "vendor",
+      "name" : "Oracle"
+    }, {
+      "branches" : [ {
+        "category" : "product_name",
+        "name" : "RESF Rocky Linux",
+        "product" : {
+          "name" : "RESF Rocky Linux",
+          "product_id" : "T054581",
+          "product_identification_helper" : {
+            "cpe" : "cpe:/o:resf:rocky_linux:-"
+          }
+        }
+      } ],
+      "category" : "vendor",
+      "name" : "RESF"
+    }, {
+      "branches" : [ {
+        "category" : "product_name",
+        "name" : "Red Hat Enterprise Linux",
+        "product" : {
+          "name" : "Red Hat Enterprise Linux",
+          "product_id" : "67646",
+          "product_identification_helper" : {
+            "cpe" : "cpe:/o:redhat:enterprise_linux:-"
+          }
+        }
+      } ],
+      "category" : "vendor",
+      "name" : "Red Hat"
+    }, {
+      "branches" : [ {
+        "category" : "product_name",
+        "name" : "SUSE Linux",
+        "product" : {
+          "name" : "SUSE Linux",
+          "product_id" : "T054646",
+          "product_identification_helper" : {
+            "cpe" : "cpe:/o:suse:suse_linux:-"
+          }
+        }
+      }, {
+        "category" : "product_name",
+        "name" : "SUSE openSUSE",
+        "product" : {
+          "name" : "SUSE openSUSE",
+          "product_id" : "T055946",
+          "product_identification_helper" : {
+            "cpe" : "cpe:/o:suse:opensuse:-"
+          }
+        }
+      } ],
+      "category" : "vendor",
+      "name" : "SUSE"
+    } ]
+  },
+  "vulnerabilities" : [ {
+    "cve" : "CVE-2026-59083",
+    "product_status" : {
+      "known_affected" : [ "T056236", "T056434", "T056435", "T059913", "T056436", "T054581", "T059915", "67646", "T011169", "T059916", "T055946", "T054646", "2951" ]
+    },
+    "release_date" : "2026-07-13T22:00:00.000+00:00",
+    "title" : "CVE-2026-59083"
+  }, {
+    "cve" : "CVE-2026-59084",
+    "product_status" : {
+      "known_affected" : [ "T056236", "T056434", "T056435", "T059913", "T056436", "T054581", "T059915", "67646", "T011169", "T059916", "T055946", "T054646", "2951" ]
+    },
+    "release_date" : "2026-07-13T22:00:00.000+00:00",
+    "title" : "CVE-2026-59084"
+  } ]
+}

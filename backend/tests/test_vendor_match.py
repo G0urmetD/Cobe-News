@@ -394,6 +394,74 @@ def test_several_ranges_in_one_version_text_are_all_kept():
     assert eval_ranges("generic", entry, parse("generic", "2.4.1")).status == "not_affected"
 
 
+@pytest.mark.parametrize(
+    ("text", "bounds"),
+    [
+        ("2.0 to 2.4", [("2.0", "2.4")]),
+        ("1.0 - 1.5", [("1.0", "1.5")]),
+        ("1.0 – 1.5", [("1.0", "1.5")]),
+        ("2.0 bis 2.4.1", [("2.0", "2.4.1")]),
+        ("8.0.0-8.0.37", [("8.0.0", "8.0.37")]),
+        ("10.1-10.1.0.8", [("10.1", "10.1.0.8")]),
+        ("V10.3.1050.0-V10.3.1064.1", [("V10.3.1050.0", "V10.3.1064.1")]),
+        ("8.0.0-8.0.37, 8.4.0-8.4.12", [("8.0.0", "8.0.37"), ("8.4.0", "8.4.12")]),
+    ],
+)
+def test_free_text_ranges_are_ranges(text, bounds):
+    """0.1.57: a range written in words or with a dash was one version made of all its digits ("2.0 to 2.4" = 2.0.2.4)
+    – below 2.2, which then came out "nicht betroffen"."""
+    from app.vendor_match import eval_ranges, ranges_of
+    from app.vendor_versions import parse
+
+    got = ranges_of(text)
+    assert [(r["from"], r["to"]) for r in got] == bounds and all(r["from_incl"] and r["to_incl"] for r in got)
+    lo, hi = bounds[0]
+    entry = {"affected": got, "fixed": []}
+    assert eval_ranges("generic", entry, parse("generic", lo)).status == "affected"
+    assert eval_ranges("generic", entry, parse("generic", hi)).status == "affected"  # both ends count
+
+
+def test_free_text_never_one_version():
+    from app.vendor_match import eval_ranges, ranges_of
+    from app.vendor_versions import parse
+
+    def ev(text: str, version: str) -> str:
+        return eval_ranges("generic", {"affected": ranges_of(text), "fixed": []}, parse("generic", version)).status
+
+    # (1.9: a line the text does not name – "possibly", as for every range)
+    assert [ev("2.0 to 2.4", v) for v in ("2.2", "2.4.3", "2.0", "1.9", "2.5")] == ["affected", "affected", "affected", "possible", "not_affected"]
+    assert ev("1.0 - 1.5", "1.2") == "affected"
+    # prose around versions, an end below its start: not read (no verdict) – never "2.4" or "3.0.2.0" as one version
+    for text in ("1.0 and later", "prior to 3.1", "3.0 to 2.0", "before V22.6.3 or 23.1.0", "2.0 to x", "< 2.0 - 2.4"):
+        assert ranges_of(text) == [], text
+    # a dash inside one version stays one version: NetScaler's build, a kernel's release, a Debian revision
+    for text in ("14.1-73.57", "5.10.0-60.18.0.50.h602", "1.2.3-1.4", "6.15-rc1"):
+        assert ranges_of(text) == [{"text": text, "exact": text}], text
+
+
+@pytest.mark.parametrize(
+    ("text", "want", "probe"),
+    [
+        ("V3.1", {"exact": "V3.1"}, {"3.1": "affected", "V3.2": "not_affected"}),
+        ("< V3.1", {"to": "V3.1", "to_incl": False}, {"3.1": "not_affected", "V3.1.2": "not_affected", "V3.0.5": "possible"}),
+        ("vers:intdot/<V3.1", {"to": "V3.1", "to_incl": False}, {"V3.1": "not_affected", "3.0": "possible"}),
+        ("vers:all/<V6.24", {"to": "V6.24", "to_incl": False}, {"6.24": "not_affected", "V6.24.1": "not_affected"}),
+        ("All versions < V3.1 SP1", {"to": "V3.1 SP1", "to_incl": False}, {"V3.1": "affected", "3.1 SP1": "not_affected"}),
+        (">=V2.0|<V3.1", {"from": "V2.0", "from_incl": True, "to": "V3.1", "to_incl": False}, {"2.5": "affected", "V3.1": "not_affected"}),
+    ],
+)
+def test_siemens_v_prefix(text, want, probe):
+    """Siemens' documents up to 2024 write "< V3.1", "vers:all/<V6.24" – they were not read (no verdict). Read now as
+    the same bound without the "V" (an upper bound alone speaks for its line: an older line is "possibly")."""
+    from app.vendor_match import eval_ranges, ranges_of
+    from app.vendor_versions import parse
+
+    (got,) = ranges_of(text)
+    assert {k: v for k, v in got.items() if k != "text"} == want
+    assert {v: eval_ranges("generic", {"affected": [got], "fixed": []}, parse("generic", v)).status for v in probe} == probe
+    assert [r["exact"] for r in ranges_of("V15, V15.1, V16 and V17")] == ["V15", "V15.1", "V16", "V17"]
+
+
 def test_cve5_exact_version_with_status_unknown_is_not_cleared():
     from app.vendor_match import eval_cna
     from app.vendor_versions import parse

@@ -136,6 +136,80 @@ def test_cisco_explicit_versions():
     assert evaluate(prod, "csaf", c, None).status == "unversioned"
 
 
+# ---------------------------------------------------------------- 0.1.57: ranges in words / with a dash, Siemens' "V"
+# Real documents (Nov 2026): the BSI writes product_version "8.0.0-8.0.37" for "8.0.0 through 8.0.37" – read as the one
+# version 8.0.0.8.0.37 it made MySQL 8.0.20 "nicht betroffen (neuer als alle genannten)"; Siemens' documents up to
+# 2024 write "< V3.1", "vers:all/<V6.24", "V15, V15.1, V16 and V17" – unread, the product got no verdict at all.
+
+
+def _prod(label: str, scheme: str = "generic", cpes: list | None = None) -> dict:
+    return {"key": "x", "label": label, "scheme": scheme, "cpes": cpes or [], "cna": []}
+
+
+@pytest.mark.parametrize(
+    ("version", "status"),
+    [
+        ("8.0.20", "affected"),  # was "not_affected" – the false "nicht betroffen"
+        ("8.0.0", "affected"),
+        ("8.0.49", "affected"),  # both ends of "8.0.0-8.0.49" are affected
+        ("8.0.50", "not_affected"),  # newer than its line's range
+        ("8.4.5", "affected"),
+        ("8.4.13", "not_affected"),
+        ("9.7.1", "affected"),
+        ("9.7.4", "not_affected"),  # newer than "9.7.3" and "9.7.0-9.7.3"
+        ("26.7.1", "affected"),
+        ("9.5.0", "possible"),  # a line the document does not name
+    ],
+)
+def test_bsi_dash_ranges_are_ranges(version, status):
+    d = csaf("csaf_wid_mysql_spans.json", "bsi")
+    mysql = next(p for p in d["products"] if p["name"] == "MySQL")
+    assert {"text": "8.0.0-8.0.37", "from": "8.0.0", "from_incl": True, "to": "8.0.37", "to_incl": True} in mysql["affected"]
+    assert evaluate(catalog.product("mysql"), "csaf", d, version).status == status
+
+
+def test_bsi_dash_ranges_with_v():
+    d = csaf("csaf_wid_hmc_v_spans.json", "bsi")
+    hmc = next(p for p in d["products"] if p["cpe"] == "a:ibm:hardware_management_console")
+    assert [(r.get("exact"), r.get("from"), r.get("to")) for r in hmc["affected"]] == [
+        ("V11.2.1120.0", None, None), (None, "V11.1.1110.0", "V11.1.1112.2"), (None, "V10.3.1050.0", "V10.3.1064.1")
+    ]  # fmt: skip
+    prod = _prod("Power Hardware Management Console", cpes=["a:ibm:hardware_management_console"])
+    assert [evaluate(prod, "csaf", d, v).status for v in ("V10.3.1060.0", "10.3.1064.1", "V11.2.1120.0", "V11.1.1113.0")] == ["affected", "affected", "affected", "not_affected"]
+
+
+def test_siemens_v_bounds_and_lists():
+    s = csaf("csaf_siemens_2024_v_bounds.json", "siemens")  # SSA-280603 (2024): "vers:all/<V6.24"
+    one = next(p for p in s["products"] if p["name"] == "SINUMERIK ONE")
+    assert one["affected"] == [{"text": "vers:all/<V6.24", "to": "V6.24", "to_incl": False}]
+    # read as today's "vers:intdot/<6.24": an upper bound without a start speaks for its own line (6.24) – an older
+    # line stays "possibly" (BSI's "<19.5.1, <19.4.3" rule), before it got no verdict at all
+    assert [evaluate(_prod("SINUMERIK ONE"), "csaf", s, v).status for v in ("V6.23", "6.15", "V6.24", "6.24.1", "V6.25")] == ["possible", "possible", "not_affected", "not_affected", "not_affected"]
+    t = csaf("csaf_siemens_2023_v_list.json", "siemens")  # SSA-711829 (2023): "< V3.1 SP1", "V15, V15.1, V16 and V17"
+    tia = next(p for p in t["products"] if p["name"] == "TIA Portal")
+    assert sorted(r["exact"] for r in tia["affected"]) == ["V15", "V15.1", "V16", "V17"]
+    assert [evaluate(_prod("TIA Portal"), "csaf", t, v).status for v in ("V16", "15.1", "V18", "V15.2")] == ["affected", "affected", "not_affected", "possible"]
+    pcs = _prod("SIMATIC PCS neo (Administration Console)")
+    assert [evaluate(pcs, "csaf", t, v).status for v in ("V3.1", "V3.1 SP1", "V4.0")] == ["affected", "not_affected", "not_affected"]
+
+
+def test_current_siemens_and_cisco_formats_unchanged():
+    """Today's Siemens intervals and Cisco's lists of exact versions read as before (regression for the range rules)."""
+    s = csaf("csaf_siemens_2026_intervals.json", "siemens")
+    assert [p["affected"] for p in s["products"]] == [
+        [{"text": "vers:intdot/>=11.15.0|<11.16.0", "from": "11.15.0", "from_incl": True, "to": "11.16.0", "to_incl": False}],
+        [{"text": "vers:intdot/>=11.12.6|<11.12.7", "from": "11.12.6", "from_incl": True, "to": "11.12.7", "to_incl": False}],
+    ]
+    for name in ("csaf_cisco_iosxe_list.json", "csaf_cisco_cucm_list.json", "csaf_cisco.json"):
+        c = csaf(name, "cisco")
+        for p in c["products"]:
+            assert all(r.get("all") or (set(r) == {"text", "exact"} and r["text"] == r["exact"]) for r in p["affected"]), (name, p["name"])
+    c = csaf("csaf_cisco_cucm_list.json", "cisco")
+    ucm = catalog.product("cisco-ucm")
+    listed = next(p for p in c["products"] if p["name"] == "Cisco Unified Communications Manager")["affected"][0]["exact"]
+    assert evaluate(ucm, "csaf", c, listed).status == "affected"
+
+
 # ---------------------------------------------------------------- the round, offline
 
 
