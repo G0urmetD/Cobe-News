@@ -1344,10 +1344,43 @@ def _starts_new(out: dict, key: str, ver: str) -> bool:
     return False
 
 
+# A range written in words or with a dash – no operator: "2.0 to 2.4", "1.0 - 1.5", "V10.3.1050.0 – V10.3.1064.1", the
+# BSI's product_version "8.0.0-8.0.37" (MySQL: every version from 8.0.0 through 8.0.37). Read as one version they were
+# 8.0.0.8.0.37 – below 8.0.20, which then came out "nicht betroffen, neuer als alle genannten" (WID-SEC-W-2026-4081).
+# Both ends count (the BSI's "8.0.0-8.0.37" names 8.0.37 itself as affected).
+_SPAN_WORDS = re.compile(r"(?i)([Vv]?\d[0-9A-Za-z.+_]*)\s*(?:\s(?:to|bis|through|thru|until)\s|\s-\s|[–—])\s*([Vv]?\d[0-9A-Za-z.+_]*)")
+# "8.0.0-8.0.37" without spaces – also a single version in some schemes (NetScaler's "14.1-73.57", a kernel's
+# "5.10.0-60.18.0.50.h602", Debian's "1.2.3-1.4"): a range only when both sides are plain dotted versions of the same
+# major version and the second is at least as long and higher
+_SPAN_DASH = re.compile(r"([Vv]?\d+(?:\.\d+)+)-([Vv]?\d+(?:\.\d+)+)")
+# words of prose around versions ("1.0 and later", "before V22.6.3 or 23.1.0", "prior to 3.1"): such a text is not
+# read at all – never as the one version its digits make
+_PROSE = re.compile(r"(?i)\b(?:to|bis|through|thru|until|till|and|or|und|oder|later|earlier|prior|before|after|since|newer|older|higher|lower|above|below|ab)\b|\s-\s|[–—]")
+
+
+def _span(part: str) -> dict | None | bool:
+    """A part of a version text that is a range of two versions ("2.0 to 2.4", "8.0.0-8.0.37"): {from, to} with both
+    ends; False when it is written as one but cannot be read (the end below the start, a side no version); None when
+    it is no such range."""
+    if m := _SPAN_WORDS.fullmatch(part):
+        lo, hi = bound_v("generic", m.group(1)), bound_v("generic", m.group(2))
+        if lo is None or hi is None or hi < lo:
+            return False
+    elif m := _SPAN_DASH.fullmatch(part):
+        lo, hi = bound_v("generic", m.group(1)), bound_v("generic", m.group(2))
+        if lo is None or hi is None or lo.key[:1] != hi.key[:1] or hi.depth < lo.depth or hi <= lo:
+            return None  # one version with a dash in it (14.1-73.57)
+    else:
+        return None
+    return {"from": m.group(1), "from_incl": True, "to": m.group(2), "to_incl": True}
+
+
 def ranges_of(text: str) -> list[dict]:
     """The ranges of one version text, as range_of – but a text with several of them ('vers:intdot/>=1.2.0|<1.2.5|>=1.2.8|
-    <1.2.9': two intervals, '<19.5.1, <19.4.3': two lines, '2.4.1|2.4.3': two versions) gives each of them, not only
-    the last one. [] when it cannot be read."""
+    <1.2.9': two intervals, '<19.5.1, <19.4.3': two lines, '2.4.1|2.4.3': two versions, Siemens' older 'V15, V15.1, V16
+    and V17') gives each of them, not only the last one. A range in words or with a dash ('2.0 to 2.4', '8.0.0-8.0.37')
+    is a range with both ends (_span); a version may carry Siemens' "V" ('< V3.1', 'vers:intdot/<V3.1'). [] when it
+    cannot be read – also prose around versions ('1.0 and later'): never one version made of its digits."""
     t = (text or "").strip()
     if len(t) > VTEXT_MAX:
         return []  # no range anyone wrote – and splitting it would be quadratic
@@ -1356,12 +1389,24 @@ def ranges_of(text: str) -> list[dict]:
         return [{"all": True, "text": "alle Versionen" if t else ""}]
     if m := re.fullmatch(r"(?i)(\d+(?:\.\d+)*)\s+all\s+versions?", t):
         return [{"line": m.group(1), "text": f"{m.group(1)}.x"}]
+    t = re.sub(r"(?i)^all\s+versions?\s*(?=[<>=])", "", t)  # Siemens' older "All versions < V3.1"
     found: list[dict] = []
     parts: list[list[str]] = [[]]  # the written parts of each range (its text when there are several)
     out: dict = {"text": text.strip()[:80]}
-    for part in re.split(r"\s*[|,]\s*|\s+(?=[<>=])", t):
-        m = re.fullmatch(r"(<=|>=|<|>|=)?\s*([0-9][0-9A-Za-z.\-_()+ ]*?)", part.strip())
-        if not m:
+    for part in re.split(r"\s*[|,]\s*|\s+(?=[<>=])|\s+(?:and|or|und|oder)\s+(?=[<>=]?\s*[Vv]?\d)", t):
+        span = _span(part.strip())
+        if span is False:
+            return []
+        if span:
+            if any(k in out for k in ("from", "to", "exact")):
+                found.append(out)
+                out = {"text": ""}
+                parts.append([])
+            parts[-1].append(part.strip())
+            out |= span
+            continue
+        m = re.fullmatch(r"(<=|>=|<|>|=)?\s*([Vv]?[0-9][0-9A-Za-z.\-_()+ ]*?)", part.strip())
+        if not m or _PROSE.search(m.group(2)):
             return []
         op, ver = m.group(1) or "=", m.group(2).strip()
         key = "to" if op in ("<", "<=") else "from" if op in (">=", ">") else "exact"
@@ -1458,8 +1503,10 @@ def eval_ranges(scheme: str, entry: dict, v: V | None) -> Verdict | None:
         if cand:
             best.fixed = min(same or cand).text
     if best is None and exacts:
-        same = [x for x in exacts if x.key[:2] == v.key[:2]]
-        if v > max(same or exacts):
+        # newer than every version named – the ends of ranges next to the list as well (the BSI's MySQL: "9.7.3" and
+        # "9.7.0-9.7.3" next to "8.0.0-8.0.49": 8.0.50 is newer than its line's range, 9.7.4 than its line's list)
+        same = [x for x in named if x.key[:2] == v.key[:2]]
+        if v > max(same or named):
             return Verdict("not_affected", "newer_than_listed")
         return Verdict("possible", "not_listed")
     if best is None:

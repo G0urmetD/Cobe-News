@@ -43,7 +43,9 @@ EXTRACT_V = 1
 # a change of a parser that alters what it reads – the next record of that source sets its facts anew, silently.
 # nvd 2 (0.1.52): the records keep their CNA (data["assigner"], vendor_match.cna_by) – the one refetch of migration 0036
 # turns "laut Hersteller" into a third party's word for many of them, a verdict that moves without anything new said
-PARSER_V = {"nvd": 2, "paloalto": 1, "fortinet": 1, "veeam": 1, "csaf": 1, "cvelist": 1, "osv": 1}
+# csaf 2 (0.1.57): ranges in words or with a dash ("8.0.0-8.0.37") and Siemens' "< V3.1" are read – texts that were
+# dropped before ("< V3.1", "V15, V15.1, V16 and V17") are affected ranges now: no "wider affected range" of the vendor
+PARSER_V = {"nvd": 2, "paloalto": 1, "fortinet": 1, "veeam": 1, "csaf": 2, "cvelist": 1, "osv": 1}
 KEEP = timedelta(days=365)
 PER_ADVISORY = 20
 RECENT = timedelta(days=30)  # "Geändert" in the lists: a change within this time
