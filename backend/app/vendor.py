@@ -457,6 +457,10 @@ def _change_plans(links: list[tuple[dict, set[str]]], prev: dict[str, tuple], li
             before = stored
         else:  # no state yet (stored before 0.1.32) or another extractor: the stored record, read as now
             before = changes_svc.facts_of(source, sev, cvss, cves, data)
+        if changes_svc.rerated(source, data, a.get("data")):
+            # Palo Alto's record of the parser before 0.1.57, which rated by the CVSS base: the vendor's own rating now
+            # (its threat score) is no revision and no event – what else changed in the same record still is
+            before = {**before, "sev": new["sev"], "cvss": new["cvss"]}
         silent = changes_svc.reparsed(source, stored, data, a.get("data")) or bool((a.get("data") or {}).get("initial"))
         merged = new if silent else changes_svc.merge(before, new)  # silent: as the source says now, nothing kept
         facts = _stamped(merged, source)
@@ -1689,6 +1693,8 @@ def findings(
                 "also": [{"source": n.source, "ident": n.ident, "url": n.url} for n in others][:6],
                 "cves": cves[:30],
                 "cvss": cvss,
+                # Palo Alto rates by its threat score (CVSS-BT, vendor_sources._pan_one): the CVSS base beside it
+                "cvss_base": _base_beside(a, cvss),
                 "severity": sev,
                 "exploited": exploited,
                 "kev": {"added": k.date_added, "due": k.due, "ransomware": k.ransomware} if k else None,
@@ -1713,6 +1719,15 @@ def findings(
     out.sort(key=lambda f: f["published_at"] or "", reverse=True)
     out.sort(key=lambda f: (-ORDER[f["status"]], not f["exploited"], -(f["cvss"] or 0)))
     return out
+
+
+def _base_beside(a: VendorAdvisory, cvss: float | None) -> float | None:
+    """The CVSS base a Palo Alto advisory keeps beside its rating (the threat score) – where the finding shows that
+    rating (not another record's higher score) and the base differs from it; else None."""
+    if a.source != "paloalto" or a.cvss is None or cvss is None or abs(a.cvss - cvss) >= 0.05:
+        return None
+    base = src._d((a.data or {}).get("base")).get("cvss")
+    return float(base) if isinstance(base, int | float) and not isinstance(base, bool) and abs(base - cvss) >= 0.05 else None
 
 
 # ---------------------------------------------------------------- the version to go to

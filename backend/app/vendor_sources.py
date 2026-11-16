@@ -3,7 +3,8 @@ the requests (through the news fetcher's hardened download: https only, no inter
 limits, no XML DTDs).
 
 - Palo Alto Networks: security.paloaltonetworks.com/json/?product=<name>&sort=-updated&page=<n> – 25 advisories a page,
-  per product line the affected and fixed versions ("< 11.2.4-h22, …"), an explicit list of affected versions, CVSS.
+  per product line the affected and fixed versions ("< 11.2.4-h22, …"), an explicit list of affected versions, CVSS
+  (Palo Alto's own rating: the CVSS-BT threat score where there is one, the base kept beside it).
 - Fortinet: the PSIRT RSS (filestore.fortinet.com/fortiguard/rss/ir.xml, the newest 50 advisories) names a CSAF file
   per advisory: affected and not affected version ranges per product, the fix per line.
 - Veeam: the security KB feed (www.veeam.com/services/open/kb/security-feed, Atom, the newest ~20 KB articles) – per
@@ -160,7 +161,15 @@ def _pan_one(a) -> dict | None:
     title = html.unescape(_s(a.get("title"), 400))
     problem = " ".join(_s(p.get("value"), 3000) for p in _l(a.get("problem")) if isinstance(p, dict))[:3000]
     solution = " ".join(_s(p.get("value"), 2000) for p in _l(a.get("solution")) if isinstance(p, dict))[:2000]
-    score = _score(a.get("baseScore"))
+    # Palo Alto's own rating is CVSS-BT (CVSS 4.0 base + threat metrics: E:U lowers an unexploited one) – what its page
+    # shows as "Severity", the RSS title says ("(Severity: MEDIUM)") and it publishes to cve.org and the NVD as the
+    # score. The JSON keeps the pure base beside it (baseScore 8.7 HIGH, threatScore 6.6 MEDIUM, severity MEDIUM for
+    # CVE-2026-0331): the rating is the threat score, the base is kept for the drawer ("Basis 8.7"). Older advisories
+    # (CVSS 3.x) have no threat score – their base is the rating, as before.
+    base = _score(a.get("baseScore"))
+    threat = _score(a.get("threatScore"))
+    score = threat if threat is not None else base
+    given = next((g for k in ("severity", "threatSeverity", "baseSeverity") if (g := _s(a.get(k), 20))), "")
     cves = pan_cves(ident, title, problem)
     return {
         "id": f"paloalto:{ident}",
@@ -171,7 +180,7 @@ def _pan_one(a) -> dict | None:
         "url": f"{PAN_BASE}/{quote(ident)}",
         "cves": cves,
         "cvss": score,
-        "severity": severity_of(score, _s(a.get("baseSeverity"), 20)),
+        "severity": severity_of(score, given),
         "published_at": _date(_s(a.get("date"), 40)),
         "updated_at": _date(_s(a.get("updated"), 40)) or _date(_s(a.get("date"), 40)),
         "names": products + [ln["name"] for ln in lines],
@@ -180,6 +189,9 @@ def _pan_one(a) -> dict | None:
             "affected_list": [_s(x, 60) for x in _l(a.get("affected_list")) if isinstance(x, str)][:3000],
             "products": products,
             "solution": html_to_text(solution)[:1500],
+            # the CVSS base beside the rating (always there since 0.1.57 – advisory_changes.rerated: the record of the
+            # parser before, which rated by the base, is re-rated silently once)
+            "base": {"cvss": base, "severity": severity_of(base, _s(a.get("baseSeverity"), 20))},
         },
     }
 
