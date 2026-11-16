@@ -765,7 +765,7 @@ A suggestion is answered exactly once. Addresses are only shown as text and link
 | Palo Alto Networks ([PSIRT](term:psirt)) | PAN-OS, Panorama, GlobalProtect, Prisma, Cortex and more: affected and fixed versions per line, down to the hotfix. Severity and [CVSS](term:cvss) are Palo Alto's rating – CVSS-BT, i.e. with the threat situation, as on Palo Alto's page; the pure base score is shown beside it ("CVSS 6.6 · base 8.7") |
 | Fortinet (PSIRT RSS and the [CSAF](term:csaf) file of each advisory) | affected and unaffected ranges per product, fix per line |
 | Veeam (security KB feed) | affected builds and fixed builds per release line |
-| [NVD](term:nvd) | every product with a CPE: CVEs with version ranges and the vendor's data (Microsoft: build ranges), [CVSS](term:cvss); new CVEs not analysed yet by keyword search over the last 30 days |
+| [NVD](term:nvd) | every product with a CPE: CVEs with version ranges and the vendor's data (Microsoft: build ranges), [CVSS](term:cvss) – the vendor's rating, NVD's own beside it ([Which rating counts](#welche-bewertung)); new CVEs not analysed yet by keyword search over the last 30 days |
 | CISA [KEV](term:kev) | "actively exploited" |
 | endoflife.date | release lines, latest version per line, end of support |
 | GitHub releases, vendors' release notes | release lines and latest version for products without endoflife.date ([release data](#release-daten)) – no end of support |
@@ -792,6 +792,26 @@ Per CPE, Vendor News first fetches the newest 2000 CVEs, after that only what NV
 errors it asks again with growing pauses; if NVD refuses ("too many requests"), all NVD queries pause together. Admins
 find the settings under *Settings → Integrations → Vendor News*, see
 [Integrations](/docs/integrationen#vendor-news).
+
+### Which rating counts {#welche-bewertung}
+
+A CVE often has several ratings: the vendor's, the NVD's own analysis, the BSI's, CISA's. They can differ a lot –
+GitLab rates CVE-2025-2938 3.1 (low), the NVD 8.8 (high). **The vendor's rating counts** – more precisely, the rating
+of whoever published the CVE (the [CNA](term:cna)), as cve.org and the vendor's own page show it. The vendor knows its
+product best.
+
+- **A finding's severity and CVSS** come from the vendor's advisory (Palo Alto, Fortinet, Veeam, the
+  [CSAF](term:csaf) advisories of Siemens, Cisco and the other providers) and from the vendor's rating of each CVE. If
+  a finding has several CVEs, the highest counts.
+- **Only where the vendor does not rate a CVE** does another rating step in, in this order: the NVD's own analysis,
+  a rating of the CVE in the BSI's document, CISA's, and last the one severity of a BSI document for all its CVEs.
+- **Beside it** the NVD's own rating is shown where it differs – e.g. "CVSS 3.1 · NVD 8.8" on the finding and in the
+  details from the source. Hovering says which one counts.
+- For Palo Alto, the vendor's rating is CVSS-BT; the pure base score is shown beside it ("CVSS 6.6 · base 8.7").
+
+With 0.1.57 the stored entries are re-rated once by this rule. That happens quietly: no change in the **Changes**
+tab, no notification, no "Now rated higher", and a confirmation ([Confirming a finding](#treffer-bestaetigen)) stays –
+also where a finding is rated higher by it. A later change by the vendor is reported as usual.
 
 ### Citrix and NetScaler {#citrix}
 

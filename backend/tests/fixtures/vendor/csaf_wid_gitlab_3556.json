@@ -1,0 +1,426 @@
+{
+ "document": {
+  "aggregate_severity": {
+   "text": "hoch"
+  },
+  "category": "csaf_base",
+  "csaf_version": "2.0",
+  "distribution": {
+   "tlp": {
+    "label": "WHITE",
+    "url": "https://www.first.org/tlp/"
+   }
+  },
+  "lang": "de-DE",
+  "notes": [
+   {
+    "category": "legal_disclaimer",
+    "text": "Das BSI ist als Anbieter f\u00fcr die eigenen, zur Nutzung bereitgestellten Inhalte nach den allgemeinen Gesetzen verantwortlich. Nutzerinnen und Nutzer sind jedoch daf\u00fcr verantwortlich, die Verwendung und/oder die Umsetzung der mit den Inhalten bereitgestellten Informationen sorgf\u00e4ltig im Einzelfall zu pr\u00fcfen."
+   },
+   {
+    "category": "description",
+    "text": "GitLab ist eine Webanwendung zur Versionsverwaltung f\u00fcr Softwareprojekte auf Basis von git.",
+    "title": "Produktbeschreibung"
+   },
+   {
+    "category": "summary",
+    "text": "Ein Angreifer kann mehrere Schwachstellen in GitLab ausnutzen, um beliebigen Programmcode auszuf\u00fchren, um Informationen offenzulegen, um Daten zu manipulieren, um einen Cross-Site Scripting Angriff durchzuf\u00fchren und um Sicherheitsvorkehrungen zu umgehen.",
+    "title": "Angriff"
+   },
+   {
+    "category": "general",
+    "text": "- Linux\n- Sonstiges\n- UNIX",
+    "title": "Betroffene Betriebssysteme"
+   }
+  ],
+  "publisher": {
+   "category": "other",
+   "contact_details": "csaf-provider@cert-bund.de",
+   "name": "Bundesamt f\u00fcr Sicherheit in der Informationstechnik",
+   "namespace": "https://www.bsi.bund.de"
+  },
+  "references": [
+   {
+    "category": "self",
+    "summary": "WID-SEC-W-2026-3556 - CSAF Version",
+    "url": "https://wid.cert-bund.de/.well-known/csaf/white/2026/wid-sec-w-2026-3556.json"
+   },
+   {
+    "category": "self",
+    "summary": "WID-SEC-2026-3556 - Portal Version",
+    "url": "https://wid.cert-bund.de/portal/wid/securityadvisory?name=WID-SEC-2026-3556"
+   },
+   {
+    "category": "external",
+    "summary": "GitLab Critical Patch Release: 19.4.1, 19.3.3, 19.2.7 vom 2026-09-23",
+    "url": "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-4-1-released/"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:88861 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:88861"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:88880 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:88880"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:88865 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:88865"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96067 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96067"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96120 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96120"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96068 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96068"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:96120 vom 2026-11-09",
+    "url": "https://errata.build.resf.org/RLSA-2026:96120"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:96068 vom 2026-11-09",
+    "url": "https://errata.build.resf.org/RLSA-2026:96068"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96235 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96235"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:96067 vom 2026-11-10",
+    "url": "https://errata.build.resf.org/RLSA-2026:96067"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:96233 vom 2026-11-10",
+    "url": "https://errata.build.resf.org/RLSA-2026:96233"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:96235 vom 2026-11-10",
+    "url": "https://errata.build.resf.org/RLSA-2026:96235"
+   }
+  ],
+  "source_lang": "en-US",
+  "title": "GitLab: Mehrere Schwachstellen",
+  "tracking": {
+   "current_release_date": "2026-11-09T23:00:00.000+00:00",
+   "generator": {
+    "date": "2026-11-10T13:08:01.517+00:00",
+    "engine": {
+     "name": "BSI-WID",
+     "version": "1.7.0"
+    }
+   },
+   "id": "WID-SEC-W-2026-3556",
+   "initial_release_date": "2026-09-23T22:00:00.000+00:00",
+   "revision_history": [
+    {
+     "date": "2026-09-23T22:00:00.000+00:00",
+     "number": "1",
+     "summary": "Initiale Fassung"
+    },
+    {
+     "date": "2026-09-29T22:00:00.000+00:00",
+     "number": "2",
+     "summary": "Referenz(en) aufgenommen: EUVD-2026-88690, EUVD-2026-88689, EUVD-2026-88688, EUVD-2026-88687"
+    },
+    {
+     "date": "2026-10-27T23:00:00.000+00:00",
+     "number": "3",
+     "summary": "Neue Updates von Red Hat aufgenommen"
+    },
+    {
+     "date": "2026-11-08T23:00:00.000+00:00",
+     "number": "4",
+     "summary": "Neue Updates von Red Hat aufgenommen"
+    },
+    {
+     "date": "2026-11-09T23:00:00.000+00:00",
+     "number": "5",
+     "summary": "Neue Updates von Red Hat aufgenommen"
+    }
+   ],
+   "status": "final",
+   "version": "5"
+  }
+ },
+ "product_tree": {
+  "branches": [
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<19.4.1",
+        "product": {
+         "name": "Open Source GitLab <19.4.1",
+         "product_id": "T060104"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.4.1",
+        "product": {
+         "name": "Open Source GitLab 19.4.1",
+         "product_id": "T060104-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.4.1"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<19.3.3",
+        "product": {
+         "name": "Open Source GitLab <19.3.3",
+         "product_id": "T060105"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.3.3",
+        "product": {
+         "name": "Open Source GitLab 19.3.3",
+         "product_id": "T060105-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.3.3"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<19.2.7",
+        "product": {
+         "name": "Open Source GitLab <19.2.7",
+         "product_id": "T060106"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "19.2.7",
+        "product": {
+         "name": "Open Source GitLab 19.2.7",
+         "product_id": "T060106-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:gitlab:gitlab:19.2.7"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "GitLab"
+     }
+    ],
+    "category": "vendor",
+    "name": "Open Source"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "RESF Rocky Linux",
+      "product": {
+       "name": "RESF Rocky Linux",
+       "product_id": "T054581",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:resf:rocky_linux:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "RESF"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Red Hat Enterprise Linux",
+      "product": {
+       "name": "Red Hat Enterprise Linux",
+       "product_id": "67646",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:redhat:enterprise_linux:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Red Hat"
+   }
+  ]
+ },
+ "vulnerabilities": [
+  {
+   "cve": "CVE-2026-10518",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-10518"
+  },
+  {
+   "cve": "CVE-2026-4523",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-4523"
+  },
+  {
+   "cve": "CVE-2026-84739",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-84739"
+  },
+  {
+   "cve": "CVE-2026-89078",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-89078"
+  },
+  {
+   "cve": "CVE-2026-8937",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-8937"
+  },
+  {
+   "cve": "CVE-2026-92470",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-92470"
+  },
+  {
+   "cve": "CVE-2026-92529",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-92529"
+  },
+  {
+   "cve": "CVE-2026-92530",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-92530"
+  },
+  {
+   "cve": "CVE-2026-92628",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-92628"
+  },
+  {
+   "cve": "CVE-2026-92874",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-92874"
+  },
+  {
+   "cve": "CVE-2026-93577",
+   "product_status": {
+    "known_affected": [
+     "T060106",
+     "T060105",
+     "T054581",
+     "67646",
+     "T060104"
+    ]
+   },
+   "release_date": "2026-09-23T22:00:00.000+00:00",
+   "title": "CVE-2026-93577"
+  }
+ ]
+}

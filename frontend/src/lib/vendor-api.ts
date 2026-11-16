@@ -142,6 +142,8 @@ export interface Finding {
   cvss: number | null
   /** Palo Alto: the CVSS base beside its rating (CVSS-BT, base + threat) where they differ */
   cvss_base?: number | null
+  /** What the NVD's own analysis rates it, where that differs from the rating that counts (the vendor's, the CNA's) */
+  cvss_nvd?: number | null
   severity: NewsSeverity
   exploited: boolean
   kev: { added: string; due: string; ransomware: boolean } | null

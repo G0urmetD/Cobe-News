@@ -432,6 +432,7 @@ const vendorDe: Record<string, string> = {
   "details.temporal": "zeitlich",
   "details.base": "Basis",
   "details.baseHint": "Bewertung des Herstellers: CVSS-BT (Basis und Bedrohungslage, wie auf der Seite von Palo Alto). Daneben der reine CVSS-Basiswert.",
+  "details.nvdHint": "Es zählt die Bewertung des Herstellers (wie auf cve.org und seiner Seite). Daneben die eigene Analyse der NVD, wo sie abweicht.",
   "details.remote": "Remote angreifbar",
   "details.mitigation": "Workaround/Mitigation vorhanden",
   "details.allVersions": "alle Versionen",

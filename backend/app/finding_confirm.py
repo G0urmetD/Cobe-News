@@ -16,7 +16,8 @@ the overview's lists unless "Mit Bestätigten" is on.
 
 **It lapses by itself** (`check`, in every evaluation of the product's events – before its events are made, so the
 event that brings the change goes out) when the finding changes materially: now exploited (KEV, the vendor, EUVD), rated
-higher, a CVE added, more versions entered affected (or more surely affected) than before – a version added later, a
+higher (not by a parser fix that rated its records by another rule – "Hersteller zählt" 0.1.57, vendor.unprime: the
+confirmation then stands on the new rating), a CVE added, more versions entered affected (or more surely affected) than before – a version added later, a
 wider affected range; compared by the verdicts, not the versions' text (lapse_reason) –, the advisory withdrawn
 (vendor.drop_advisories), its record now grouped under another leading record ("regrouped"). A new fixed version alone is no reason. A
 lapsed confirmation stays as a row (ended_at, ended_reason) – the drawer says "Bestätigung aufgehoben: jetzt
@@ -120,17 +121,20 @@ def _concerned(statuses) -> list[int]:  # noqa: ANN001
     return [sum(1 for r in ranks if r >= ORDER.get(level, 0)) for level in LEVELS]
 
 
-def lapse_reason(old: dict, f: dict) -> str | None:
+def lapse_reason(old: dict, f: dict, *, rerate: bool = False) -> str | None:
     """Why a confirmation made on `old` (facts_of) no longer fits the finding `f` – None: it still does.
 
     The versions are compared by their verdicts, not by their text: it lapses when more versions are affected (or more
     certainly affected) than when it was confirmed – a version added later that is affected, an affected range widened
     to a version entered, "possibly" become "affected". A version edited to another one with the same verdict (11.2.4-h23
     → 11.2.4-h25, both affected), a version removed or one no longer affected is no reason: nothing more is exposed than
-    what was assessed."""
+    what was assessed.
+
+    `rerate`: the product's ratings are taken anew (vendor.unprime – a parser fix rated its records by another rule,
+    "Hersteller zählt"): a higher rating is no reason then – the vendor said nothing new (check takes it as it is)."""
     if bool(f.get("exploited")) and not old.get("exploited"):
         return "exploited"
-    if SEV_RANK.get(str(f.get("severity") or "info"), 0) > SEV_RANK.get(str(old.get("severity") or "info"), 0):
+    if not rerate and SEV_RANK.get(str(f.get("severity") or "info"), 0) > SEV_RANK.get(str(old.get("severity") or "info"), 0):
         return "severity"
     if {str(c).upper() for c in f.get("cves") or []} - {str(c).upper() for c in old.get("cves") or []}:
         return "cves"
@@ -173,6 +177,8 @@ class Standing:
     """The confirmations of some products, read once per request: the standing ones and those that lapsed lately."""
 
     rows: dict[tuple[str, str], dict] = field(default_factory=dict)
+    # products whose ratings their next evaluation takes anew (vendor.pending_rerate): a higher rating is no lapse there
+    rerating: frozenset[str] = frozenset()
 
     def __bool__(self) -> bool:
         return any(c["ended_at"] is None for c in self.rows.values())
@@ -181,7 +187,7 @@ class Standing:
         """The confirmation that stands for this finding now – none when there is none, it ended, or the finding
         changed since (lapsed, even before the next evaluation writes it down)."""
         c = self.rows.get((product, f["id"]))
-        if c is None or c["ended_at"] is not None or lapse_reason(c["facts"], f) is not None:
+        if c is None or c["ended_at"] is not None or lapse_reason(c["facts"], f, rerate=product in self.rerating) is not None:
             return None
         return c
 
@@ -214,7 +220,10 @@ async def standing(db: AsyncSession, products: list[str] | set[str] | None = Non
         if had is not None and (had["ended_at"] is None or (ended is not None and ended <= had["ended_at"])):
             continue
         rows[(p, fid)] = {"status": st, "note": note, "user_name": name, "confirmed_at": at, "facts": facts or {}, "ended_at": ended, "ended_reason": why}
-    return Standing(rows)
+    from app import vendor  # vendor imports this module's users – only when asked
+
+    await vendor._primed_products(db)
+    return Standing(rows, vendor.pending_rerate({p for p, _ in rows}))
 
 
 # ---------------------------------------------------------------- the events it holds back
@@ -320,10 +329,12 @@ def _end(c: VendorConfirm, reason: str, now: datetime) -> None:
     c.ended_at, c.held_until, c.ended_reason, c.ended_by = now, max(c.held_from, now - LAPSE_GRACE), reason, None
 
 
-async def check(db: AsyncSession, product: dict, findings: list[dict], now: datetime | None = None) -> dict[str, str]:
+async def check(db: AsyncSession, product: dict, findings: list[dict], now: datetime | None = None, *, rerate: bool = False) -> dict[str, str]:
     """The confirmations of this product that no longer fit its findings end now (with an audit entry each). Returns
     finding id → why, for the events made in the same evaluation. Not committed (the evaluation's transaction – changed()
-    after its commit)."""
+    after its commit). `rerate`: the evaluation takes the product's ratings anew (vendor.unprime, after a parser fix
+    re-rated its records): a finding rated higher keeps its confirmation, which is made on the higher rating from now on
+    – a later rise (the vendor's, "exploited") lapses it as always."""
     now = now or now_utc()
     key = product["key"]
     # a row an undo or a new confirmation holds right now is left for the next evaluation (no lost update of theirs)
@@ -348,7 +359,9 @@ async def check(db: AsyncSession, product: dict, findings: list[dict], now: date
                 continue
             why = "regrouped"
         else:
-            why = lapse_reason(c.facts or {}, f)
+            why = lapse_reason(c.facts or {}, f, rerate=rerate)
+            if why is None and rerate and SEV_RANK.get(str(f.get("severity") or "info"), 0) > SEV_RANK.get(str((c.facts or {}).get("severity") or "info"), 0):
+                c.facts = {**(c.facts or {}), "severity": str(f.get("severity") or "info")}  # quietly: no audit, no event
         if why is None:
             continue
         _end(c, why, now)
