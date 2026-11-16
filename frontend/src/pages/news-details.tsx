@@ -82,11 +82,14 @@ export function StoryDetailsBlock({ details, story }: { details: StoryDetails; s
       <div className="flex flex-wrap items-center gap-1.5">
         <h3 className="mr-auto text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t("details.title")}</h3>
         {cvss && (
-          <Pill color={cvssTone(cvss.score)} title={[cvss.base != null && t("details.baseHint"), cvss.vector].filter(Boolean).join("\n") || undefined}>
+          <Pill
+            color={cvssTone(cvss.score)}
+            title={[cvss.base != null && t("details.baseHint"), cvss.nvd_own != null && t("details.nvdHint"), cvss.vector].filter(Boolean).join("\n") || undefined}
+          >
             <Term k="cvss">CVSS</Term> {cvss.score.toFixed(1)}
             {cvss.temporal !== null && cvss.temporal !== cvss.score && ` · ${t("details.temporal")} ${cvss.temporal.toFixed(1)}`}
             {cvss.base != null && ` · ${t("details.base")} ${cvss.base.toFixed(1)}`}
-            {cvss.nvd && ` · NVD`}
+            {cvss.nvd_own != null ? ` · NVD ${cvss.nvd_own.toFixed(1)}` : cvss.nvd && ` · NVD`}
           </Pill>
         )}
         {details.severity_text && <Pill color="--muted-foreground">{details.severity_text}</Pill>}

@@ -371,3 +371,16 @@ async def test_migration_refetches_the_nvd_and_takes_back_the_borrowed_score(adm
     async with db.session() as s:
         await vendor.store(s, [story_details.csaf_advisory(d, "https://wid.cert-bund.de/x")], vendor.build_index())
         assert (await s.scalars(select(VendorAdvisoryChange).where(VendorAdvisoryChange.advisory_id == wid))).all() == []
+
+
+async def test_a_watched_cve_has_the_severity_that_counts():
+    """CVE beobachten names the same severity as the finding: GitLab's LOW for CVE-2025-2938, not the NVD's HIGH."""
+    from app import cve_watch
+
+    nvd = _nvd()
+    wid = {"id": "csaf:WID-SEC-W-2026-3556", "source": "csaf", "ident": "WID-SEC-W-2026-3556", "title": "GitLab: Mehrere Schwachstellen", "summary": "", "url": "https://wid.cert-bund.de/x", "cves": ["CVE-2025-2938", "CVE-2026-84739"], "cvss": None, "severity": "critical", "published_at": None, "updated_at": None, "data": {"products": [], "publisher": "BSI"}}
+    async with db.session() as s:
+        await vendor.store(s, [nvd["CVE-2025-2938"], wid], vendor.build_index())
+        got = await cve_watch.facts(s, ["CVE-2025-2938", "CVE-2026-84739"])
+    assert got["CVE-2025-2938"]["severity"] == "low"  # the BSI's word does not count where GitLab rated it
+    assert got["CVE-2026-84739"]["severity"] == "critical"  # nothing else rates it: the document's word

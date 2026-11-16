@@ -31,12 +31,13 @@ origin (NULL) and count as manual.
 """
 
 import hashlib
+import json
 import logging
 import re
 import time
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, delete, func, or_, select, text
+from sqlalchemy import Text, and_, cast, delete, func, or_, select, text
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -84,8 +85,8 @@ def scope(cve: str) -> str:
 
 async def facts(db: AsyncSession, cves: list[str]) -> dict[str, dict]:
     """Per CVE what the stored data says now: kev (and its entry), the fixed versions of every advisory naming it, the
-    highest severity, a title, the EPSS (score, percentile, day), which advisory first named each fixed version
-    (`fixed_in`) and the advisory to open (`link`). Only the own database – nothing is fetched."""
+    severity that counts (vendor.rating), a title, the EPSS (score, percentile, day), which advisory first named each
+    fixed version (`fixed_in`) and the advisory to open (`link`). Only the own database – nothing is fetched."""
     from app import exploits, vendor
 
     out: dict[str, dict] = {c: {"kev": None, "fixed": [], "fixed_in": {}, "severity": "info", "title": "", "epss": None, "advisories": [], "link": None, "exploits": []} for c in cves}
@@ -101,7 +102,7 @@ async def facts(db: AsyncSession, cves: list[str]) -> dict[str, dict]:
             out[e.cve]["epss"] = {"score": float(e.score), "percentile": None if e.percentile is None else float(e.percentile), "day": e.day or ""}
         rows = (
             await db.execute(
-                select(VendorAdvisory.id, VendorAdvisory.source, VendorAdvisory.ident, VendorAdvisory.title, VendorAdvisory.severity, VendorAdvisory.cves, VendorAdvisoryState.facts, VendorAdvisory.url)
+                select(VendorAdvisory.id, VendorAdvisory.source, VendorAdvisory.ident, VendorAdvisory.title, VendorAdvisory.severity, VendorAdvisory.cves, VendorAdvisoryState.facts, VendorAdvisory.url, VendorAdvisory.cvss, cast(_rating_data(), Text))
                 .outerjoin(VendorAdvisoryState, VendorAdvisoryState.advisory_id == VendorAdvisory.id)
                 .where(or_(VendorAdvisory.cves.op("?|")(pg_array(part)), VendorAdvisory.ident.in_(part)))
                 # a CSAF provider's TLP:GREEN document stays with the product's findings, where it is labelled –
@@ -116,7 +117,8 @@ async def facts(db: AsyncSession, cves: list[str]) -> dict[str, dict]:
             # advisories stored before 0.1.33 have no facts yet: made from the record, as advisory_changes does
             q = select(VendorAdvisory.id, VendorAdvisory.source, VendorAdvisory.severity, VendorAdvisory.cvss, VendorAdvisory.cves, VendorAdvisory.data).where(VendorAdvisory.id.in_(missing))
             data = {r[0]: r for r in (await db.execute(q)).all()}
-        for aid, source, ident, title, sev, acves, fx, url in rows:
+        rated: dict[str, list] = {}  # per CVE its records as the rating needs them (vendor.rating – "Hersteller zählt")
+        for aid, source, ident, title, sev, acves, fx, url, cvss, rdata in rows:
             if not isinstance(fx, dict):
                 r = data.get(aid)
                 fx = changes_svc.facts_of(r[1], r[2], r[3], r[4], r[5]) if r is not None else {}
@@ -131,15 +133,26 @@ async def facts(db: AsyncSession, cves: list[str]) -> dict[str, dict]:
                 link = _link(source, ident, url, sev, bool(fixed))
                 if link is not None and (o["link"] is None or link[0] > o["link"][0]):
                     o["link"] = link
-                if SEV_RANK.get(sev or "info", 0) > SEV_RANK.get(o["severity"], 0):
-                    o["severity"] = sev
+                d = json.loads(rdata) if rdata else {}
+                rated.setdefault(c, []).append(vendor.Adv(aid, source, str(ident or ""), "", "", "", list(acves or []), cvss, sev or "info", False, None, None, {k: v for k, v in d.items() if v is not None}))
                 if title and not o["title"]:
                     o["title"] = str(title)[:200]
+        for c, recs in rated.items():
+            # the severity that counts, as for a finding: the vendor's and the CNA's, the others only where they rate
+            # nothing (a GitLab CVE: GitLab's LOW, not the NVD's HIGH)
+            out[c]["severity"] = vendor.rating(recs, [c])[1]
     for o in out.values():
         o["fixed"] = changes_svc._uniq(o["fixed"])[:FIXED_MAX]
         o["advisories"] = sorted(set(o["advisories"]))
         o["link"] = o["link"][1] if o["link"] else None
     return out
+
+
+def _rating_data():  # noqa: ANN202
+    """SQL: what vendor.rating reads of a record's data – a few keys, not the whole record (an NVD configuration)."""
+    d = VendorAdvisory.data
+    keys = ("rated", "cvss_from_adp", "nvd_own", "publisher", "provider", "kind", "scores")
+    return func.jsonb_build_object(*(x for k in keys for x in (k, d[k])))
 
 
 def _link(source: str, ident: str | None, url: str | None, sev: str | None, fixed: bool) -> tuple | None:
