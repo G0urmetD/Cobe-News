@@ -447,7 +447,7 @@ async def _send(job: _Job, smtp: dict) -> tuple[notify.NotifyError | None, bool]
                     await notify.send_mail(smtp, [job.address], subject, text_, html)
                 else:
                     url = personal.check_teams_url(job.url)
-                    await notify.post(url, notify._json(render("teams", stories, total, job.lang, job.tz)), notify.JSON_HEADERS, policy=notify.PUBLIC_ONLY)
+                    await personal.post_teams(url, notify._json(render("teams", stories, total, job.lang, job.tz)))
                 sent = True
     except notify.NotifyError as exc:
         return exc, sent

@@ -42,7 +42,8 @@ desktop push and a Microsoft Teams Workflows webhook of their own.
   sent later, also when the confirmation is undone. When it lapses (the finding changed) the event of the change goes.
 - **Egress.** Mail through notify.send_mail (the SMTP settings, its pinned and checked connection). The Teams URL is a
   person's input: https on the Teams / Power Automate hosts only (TEAMS_HOSTS), public addresses only – never
-  WEBHOOK_PRIVATE_NETS (notify.PUBLIC_ONLY) –, encrypted at rest (crypto) and never sent back or logged. Desktop push
+  WEBHOOK_PRIVATE_NETS (notify.PUBLIC_ONLY), also through HTTPS_PROXY as far as this server can resolve the name
+  (post_teams) –, encrypted at rest (crypto) and never sent back or logged. Desktop push
   through the person's Web Push subscriptions (webpush.py).
 """
 
@@ -186,6 +187,29 @@ def check_teams_url(url: str) -> str:
     if parts.port not in (None, 443) or not _host_ok(parts.hostname or ""):
         raise notify.NotifyError("host_not_allowed")
     return url
+
+
+TEAMS_DNS_S = netaddr.DNS_BUDGET_S  # the own look-up of a Teams host before it goes through the proxy, at most
+
+
+async def post_teams(url: str, body: bytes) -> notify.Reply:
+    """A card to a person's Teams URL (checked by check_teams_url first) – public addresses only (notify.PUBLIC_ONLY).
+
+    Without HTTPS_PROXY the name is resolved once, checked and exactly that address connected to. With HTTPS_PROXY the
+    proxy resolves the name – the check of the connection does not apply there. The URL is a person's input, not an
+    admin's: the name is resolved here as well and refused (forbidden_target, shown on the person's settings) when it
+    points to an address that is not public – as the direct way does. A name this server cannot resolve (an
+    installation that reaches the internet only through the proxy, without outside DNS) goes through the proxy as
+    before: the host is in one of Microsoft's zones (TEAMS_HOSTS), which a person cannot point anywhere else. The
+    proxy stays (as for the push services and the admins' Teams channels): many installations have no other way out."""
+    if get_config().proxy:
+        try:
+            bad = await asyncio.wait_for(asyncio.to_thread(netaddr.forbidden_target, url, **notify.PUBLIC_ONLY), TEAMS_DNS_S)
+        except TimeoutError:
+            bad = False  # no answer in time: no DNS of its own – the proxy resolves it
+        if bad:
+            raise notify.NotifyError("forbidden_target")
+    return await notify.post(url, body, notify.JSON_HEADERS, policy=notify.PUBLIC_ONLY)
 
 
 def masked(p: PersonNotify | None) -> str | None:
@@ -878,7 +902,7 @@ async def _send(job: _Job, smtp: dict, key: webpush.Vapid | None) -> tuple[notif
                 await notify.send_mail(smtp, [job.address], subject, text_, html)
             elif job.way == "teams":
                 url = check_teams_url(job.url)
-                await notify.post(url, notify._json(render_teams(job.events, job.lang, tz=job.tz)), notify.JSON_HEADERS, policy=notify.PUBLIC_ONLY)
+                await post_teams(url, notify._json(render_teams(job.events, job.lang, tz=job.tz)))
             else:
                 if key is None:
                     return notify.NotifyError("not_configured"), []
@@ -1123,7 +1147,7 @@ async def send_teams_test(db: AsyncSession, p: PersonNotify) -> None:
     await dbm.release(db)
     try:
         async with asyncio.timeout(SEND_DEADLINE):
-            await notify.post(url, body, notify.JSON_HEADERS, policy=notify.PUBLIC_ONLY)
+            await post_teams(url, body)
     except TimeoutError as exc:
         raise notify.NotifyError("timeout") from exc
     p = await db.get(PersonNotify, uid)

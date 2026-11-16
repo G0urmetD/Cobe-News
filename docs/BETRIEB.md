@@ -1439,6 +1439,15 @@ bekommt so eine zweite Nachricht zum selben Befund.
   „Über den Proxy“ je Webhook: aus (Standard für neue Webhooks – in der Oberfläche wie über die API; vorher gespeicherte
   Kanäle behalten ihre Einstellung) verbindet direkt mit Adressprüfung, an schickt über den Proxy, der dann die Namen
   auflöst.
+- **Der eigene Teams-Webhook einer Person** (persönliche Benachrichtigungen, Security-Meldungen per Teams) ist die
+  Eingabe einer Person, nicht eines Admins: nur `*.logic.azure.com`, `*.powerplatform.com`, `*.webhook.office.com`
+  (https, Port 443) und nur öffentliche Ziele – `WEBHOOK_HOSTS` und `WEBHOOK_PRIVATE_NETS` gelten nicht. Mit
+  `HTTPS_PROXY` geht er über den Proxy (wie Web Push und die Teams-Kanäle; viele Installationen haben keinen anderen Weg
+  hinaus). Ab 0.1.57 löst der Server den Namen vorher selbst auf: zeigt er auf eine nicht öffentliche Adresse (privat,
+  Loopback, Link-Local …), wird nicht gesendet – die Person sieht „Ziel nicht erlaubt“, wie ohne Proxy. Kann der Server
+  den Namen nicht auflösen (kein DNS nach draußen, höchstens 3 Sekunden), entscheidet der Proxy; die Hosts liegen in
+  Microsofts Zonen, die eine Person nicht umlenken kann. Wer Logic Apps über Private Link (private Adressen im eigenen
+  DNS) betreibt: dorthin geht der persönliche Weg nicht – dafür einen Teams-Kanal eines Admins nehmen.
 - **Update auf 0.1.22 – Kanäle ins Firmennetz:** Bis 0.1.21 durften Webhooks ohne Weiteres an private Adressen. Zeigt
   ein Kanal auf eine interne Adresse (z. B. n8n unter `10.…`, `172.16–31.…`, `192.168.…` oder einen internen Namen,
   der dorthin auflöst), meldet er danach „Ziel nicht erlaubt“ – dessen Adresse oder Netz in `WEBHOOK_PRIVATE_NETS` in
