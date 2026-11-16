@@ -12,8 +12,8 @@ problems of 18.7 do not apply: no btree on bpchar columns, no GiST trigram (gist
 REINDEX (not CONCURRENTLY – that cannot run in the migration's transaction) blocks writes to the table for the moment
 the rebuild takes – seconds at these sizes, while the app starts. The downgrade changes nothing.
 
-Revision ID: 0048
-Revises: 0047
+Revision ID: 0049
+Revises: 0048
 Create Date: 2026-11-16
 """
 
@@ -21,8 +21,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0048"
-down_revision: str | None = "0047"
+revision: str = "0049"
+down_revision: str | None = "0048"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
