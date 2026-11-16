@@ -129,7 +129,8 @@ export interface StoryDetails {
   products: DetailProduct[]
   more_products: number
   cves: string[]
-  cvss: { score: number; temporal: number | null; vector: string; version: string; cve?: string; nvd?: boolean }[]
+  /** `base`: the CVSS base beside the vendor's rating where they differ – Palo Alto rates by CVSS-BT (base + threat) */
+  cvss: { score: number; temporal: number | null; base?: number | null; vector: string; version: string; cve?: string; nvd?: boolean }[]
   exploited: boolean
   remote: boolean | null
   mitigation: boolean | null

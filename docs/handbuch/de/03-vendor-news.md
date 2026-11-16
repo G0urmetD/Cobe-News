@@ -787,7 +787,7 @@ Ein Vorschlag wird genau einmal beantwortet. Adressen werden nur als Text und Li
 
 | Quelle | Wofür |
 |---|---|
-| Palo Alto Networks ([PSIRT](term:psirt)) | PAN-OS, Panorama, GlobalProtect, Prisma, Cortex u. a.: betroffene und behobene Versionen je Linie, Hotfix-genau |
+| Palo Alto Networks ([PSIRT](term:psirt)) | PAN-OS, Panorama, GlobalProtect, Prisma, Cortex u. a.: betroffene und behobene Versionen je Linie, Hotfix-genau. Schwere und [CVSS](term:cvss) sind die Bewertung von Palo Alto – CVSS-BT, also mit der Bedrohungslage, wie auf der Seite von Palo Alto; der reine Basiswert steht daneben („CVSS 6.6 · Basis 8.7“) |
 | Fortinet (PSIRT-RSS und je Hinweis die [CSAF](term:csaf)-Datei) | betroffene und nicht betroffene Bereiche je Produkt, Fix je Linie |
 | Veeam (Security-KB-Feed) | betroffene Builds und Fix-Builds je Release-Linie |
 | [NVD](term:nvd) | alle Produkte mit CPE: CVEs mit Versionsbereichen und den Angaben des Herstellers (Microsoft: Build-Bereiche), [CVSS](term:cvss); neue, noch nicht analysierte CVEs per Stichwortsuche der letzten 30 Tage |

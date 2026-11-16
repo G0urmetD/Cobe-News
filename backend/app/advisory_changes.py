@@ -16,6 +16,8 @@ No noise:
   record with the new extractor before comparing – a better extractor is never a change;
 - a parser of a source changed (PARSER_V[source], raised with such a change): the facts are set anew, silently;
 - a CSAF provider's first fill (data.initial) sets them silently as well;
+- Palo Alto's rating by its threat score instead of the CVSS base (0.1.57, rerated): the new severity and CVSS of the
+  first such record are taken as they were – a lowering by a parser fix is no revision; its other changes still are;
 - a batch where most known advisories changed at once (MASS_MIN, MASS_SHARE) is a source that reformatted: silent.
 
 Kept: PER_ADVISORY revisions per advisory, none older than KEEP (prune, daily). Events (kind "change") only for
@@ -226,6 +228,15 @@ def reparsed(source: str, stored: dict | None, old: dict | None, new: dict | Non
     if stored:
         return stored.get("p", 1) != PARSER_V.get(source, 1)
     return source == "nvd" and isinstance(new, dict) and "assigner" in new and not (isinstance(old, dict) and "assigner" in old)
+
+
+def rerated(source: str, old: dict | None, new: dict | None) -> bool:
+    """A Palo Alto record of the parser before 0.1.57 comes again: that parser rated by the CVSS 4.0 base (8.7 HIGH),
+    this one by Palo Alto's own rating, the threat score (6.6 MEDIUM, what its page and cve.org say) and keeps the base
+    beside it (data["base"]). The severity and CVSS it brings are then no change (vendor._change_plans takes them as
+    they were) – a lowering by a parser fix is no news; any other change of the same record still counts. Only on the
+    first record with the base: a later re-rating by Palo Alto (exploited now, E:A) is a change as always."""
+    return source == "paloalto" and isinstance(new, dict) and "base" in new and not (isinstance(old, dict) and "base" in old)
 
 
 def _unknown_sev(f: dict) -> bool:

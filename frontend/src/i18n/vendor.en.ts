@@ -427,6 +427,8 @@ const vendorEn: Record<string, string> = {
   "errors.vendor_off": "Vendor News is switched off.",
   "details.title": "Affected versions",
   "details.temporal": "temporal",
+  "details.base": "base",
+  "details.baseHint": "The vendor's rating: CVSS-BT (base and threat, as on Palo Alto's page). Beside it the pure CVSS base score.",
   "details.remote": "Remotely exploitable",
   "details.mitigation": "Workaround/mitigation available",
   "details.allVersions": "all versions",

@@ -430,6 +430,8 @@ const vendorDe: Record<string, string> = {
   "errors.vendor_off": "Vendor News ist ausgeschaltet.",
   "details.title": "Betroffene Versionen",
   "details.temporal": "zeitlich",
+  "details.base": "Basis",
+  "details.baseHint": "Bewertung des Herstellers: CVSS-BT (Basis und Bedrohungslage, wie auf der Seite von Palo Alto). Daneben der reine CVSS-Basiswert.",
   "details.remote": "Remote angreifbar",
   "details.mitigation": "Workaround/Mitigation vorhanden",
   "details.allVersions": "alle Versionen",

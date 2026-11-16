@@ -9,7 +9,8 @@ Per source:
 - Siemens ProductCERT: CSAF 2.0 (/productcert/csaf/ssa-NNNNNN.json)
 - Cisco PSIRT: CSAF 2.0 (/security/center/contentjson/CiscoSecurityAdvisory/<id>/csaf/<id>.json)
 - Fortinet PSIRT: CSAF 2.0 – its address from the PSIRT RSS
-- Palo Alto Networks: the advisory as CVE 5 JSON (/json/<id>)
+- Palo Alto Networks: the advisory as CVE 5 JSON (/json/<id>) – its CVSS is Palo Alto's own rating, the CVSS-BT
+  threat score (as on its page and at cve.org), the base beside it
 - Veeam (www.veeam.com/kbNNNN, the built-in source "veeam"): the KB article is the story's own text – read with Vendor
   News' parser (vendor_sources.parse_veeam_entry), no request
 - CISA KEV / ENISA EUVD: the story itself (exploited, due date, EPSS) plus the NVD for ranges and CVSS
@@ -77,6 +78,10 @@ PUBLISHER = {
 }
 PROVIDER_KINDS = ("siemens", "cisco")  # story kinds whose documents come from a CSAF provider of csaf.yaml (same key)
 DOCUMENT_KINDS = ("bsi", "siemens", "cisco", "fortinet", "paloalto")  # one request for the advisory's own document
+# per kind the parser of its details (their "v"), raised when it reads the same document otherwise: the first details of
+# the new parser are no news (enrich_round: quiet systems and topics) – paloalto 2 (0.1.57): Palo Alto's threat score
+# (CVSS-BT) as the CVSS, the base beside it; migration 0047 asks every Palo Alto story's details once again
+PARSER_V = {"paloalto": 2}
 
 
 # ---------------------------------------------------------------- where the details of a story are
@@ -320,8 +325,12 @@ def parse_cve5(data: bytes) -> dict:
     for m in _l(cna.get("metrics")):
         for k in ("cvssV4_0", "cvssV3_1", "cvssV3_0"):
             d = m.get(k) if isinstance(m, dict) else None
-            if isinstance(d, dict) and isinstance(d.get("baseScore"), int | float):
-                cvss.append({"score": float(d["baseScore"]), "temporal": None, "vector": _s(d.get("vectorString"), 200), "version": _s(d.get("version"), 5)})
+            if isinstance(d, dict) and (base := src._score(d.get("baseScore"))) is not None:
+                # Palo Alto's rating is the CVSS-BT threat score (base + threat metrics, as its page and cve.org show
+                # it – 6.6 for CVE-2026-0331, base 8.7): the score shown; the base beside it ("Basis 8.7")
+                threat = src._score(d.get("threatScore"))
+                score = threat if threat is not None else base
+                cvss.append({"score": score, "temporal": None, "base": base if abs(base - score) >= 0.05 else None, "vector": _s(d.get("vectorString"), 200), "version": _s(d.get("version"), 5)})
                 break
     text = lambda key: " ".join(_s(x.get("value"), 600) for x in _l(cna.get(key)) if isinstance(x, dict))[:600]  # noqa: E731
     rems = [{"category": "vendor_fix", "text": text("solutions"), "url": ""}] if text("solutions") else []
@@ -331,6 +340,7 @@ def parse_cve5(data: bytes) -> dict:
     ident = _s(meta.get("cveId"), 40)
     return {
         "kind": "paloalto",
+        "v": PARSER_V["paloalto"],
         "publisher": PUBLISHER["paloalto"],
         "id": ident,
         "title": _s(cna.get("title"), 300),
@@ -797,13 +807,18 @@ async def enrich_round(db: AsyncSession, *, limit: int = 60) -> int:
                 det.status, det.next_try_at = "none", None  # no public document (e.g. TLP:GREEN at the BSI) – not asked again
             if err.category == "rate_limited":
                 budget[0] = 0
+            if det.data and det.failures >= 5 and now - item.published_at >= FRESH:
+                det.next_try_at = None  # an older story asked again (a new parser, migration 0047): it keeps what it has
         else:
             det.failures, det.status, det.next_try_at = (det.failures or 0) + 1, "error", now + timedelta(hours=6)
         await db.commit()
         if err is None:
+            # the same document read by another parser (PARSER_V – a better reading is no news): quiet, as unchanged
+            # details are – what it brings is shown and filtered, never a rule's delivery
+            again_parsed = reparsed(kind, before, d)
             # the details may make it "exploited" or "ohne Patch" (CSAF: no fix available) – its topics again; and the
             # followed products they concern ("Betrifft unsere Produkte")
-            await news_svc.retopic(db, NewsItem.id == item.id)
+            await news_svc.retopic(db, NewsItem.id == item.id, bulk=again_parsed)
             if fol is None:
                 fol = await followed(db)
             await set_products(db, item.id, products_of(d, fol))
@@ -811,13 +826,18 @@ async def enrich_round(db: AsyncSession, *, limit: int = 60) -> int:
             # changed: loud (a rule naming one sends the story now, once); the same again: quiet
             from app import systems
 
-            await systems.set_exact(db, item.id, systems.exact(d), quiet=d == before)
+            await systems.set_exact(db, item.id, systems.exact(d), quiet=d == before or again_parsed)
             await db.commit()
         done += 1
         if done >= limit:
             break
     await db.commit()
     return done
+
+
+def reparsed(kind: str, before: dict | None, d: dict | None) -> bool:
+    """Details of a kind whose parser changed (PARSER_V) replace the ones the parser before made."""
+    return kind in PARSER_V and isinstance(before, dict) and isinstance(d, dict) and before.get("v", 1) != d.get("v", 1)
 
 
 # ---------------------------------------------------------------- the story and the followed products

@@ -1256,8 +1256,9 @@ const FindingRow = memo(function FindingRow({
         )}
         <SevPill s={f.severity} />
         {f.cvss !== null && (
-          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]" title={f.cvss_base != null ? t("details.baseHint") : undefined}>
             <Term k="cvss">CVSS</Term> {f.cvss.toFixed(1)}
+            {f.cvss_base != null && ` · ${t("details.base")} ${f.cvss_base.toFixed(1)}`}
           </span>
         )}
         {f.kev && (

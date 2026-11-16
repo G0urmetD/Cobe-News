@@ -140,6 +140,8 @@ export interface Finding {
   also: { source: string; ident: string; url: string }[]
   cves: string[]
   cvss: number | null
+  /** Palo Alto: the CVSS base beside its rating (CVSS-BT, base + threat) where they differ */
+  cvss_base?: number | null
   severity: NewsSeverity
   exploited: boolean
   kev: { added: string; due: string; ransomware: boolean } | null
