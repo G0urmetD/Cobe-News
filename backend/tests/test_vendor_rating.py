@@ -16,6 +16,7 @@ from pathlib import Path
 import httpx
 import pytest
 from sqlalchemy import select, text
+from test_structured import net, structured_on  # noqa: F401 - fixtures
 from test_vendor_service import _dispatch, _follow, _webhook_rule, hooks, sites, vendor_reset  # noqa: F401 - fixtures
 
 from app import advisory_changes as ch
@@ -393,3 +394,98 @@ async def test_a_watched_cve_has_the_severity_that_counts():
         got = await cve_watch.facts(s, ["CVE-2025-2938", "CVE-2026-84739"])
     assert got["CVE-2025-2938"]["severity"] == "low"  # the BSI's word does not count where GitLab rated it
     assert got["CVE-2026-84739"]["severity"] == "critical"  # nothing else rates it: the document's word
+
+
+# ---------------------------------------------------------------- CVEs only a coordinator's document names
+
+
+def _wid(ident: str, cves: list[str], severity: str, recent: bool = True) -> dict:
+    """The BSI's real WID-SEC-W-2026-4117 ("Node.js: Mehrere Schwachstellen", listed with PAN-OS and Panorama) as
+    stored – its CVEs and its own word ("kritisch") as the test needs them."""
+    d = story_details.parse_csaf((FIX / "csaf_wid_nodejs_4117.json").read_bytes(), "bsi", story_details.STORE_PRODUCTS)
+    adv = story_details.csaf_advisory(d, "https://wid.cert-bund.de/portal/wid/securityadvisory?name=WID-SEC-W-2026-4117")
+    at = datetime.now(UTC) - timedelta(hours=2) if recent else adv["published_at"]
+    return adv | {"id": f"csaf:{ident}", "ident": ident, "cves": cves, "severity": severity, "cvss": None, "published_at": at, "updated_at": at}
+
+
+async def _backfill() -> int | None:
+    async with db.session() as s:
+        products = [p for f in await vendor.follows(s) if (p := vendor.product_of(f))]
+        return await cvelist.backfill(s, products, await vendor.current_index(s), True)
+
+
+def _finding_of(page: dict, cve: str) -> dict:
+    return next(x for x in page["findings"] if cve in x["cves"])
+
+
+async def test_a_coordinators_cves_get_their_cna_record_quietly_after_the_update(admin_client, monkeypatch, net, structured_on, hooks):
+    """The Node.js CVEs of WID-SEC-W-2026-4117 have no record in Vendor News: the finding had only the document's word.
+    Their cvelistV5 records are fetched on demand and their CNAs' ratings count (Google 9.2 for CVE-2026-111497, raised
+    from the document's "mittel"); the backlog of before the update is taken quietly – no message, the confirmation
+    stays – and the document's word stays only for a CVE nobody rates."""
+    await _follow(admin_client, "panos", "11.2.4-h20")
+    await _webhook_rule(admin_client, ["vendor_vuln"])
+    await _baseline(monkeypatch)
+    cves = ["CVE-2026-105481", "CVE-2026-106070", "CVE-2026-111497", "CVE-2026-99999"]
+    wid = _wid("WID-SEC-W-2026-4117", cves, "medium")
+    await _store(wid)
+    await _dispatch()
+    sent = len(hooks)
+    page = (await admin_client.get("/api/vendor/products/panos")).json()
+    f = _finding_of(page, "CVE-2026-111497")
+    assert (f["severity"], f["cvss"]) == ("medium", None)  # the document's word – nobody else rates them yet
+    r = await admin_client.post("/api/vendor/findings/confirm", json={"product": "panos", "finding": f["id"], "status": "accepted", "note": "Node.js nicht im Einsatz"})
+    assert r.status_code == 200, r.text
+    for c in cves[:3]:
+        net.add(cvelist.raw_url(c), (FIX / f"cve5_rating_{c}.json").read_bytes())
+    assert await _backfill() == 3  # one request each (CVE-2026-99999: not at cve.org, remembered as asked)
+    assert sorted(u.rsplit("/", 1)[1] for u in net.urls("raw.githubusercontent.com")) == sorted(f"{c}.json" for c in cves)
+    async with db.session() as s:
+        assert await vendor.evaluate_events(s) == 0  # quiet: the backlog of before the update
+    await _dispatch()
+    assert len(hooks) == sent
+    page = (await admin_client.get("/api/vendor/products/panos")).json()
+    f = _finding_of(page, "CVE-2026-111497")
+    assert (f["severity"], f["cvss"], f["confirmed"] is not None) == ("critical", 9.2, True)
+    async with db.session() as s:
+        conf = await s.scalar(select(VendorConfirm).where(VendorConfirm.finding == f["id"]))
+        assert conf.ended_at is None and conf.facts["severity"] == "critical"
+        assert await s.scalar(select(Counter.value).where(Counter.name == cvelist.COORDINATOR_PRIMED)) is None
+    # everything asked: the backlog is done – nothing more to fetch, and a later CNA rating is news again
+    assert await _backfill() is None
+    async with db.session() as s:
+        assert await s.scalar(select(Counter.value).where(Counter.name == cvelist.COORDINATOR_PRIMED)) == 1
+    assert len(net.urls("raw.githubusercontent.com")) == len(cves)
+
+
+async def test_a_cna_rating_that_comes_later_is_news_once_the_backlog_is_done(admin_client, monkeypatch, net, structured_on, hooks):
+    """After the update's backlog: a new document's CVE whose CNA rates it higher than the document said ("niedrig",
+    HackerOne 7.4 HIGH) is "jetzt höher eingestuft" – as when the NVD rates a CVE days after it came."""
+    await _follow(admin_client, "panos", "11.2.4-h20")
+    await _webhook_rule(admin_client, ["vendor_vuln"])
+    await _baseline(monkeypatch)
+    assert await _backfill() is None  # nothing waiting: primed
+    await _store(_wid("WID-SEC-W-2026-9001", ["CVE-2026-105482"], "low"))
+    await _dispatch()
+    sent = len(hooks)
+    net.add(cvelist.raw_url("CVE-2026-105482"), (FIX / "cve5_rating_CVE-2026-105482.json").read_bytes())
+    assert await _backfill() == 1
+    async with db.session() as s:
+        assert await vendor.evaluate_events(s) >= 1
+    f = _finding_of((await admin_client.get("/api/vendor/products/panos")).json(), "CVE-2026-105482")
+    assert (f["severity"], f["cvss"]) == ("high", 7.4)
+    async with db.session() as s:
+        rated = [e for e in await s.scalars(select(VendorEvent).where(VendorEvent.key.like("rated:%"))) if "WID-SEC-W-2026-9001" in e.key]
+    assert [(e.severity, e.baseline) for e in rated] == [("high", False)]
+    await _dispatch()
+    assert len(hooks) > sent
+
+
+async def test_coordinator_cves_skip_vendor_documents_and_known_records(admin_client, net, structured_on):
+    await _follow(admin_client, "panos", "11.2.4-h20")
+    nvd = _nvd()["CVE-2024-0012"]
+    own = _wid("WID-SEC-W-2026-9002", ["CVE-2024-0012", "CVE-2026-105481"], "high") | {"data": {**_wid("x", [], "high")["data"], "publisher": "Siemens ProductCERT", "provider": "siemens"}}
+    await _store(nvd, _wid("WID-SEC-W-2026-9003", ["CVE-2024-0012", "CVE-2026-105482", "not-a-cve"], "high"), own)
+    async with db.session() as s:
+        got = await cvelist.coordinator_cves(s, ["panos"], datetime.now(UTC), 20)
+    assert got == ["CVE-2026-105482"]  # NVD knows CVE-2024-0012; the vendor's own document is no coordinator's

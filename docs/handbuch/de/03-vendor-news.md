@@ -830,6 +830,8 @@ so wie sie auf cve.org und auf der Seite des Herstellers steht. Er kennt sein Pr
   CVE. Hat ein Befund mehrere CVEs, zählt die höchste.
 - **Nur wenn der Hersteller eine CVE nicht bewertet**, springt der Reihe nach ein: die eigene Analyse der NVD, eine
   Bewertung der CVE im Dokument des BSI, die der CISA, zuletzt die eine Schwere des BSI-Dokuments für alle seine CVEs.
+  Nennt nur ein BSI-Hinweis eine CVE (etwa Node.js-Lücken bei PAN-OS), holt Vendor News ihren Eintrag aus der
+  CVE-Liste nach, damit auch dort die Bewertung des Herstellers gilt.
 - **Daneben** steht die eigene Bewertung der NVD, wenn sie abweicht – etwa „CVSS 3.1 · NVD 8.8“ am Befund und in den
   Details aus der Quelle. Beim Darüberfahren steht, was gilt.
 - Bei Palo Alto ist die Bewertung des Herstellers CVSS-BT, der reine Basiswert steht daneben („CVSS 6.6 · Basis 8.7“).

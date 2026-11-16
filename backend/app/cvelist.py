@@ -7,8 +7,9 @@ whole list (the all_CVEs zip, ~650 MB, is never downloaded).
 - Kept: the records that concern a followed product (the CNA names it, or CISA's ADP lists one of its CPEs) and the
   records stored before (an update) – not every CVE. A rejected record removes the stored one.
 - On demand, one at a time (raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/<year>/<n>xxx/<CVE>.json): the
-  CVEs of findings whose NVD record has no CPE configuration yet ("Awaiting Analysis") and of stories the NVD cannot
-  describe – each at most once a week, SINGLE_PER_ROUND a round.
+  CVEs of findings whose NVD record has no CPE configuration yet ("Awaiting Analysis"), of stories the NVD cannot
+  describe and the CVEs only a coordinator's document names (the BSI's WID: their CNA's rating counts, not the
+  document's word) – each at most once a week, SINGLE_PER_ROUND a round.
 - Stored as Vendor News advisories `cvelist:<CVE>` (source cvelist) in the shape of the NVD's (`cna`: the CNA's
   affected rows, `adp`: CISA's) plus SSVC and KEV from CISA's ADP container. CVSS: the CNA's own rating, CISA's only
   where the CNA gives none (data["rated"]). Judged after the vendor and – where it has CPE configurations – the NVD
@@ -25,15 +26,17 @@ import struct
 import zipfile
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app import db as dbm
 from app import source_health
 from app import vendor_sources as src
-from app.models import VendorAdvisory, VendorAdvisoryProduct, VendorFetch
+from app.models import Counter, VendorAdvisory, VendorAdvisoryProduct, VendorFetch
 from app.news import NewsError, _date
+from app.vendor_match import VENDOR_PUBLISHERS
 
 log = logging.getLogger("cobe_news.cvelist")
 
@@ -61,6 +64,11 @@ MAX_VERSION_ROWS = 2000  # rows of one record kept (versions of all affected ent
 RECORD_LIMIT = 8 * 1024 * 1024
 SINGLE_EVERY = timedelta(days=7)
 SINGLE_PER_ROUND = 20
+# of them at least this many for the CVEs only a coordinator's document names (coordinator_cves) – when it has any
+COORDINATOR_MIN = 5
+# counter: the CVEs the coordinators' documents named before 0.1.57 were all asked – a CNA's rating that comes later is
+# news as any later rating; until then the products of those documents take it quietly (backfill)
+COORDINATOR_PRIMED = "cvelist_coordinator_primed"
 CVE_ID = re.compile(r"^CVE-(\d{4})-(\d{4,7})$")
 
 
@@ -520,9 +528,39 @@ async def single(db: AsyncSession, cve: str, budget: list[int], ix=None) -> Vend
     return await db.get(VendorAdvisory, f"cvelist:{cve}", populate_existing=True)
 
 
+async def coordinator_cves(db: AsyncSession, keys: list[str], now: datetime, limit: int) -> list[str]:
+    """The CVEs a coordinator's CSAF document of these products names (the BSI's WID – not a vendor's own document,
+    vendor_match.csaf_by) that have no record at all (neither the NVD's nor cvelistV5's) and were not asked within
+    SINGLE_EVERY – the newest documents first. "Node.js: Mehrere Schwachstellen" listed with Panorama: Vendor News keeps
+    no record of those Node.js CVEs, the finding had only the document's "kritisch"."""
+    vendor_pub = " OR ".join(f"lower(COALESCE(a.data->>'publisher', '')) LIKE '{n}%'" for n in VENDOR_PUBLISHERS)
+    kinds = ", ".join(f"'{n}'" for n in VENDOR_PUBLISHERS)
+    stmt = text(
+        f"""
+        SELECT c.cve FROM (
+            SELECT DISTINCT ON (e.cve) e.cve, a.published_at
+            FROM vendor_advisories AS a
+            JOIN vendor_advisory_products AS p ON p.advisory_id = a.id
+            CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(a.cves) = 'array' THEN a.cves ELSE '[]'::jsonb END) AS e(cve)
+            WHERE a.source = 'csaf' AND p.product = ANY(:keys)
+              AND COALESCE(a.data->>'provider', '') = ''
+              AND NOT ({vendor_pub}) AND COALESCE(a.data->>'kind', '') NOT IN ({kinds})
+            ORDER BY e.cve, a.published_at DESC NULLS LAST
+        ) AS c
+        WHERE c.cve ~ '^CVE-[0-9]{{4}}-[0-9]{{4,7}}$'
+          AND NOT EXISTS (SELECT 1 FROM vendor_advisories AS x WHERE x.id IN ('nvd:' || c.cve, 'cvelist:' || c.cve))
+          AND NOT EXISTS (SELECT 1 FROM vendor_fetch AS f WHERE f.key = '{PER_CVE}' || c.cve AND f.last_fetch_at > :since)
+        ORDER BY c.published_at DESC NULLS LAST, c.cve
+        LIMIT :n
+        """
+    )
+    return list(await db.scalars(stmt, {"keys": keys, "since": now - SINGLE_EVERY, "n": limit}))
+
+
 async def backfill(db: AsyncSession, products: list[dict], ix, force: bool) -> int | None:  # noqa: ANN001
     """The CVEs of findings the NVD has not analysed (its record has no CPE configuration) and cvelistV5 was not asked
-    about yet: their records, SINGLE_PER_ROUND a round, the newest first."""
+    about yet: their records, SINGLE_PER_ROUND a round, the newest first – and the CVEs only a coordinator's document
+    names (coordinator_cves)."""
     from app import vendor
 
     st = await vendor._state(db, SINGLE_KEY)
@@ -547,7 +585,20 @@ async def backfill(db: AsyncSession, products: list[dict], ix, force: bool) -> i
     )
     cves = list(dict.fromkeys(await db.scalars(stmt)))
     known = set(await db.scalars(select(VendorAdvisory.ident).where(VendorAdvisory.id.in_([f"cvelist:{c}" for c in cves]))))
-    cves = [c for c in cves if c not in known][:SINGLE_PER_ROUND]
+    cves = [c for c in cves if c not in known]
+    # the CVEs a coordinator's document names (the BSI's WID) that no record knows: their CNA's rating counts for the
+    # finding (vendor.cve_ratings), not the document's one word – at least COORDINATOR_MIN of the round's lookups
+    coord = await coordinator_cves(db, keys, now, SINGLE_PER_ROUND)
+    take = min(len(coord), max(COORDINATOR_MIN, SINGLE_PER_ROUND - len(cves)))
+    coord = coord[:take]
+    cves = [*cves[: SINGLE_PER_ROUND - len(coord)], *coord]
+    primed = await db.scalar(select(Counter.value).where(Counter.name == COORDINATOR_PRIMED))
+    if not coord and primed is None:
+        # the documents' CVEs of before the update all asked: from now on a CNA's rating that comes later is news as
+        # any other rating that comes later ("jetzt höher eingestuft")
+        await db.execute(pg_insert(Counter).values(name=COORDINATOR_PRIMED, value=1).on_conflict_do_nothing())
+        await db.commit()
+        primed = 1
     if not cves:
         st.next_fetch_at = now + DELTA_EVERY
         await db.commit()
@@ -559,6 +610,10 @@ async def backfill(db: AsyncSession, products: list[dict], ix, force: bool) -> i
         for c in cves:
             if await single(db, c, budget, ix) is not None:
                 got += 1
+        if coord and primed is None:
+            # the backlog of before the update ("Hersteller zählt" 0.1.57): the CNA's rating replacing the document's
+            # word is no news – the products of those documents take their ratings quietly (vendor.unprime)
+            await vendor.unprime(db, await vendor._csaf_naming(db, coord))
         st = await vendor._state(db, SINGLE_KEY)
         vendor._ok(st, DELTA_EVERY, got)
         vendor._record(db, st, meter, items=got)

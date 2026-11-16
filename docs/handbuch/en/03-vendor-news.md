@@ -805,6 +805,8 @@ product best.
   a finding has several CVEs, the highest counts.
 - **Only where the vendor does not rate a CVE** does another rating step in, in this order: the NVD's own analysis,
   a rating of the CVE in the BSI's document, CISA's, and last the one severity of a BSI document for all its CVEs.
+  Where only a BSI advisory names a CVE (Node.js vulnerabilities listed with PAN-OS, say), Vendor News fetches its
+  record from the CVE list, so that the vendor's rating counts there too.
 - **Beside it** the NVD's own rating is shown where it differs – e.g. "CVSS 3.1 · NVD 8.8" on the finding and in the
   details from the source. Hovering says which one counts.
 - For Palo Alto, the vendor's rating is CVSS-BT; the pure base score is shown beside it ("CVSS 6.6 · base 8.7").
