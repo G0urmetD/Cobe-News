@@ -331,8 +331,7 @@ async def test_migration_refetches_the_nvd_and_takes_back_the_borrowed_score(adm
         s.add(VendorAdvisory(id=wid, source="csaf", ident="WID-SEC-W-2026-3556", title="GitLab: Mehrere Schwachstellen", summary="", url="https://wid.cert-bund.de/x", cves=["CVE-2026-10518"], cvss=8.7, severity="high", exploited=False, data={"products": [], "publisher": "BSI"}))
         s.add(VendorAdvisory(id="csaf:WID-SEC-W-2026-0001", source="csaf", ident="WID-SEC-W-2026-0001", title="Own score", summary="", url="https://wid.cert-bund.de/y", cves=[], cvss=9.1, severity="critical", exploited=False, data={"products": [], "publisher": "BSI"}))
         await s.flush()
-        s.add(VendorAdvisoryProduct(product="panos", advisory_id=wid))  # the WID's product: its ratings taken anew
-        s.add(Counter(name=f"{vendor.RATED_PRIMED}:panos", value=1))
+        s.add(VendorAdvisoryProduct(product="gitlab", advisory_id=wid))
         await s.commit()
 
     def down(conn):  # noqa: ANN001, ANN202
@@ -349,9 +348,12 @@ async def test_migration_refetches_the_nvd_and_takes_back_the_borrowed_score(adm
         a, own = await s.get(VendorAdvisory, wid), await s.get(VendorAdvisory, "csaf:WID-SEC-W-2026-0001")
         assert (a.cvss, a.severity) == (None, "high") and (own.cvss, own.severity) == (9.1, "critical")
         primed = set(await s.scalars(select(Counter.name).where(Counter.name.like(f"{vendor.RATED_PRIMED}:%"))))
-    assert primed == {f"{vendor.RATED_PRIMED}:gitlab"}  # panos (the WID's product) is evaluated anew, quietly
+    assert primed == set()  # every product's next evaluation takes the ratings as they are then – quietly
     vendor.reset()  # a new process after the upgrade
     monkeypatch.setattr(vendor, "_ready", lambda p, answered: True)
+    async with db.session() as s:
+        assert await vendor.evaluate_events(s) == 0  # the first evaluation: quiet – and the products primed again
+        assert await s.scalar(select(Counter.value).where(Counter.name == f"{vendor.RATED_PRIMED}:gitlab")) == 1
 
     calls: list[httpx.Request] = []
 

@@ -356,7 +356,8 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
     targets: dict[str, dict] | None = None  # the followed products and versions – read once, when a stored one comes again
     poc_moved: list[str] = []  # CVEs whose SSVC "poc" came or went: the news naming them get their topics again
     rerated: set[str] = set()  # products of records rated anew by a parser fix (_change_plans): their ratings taken quietly
-    rerated_cves: list[str] = []  # … and their CVEs: a coordinator's document naming one is rated by it (cve_ratings)
+    written_cves: list[str] = []  # CVE records written: a coordinator's document naming one is rated by it (cve_ratings)
+    rerated_cves: list[str] = []  # … of them those rated anew
     for i in range(0, len(advs), STORE_BATCH):
         part = list({a["id"]: a for a in advs[i : i + STORE_BATCH]}.values())
         ids = [a["id"] for a in part]
@@ -411,6 +412,8 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
                     skipped.append(str(a.get("id")))
                 continue
             changed += 1
+            if a.get("source") in CVE_SOURCES:
+                written_cves.append(str(a.get("ident") or "").upper())
             if plan is not None and "rerated" in plan:
                 rerated.update(plan["rerated"])
                 if a.get("source") in CVE_SOURCES:
@@ -418,10 +421,10 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
             if a.get("source") == "cvelist" and _ssvc_poc(olds[a["id"]].data if a["id"] in olds else None) != _ssvc_poc(a.get("data")):
                 poc_moved.append(str(a.get("ident") or ""))
         await db.commit()
-    for i in range(0, len(rerated_cves), 1000):
-        part = rerated_cves[i : i + 1000]
-        q = select(VendorAdvisoryProduct.product).join(VendorAdvisory, VendorAdvisory.id == VendorAdvisoryProduct.advisory_id).where(VendorAdvisory.source == "csaf", VendorAdvisory.cves.op("?|")(pg_array(part)))
-        rerated.update(await db.scalars(q.distinct()))
+    # the products of a coordinator's document naming a CVE written here: their findings are rated by its record too
+    # (cve_ratings) – their views are recomputed, and a re-rating is taken quietly there as well
+    touched |= await _csaf_naming(db, written_cves)
+    rerated |= await _csaf_naming(db, rerated_cves)
     if rerated:
         await unprime(db, rerated)
     if changed:
@@ -432,6 +435,16 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
         await news.retopic_cves(db, poc_moved)  # "Exploit veröffentlicht" (news.exploit_cves)
         await db.commit()
     return changed
+
+
+async def _csaf_naming(db: AsyncSession, cves: list[str]) -> set[str]:
+    """The products linked to a CSAF document that names one of these CVEs (the GIN index on cves)."""
+    out: set[str] = set()
+    for i in range(0, len(cves), 1000):
+        part = sorted(set(cves[i : i + 1000]))
+        q = select(VendorAdvisoryProduct.product).join(VendorAdvisory, VendorAdvisory.id == VendorAdvisoryProduct.advisory_id).where(VendorAdvisory.source == "csaf", VendorAdvisory.cves.op("?|")(pg_array(part)))
+        out.update(await db.scalars(q.distinct()))
+    return out
 
 
 def _ssvc_poc(data: dict | None) -> bool:

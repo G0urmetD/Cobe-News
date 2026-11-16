@@ -15,12 +15,15 @@ as a fallback (vendor.rating).
   score of its first CVEs as its own: "GitLab: Mehrere Schwachstellen" (WID-SEC-W-2026-3556, 11 CVEs) was 8.7 HIGH,
   its CVE-2026-10518 is 4.3. Those records are known by their story's details (the score shown with "nvd": true):
   their CVSS goes, their severity is the document's own word (aggregate_severity – "hoch": high). In place, no
-  request; the next write of such a record is quiet (rerated), and so is the next evaluation of its products (their
-  "vendor_rated_primed" marks go – the document's word may be higher than the borrowed score).
+  request; the next write of such a record is quiet (rerated).
+- The rule applies to the findings at once: every product's next evaluation takes their ratings as they are then
+  (the "vendor_rated_primed" marks go, as the update to 0.1.53 began; vendor.unprime) – a rise by the new rule is no
+  "jetzt höher eingestuft" and no lapse of a confirmation; a rise that happens to come in the same round is taken
+  quietly as well. Each record re-rated later by its refetch does the same for its products.
 
-Touches the NVD rows of vendor_fetch (a few hundred) and the CSAF records of the stories (a few thousand at most) – no
-lock worth mentioning. The downgrade changes nothing (a full fetch is harmless; a CSAF record without the borrowed
-score is what the new parser writes as well).
+Touches the NVD rows of vendor_fetch (a few hundred), the CSAF records of the stories (a few thousand at most) and one
+counter per followed product – no lock worth mentioning. The downgrade changes nothing (a full fetch is harmless; a CSAF
+record without the borrowed score is what the new parser writes as well).
 
 Revision ID: 0048
 Revises: 0047
@@ -43,12 +46,8 @@ def upgrade() -> None:
         "next_fetch_at = CASE WHEN COALESCE(failures, 0) = 0 THEN NULL ELSE next_fetch_at END "
         "WHERE key LIKE 'nvd:%'"
     )
-    # the products of a record changed here are rated anew by their next evaluation (vendor.unprime): the document's own
-    # word may be higher than the borrowed score ("kritisch" where NVD's 7.4 stood) – no "jetzt höher eingestuft", a
-    # confirmation stays
     op.execute(
         """
-        WITH changed AS (
         UPDATE vendor_advisories AS a SET cvss = NULL,
             severity = CASE lower(btrim(COALESCE(d.data->>'severity_text', '')))
                 WHEN 'kritisch' THEN 'critical' WHEN 'critical' THEN 'critical'
@@ -65,13 +64,12 @@ def upgrade() -> None:
           AND a.source = 'csaf'
           AND abs(a.cvss - CASE WHEN jsonb_typeof(d.data->'cvss'->0->'score') = 'number' THEN (d.data->'cvss'->0->>'score')::float8 END) < 0.05
           AND COALESCE((a.data->>'rating')::text, '') = ''
-        RETURNING a.id
-        )
-        DELETE FROM counters WHERE name IN (
-            SELECT 'vendor_rated_primed:' || p.product FROM vendor_advisory_products AS p JOIN changed ON changed.id = p.advisory_id
-        )
         """
     )
+    # every product's next evaluation takes its findings' ratings as they are then (vendor.unprime): the new rule
+    # applies at once – a coordinator's document now rated by its own word or by the CNAs of its CVEs may be higher
+    # than the borrowed score – no "jetzt höher eingestuft" of it, a confirmation stays
+    op.execute("DELETE FROM counters WHERE name LIKE 'vendor_rated_primed:%'")
 
 
 def downgrade() -> None:
