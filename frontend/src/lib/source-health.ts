@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { type QueryClient, keepPreviousData, useQuery } from "@tanstack/react-query"
 import type { TFunction } from "i18next"
 import { api, DETAIL_TIMEOUT_MS, detailRetry } from "@/lib/api"
 import { polled } from "@/lib/poll"
@@ -79,6 +79,9 @@ export interface HealthDetail {
 }
 
 export const HEALTH_KEY = ["admin", "source-health"] as const
+/** After a change in the News or Vendor News settings (a source on/off, added, removed, fetched; a follow): the health
+ *  view is asked again – it would otherwise stay on what was before for up to its 60 s / 5 min. */
+export const refreshHealth = (qc: QueryClient) => void qc.invalidateQueries({ queryKey: HEALTH_KEY })
 
 /** The table – and the number on "Integrationen" in the settings navigation (the same query, shared). */
 export const useSourceHealth = (enabled = true) =>

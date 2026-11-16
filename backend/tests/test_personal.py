@@ -228,6 +228,49 @@ async def test_routing_all_members_or_chosen_ones_and_leaving_drops_it(admin_cli
         assert set(await s.scalars(select(PersonRoute.user_id).where(PersonRoute.team_product_id == tp_cisco))) == {d.id}
 
 
+async def test_products_and_their_routing_are_saved_together_or_not_at_all(admin_client):
+    """0.1.57: the products part sends its routings with the products – one transaction: a refused routing (a stranger)
+    leaves the products as they were, and a new product can get its people in the same save."""
+    from app.models import AuditEntry
+
+    await _switch()
+    a, b = await _person("anja"), await _person("bert")
+    tid, _ = await _team([a, b], products=("panos",))
+    async with db.session() as s:
+        s.add(VendorFollow(product="cisco-asa"))
+        await s.commit()
+    stranger = await _person("zora")
+    # a new product and a routing nobody may get: refused, and nothing of it is stored (no audit entry either)
+    r = await admin_client.put(
+        f"/api/admin/teams/{tid}/products",
+        json={"products": ["panos", "cisco-asa"], "routing": [{"product": "panos", "all_members": False, "members": [str(a.id)]}, {"product": "cisco-asa", "all_members": False, "members": [str(stranger.id)]}]},
+    )
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "not_member"
+    team = next(x for x in (await admin_client.get("/api/admin/teams")).json() if x["id"] == str(tid))
+    assert [(p["key"], p["all_members"]) for p in team["products"]] == [("panos", True)]
+    async with db.session() as s:
+        assert await s.scalar(select(func.count()).select_from(AuditEntry).where(AuditEntry.action.in_(["team.products_changed", "team.routing_changed"]))) == 0
+        assert await s.scalar(select(func.count()).select_from(TeamProductMember)) == 0
+    # a routing of a product the team does not get: refused as well
+    r = await admin_client.put(f"/api/admin/teams/{tid}/products", json={"products": ["panos"], "routing": [{"product": "cisco-asa", "all_members": True}]})
+    assert r.status_code == 404
+    # all fine: both products, the new one for B only, panos for A only – one save, each change in the audit log
+    r = await admin_client.put(
+        f"/api/admin/teams/{tid}/products",
+        json={"products": ["panos", "cisco-asa"], "routing": [{"product": "panos", "all_members": False, "members": [str(a.id)]}, {"product": "cisco-asa", "all_members": False, "members": [str(b.id)]}]},
+    )
+    assert r.status_code == 200, r.text
+    prods = {p["key"]: p for p in r.json()["products"]}
+    assert [x["username"] for x in prods["panos"]["people"]] == ["anja"] and [x["username"] for x in prods["cisco-asa"]["people"]] == ["bert"]
+    async with db.session() as s:
+        actions = sorted(await s.scalars(select(AuditEntry.action).where(AuditEntry.action.in_(["team.products_changed", "team.routing_changed"]))))
+        assert actions == ["team.products_changed", "team.routing_changed", "team.routing_changed"]
+        assert await s.scalar(select(func.count()).select_from(TeamProductMember)) == 2
+    # an older client without `routing`: the products alone, as before
+    r = await admin_client.put(f"/api/admin/teams/{tid}/products", json={"products": ["panos"]})
+    assert r.status_code == 200 and [p["key"] for p in r.json()["products"]] == ["panos"] and r.json()["products"][0]["all_members"] is False
+
+
 async def test_leaving_through_the_sync_drops_the_routing(monkeypatch):
     async with db.session() as s:
         await settings_store.put(s, "ldap", {"enabled": True, "servers": ["dc01.corp.example"], "base_dn": "DC=corp,DC=example", "bind_dn": "CN=svc", "bind_password_enc": ""})

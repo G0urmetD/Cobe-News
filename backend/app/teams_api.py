@@ -461,14 +461,26 @@ async def remove_member(tid: uuid.UUID, uid: uuid.UUID, admin: Admin, db: Db) ->
 # ---------------------------------------------------------------- products
 
 
+class RoutingOf(_M):
+    """Who of the team gets one of its products (as PUT …/routing)."""
+
+    product: str = Field(min_length=1, max_length=200)
+    all_members: bool = True
+    members: list[uuid.UUID] = Field(default_factory=list, max_length=2000)
+
+
 class ProductsIn(_M):
     products: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(default_factory=list, max_length=2000)
+    # 0.1.57: the routings changed in the same form, applied in the same transaction – the products part saves all or
+    # nothing (before, a failing routing request after the products had been saved left half of the form stored)
+    routing: list[RoutingOf] = Field(default_factory=list, max_length=2000)
 
 
 @router.put("/admin/teams/{tid}/products")
 async def set_products(tid: uuid.UUID, body: ProductsIn, admin: Admin, db: Db) -> dict:
     """The team's products, as a whole. One kept keeps its assignment (and when it was made: a rule limited to the team
-    sends a product's events from its assignment on)."""
+    sends a product's events from its assignment on). `routing`: who of the team gets which of them (as PUT …/routing,
+    checked and recorded the same way) – everything is committed together or nothing is."""
     t = await _team(db, tid)
     keys = list(dict.fromkeys(body.products))
     follows = {f.product: f.id for f in await db.scalars(select(VendorFollow).where(VendorFollow.product.in_(keys)))} if keys else {}
@@ -486,23 +498,18 @@ async def set_products(tid: uuid.UUID, body: ProductsIn, admin: Admin, db: Db) -
     now = datetime.now(UTC)
     for fid in want - set(have):
         await db.execute(pg_insert(TeamProduct).values(id=uuid.uuid4(), team_id=t.id, follow_id=fid, all_members=True, added_at=now).on_conflict_do_nothing())
+    for r in body.routing:
+        # only a product the team has after this save (a new one too); anything refused leaves the whole save undone
+        if r.product not in follows:
+            raise api_error(404, "not_found")
+        await _route(db, admin, t, await db.scalar(select(TeamProduct).where(TeamProduct.team_id == t.id, TeamProduct.follow_id == follows[r.product])), r)
     await db.commit()
     notify.changed()  # rules limited to the team look again
     return (await _teams_out(db, [t]))[0]
 
 
-class RoutingIn(_M):
-    product: str = Field(min_length=1, max_length=200)
-    all_members: bool = True
-    members: list[uuid.UUID] = Field(default_factory=list, max_length=2000)
-
-
-@router.put("/admin/teams/{tid}/routing")
-async def set_routing(tid: uuid.UUID, body: RoutingIn, admin: Admin, db: Db) -> dict:
-    """Who of the team gets a product's Vendor News (personal notifications, "Mein Team"): all members, or the chosen
-    ones – members of the team only. Whoever gets it newly gets its events from now on, not the older ones."""
-    t = await _team(db, tid)
-    tp = await db.scalar(select(TeamProduct).join(VendorFollow, VendorFollow.id == TeamProduct.follow_id).where(TeamProduct.team_id == t.id, VendorFollow.product == body.product))
+async def _route(db, admin, t: Team, tp: TeamProduct | None, body: RoutingOf) -> None:  # noqa: ANN001
+    """One product's routing: members of the team only, recorded in the audit log. Not committed."""
     if tp is None:
         raise api_error(404, "not_found")
     members = list(dict.fromkeys(body.members)) if not body.all_members else []
@@ -513,6 +520,15 @@ async def set_routing(tid: uuid.UUID, body: RoutingIn, admin: Admin, db: Db) -> 
     await personal.set_routing(db, tp, body.all_members, members)
     names = list(await db.scalars(select(User.username).where(User.id.in_(members)))) if members else []
     audit.record(db, admin, "team.routing_changed", _team_target(t), {"product": body.product, "all_members": body.all_members, "members": sorted(names)})
+
+
+@router.put("/admin/teams/{tid}/routing")
+async def set_routing(tid: uuid.UUID, body: RoutingOf, admin: Admin, db: Db) -> dict:
+    """Who of the team gets a product's Vendor News (personal notifications, "Mein Team"): all members, or the chosen
+    ones – members of the team only. Whoever gets it newly gets its events from now on, not the older ones."""
+    t = await _team(db, tid)
+    tp = await db.scalar(select(TeamProduct).join(VendorFollow, VendorFollow.id == TeamProduct.follow_id).where(TeamProduct.team_id == t.id, VendorFollow.product == body.product))
+    await _route(db, admin, t, tp, body)
     await db.commit()
     return (await _teams_out(db, [t]))[0]
 
