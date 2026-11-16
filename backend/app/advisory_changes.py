@@ -16,8 +16,9 @@ No noise:
   record with the new extractor before comparing – a better extractor is never a change;
 - a parser of a source changed (PARSER_V[source], raised with such a change): the facts are set anew, silently;
 - a CSAF provider's first fill (data.initial) sets them silently as well;
-- Palo Alto's rating by its threat score instead of the CVSS base (0.1.57, rerated): the new severity and CVSS of the
-  first such record are taken as they were – a lowering by a parser fix is no revision; its other changes still are;
+- Palo Alto's rating by its threat score instead of the CVSS base, the CVE records' by the CNA's own rating instead of
+  NVD's analysis (0.1.57, rerated): the new severity and CVSS of the first such record are taken as they were – a
+  re-rating by a parser fix is no revision, in either direction; its other changes still are;
 - a batch where most known advisories changed at once (MASS_MIN, MASS_SHARE) is a source that reformatted: silent.
 
 Kept: PER_ADVISORY revisions per advisory, none older than KEEP (prune, daily). Events (kind "change") only for
@@ -36,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import VendorAdvisoryChange, VendorEvent
 from app.vendor_match import evaluate
+from app.vendor_sources import RATING_V
 
 log = logging.getLogger("cobe_news.vendor")
 
@@ -48,6 +50,9 @@ EXTRACT_V = 1
 # csaf 2 (0.1.57): ranges in words or with a dash ("8.0.0-8.0.37") and Siemens' "< V3.1" are read – texts that were
 # dropped before ("< V3.1", "V15, V15.1, V16 and V17") are affected ranges now: no "wider affected range" of the vendor
 PARSER_V = {"nvd": 2, "paloalto": 1, "fortinet": 1, "veeam": 1, "csaf": 2, "cvelist": 1, "osv": 1}
+# the sources whose records carry the rating rule they were rated by (vendor_sources.RATING_V, data["rating"]): a record
+# of another rule is re-rated quietly once (rerated)
+RATING_SOURCES = ("nvd", "cvelist", "csaf")
 KEEP = timedelta(days=365)
 PER_ADVISORY = 20
 RECENT = timedelta(days=30)  # "Geändert" in the lists: a change within this time
@@ -233,12 +238,24 @@ def reparsed(source: str, stored: dict | None, old: dict | None, new: dict | Non
 
 
 def rerated(source: str, old: dict | None, new: dict | None) -> bool:
-    """A Palo Alto record of the parser before 0.1.57 comes again: that parser rated by the CVSS 4.0 base (8.7 HIGH),
-    this one by Palo Alto's own rating, the threat score (6.6 MEDIUM, what its page and cve.org say) and keeps the base
-    beside it (data["base"]). The severity and CVSS it brings are then no change (vendor._change_plans takes them as
-    they were) – a lowering by a parser fix is no news; any other change of the same record still counts. Only on the
-    first record with the base: a later re-rating by Palo Alto (exploited now, E:A) is a change as always."""
-    return source == "paloalto" and isinstance(new, dict) and "base" in new and not (isinstance(old, dict) and "base" in old)
+    """A record of a parser before 0.1.57 comes again, rated by another rule – its severity and CVSS are then no change
+    (vendor._change_plans takes them as they were): a re-rating by a parser fix is no news, in either direction; any
+    other change of the same record still counts. Only on the first record of the new rule: a later re-rating by the
+    source (the vendor raises it, exploited now) is a change as always.
+    - Palo Alto: that parser rated by the CVSS 4.0 base (8.7 HIGH), this one by Palo Alto's own rating, the threat
+      score (6.6 MEDIUM, what its page and cve.org say) and keeps the base beside it (data["base"]);
+    - NVD, cvelistV5, CSAF ("Hersteller zählt", vendor_sources.RATING_V – data["rating"]): the NVD record is rated by the
+      CNA's own metric, no longer by NVD's own analysis first (GitLab CVE-2025-2938: 3.1 LOW, not NVD's 8.8 HIGH); of
+      several metrics of the same version the highest; a CSAF document without a score of its own no longer takes the
+      highest NVD score of its CVEs (story_details.csaf_advisory)."""
+    if not isinstance(new, dict):
+        return False
+    was = old if isinstance(old, dict) else {}
+    if source == "paloalto":
+        return "base" in new and "base" not in was
+    if source in RATING_SOURCES:
+        return new.get("rating") == RATING_V and was.get("rating") != RATING_V
+    return False
 
 
 def _unknown_sev(f: dict) -> bool:

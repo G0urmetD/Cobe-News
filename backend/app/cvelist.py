@@ -10,8 +10,9 @@ whole list (the all_CVEs zip, ~650 MB, is never downloaded).
   CVEs of findings whose NVD record has no CPE configuration yet ("Awaiting Analysis") and of stories the NVD cannot
   describe – each at most once a week, SINGLE_PER_ROUND a round.
 - Stored as Vendor News advisories `cvelist:<CVE>` (source cvelist) in the shape of the NVD's (`cna`: the CNA's
-  affected rows, `adp`: CISA's) plus SSVC, KEV and CVSS from CISA's ADP container. Judged after the vendor and – where
-  it has CPE configurations – the NVD (vendor.cve_verdict); the NVD stays for the CPE matching.
+  affected rows, `adp`: CISA's) plus SSVC and KEV from CISA's ADP container. CVSS: the CNA's own rating, CISA's only
+  where the CNA gives none (data["rated"]). Judged after the vendor and – where it has CPE configurations – the NVD
+  (vendor.cve_verdict); the NVD stays for the CPE matching.
 Only public GitHub addresses are asked; nothing about the installation leaves the machine.
 """
 
@@ -92,12 +93,17 @@ def parse_release(data: bytes) -> dict:
 
 
 def _metric(metrics) -> tuple[float | None, str, str]:  # noqa: ANN001
-    """(score, severity, vector) of the first CVSS of a container's metrics: 4.0, 3.1, 3.0."""
+    """(score, severity, vector) of a container's rating: its newest CVSS version (4.0, 3.1, 3.0) – of several metrics
+    of that version (scenarios: Palo Alto rates PA-Series and Prisma Access apart) the highest, as for the NVD's copy
+    (vendor_sources._nvd_metrics)."""
     for key in ("cvssV4_0", "cvssV3_1", "cvssV3_0"):
+        rows = []
         for m in src._l(metrics):
             d = src._d(m.get(key)) if isinstance(m, dict) else {}
             if (s := src._score(d.get("baseScore"))) is not None:
-                return s, src._s(d.get("baseSeverity"), 20), src._s(d.get("vectorString"), 200)
+                rows.append((s, src._s(d.get("baseSeverity"), 20), src._s(d.get("vectorString"), 200)))
+        if rows:
+            return max(rows, key=lambda r: r[0])
     return None, "", ""
 
 
@@ -201,6 +207,10 @@ def parse_record(doc) -> dict | str | None:  # noqa: ANN001
             "assigner": src._s(meta.get("assignerShortName"), 60) or src._s(src._d(cna.get("providerMetadata")).get("shortName"), 60),
             "cvss_vector": vector,
             "cvss_from_adp": from_adp,
+            # the rule it was rated by (vendor_sources.RATING_V: the CNA's own rating first, CISA's ADP only where the
+            # CNA gives none) and whose rating it is – a record of the parser before is re-rated quietly once
+            "rating": src.RATING_V,
+            "rated": ("adp" if from_adp else "cna") if score is not None else "",
             "ssvc": ssvc,
             "kev": kev,
         },
