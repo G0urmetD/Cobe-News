@@ -271,11 +271,15 @@ async def _sync(db: AsyncSession, team_ids: set[uuid.UUID] | None) -> dict[str, 
             loads[key] = await _members(source, cfgs[source], gid)
     # the directories may take minutes: Teams switched off meanwhile – nothing of this load is written (it would switch
     # the accounts on again that the switch just turned off); a team deleted meanwhile is left out (its memberships
-    # would break the load of every other team)
+    # would break the load of every other team); a group unbound meanwhile as well – its members neither join nor stay
+    # (they kept the team, and got a new account and a welcome mail, until the load the unbinding started)
     if not (await config(db)).get("enabled"):
         return {}
     teams = list(await db.scalars(select(Team.id).where(Team.id.in_(teams))))
-    bound = [b for b in bound if b[1] in set(teams)]
+    still = set(await db.scalars(select(TeamGroup.id).where(TeamGroup.id.in_([b[0] for b in bound])))) if bound else set()
+    bound = [b for b in bound if b[1] in set(teams) and b[0] in still]
+    keep = {(source, gid.lower()) for _, _, source, gid in bound}
+    loads = {k: v for k, v in loads.items() if k in keep}
     now = datetime.now(UTC)
     for gid_row, _, source, gid in bound:
         got = loads[(source, gid.lower())]
