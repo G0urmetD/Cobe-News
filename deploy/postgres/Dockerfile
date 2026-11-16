@@ -2,8 +2,8 @@
 # published, plus the set-up of the app's own role at every start (cobe-news-db.sh → db-init.sh → app-role.sql,
 # audit-lock.sql, restore-role.sql) – no one-shot db-init container any more (up to 0.1.48). Build context: this folder only
 # (.dockerignore lets nothing else in). docs/BETRIEB.md: PostgreSQL, Rollen.
-# base image pinned by digest (the tag for the reader; update with the others – docs/BETRIEB.md: Entwicklung, Basis-Images)
-FROM postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+# base image pinned by digest (the tag for the reader – PostgreSQL 18.7 since 0.1.57; update with the others – docs/BETRIEB.md: Entwicklung, Basis-Images)
+FROM postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
 # the Alpine security updates published since the pinned base image (the release pipeline's scan fails on a fixable
 # high or critical finding – docs/SICHERHEIT-SCANS.md). The switch to the user postgres: su-exec from Alpine (C, a few
 # lines, updated with Alpine) instead of the image's gosu – gosu 1.19 is built with Go 1.24.6, whose standard library
