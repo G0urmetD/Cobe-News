@@ -1627,6 +1627,10 @@ wegräumen oder `SQLITE_IMPORT=0` setzen.
   Datenbank-Container setzt es bei jedem Start (`docker compose up -d` legt ihn und die App dafür neu an).
 - Sortierung byteweise (`--locale-provider=builtin --locale=C.UTF-8`) – wie zuvor SQLite, unabhängig von der
   C-Bibliothek des Images (kein Neuaufbau der Indizes nach einem Image-Update).
+- Version: PostgreSQL 18.7 (ab 0.1.57; vorher 18.6). 18.7 behebt unter anderem einen Fehler in GIN-Indizes, der
+  bestehende Indizes nicht repariert; Migration 0048 baut die GIN-Indizes der App beim Update deshalb einmal vorsorglich
+  neu auf (wenige MB, Sekunden). Ausgenommen ist der Suchindex des Protokolls – er gehört `cobe_news_audit`, nicht der
+  App. Bei Bedarf von Hand: `docker compose exec db psql -U cobe_news cobe_news -c 'REINDEX INDEX ix_audit_log_search'`.
 - Das Schema kommt aus Alembic-Migrationen (`backend/app/migrations`); die App bringt es bei jedem Start auf den Stand
   ihrer Version (`python -m app.cli migrate` geht auch von Hand). Jede Verbindung hat ein Statement-Timeout (30 s) und
   ein Timeout für vergessene offene Transaktionen (5 min); die App hält höchstens 15 Verbindungen.
