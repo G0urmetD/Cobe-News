@@ -1,7 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { QueryClient } from "@tanstack/react-query"
 import de from "@/i18n/de"
 import en from "@/i18n/en"
-import { PERSONAL_KINDS, groupStateKey, readScope, resolveScope, saveScope, upcoming, wayState } from "@/lib/teams-api"
+import {
+  PERSONAL_KEY,
+  PERSONAL_KINDS,
+  type Team,
+  type TeamProduct,
+  groupStateKey,
+  productsSave,
+  readScope,
+  refreshTeams,
+  resolveScope,
+  saveScope,
+  teamSheet,
+  upcoming,
+  wayState,
+} from "@/lib/teams-api"
 import { followedCount, overviewKey, type VendorOverview } from "@/lib/vendor-api"
 
 describe("groupStateKey", () => {
@@ -123,5 +138,59 @@ describe("Hersteller-News meiner Produkte", () => {
     }
     // plain words: the warning for an empty choice says what happens
     expect(de["teams.routing.nobody"]).toBe("Niemand bekommt die News zu diesem Produkt.")
+  })
+})
+
+describe("after a change of the teams", () => {
+  it("asks the personal notifications and Mein Team again – not 30 s on what was before", () => {
+    const qc = new QueryClient()
+    const keys = [PERSONAL_KEY, ["me", "teams"], ["admin", "teams", "list"], ["vendor", "overview", "team"]] as const
+    for (const k of keys) qc.setQueryData([...k], {})
+    qc.setQueryData(["vendor", "overview"], {})
+    refreshTeams(qc)
+    for (const k of keys) expect(qc.getQueryState([...k])?.isInvalidated, k.join("/")).toBe(true)
+    // the full list does not depend on the teams
+    expect(qc.getQueryState(["vendor", "overview"])?.isInvalidated).toBe(false)
+  })
+})
+
+describe("the team sheet for ?team=", () => {
+  const team = { id: "t1", name: "Net" } as Team
+  it("shows the team, the form for a new one, or nothing", () => {
+    expect(teamSheet(null, [team], false)).toEqual({ kind: "none" })
+    expect(teamSheet("new", [], false)).toEqual({ kind: "new" })
+    expect(teamSheet("t1", [team], true)).toEqual({ kind: "team", team })
+  })
+  it("says 'nicht gefunden' for a deleted team once the list is fresh – no spinner without end", () => {
+    expect(teamSheet("gone", [team], false)).toEqual({ kind: "missing" })
+    // the list is being asked again (a team just created): a short wait, not "nicht gefunden"
+    expect(teamSheet("gone", [team], true)).toEqual({ kind: "loading" })
+    for (const k of ["teams.notFoundTitle", "teams.notFoundText", "teams.backToList", "teams.routing.loadFailed", "errors.retry"]) {
+      expect(de[k], k).toBeTruthy()
+      expect(en[k], k).toBeTruthy()
+    }
+  })
+})
+
+describe("saving the products part", () => {
+  const anja = { id: "u1", username: "anja", display_name: "Anja" }
+  const stored = [{ key: "panos", label: "PAN-OS", enabled: true, all_members: true, people: [] }] as TeamProduct[]
+  it("is one request: the products with every changed routing, a new product's too", () => {
+    const x = productsSave(["panos", "fortios"], { panos: { all: false, people: [anja] }, fortios: { all: false, people: [anja] } }, stored)
+    expect(x.dirty).toBe(true)
+    expect(x.body).toEqual({
+      products: ["panos", "fortios"],
+      routing: [
+        { product: "panos", all_members: false, members: ["u1"] },
+        { product: "fortios", all_members: false, members: ["u1"] },
+      ],
+    })
+  })
+  it("sends no routing that did not change, and is not dirty without a change", () => {
+    expect(productsSave(["panos"], { panos: { all: true, people: [] } }, stored)).toEqual({ dirty: false, body: { products: ["panos"], routing: [] } })
+    // a new product for all members: only the product
+    expect(productsSave(["panos", "fortios"], {}, stored)).toEqual({ dirty: true, body: { products: ["panos", "fortios"], routing: [] } })
+    // a removed product's routing is not sent
+    expect(productsSave([], { panos: { all: false, people: [anja] } }, stored).body).toEqual({ products: [], routing: [] })
   })
 })

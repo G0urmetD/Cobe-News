@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { QueryClient } from "@tanstack/react-query"
 import i18next from "i18next"
 import de from "@/i18n/de"
 import en from "@/i18n/en"
@@ -9,17 +10,20 @@ import {
   errorLabel,
   filterRows,
   fmtMs,
+  HEALTH_KEY,
   type HealthOverview,
   type HealthRow,
   type HealthState,
   isProblem,
   parseSourceParam,
+  refreshHealth,
   sortRows,
   sparkLabel,
   sparkPoints,
   STATE_COLOR,
   STATE_ORDER,
 } from "@/lib/source-health"
+import { refreshVendor } from "@/lib/vendor-api"
 
 const row = (name: string, state: HealthState): HealthRow => ({
   kind: "news",
@@ -150,5 +154,22 @@ describe("i18n", () => {
       expect(healthEn[`health.reason.${r}`]).toBeTruthy()
     expect(de["notify.kind.source_health"]).toBeTruthy()
     expect(en["notify.kind.source_healthHint"]).toBeTruthy()
+  })
+})
+
+describe("the health view after a settings change", () => {
+  it("is asked again after a News change and after any Vendor News change (a follow, the settings)", async () => {
+    const qc = new QueryClient()
+    qc.setQueryData([...HEALTH_KEY], {})
+    qc.setQueryData([...HEALTH_KEY, "news", "x"], {})
+    refreshHealth(qc)
+    expect(qc.getQueryState([...HEALTH_KEY])?.isInvalidated).toBe(true)
+    expect(qc.getQueryState([...HEALTH_KEY, "news", "x"])?.isInvalidated).toBe(true)
+    const qc2 = new QueryClient()
+    qc2.setQueryData([...HEALTH_KEY], {})
+    qc2.setQueryData(["vendor", "overview"], {})
+    await refreshVendor(qc2)
+    expect(qc2.getQueryState([...HEALTH_KEY])?.isInvalidated).toBe(true)
+    expect(qc2.getQueryState(["vendor", "overview"])?.isInvalidated).toBe(true)
   })
 })

@@ -2,6 +2,7 @@ import { type InfiniteData, type QueryClient, keepPreviousData, useInfiniteQuery
 import type { ConfirmLapse, Confirmation } from "@/lib/finding-confirm"
 import { api, DETAIL_TIMEOUT_MS, detailRetry } from "@/lib/api"
 import { polled } from "@/lib/poll"
+import { refreshHealth } from "@/lib/source-health"
 import type { AdvisoryChange } from "@/lib/advisory-changes"
 import type { NewsSeverity } from "@/lib/news-api"
 
@@ -512,12 +513,14 @@ export function visibleFindings(d: ProductDetail): number {
 export const productKeyOf = (key: string) => ["vendor", "product", key] as const
 
 /**
- * After a change of Vendor News data: every vendor view is refetched; the promise ends when the views under `wait` have
+ * After a change of Vendor News data: every vendor view (and the health view) is refetched; the promise ends when the views under `wait` have
  * their fresh data (a switch or a form stays busy until it shows what was saved – the heavy overview does not hold it up).
  */
 export async function refreshVendor(qc: QueryClient, wait?: readonly unknown[]): Promise<void> {
   const waited = (k: readonly unknown[]) => !!wait && wait.every((x, i) => k[i] === x)
   void qc.invalidateQueries({ queryKey: ["vendor"], predicate: (q) => !waited(q.queryKey) })
+  // which products are followed decides which Vendor News queries run – the health view lists them
+  refreshHealth(qc)
   if (wait) await qc.invalidateQueries({ queryKey: [...wait] })
 }
 

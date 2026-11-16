@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { type QueryClient, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import type { RuleSystem } from "@/lib/rule-filters"
 import { api } from "@/lib/api"
@@ -128,6 +128,59 @@ export const useTeamMembers = (teamId: string, q: string, offset: number, loadin
     enabled,
   })
 export const useMyTeams = (enabled = true) => useQuery({ queryKey: ["me", "teams"], queryFn: () => api.get<MyTeams>("/api/me/teams"), staleTime: 60_000, enabled })
+
+/**
+ * After a change of the teams (the switch, a team, its members or products): every view that depends on them is asked
+ * again – the admin lists, the viewer's own teams and their "Mein Team" overview, and the personal notifications
+ * ("Meine Produkte": available or not, which products), which otherwise stayed up to 30 s on what was before.
+ */
+export function refreshTeams(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: ["admin", "teams"] })
+  void qc.invalidateQueries({ queryKey: ["admin", "users"] })
+  void qc.invalidateQueries({ queryKey: ["me", "teams"] })
+  void qc.invalidateQueries({ queryKey: PERSONAL_KEY })
+  void qc.invalidateQueries({ queryKey: ["vendor", "overview", "team"] })
+}
+
+/**
+ * What the team sheet shows for `?team=`: the form for a new one, the team, a short wait while the list is being asked
+ * (`waiting`: no answer since the sheet was opened – a link to a team the cached list does not know yet), or "Team
+ * nicht gefunden" (deleted, or a stale link) – never a spinner without end.
+ */
+export type TeamSheet = { kind: "none" } | { kind: "new" } | { kind: "team"; team: Team } | { kind: "loading" } | { kind: "missing" }
+export function teamSheet(open: string | null, teams: Team[], waiting: boolean): TeamSheet {
+  if (!open) return { kind: "none" }
+  if (open === "new") return { kind: "new" }
+  const team = teams.find((x) => x.id === open)
+  if (team) return { kind: "team", team }
+  return waiting ? { kind: "loading" } : { kind: "missing" }
+}
+
+/** One product's routing in the products part: for all members, or for the chosen ones. */
+export type Routing = { all: boolean; people: PersonRef[] }
+export const routingOf = (p: TeamProduct): Routing => ({ all: p.all_members, people: p.people })
+const ALL: Routing = { all: true, people: [] }
+const sameRouting = (a: Routing, b: Routing) => a.all === b.all && (a.all || JSON.stringify(a.people.map((x) => x.id).sort()) === JSON.stringify(b.people.map((x) => x.id).sort()))
+
+/**
+ * The one request of the products part (PUT …/products): the products and the routings that differ from what is
+ * stored – a new product's too. The server applies all of it in one transaction (all or nothing).
+ */
+export function productsSave(chosen: string[], routing: Record<string, Routing>, stored: TeamProduct[]) {
+  const saved = Object.fromEntries(stored.map((p) => [p.key, routingOf(p)])) as Record<string, Routing>
+  const changed = chosen.filter((k) => !sameRouting(routing[k] ?? ALL, saved[k] ?? ALL))
+  const productsChanged = JSON.stringify([...chosen].sort()) !== JSON.stringify(stored.map((p) => p.key).sort())
+  return {
+    dirty: productsChanged || changed.length > 0,
+    body: {
+      products: chosen,
+      routing: changed.map((k) => {
+        const r = routing[k] ?? ALL
+        return { product: k, all_members: r.all, members: r.all ? [] : r.people.map((x) => x.id) }
+      }),
+    },
+  }
+}
 
 /** The i18n key of a group's state line: what the last load said, with the permission it lacks when Graph refused. */
 export function groupStateKey(g: Pick<TeamGroup, "state" | "error" | "source">): string {

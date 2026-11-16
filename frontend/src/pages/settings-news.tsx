@@ -19,6 +19,7 @@ import { confirmDiscard } from "@/lib/unsaved"
 import { type AdminNewsSource, NEWS_CATEGORIES, type NewsCategory, type NewsSettings, useAdminNews } from "@/lib/news-api"
 import { cn } from "@/lib/utils"
 import { useSection } from "@/lib/settings-api"
+import { refreshHealth } from "@/lib/source-health"
 import { Pill } from "@/components/cobe/badges"
 import { SourceLogo } from "@/pages/news"
 import { ConfigureLabel, IntegrationSheetContent, NumberField, SaveBar, SheetActions, SheetBody, SheetLoading } from "@/pages/settings-shared"
@@ -82,6 +83,7 @@ function NewsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
                 onSuccess: () => {
                   void qc.invalidateQueries({ queryKey: ["admin-news"] })
                   void qc.invalidateQueries({ queryKey: ["news"] })
+                  refreshHealth(qc)
                 },
               })
             }
@@ -178,7 +180,10 @@ function FetchNow({ enabled }: { enabled: boolean }) {
         try {
           await api.post("/api/admin/news/fetch")
           toast.success(t("settings.news.fetching"))
-          setTimeout(() => void qc.invalidateQueries({ queryKey: ["admin-news"] }), 15_000)
+          setTimeout(() => {
+            void qc.invalidateQueries({ queryKey: ["admin-news"] })
+            refreshHealth(qc)
+          }, 15_000)
         } catch (e) {
           toast.error(errorText(t, e))
         } finally {
@@ -198,6 +203,7 @@ function Sources({ enabled }: { enabled: boolean }) {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["admin-news"] })
     void qc.invalidateQueries({ queryKey: ["news"] })
+    refreshHealth(qc)
   }
   const patch = async (s: AdminNewsSource, enabled: boolean) => {
     try {
