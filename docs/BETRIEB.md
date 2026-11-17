@@ -2164,6 +2164,10 @@ cd frontend && BASE_URL=http://localhost:5611 CREDS=/tmp/cn-e2e/creds.json \
   PLAYWRIGHT=/pfad/zu/node_modules/playwright/index.mjs node e2e/select-in-sheet.mjs   # creds.json: {"user","password","totp"}
 # ebenso: node e2e/signin-settings.mjs (speichert AD/LDAP der Wegwerf-Instanz mit Namen unter corp.example)
 # ebenso: node e2e/drawer-reopen.mjs (Schublade gleich wieder geöffnet: Abdunklung unter, nicht über ihr; PRODUCT=<Katalog-Key>)
+# ebenso: node e2e/drawer-after-signin.mjs (Link aus Benachrichtigung, Mail, Chat, Kalender abgemeldet geöffnet – Meldung,
+#   mehrere Meldungen, Produkt, Versionen, Änderungen, beobachtete CVE –, mit Passwort und Code angemeldet und frisch
+#   geladen wie nach Entra ID: Adresse bleibt, Schublade obenauf und bedienbar; Entra-Start nimmt einen langen Link;
+#   News eingeschaltet mit zwei Meldungen; PRODUCT=<Katalog-Key>, CVE=<wird dabei beobachtet>)
 ```
 
 **Basis-Images** sind mit ihrem Digest festgeschrieben (`Dockerfile`: `node:24-slim@sha256:…`, `python:3.13-slim@sha256:…`;
