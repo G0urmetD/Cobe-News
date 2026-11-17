@@ -2,6 +2,17 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.58 – Anmeldung mit Microsoft über lange Links
+
+### Verbessert
+- **Links nach der Anmeldung**: Ein neuer Browser-Check (`frontend/e2e/drawer-after-signin.mjs`) öffnet jede Art von Link aus Benachrichtigungen, Mails, Chats und dem Kalender im abgemeldeten Zustand – Meldung, mehrere Meldungen, Produkt, Versionen, Änderungen, beobachtete CVE – und prüft nach der Anmeldung mit Passwort und Code und nach dem Neuladen wie bei Entra ID: die Adresse bleibt, die Schublade liegt bedienbar über der Abdunklung.
+
+### Fixes
+- **Anmeldung mit Microsoft über lange Links**: Ein Link, der mehrere Meldungen öffnet („Cobe News öffnen“ in Mail, Teams, Slack, Discord, Telegram oder Webhook), war ab etwa acht Meldungen zu lang für die Anmeldung mit Entra ID – sie brach mit einem Fehler ab. Jetzt landet man nach der Anmeldung genau dort; ein noch längerer Link führt auf die Startseite, statt die Anmeldung zu verhindern.
+
+### Betrieb
+- Keine Migration. **Zurück auf 0.1.57** wie bei jedem Update (Images der Vorversion, Datenbank aus dem Backup vor dem Update).
+
 ## 0.1.57 – Schwere nach Hersteller, Palo-Alto-Bewertung, PostgreSQL 18.7
 
 ### Verbessert

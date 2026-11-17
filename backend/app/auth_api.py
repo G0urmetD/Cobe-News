@@ -669,9 +669,10 @@ def _oidc_rate_ok(ip: str) -> bool:
 
 
 def _safe_next(value: str | None) -> str:
-    """Where to land after the sign-in: only a path of this app (no other site, no scheme-relative //host)."""
+    """Where to land after the sign-in: only a path of this app (no other site, no scheme-relative //host). NEXT_MAX
+    counts bytes: what the cookie carries (2000 characters of a non-Latin script would not fit in it)."""
     v = (value or "").strip()
-    return v if v.startswith("/") and not v.startswith("//") and "\\" not in v and len(v) <= NEXT_MAX else "/"
+    return v if v.startswith("/") and not v.startswith("//") and "\\" not in v and len(v.encode()) <= NEXT_MAX else "/"
 
 
 @router.get("/auth/oidc/start")
