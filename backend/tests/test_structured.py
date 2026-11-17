@@ -635,6 +635,45 @@ async def test_epss_for_findings_and_stories_once_a_day(net, structured_on, admi
     assert (await reader_client.get(f"/api/news/{story['id']}")).json()["epss"][0]["cve"] == "CVE-2021-44228"
 
 
+async def test_epss_score_gone_or_pruned_leaves_no_old_score_in_the_views(net, structured_on, admin_client, reader_client):
+    """0.1.57: a score FIRST no longer gives (a withdrawn CVE) and a score the prune removes left the old score in the
+    cached views (no invalidate / bump) until something else recomputed them."""
+    from sqlalchemy import update
+
+    await _follow(admin_client, "panos", "10.2.7")
+    async with db.session() as s:
+        await vendor.store(s, [cvelist.parse_one(fx("cve_CVE-2024-3400.json"))], await vendor.current_index(s))
+    net.add("https://api.first.org/data/v1/epss*", fx("epss.json"))
+    async with db.session() as s:
+        assert await epss.refresh(s, force=True) == 1
+
+    async def shown() -> dict | None:
+        f = (await reader_client.get("/api/vendor/products/panos")).json()["findings"]
+        return next(x for x in f if "CVE-2024-3400" in x["cves"])["epss"]
+
+    assert (await shown())["score"] == 0.99999
+    # the next day FIRST no longer knows it
+    net.add("https://api.first.org/data/v1/epss*", {"status": "OK", "data": []})
+    async with db.session() as s:
+        await s.execute(update(EpssScore).values(fetched_at=datetime.now(UTC) - timedelta(days=2)))
+        await s.commit()
+        assert await epss.refresh(s, force=True) == 1
+        assert (await s.get(EpssScore, "CVE-2024-3400")).score is None
+    assert await shown() is None
+    # a score again – then not asked for a month: the prune removes it, the view with it
+    net.add("https://api.first.org/data/v1/epss*", fx("epss.json"))
+    async with db.session() as s:
+        await s.execute(update(EpssScore).values(fetched_at=datetime.now(UTC) - timedelta(days=2)))
+        await s.commit()
+        assert await epss.refresh(s, force=True) == 1
+    assert (await shown())["score"] == 0.99999
+    async with db.session() as s:
+        await s.execute(update(EpssScore).values(fetched_at=datetime.now(UTC) - epss.KEEP - timedelta(days=1)))
+        await s.commit()
+        assert await epss._prune(s) == 1
+    assert await shown() is None
+
+
 async def test_findings_sorted_by_epss(net, structured_on, admin_client, reader_client):
     await _follow(admin_client, "panos")
     recs = [cvelist.parse_record(record(f"CVE-2026-9000{i}", "Palo Alto Networks", "PAN-OS", [{"version": "10.0.0", "lessThan": "12.0", "status": "affected"}])) for i in range(3)]
@@ -830,3 +869,43 @@ async def test_osv_record_without_packages_any_more_drops_the_old_copy(net, stru
         await s.commit()
         await osv.refresh(s, force=True)
         assert await s.get(VendorAdvisory, "osv:CVE-2023-46589", populate_existing=True) is None
+
+
+async def test_osv_record_not_stored_is_asked_again_soon(net, structured_on, admin_client, monkeypatch):
+    """0.1.57: the CVE was marked "asked" before its record was stored – a failure of the store (a timeout, a bug)
+    left it unasked for 1–7 days. Now it is due again with the next round; after osv.STORE_TRIES failed rounds it
+    counts as asked all the same (one CVE that always fails does not hold up the others)."""
+    await _follow(admin_client, "tomcat", "9.0.80")
+    nvd = {"id": "nvd:CVE-2023-46589", "source": "nvd", "ident": "CVE-2023-46589", "title": "Tomcat", "summary": "", "url": "", "cves": ["CVE-2023-46589"], "cvss": 7.5, "severity": "high", "published_at": datetime(2023, 11, 28, tzinfo=UTC), "updated_at": None,
+           "data": {"configs": [{"nodes": [{"cpeMatch": [{"vulnerable": True, "criteria": "cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*"}]}]}], "cna": [], "desc": "x"}}  # fmt: skip
+    async with db.session() as s:
+        await vendor.store(s, [nvd], await vendor.current_index(s))
+    net.add(osv.API + "CVE-2023-46589", fx("osv_CVE-2023-46589.json"))
+    net.add(osv.API + "GHSA-fccv-jmmp-qg76", fx("osv_GHSA-fccv-jmmp-qg76.json"))
+    real = vendor.store
+
+    async def broken(db_, advs, ix, skipped=None):  # noqa: ANN001
+        if any(a["id"].startswith("osv:") for a in advs):
+            raise RuntimeError("store failed")
+        return await real(db_, advs, ix, skipped)
+
+    monkeypatch.setattr(vendor, "store", broken)
+    for n in range(1, osv.STORE_TRIES):
+        async with db.session() as s:
+            await osv.refresh(s, force=True)
+            row = await s.get(VendorFetch, osv.PER_CVE + "CVE-2023-46589", populate_existing=True)
+            assert row.last_fetch_at is None and row.failures == n  # not asked: due again
+            assert (await s.get(VendorFetch, osv.KEY, populate_existing=True)).failures == n  # the source's backoff as before
+    calls = len(net.calls)
+    async with db.session() as s:
+        await osv.refresh(s, force=True)
+        assert len(net.calls) > calls  # asked again
+        row = await s.get(VendorFetch, osv.PER_CVE + "CVE-2023-46589", populate_existing=True)
+        assert row.last_fetch_at is not None and row.failures == 0  # STORE_TRIES: counts as asked now
+    monkeypatch.setattr(vendor, "store", real)
+    async with db.session() as s:
+        row = await s.get(VendorFetch, osv.PER_CVE + "CVE-2023-46589")
+        row.last_fetch_at = datetime.now(UTC) - timedelta(days=60)
+        await s.commit()
+        assert await osv.refresh(s, force=True) == 1  # stored once the store works
+        assert await s.get(VendorAdvisory, "osv:CVE-2023-46589") is not None

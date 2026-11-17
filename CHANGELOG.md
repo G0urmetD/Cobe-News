@@ -2,6 +2,39 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.57 – Schwere nach Hersteller, Palo-Alto-Bewertung, PostgreSQL 18.7
+
+### Verbessert
+- **Hersteller zählt**: Schwere und CVSS eines Befunds kommen aus dem Hinweis des Herstellers und der Bewertung des CNA je CVE; die eigene Analyse der NVD, das BSI-Dokument und die CISA springen nur für eine CVE ein, die der Hersteller nicht bewertet. Weicht die NVD ab, steht ihr Wert daneben („CVSS 3.1 · NVD 8.8“, Erklärung beim Darüberfahren) – am Befund und in den Details aus der Quelle. „CVE beobachten“ nennt dieselbe Schwere. Handbuch: „Welche Bewertung zählt“.
+- **Basiswert daneben**: Bei Palo Alto zeigen Treffer und Details neben der Bewertung den reinen Basiswert („CVSS 6.6 · Basis 8.7“), mit Erklärung beim Darüberfahren; das Handbuch nennt die Regel.
+- **Stille Neubewertung beim Update**: Gespeicherte Hinweise von Palo Alto und aus der NVD werden nach dem Update einmal vollständig neu abgerufen und still neu eingestuft – in beide Richtungen: keine Revision, keine Benachrichtigung, kein „Jetzt höher eingestuft“, Bestätigungen bleiben stehen. Spätere Änderungen durch den Hersteller werden wie gewohnt gemeldet.
+- **Gesundheit aktuell**: Nach Änderungen in den News- oder Vendor-News-Einstellungen (Quelle an/aus, hinzugefügt, entfernt, abgerufen; einem Produkt folgen) lädt die Gesundheitsansicht sofort neu statt bis zu 5 Minuten den alten Stand zu zeigen.
+- **Teams ein- und ausschalten**: „Meine Produkte“ (persönliche Benachrichtigungen) und „Mein Team“ in Vendor News zeigen den neuen Stand sofort statt bis zu 30 Sekunden später.
+- **Neues Team**: Nach „Team anlegen“ öffnet sich das Team sofort, ohne auf die Liste zu warten.
+- **EPSS**: Ein Wert, den FIRST nicht mehr liefert oder der nach 30 Tagen entfernt wird, verschwindet sofort aus den Treffern. Vorher blieb der alte Wert eine Weile stehen.
+- **OSV**: Eine CVE, deren Datensatz nicht gespeichert werden konnte, wird in der nächsten Runde erneut gefragt, nicht erst nach 1–7 Tagen (nach drei Fehlversuchen im üblichen Abstand).
+- **Teams**: Eine Gruppe, die während des Ladens entfernt wird, bringt niemanden mehr ins Team – kein neues Konto, keine Willkommens-Mail.
+- **Eigene Security-Meldungen bei vielen Personen**: Eine Runde liest Abwesenheiten und Stummschaltungen einmal für alle und schreibt Reservierungen und Ergebnisse gesammelt statt Person für Person – rund 550 statt 3000 Datenbankabfragen je Runde mit 500 Empfänger-Wegen, etwa viermal schneller. Wer was bekommt, bleibt gleich; schlägt das gesammelte Schreiben fehl, geht es wie bisher Person für Person weiter.
+
+### Fixes
+- **Palo-Alto-Bewertung**: Vendor News und die Details aus der Quelle übernehmen jetzt Palo Altos eigene Bewertung (CVSS-BT, also mit der Bedrohungslage, wie auf der Seite von Palo Alto, im RSS-Titel und bei cve.org/NVD) statt des reinen CVSS-4.0-Basiswerts – CVE-2026-0331 ist MEDIUM 6.6 statt HIGH 8.7, CVE-2026-0328 LOW 2.7 statt HIGH 7.0. Auch der CVE-Datensatz (cvelistV5) zählt nach dem Threat-Score, und für die CVEs eines Herstellerhinweises zählt der Hinweis selbst vor jedem CVE-Datensatz.
+- **Schwere nach Hersteller (NVD)**: Ein NVD-Eintrag wird nach der Bewertung des CNA eingestuft – wie auf cve.org und der Seite des Herstellers –, nicht mehr nach der eigenen Analyse der NVD: GitLab CVE-2025-2938 ist niedrig (3.1) statt hoch (NVD 8.8), CVE-2020-13276 hoch (7.4) statt mittel (NVD 4.3). Die NVD-Bewertung gilt nur noch, wo der CNA keine gibt, die der CISA (ADP) zuletzt; von mehreren Bewertungen derselben CVSS-Version zählt die höchste – auch in der CVE-Liste (cvelistV5).
+- **BSI-Hinweise ohne eigenen CVSS**: Ein CSAF-Dokument ohne eigene Bewertung (die WID-Hinweise des BSI haben keine) übernahm den höchsten NVD-Wert seiner ersten CVEs – „GitLab: Mehrere Schwachstellen“ mit 11 CVEs stand für jede auf 8.7 hoch, CVE-2026-10518 ist 4.3. Jetzt zählt die Bewertung des Herstellers je CVE; CVEs, die nur aus einem BSI-Hinweis bekannt sind, holt Vendor News dafür aus der CVE-Liste nach. Die Schwere des Dokuments gilt nur noch, wo niemand sonst bewertet.
+- **Versionsbereiche in Worten oder mit Bindestrich**: „8.0.0-8.0.37“, „2.0 to 2.4“ oder „1.0 - 1.5“ in CSAF-Dokumenten (vor allem beim BSI) gelten jetzt als Bereich mit beiden Enden. Vorher wurden sie als eine einzige Version gelesen, und MySQL 8.0.20 war laut WID-SEC-W-2026-4081 fälschlich „nicht betroffen“. Text drumherum („1.0 and later“) wird nie mehr als Version gelesen.
+- **Siemens-Versionen mit „V“**: ältere Siemens-Advisories („< V3.1“, „vers:all/<V6.24“, „V15, V15.1, V16 and V17“) werden gelesen. Vorher bekam das Produkt daraus gar keine Bewertung.
+- **Liste und Bereich gemischt**: „neuer als alle genannten“ beachtet auch die Enden der Bereiche. Eine Version in einer Lücke ist nicht mehr fälschlich „nicht betroffen“.
+- **Team-Produkte speichern**: Produkte und „Wer bekommt was?“ werden in einem Schritt gespeichert – alles oder nichts. Bisher blieb bei einem Fehler in der Zuteilung die Hälfte des Formulars gespeichert.
+- **Gelöschtes Team per Link**: Ein Link auf ein gelöschtes Team zeigt „Team nicht gefunden“ mit dem Weg zurück zur Liste statt eines endlosen Ladekreises.
+- **Personensuche in der Zuteilung**: Kann die Mitgliederliste nicht geladen werden, steht eine Meldung mit „Erneut versuchen“ da statt eines endlosen Ladekreises.
+
+### Sicherheit
+- **Eigener Teams-Webhook über den Proxy**: Mit `HTTPS_PROXY` prüft der Server die Adresse des persönlichen Teams-Webhooks jetzt selbst, soweit er den Namen auflösen kann. Eine private Adresse ist „Ziel nicht erlaubt“, wie ohne Proxy. Ohne eigenes DNS geht der Weg weiter über den Proxy.
+- **PostgreSQL 18.7**: Das Datenbank-Image wechselt von 18.6 auf 18.7 (Digest festgeschrieben). 18.7 behebt unter anderem einen Fehler in GIN-Indizes, durch den Suchen nach einem abgebrochenen Seiten-Split Zeilen übersehen konnten; Migration 0049 baut die GIN-Indizes der App deshalb einmal neu auf.
+
+### Betrieb
+- **Migrationen 0047 bis 0049**: 0047 lässt jede Palo-Alto-Abfrage einmal vollständig neu laufen und die Details der Palo-Alto-Meldungen neu holen; 0048 lässt jede NVD-CPE-Abfrage einmal vollständig laufen (wie der wöchentliche Vollabruf) und setzt die Bewertung gespeicherter BSI-Hinweise zurück; 0049 baut die GIN-Indizes neu auf (Sekunden, beim Start). Keine neuen Tabellen. Die ersten Abrufrunden nach dem Update dauern dadurch länger und fragen NVD und Palo Alto mehr als sonst. **Zurück auf 0.1.56** wie bei jedem Update (Images der Vorversion, Datenbank aus dem Backup vor dem Update).
+- **Suchindex des Audit-Logs**: Er gehört der Audit-Rolle, die Migration darf ihn nicht anfassen. Wer ihn trotzdem neu aufbauen will: `docker compose exec db psql -U cobe_news cobe_news -c 'REINDEX INDEX ix_audit_log_search'` (siehe `docs/BETRIEB.md`, PostgreSQL).
+
 ## 0.1.56 – Treffer bestätigen, Gerät merken, Push mit Produkt
 
 ### Neu
@@ -28,6 +61,7 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 - **Wochenrückblick bei Mailserver-Ausfall**: Fehlversuche kommen mit wachsender Pause statt im Minutentakt (vorher war nach fünf Minuten Schluss); ein Fehler bei einem Team hält die anderen nicht mehr auf.
 - **Security-Meldungen**: Ein Fehler bei einer Person nimmt den anderen ihre Nachrichten nicht mehr weg.
 - **Persönliche Benachrichtigungen bei vielen Bestätigungen** sind schnell (vorher bei großen Teams und vielen bestätigten Treffern bis zu 18 s pro Runde).
+- **Zahl der eingebauten Quellen**: Handbuch und README nannten 46, es sind 44.
 - **Web Push für viele Browser** in einem Bruchteil der Zeit (gleiche Auswahl: eine Abfrage statt vier je Browser).
 
 ### Sicherheit

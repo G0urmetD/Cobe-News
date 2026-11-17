@@ -1255,9 +1255,14 @@ const FindingRow = memo(function FindingRow({
           </Tooltip>
         )}
         <SevPill s={f.severity} />
-        {f.cvss !== null && (
-          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
-            <Term k="cvss">CVSS</Term> {f.cvss.toFixed(1)}
+        {(f.cvss !== null || f.cvss_nvd != null) && (
+          <span
+            className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"
+            title={[f.cvss_base != null && t("details.baseHint"), f.cvss_nvd != null && t("details.nvdHint")].filter(Boolean).join("\n") || undefined}
+          >
+            <Term k="cvss">CVSS</Term> {f.cvss !== null ? f.cvss.toFixed(1) : t("vendor.card.cvssNone")}
+            {f.cvss_base != null && ` · ${t("details.base")} ${f.cvss_base.toFixed(1)}`}
+            {f.cvss_nvd != null && ` · NVD ${f.cvss_nvd.toFixed(1)}`}
           </span>
         )}
         {f.kev && (

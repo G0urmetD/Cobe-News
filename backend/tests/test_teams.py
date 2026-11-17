@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from conftest import add_user, make_client, sign_in
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
 from app import db, notify, teams
 from app import settings as settings_store
@@ -888,3 +888,35 @@ async def test_team_deleted_during_a_load_does_not_break_the_others(directory_fa
     assert await _members(kept) == {"user2"}
     async with db.session() as s:
         assert (await s.scalar(select(TeamGroup.state).where(TeamGroup.team_id == kept))) == "ok"
+
+
+async def test_group_unbound_during_a_load_brings_nobody(directory_fake, monkeypatch):
+    """0.1.57: a group unbound while the directories are asked kept its members (and their new accounts) until the
+    next load – the load works with the groups still bound after asking, as it does with the teams."""
+    await _settings()
+    tid = await _team("Security", ("ldap", SEC), ("ldap", NET))
+    directory_fake.set("ldap", SEC, [person(1)])
+    directory_fake.set("ldap", NET, [person(2)])
+    real = teams._members
+
+    async def unbind_while_loading(source, cfg, group_id):  # noqa: ANN001, ANN202
+        if group_id.lower() == NET.lower():
+            async with db.session() as s:
+                await s.execute(delete(TeamGroup).where(TeamGroup.team_id == tid, func.lower(TeamGroup.group_id) == NET.lower()))
+                await s.commit()
+        return await real(source, cfg, group_id)
+
+    monkeypatch.setattr(teams, "_members", unbind_while_loading)
+    await _sync()
+    assert await _members(tid) == {"user1"}
+    assert await _user("user2") is None  # no account for a member of a group no longer bound
+    # bound and loaded before, unbound during the next load: the members leave with that load
+    monkeypatch.setattr(teams, "_members", real)
+    async with db.session() as s:
+        s.add(TeamGroup(team_id=tid, source="ldap", group_id=NET, group_name="NET", state="ok"))
+        await s.commit()
+    await _sync()
+    assert await _members(tid) == {"user1", "user2"}
+    monkeypatch.setattr(teams, "_members", unbind_while_loading)
+    await _sync()
+    assert await _members(tid) == {"user1"}

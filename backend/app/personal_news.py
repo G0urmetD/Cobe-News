@@ -37,6 +37,11 @@ E-Mail oder Teams", 0.1.54) – what a channel rule does for a team, for one per
   looked at is marked, so one held by quiet hours never blocks the others. `backlog()` (the loop's "go on at once") only
   while some due person-way has not been looked at since the run of rounds began – never round after round for people
   who are only waiting (quiet hours).
+- **Set-based** (0.1.57). The people, their absences and their mutes are read once per round; each person-way's filter
+  is its own query (everybody chooses differently), but what it decides – the claims, the starts, the judgements, the
+  errors – is written CHUNK person-ways at a time in a few statements and one commit, before anything is sent, and the
+  outcomes of the round's messages are settled together (each job only its own claim; job by job only if that fails).
+  A round of 500 person-ways: about 550 statements instead of 3000.
 - **Egress** as the personal notifications: mail through notify.send_mail, the Teams URL of person_notify (checked,
   encrypted, never logged). The messages say why: "Treffer: PAN-OS" (systems or words chosen)."""
 
@@ -49,7 +54,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from sqlalchemy import Text as SqlText
-from sqlalchemy import and_, case, delete, exists, func, literal, literal_column, or_, select, union_all, update
+from sqlalchemy import and_, case, delete, exists, func, literal, literal_column, or_, select, text, union_all, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,6 +75,8 @@ MAX_AGE = personal.MAX_AGE  # a story older than this is never sent (and its sen
 CLAIM_MAX = 200  # stories in one person-way's message at most – the rest the next time
 LOOKBACK = timedelta(minutes=10)  # a change is looked for this much before the last judgement (one committed late)
 ROUND_JOBS = 500
+CHUNK = 50  # person-ways whose decisions (claims, starts, judgements) are written together: a few statements, one commit
+IN_CHUNK = 5000  # rows in one array-valued statement
 ROUND_S = 30.0
 SEND_DEADLINE = 90.0
 CONCURRENCY = 8
@@ -179,30 +186,31 @@ def by_cut(cut: datetime):  # noqa: ANN201
     return and_(NewsItem.fetched_at <= cut, ~changed_after(cut))
 
 
-async def _due(db: AsyncSession, p: PersonNews, way: str, now: datetime) -> list:
-    """The conditions of what is due for the person and way: the filter, due_where, not muted."""
+async def _due(db: AsyncSession, p: PersonNews, way: str, now: datetime, mutes: reader.Mutes | None = None) -> list:
+    """The conditions of what is due for the person and way: the filter, due_where, not muted (`mutes`: the person's
+    running mutes when read already – a round reads them for all at once)."""
     if systems_svc.has_ours(p.systems):
         await systems_svc.load_followed(db)  # "Unsere Produkte": the products followed now (kept – not read per person)
     where = [*notify.news_filter(rule_of(p)), *due_where(p, way, now)]
-    hush = reader.news_muted(await reader.mutes_of(db, p.user_id, now))
+    hush = reader.news_muted(mutes if mutes is not None else await reader.mutes_of(db, p.user_id, now))
     if hush is not None:
         where.append(~hush)
     return where
 
 
-async def stories_due(db: AsyncSession, p: PersonNews, way: str, now: datetime, cut: datetime | None = None) -> list[tuple[NewsItem, NewsSource]]:
+async def stories_due(db: AsyncSession, p: PersonNews, way: str, now: datetime, cut: datetime | None = None, mutes: reader.Mutes | None = None) -> list[tuple[NewsItem, NewsSource]]:
     """What the person's filter lets through of what is due – the most urgent CLAIM_MAX. `cut`: only what is due by
     that collecting time (by_cut)."""
-    where = await _due(db, p, way, now)
+    where = await _due(db, p, way, now, mutes)
     if cut is not None:
         where.append(by_cut(cut))
     q = select(NewsItem, NewsSource).join(NewsSource, NewsSource.id == NewsItem.source_id).where(*where).order_by(*_priority()).limit(CLAIM_MAX)
     return [(i, s) for i, s in (await db.execute(q)).all()]
 
 
-async def _after_cut(db: AsyncSession, p: PersonNews, way: str, now: datetime, cut: datetime) -> bool:
+async def _after_cut(db: AsyncSession, p: PersonNews, way: str, now: datetime, cut: datetime, mutes: reader.Mutes | None = None) -> bool:
     """Whether a story due now waits for the next collecting time (arrived or changed after `cut`)."""
-    where = await _due(db, p, way, now)
+    where = await _due(db, p, way, now, mutes)
     q = select(literal(1)).select_from(NewsItem).join(NewsSource, NewsSource.id == NewsItem.source_id).where(*where, ~by_cut(cut)).limit(1)
     return await db.scalar(q) is not None
 
@@ -320,7 +328,8 @@ async def _more(db: AsyncSession, ways: dict[str, bool], now: datetime) -> bool:
 
 async def _prepare(db: AsyncSession, ways: dict[str, bool], top: int, now: datetime, deadline: float) -> list[_Job]:
     """The due person-ways, the one looked at longest ago first: checked (absence, quiet hours, address or URL), their
-    stories claimed – written as sent and the claim marked, one commit per person-way – before anything is sent."""
+    stories claimed – written as sent and the claim marked – before anything is sent. Read person by person (each
+    filter is its own query), written CHUNK person-ways at a time in a few set-based statements and one commit."""
     due = _due_sql(ways, now)
     if due is None:
         return []
@@ -336,33 +345,180 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], top: int, now: datet
     )
     people = {p.user_id: (p, email, sched, url) for p, email, sched, url in await db.execute(q)}
     away = set(await db.scalars(select(PersonAbsence.user_id).where(PersonAbsence.user_id.in_(uids), PersonAbsence.starts_at <= now, PersonAbsence.ends_at > now, PersonAbsence.also_me.is_(False))))
+    mutes = await reader.mutes_for(db, uids, now)  # the running mutes of all of them: one query, not one per person-way
     # every person-way picked is looked at now – the next round starts with the others
     for way in WAYS:
         if mine := [u for u, w in picked if w == way]:
             await db.execute(update(PersonNews).where(PersonNews.user_id.in_(mine)).values({col(way, "seen_at"): now}).execution_options(synchronize_session=False))
     await db.commit()
     jobs: list[_Job] = []
+    plan: list[tuple] = []  # what was decided and is not written yet (plain values – a rollback loses nothing of it)
     for uid, way in picked:
         if time.monotonic() >= deadline:
             _state.more = True  # the round's time is up: the rest the next round (nothing of theirs claimed)
             break
         try:
-            if (job := await _prepare_one(db, people[uid], uid, way, uid in away, top, now)) is not None:
-                jobs.append(job)  # claimed and committed: sent (or taken back) by the round, whatever comes next
-        except Exception as exc:  # noqa: BLE001 - one person's error never abandons the jobs claimed for the others
-            await db.rollback()  # this person's claim (not committed) undone – their stories come again
+            if (what := await _judge(db, people[uid], uid, way, uid in away, top, now, mutes.get(uid) or reader.Mutes())) is not None:
+                plan.append(what)
+        except Exception as exc:  # noqa: BLE001 - one person's error never abandons the others
+            await db.rollback()  # nothing of theirs was written – their stories come again
             _failed_log(uid, way, exc)
             try:
                 # the rollback expired everything loaded: the people read again for the rest of the round
                 people = {p.user_id: (p, email, sched, url) for p, email, sched, url in await db.execute(q)}
                 await db.commit()
-            except Exception:  # noqa: BLE001 - the database itself: the jobs claimed so far still go, the rest next round
+            except Exception:  # noqa: BLE001 - the database itself: what was decided so far still goes, the rest next round
                 await db.rollback()
                 log.exception("personal news: the people not read again")
                 _state.more = True
                 break
+        if len(plan) >= CHUNK:
+            got, rolled_back = await _write(db, plan, top, now)  # claimed and committed: sent (or taken back) by the round
+            jobs += got
+            plan = []
+            if rolled_back:
+                try:
+                    # the batch's rollback expired everything loaded: the people read again for the rest of the round
+                    people = {p.user_id: (p, email, sched, url) for p, email, sched, url in await db.execute(q)}
+                    await db.commit()
+                except Exception:  # noqa: BLE001 - the database itself: what was claimed so far still goes, the rest next round
+                    await db.rollback()
+                    log.exception("personal news: the people not read again")
+                    _state.more = True
+                    break
+    jobs += (await _write(db, plan, top, now))[0]
     db.expunge_all()
     return jobs
+
+
+async def _judge(db: AsyncSession, person: tuple, uid: uuid.UUID, way: str, away: bool, top: int, now: datetime, mutes: reader.Mutes) -> tuple | None:
+    """One person-way of _prepare, read only: what _write is to write for it – (person, way, "start"): the way's start
+    follows the newest story; (…, "error", category): that, and the error shown; (…, "judged"): judged up to the newest
+    story; (…, "claim", job, judged): its stories to be claimed – or None (it waits, nothing to write)."""
+    p, email, schedule, url_enc = person
+    state = dict(getattr(p, f"state_{way}") or {})
+    if away:
+        return (uid, way, "start")  # away: nothing waits for the return
+    held, cut = quiet.hold(schedule, way, now)
+    if held and (cut is None or ((last := getattr(p, f"{way}_sent_at")) is not None and last >= cut)):
+        return None  # quiet hours, or the message of this collecting time went out already: it waits
+    # "gesammelt um HH:MM": only what came by that time – a story after it waits for the next, also when nothing was
+    # due at this one (the handbook: "kommt, was bis dahin eintraf")
+    cut = cut if held else None
+    rows = await stories_due(db, p, way, now, cut, mutes)
+    before = (int(getattr(p, f"{way}_checked_seq") or 0), getattr(p, f"{way}_checked_at"))
+    # judged up to the newest story now – unless more were due than one message takes (the rest the next time), or a
+    # story waits for the next collecting time (it would count as judged and never come)
+    judged = len(rows) < CLAIM_MAX
+    if judged and cut is not None and await _after_cut(db, p, way, now, cut, mutes):
+        judged = False
+    if not rows:
+        return (uid, way, "judged") if judged else None
+    job = _Job(uid, way, _lang(p.lang), now, before, [i.id for i, _ in rows], _messages(_story_list(p, rows)), int(state.get("failures") or 0), quiet.out(schedule)["tz"])
+    if way == "email":
+        if not email or not teams.MAIL.fullmatch(email):
+            return (uid, way, "error", "no_address")
+        job.address = email
+    else:
+        try:
+            job.url = decrypt_str(url_enc) if url_enc else ""
+        except Exception:  # noqa: BLE001 - another master key: the person enters the URL again
+            job.error = notify.NotifyError("secret_unreadable")
+        if not job.url and job.error is None:
+            return (uid, way, "error", "no_url")
+    return (uid, way, "claim", job, judged)
+
+
+def _error_patch(error: str, now: datetime) -> dict:
+    return {"last_error": error, "last_error_at": now.isoformat()}
+
+
+async def _write(db: AsyncSession, plan: list[tuple], top: int, now: datetime) -> tuple[list[_Job], bool]:
+    """What _judge decided for some person-ways, written together and committed – the jobs whose claim went in, and
+    whether a rollback was needed (it expires every object loaded: the caller reads its people again). The claim (the
+    stories written as sent, the claim marked) only while the way is still on and nothing claimed it meanwhile. If the
+    statements fail together: person-way by person-way (one person's write must not undo the others')."""
+    if not plan:
+        await db.commit()  # the reads' transaction ends
+        return [], False
+    try:
+        jobs = await _write_all(db, plan, top, now)
+        await db.commit()
+        return jobs, False
+    except Exception:  # noqa: BLE001 - written one by one instead
+        await db.rollback()
+        log.exception("personal news: a batch of claims not written at once – one by one")
+    jobs = []
+    for what in plan:
+        try:
+            if (job := await _write_one(db, what, top, now)) is not None:
+                jobs.append(job)
+            await db.commit()
+        except Exception as exc:  # noqa: BLE001 - this person's claim undone – their stories come again
+            await db.rollback()
+            _failed_log(what[0], what[1], exc)
+    return jobs, True
+
+
+async def _write_all(db: AsyncSession, plan: list[tuple], top: int, now: datetime) -> list[_Job]:
+    """_write's statements: per way the starts, the errors, the judgements and the claims, then the stories claimed –
+    a fixed number, however many person-ways (the column names are those of WAYS, never input)."""
+    claimed: list[_Job] = []
+    for way in WAYS:
+        mine = [w for w in plan if w[1] == way]
+        if not mine:
+            continue
+        on_seq, chk_seq, chk_at, claim, state = (f"{way}_on_seq", f"{way}_checked_seq", f"{way}_checked_at", f"{way}_claim_at", f"state_{way}")
+        if start := [w[0] for w in mine if w[2] == "start"]:
+            await db.execute(text(f"UPDATE person_news SET {on_seq} = :top WHERE user_id = ANY(CAST(:u AS uuid[]))"), {"top": top, "u": start})
+        for error in ("no_address", "no_url"):
+            if who := [w[0] for w in mine if w[2] == "error" and w[3] == error]:
+                await db.execute(
+                    text(f"UPDATE person_news SET {on_seq} = :top, {state} = COALESCE({state}, '{{}}'::jsonb) || CAST(:s AS jsonb) WHERE user_id = ANY(CAST(:u AS uuid[]))"),
+                    {"top": top, "u": who, "s": notify._json(_error_patch(error, now)).decode()},
+                )
+        if judged := [w[0] for w in mine if w[2] == "judged"]:
+            await db.execute(text(f"UPDATE person_news SET {chk_seq} = :top, {chk_at} = :now WHERE user_id = ANY(CAST(:u AS uuid[]))"), {"top": top, "now": now, "u": judged})
+        jobs = {w[0]: (w[3], w[4]) for w in mine if w[2] == "claim"}
+        for with_judged in (True, False):
+            who = [u for u, (_job, j) in jobs.items() if j is with_judged]
+            if not who:
+                continue
+            also = f", {chk_seq} = :top, {chk_at} = :now" if with_judged else ""
+            res = await db.execute(
+                text(f"UPDATE person_news SET {claim} = :now{also} WHERE user_id = ANY(CAST(:u AS uuid[])) AND {way}_on IS true AND {claim} IS NULL RETURNING user_id"),
+                {"now": now, "u": who, **({"top": top} if with_judged else {})},
+            )
+            claimed += [jobs[u][0] for u in res.scalars()]
+    rows = [(job.user_id, job.way, i) for job in claimed for i in job.items]
+    for i in range(0, len(rows), IN_CHUNK):
+        part = rows[i : i + IN_CHUNK]
+        await db.execute(
+            text("INSERT INTO person_news_sent (user_id, way, item_id, sent_at) SELECT u, w, i, :now FROM unnest(CAST(:u AS uuid[]), CAST(:w AS text[]), CAST(:i AS uuid[])) AS t(u, w, i) ON CONFLICT DO NOTHING"),
+            {"now": now, "u": [r[0] for r in part], "w": [r[1] for r in part], "i": [r[2] for r in part]},
+        )
+    order = {(w[0], w[1]): n for n, w in enumerate(plan)}
+    return sorted(claimed, key=lambda j: order[(j.user_id, j.way)])  # in the order picked (the fair order)
+
+
+async def _write_one(db: AsyncSession, what: tuple, top: int, now: datetime) -> _Job | None:
+    """One person-way of _write on its own (not committed) – the job when its claim went in."""
+    uid, way, kind = what[0], what[1], what[2]
+    if kind == "start":
+        await _set(db, uid, {col(way, "on_seq"): top})
+    elif kind == "error":
+        p = await db.get(PersonNews, uid)
+        if p is not None:
+            await _set(db, uid, {col(way, "on_seq"): top, col(way, "state"): {**dict(getattr(p, f"state_{way}") or {}), **_error_patch(what[3], now)}})
+    elif kind == "judged":
+        await _set(db, uid, {col(way, "checked_seq"): top, col(way, "checked_at"): now})
+    else:
+        job, judged = what[3], what[4]
+        values = {col(way, "claim_at"): now, **({col(way, "checked_seq"): top, col(way, "checked_at"): now} if judged else {})}
+        if await _set(db, uid, values, col(way, "on").is_(True), col(way, "claim_at").is_(None)):
+            await db.execute(pg_insert(PersonNewsSent).values([{"user_id": uid, "way": way, "item_id": i, "sent_at": now} for i in job.items]).on_conflict_do_nothing())
+            return job
+    return None
 
 
 FAIL_LOG = timedelta(hours=1)  # one person-way failing every round: its traceback once, then hourly (or on a new error)
@@ -382,58 +538,6 @@ def _failed_log(uid: uuid.UUID, way: str, exc: BaseException) -> None:
         log.warning("personal news %s of %s still not prepared (%s)", way, uid, what)
 
 
-async def _prepare_one(db: AsyncSession, person: tuple, uid: uuid.UUID, way: str, away: bool, top: int, now: datetime) -> _Job | None:
-    """One person-way of _prepare: checked, its stories claimed and committed – the job, or None (nothing to send)."""
-    p, email, schedule, url_enc = person
-    state = dict(getattr(p, f"state_{way}") or {})
-    if away:
-        await _set(db, uid, {col(way, "on_seq"): top})  # away: nothing waits for the return
-        await db.commit()
-        return None
-    held, cut = quiet.hold(schedule, way, now)
-    if held and (cut is None or ((last := getattr(p, f"{way}_sent_at")) is not None and last >= cut)):
-        return None  # quiet hours, or the message of this collecting time went out already: it waits
-    # "gesammelt um HH:MM": only what came by that time – a story after it waits for the next, also when nothing was
-    # due at this one (the handbook: "kommt, was bis dahin eintraf")
-    cut = cut if held else None
-    rows = await stories_due(db, p, way, now, cut)
-    before = (int(getattr(p, f"{way}_checked_seq") or 0), getattr(p, f"{way}_checked_at"))
-    # judged up to the newest story now – unless more were due than one message takes (the rest the next time), or a
-    # story waits for the next collecting time (it would count as judged and never come)
-    judged = {col(way, "checked_seq"): top, col(way, "checked_at"): now} if len(rows) < CLAIM_MAX else {}
-    if judged and cut is not None and await _after_cut(db, p, way, now, cut):
-        judged = {}
-    if not rows:
-        if judged:
-            await _set(db, uid, judged)
-        await db.commit()
-        return None
-    job = _Job(uid, way, _lang(p.lang), now, before, [i.id for i, _ in rows], _messages(_story_list(p, rows)), int(state.get("failures") or 0), quiet.out(schedule)["tz"])
-    if way == "email":
-        if not email or not teams.MAIL.fullmatch(email):
-            await _set(db, uid, {col(way, "on_seq"): top, col(way, "state"): {**state, "last_error": "no_address", "last_error_at": now.isoformat()}})
-            await db.commit()
-            return None
-        job.address = email
-    else:
-        try:
-            job.url = decrypt_str(url_enc) if url_enc else ""
-        except Exception:  # noqa: BLE001 - another master key: the person enters the URL again
-            job.error = notify.NotifyError("secret_unreadable")
-        if not job.url and job.error is None:
-            await _set(db, uid, {col(way, "on_seq"): top, col(way, "state"): {**state, "last_error": "no_url", "last_error_at": now.isoformat()}})
-            await db.commit()
-            return None
-    # the claim: the stories written as sent and the claim marked in one commit – only while the way is still on
-    # and nothing claimed it meanwhile
-    if await _set(db, uid, {col(way, "claim_at"): now, **judged}, col(way, "on").is_(True), col(way, "claim_at").is_(None)):
-        await db.execute(pg_insert(PersonNewsSent).values([{"user_id": uid, "way": way, "item_id": i, "sent_at": now} for i in job.items]).on_conflict_do_nothing())
-        await db.commit()
-        return job
-    await db.commit()
-    return None
-
-
 async def _send(job: _Job, smtp: dict) -> tuple[notify.NotifyError | None, bool]:
     """The job's messages, one after the other – (the first failure, whether one went out before it). No database work."""
     if job.error is not None:
@@ -447,7 +551,7 @@ async def _send(job: _Job, smtp: dict) -> tuple[notify.NotifyError | None, bool]
                     await notify.send_mail(smtp, [job.address], subject, text_, html)
                 else:
                     url = personal.check_teams_url(job.url)
-                    await notify.post(url, notify._json(render("teams", stories, total, job.lang, job.tz)), notify.JSON_HEADERS, policy=notify.PUBLIC_ONLY)
+                    await personal.post_teams(url, notify._json(render("teams", stories, total, job.lang, job.tz)))
                 sent = True
     except notify.NotifyError as exc:
         return exc, sent
@@ -493,6 +597,90 @@ async def _settle(db: AsyncSession, job: _Job, outcome: notify.NotifyError | Non
     await db.commit()
 
 
+async def _settle_all(db: AsyncSession, jobs: list[_Job], results: list, now: datetime) -> dict[str, int]:
+    """Every job of the round settled at once (as _settle and _unclaim, each job's own claim only): per way a few
+    set-based statements and one commit, the state merged key by key (the other keys stay). If they fail together:
+    job by job (one person's write must not undo the others')."""
+    out = {"sent": 0, "failed": 0}
+    counted: list[tuple[str, notify.NotifyError | None]] = []
+    plan: dict[str, dict[str, list]] = {w: {"ok": [], "back": [], "free": [], "fail": []} for w in WAYS}
+    for job, res in zip(jobs, results, strict=True):
+        mine = plan[job.way]
+        if res is None:  # not started: taken back, nothing was sent
+            mine["back"].append(job)
+            _state.more = True
+            continue
+        outcome, partly = res
+        counted.append((job.way, outcome))
+        if outcome is None:
+            mine["ok"].append(job)
+            out["sent"] += 1
+            continue
+        f = notify._failure(job.failures, outcome, now)
+        log.info("personal news %s of %s: %s", job.way, job.user_id, f["last_error"])
+        again = outcome.category in personal.RETRY and not partly and f["failures"] < personal.MAX_TRIES
+        mine["back" if again else "free"].append(job)
+        mine["fail"].append((job, f["next_try_at"], {"failures": f["failures"], "last_error": f["last_error"], "last_error_at": now.isoformat()}))
+        out["failed"] += 1
+    try:
+        for way, mine in plan.items():
+            claim, sent_at, nxt, state = f"{way}_claim_at", f"{way}_sent_at", f"{way}_next_at", f"state_{way}"
+            pairs = "unnest(CAST(:u AS uuid[]), CAST(:c AS timestamptz[])) AS t(u, c)"
+            if ok := mine["ok"]:
+                patch = {"failures": 0, "last_ok_at": now.isoformat(), "last_error": None}
+                await db.execute(
+                    text(f"UPDATE person_news p SET {claim} = NULL, {sent_at} = :now, {nxt} = NULL, {state} = COALESCE(p.{state}, '{{}}'::jsonb) || CAST(:s AS jsonb) FROM {pairs} WHERE p.user_id = t.u AND p.{claim} = t.c"),
+                    {"now": now, "s": notify._json(patch).decode(), "u": [j.user_id for j in ok], "c": [j.claimed_at for j in ok]},
+                )
+            if back := mine["back"]:
+                # certainly not sent: the stories are no longer sent (they come again), judged anew from where it was
+                rows = [(j.user_id, i, j.claimed_at) for j in back for i in j.items]
+                for k in range(0, len(rows), IN_CHUNK):
+                    part = rows[k : k + IN_CHUNK]
+                    await db.execute(
+                        text("DELETE FROM person_news_sent s USING unnest(CAST(:u AS uuid[]), CAST(:i AS uuid[]), CAST(:c AS timestamptz[])) AS t(u, i, c) WHERE s.user_id = t.u AND s.way = :w AND s.item_id = t.i AND s.sent_at = t.c"),
+                        {"w": way, "u": [r[0] for r in part], "i": [r[1] for r in part], "c": [r[2] for r in part]},
+                    )
+                await db.execute(
+                    text(
+                        f"UPDATE person_news p SET {claim} = NULL, {way}_checked_seq = t.cs, {way}_checked_at = t.ca "
+                        "FROM unnest(CAST(:u AS uuid[]), CAST(:c AS timestamptz[]), CAST(:cs AS integer[]), CAST(:ca AS timestamptz[])) AS t(u, c, cs, ca) "
+                        f"WHERE p.user_id = t.u AND p.{claim} = t.c"
+                    ),
+                    {"u": [j.user_id for j in back], "c": [j.claimed_at for j in back], "cs": [j.checked[0] for j in back], "ca": [j.checked[1] for j in back]},
+                )
+            if free := mine["free"]:  # may have delivered: kept as sent (never twice), only the claim ends
+                await db.execute(text(f"UPDATE person_news p SET {claim} = NULL FROM {pairs} WHERE p.user_id = t.u AND p.{claim} = t.c"), {"u": [j.user_id for j in free], "c": [j.claimed_at for j in free]})
+            if fail := mine["fail"]:
+                await db.execute(
+                    text(
+                        f"UPDATE person_news p SET {nxt} = t.n, {state} = COALESCE(p.{state}, '{{}}'::jsonb) || CAST(t.s AS jsonb) "
+                        "FROM unnest(CAST(:u AS uuid[]), CAST(:n AS timestamptz[]), CAST(:s AS text[])) AS t(u, n, s) WHERE p.user_id = t.u"
+                    ),
+                    {"u": [j.user_id for j, _n, _s in fail], "n": [n for _j, n, _s in fail], "s": [notify._json(dbm._no_nul(s)).decode() for _j, _n, s in fail]},
+                )
+        await db.commit()
+        for way, outcome in counted:
+            delivery_log.count("personal", way, delivery_log.outcome(way, outcome)[1])  # counted only, as the personal ones
+        return out
+    except Exception:  # noqa: BLE001 - written job by job instead
+        await db.rollback()
+        log.exception("personal news: a round's results not written at once – one by one")
+    out = {"sent": 0, "failed": 0}
+    for job, res in zip(jobs, results, strict=True):
+        try:
+            if res is None:
+                await _unclaim(db, job)
+                await db.commit()
+                continue
+            await _settle(db, job, res[0], res[1], now)
+            out["sent" if res[0] is None else "failed"] += 1
+        except Exception:  # noqa: BLE001 - one person's write must not undo the others' (a claim left: given up after STALE)
+            await db.rollback()
+            log.exception("personal news: state of %s not written", job.user_id)
+    return out
+
+
 async def dispatch(db: AsyncSession) -> dict[str, int]:
     """After the personal notifications: per person and way what is due for them."""
     was_more, _state.more = _state.more, False  # never sticky: every way out of here says it anew
@@ -523,20 +711,8 @@ async def dispatch(db: AsyncSession) -> dict[str, int]:
                 return None  # not started: taken back, nothing was sent
             return await _send(j, smtp)
 
-    results = await asyncio.gather(*(one(j) for j in jobs))
-    out = {"sent": 0, "failed": 0}
-    for job, res in zip(jobs, results, strict=True):
-        try:
-            if res is None:
-                await _unclaim(db, job)
-                await db.commit()
-                _state.more = True
-                continue
-            await _settle(db, job, res[0], res[1], datetime.now(UTC))
-            out["sent" if res[0] is None else "failed"] += 1
-        except Exception:  # noqa: BLE001 - one person's write must not undo the others' (a claim left: given up after STALE)
-            await db.rollback()
-            log.exception("personal news: state of %s not written", job.user_id)
+    results = list(await asyncio.gather(*(one(j) for j in jobs)))
+    out = await _settle_all(db, jobs, results, datetime.now(UTC)) if jobs else {"sent": 0, "failed": 0}
     _state.more = _state.more or await _more(db, ways, now)
     if not _state.more:
         _state.cycle = None

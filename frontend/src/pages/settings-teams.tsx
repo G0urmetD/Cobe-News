@@ -31,9 +31,13 @@ import {
   type Team,
   type TeamGroup,
   type TeamMemberRow,
-  type TeamProduct,
   type TeamsSettings,
+  type Routing,
   groupStateKey,
+  productsSave,
+  refreshTeams,
+  routingOf,
+  teamSheet,
   useTeamMembers,
   useTeamProducts,
   useTeams,
@@ -45,12 +49,6 @@ import { isoList } from "@/lib/bidi"
 
 type Part = "general" | "groups" | "members" | "products" | "weekly"
 const PARTS: Part[] = ["general", "groups", "members", "products", "weekly"]
-
-const refreshTeams = (qc: ReturnType<typeof useQueryClient>) => {
-  void qc.invalidateQueries({ queryKey: ["admin", "teams"] })
-  void qc.invalidateQueries({ queryKey: ["admin", "users"] })
-  void qc.invalidateQueries({ queryKey: ["me", "teams"] })
-}
 
 /** Settings → Teams: the teams | the switch (sub-tabs, `?tab=settings`). */
 export function TeamsSettingsPage() {
@@ -200,8 +198,13 @@ function TeamsList({ onSettings }: { onSettings: () => void }) {
       },
       { replace: !id },
     )
+  // a team not in the list: a short wait until the list has answered once since it was opened, then "nicht gefunden"
+  // (no closing by itself – that raced with "Team anlegen"; the list's polling while a group loads changes nothing)
+  const [asked, setAsked] = useState({ id: open, at: q.dataUpdatedAt })
+  if (asked.id !== open) setAsked({ id: open, at: q.dataUpdatedAt })
   if (!q.data || !settings.data) return <Loading error={q.error ?? settings.error} onRetry={() => void Promise.all([q.refetch(), settings.refetch()])} />
-  const team = open && open !== "new" ? (q.data.find((x) => x.id === open) ?? null) : null
+  const sheet = teamSheet(open, q.data, q.isFetching && q.dataUpdatedAt <= asked.at)
+  const team = sheet.kind === "team" ? sheet.team : null
   return (
     <>
       {!settings.data.enabled && (
@@ -260,12 +263,25 @@ function TeamsList({ onSettings }: { onSettings: () => void }) {
       <Sheet open={!!open} onOpenChange={(o) => !o && void confirmDiscard().then((ok) => ok && openTeam(null))}>
         <IntegrationSheetContent
           icon={UsersRound}
-          title={team ? team.name : t("teams.create")}
+          title={team ? team.name : sheet.kind === "missing" ? t("teams.notFoundTitle") : t("teams.create")}
           description={t("teams.sheetDesc")}
           help={{ chapter: "anmeldung", section: "teams" }}
         >
-          {open === "new" ? (
+          {sheet.kind === "new" ? (
             <GeneralPart team={null} onDone={(id) => (id ? openTeam(id, "groups") : openTeam(null))} />
+          ) : sheet.kind === "missing" ? (
+            <SheetBody>
+              <EmptyState
+                icon={UsersRound}
+                title={t("teams.notFoundTitle")}
+                text={t("teams.notFoundText")}
+                action={
+                  <Button size="sm" variant="outline" onClick={() => openTeam(null)}>
+                    {t("teams.backToList")}
+                  </Button>
+                }
+              />
+            </SheetBody>
           ) : !team ? (
             <SheetLoading />
           ) : (
@@ -339,6 +355,8 @@ function GeneralPart({ team, onDone }: { team: Team | null; onDone: (id: string 
       } else {
         const r = await api.post<Team>("/api/admin/teams", body)
         toast.success(t("teams.created", { name: r.name }))
+        // the new team is in the list at once – the sheet shows it, not a wait for the list
+        qc.setQueryData<Team[]>(["admin", "teams", "list"], (l) => (l && !l.some((x) => x.id === r.id) ? [...l, r] : l))
         refreshTeams(qc)
         onDone(r.id)
         return
@@ -831,10 +849,6 @@ function MembersPart({ team, settings }: { team: Team; settings: TeamsSettings }
 
 // ---------------------------------------------------------------- products and who of the team gets them
 
-type Routing = { all: boolean; people: PersonRef[] }
-const routingOf = (p: TeamProduct): Routing => ({ all: p.all_members, people: p.people })
-const sameRouting = (a: Routing, b: Routing) => a.all === b.all && (a.all || JSON.stringify(a.people.map((x) => x.id).sort()) === JSON.stringify(b.people.map((x) => x.id).sort()))
-
 function ProductsPart({ team }: { team: Team }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -845,20 +859,14 @@ function ProductsPart({ team }: { team: Team }) {
   const [routing, setRouting] = useState<Record<string, Routing>>(saved)
   const [busy, setBusy] = useState(false)
   const route = (key: string): Routing => routing[key] ?? { all: true, people: [] }
-  const changed = v.filter((k) => !sameRouting(route(k), saved[k] ?? { all: true, people: [] }))
-  const dirty = JSON.stringify([...v].sort()) !== JSON.stringify([...initial].sort()) || changed.length > 0
+  const { dirty, body } = productsSave(v, routing, team.products)
   const save = async () => {
     setBusy(true)
     try {
-      if (JSON.stringify([...v].sort()) !== JSON.stringify([...initial].sort())) await api.put(`/api/admin/teams/${team.id}/products`, { products: v })
-      for (const key of changed) {
-        const r = route(key)
-        await api.put(`/api/admin/teams/${team.id}/routing`, { product: key, all_members: r.all, members: r.all ? [] : r.people.map((x) => x.id) })
-      }
+      // one request: the products and the changed routings in one transaction – all saved or nothing
+      await api.put(`/api/admin/teams/${team.id}/products`, body)
       toast.success(t("common.saved"))
       refreshTeams(qc)
-      void qc.invalidateQueries({ queryKey: ["vendor", "overview", "team"] })
-      void qc.invalidateQueries({ queryKey: ["me", "vendor-notify"] })
     } catch (e) {
       toast.error(e instanceof ApiError ? errorText(t, e) : t("errors.generic"))
       refreshTeams(qc)
@@ -975,7 +983,14 @@ function MemberPicker({ teamId, value, onChange }: { teamId: string; value: Pers
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("teams.members.search")} aria-label={t("teams.members.search")} className="pl-8" autoFocus />
           </div>
-          {!found.data ? (
+          {found.isError && !found.data ? (
+            <div role="alert" className="flex flex-wrap items-center gap-2 px-1 py-2 text-xs">
+              <span className="min-w-0 flex-1 text-sev-critical">{t("teams.routing.loadFailed")}</span>
+              <Button variant="outline" size="xs" onClick={() => void found.refetch()} disabled={found.isFetching}>
+                {found.isFetching ? <Loader2 className="animate-spin" /> : <RefreshCw />} {t("errors.retry")}
+              </Button>
+            </div>
+          ) : !found.data ? (
             <Loader2 className="mx-auto my-2 size-4 animate-spin text-muted-foreground" />
           ) : options.length === 0 ? (
             <p className="px-1 py-2 text-xs text-muted-foreground">{t("common.noResults")}</p>

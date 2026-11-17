@@ -1,0 +1,3106 @@
+{
+ "document": {
+  "aggregate_severity": {
+   "text": "kritisch"
+  },
+  "category": "csaf_base",
+  "csaf_version": "2.0",
+  "distribution": {
+   "tlp": {
+    "label": "WHITE",
+    "url": "https://www.first.org/tlp/"
+   }
+  },
+  "lang": "de-DE",
+  "notes": [
+   {
+    "category": "legal_disclaimer",
+    "text": "Das BSI ist als Anbieter f\u00fcr die eigenen, zur Nutzung bereitgestellten Inhalte nach den allgemeinen Gesetzen verantwortlich. Nutzerinnen und Nutzer sind jedoch daf\u00fcr verantwortlich, die Verwendung und/oder die Umsetzung der mit den Inhalten bereitgestellten Informationen sorgf\u00e4ltig im Einzelfall zu pr\u00fcfen."
+   },
+   {
+    "category": "description",
+    "text": "Node.js ist eine Plattform zur Entwicklung von Netzwerkanwendungen.",
+    "title": "Produktbeschreibung"
+   },
+   {
+    "category": "summary",
+    "text": "Ein Angreifer kann mehrere Schwachstellen in Node.js ausnutzen, um einen Denial of Service Angriff durchzuf\u00fchren, um Sicherheitsvorkehrungen zu umgehen und um beliebigen Programmcode auszuf\u00fchren.",
+    "title": "Angriff"
+   },
+   {
+    "category": "general",
+    "text": "- Linux\n- Sonstiges\n- UNIX\n- Windows",
+    "title": "Betroffene Betriebssysteme"
+   }
+  ],
+  "publisher": {
+   "category": "other",
+   "contact_details": "csaf-provider@cert-bund.de",
+   "name": "Bundesamt f\u00fcr Sicherheit in der Informationstechnik",
+   "namespace": "https://www.bsi.bund.de"
+  },
+  "references": [
+   {
+    "category": "self",
+    "summary": "WID-SEC-W-2026-4117 - CSAF Version",
+    "url": "https://wid.cert-bund.de/.well-known/csaf/white/2026/wid-sec-w-2026-4117.json"
+   },
+   {
+    "category": "self",
+    "summary": "WID-SEC-2026-4117 - Portal Version",
+    "url": "https://wid.cert-bund.de/portal/wid/securityadvisory?name=WID-SEC-2026-4117"
+   },
+   {
+    "category": "external",
+    "summary": "Node.js Security Release vom 2026-10-21",
+    "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+   },
+   {
+    "category": "external",
+    "summary": "Node.js Security Release vom 2026-10-21",
+    "url": "https://nodejs.org/en/blog/release/v22.23.4"
+   },
+   {
+    "category": "external",
+    "summary": "Node.js Security Release vom 2026-10-21",
+    "url": "https://nodejs.org/en/blog/release/v24.22.1"
+   },
+   {
+    "category": "external",
+    "summary": "Node.js Security Release vom 2026-10-21",
+    "url": "https://nodejs.org/en/blog/release/v26.12.1"
+   },
+   {
+    "category": "external",
+    "summary": "PoC CVE-2026-111497 Node2Shell",
+    "url": "https://www.imperva.com/blog/node2shell-from-brotli-data-to-remote-code-execution/"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:87420 vom 2026-10-23",
+    "url": "https://access.redhat.com/errata/RHSA-2026:87420"
+   },
+   {
+    "category": "external",
+    "summary": "Fedora Security Advisory FEDORA-2026-A336A99528 vom 2026-10-26",
+    "url": "https://bodhi.fedoraproject.org/updates/FEDORA-2026-a336a99528"
+   },
+   {
+    "category": "external",
+    "summary": "Debian Security Advisory DLA-4855 vom 2026-10-24",
+    "url": "https://lists.debian.org/debian-lts-announce/2026/10/msg00049.html"
+   },
+   {
+    "category": "external",
+    "summary": "Debian Security Advisory DSA-6582 vom 2026-10-24",
+    "url": "https://security-tracker.debian.org/tracker/DSA-6582-1"
+   },
+   {
+    "category": "external",
+    "summary": "Fedora Security Advisory FEDORA-2026-5B98DD6D78 vom 2026-10-26",
+    "url": "https://bodhi.fedoraproject.org/updates/FEDORA-2026-5b98dd6d78"
+   },
+   {
+    "category": "external",
+    "summary": "Microsoft Security Update Guide",
+    "url": "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2026-111497"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500514 vom 2026-10-27",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-500514.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90501 vom 2026-10-26",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90501"
+   },
+   {
+    "category": "external",
+    "summary": "Fedora Security Advisory FEDORA-2026-4AADE61415 vom 2026-10-26",
+    "url": "https://bodhi.fedoraproject.org/updates/FEDORA-2026-4aade61415"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500517 vom 2026-10-27",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-500517.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90495 vom 2026-10-26",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90495"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500515 vom 2026-10-27",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-500515.html"
+   },
+   {
+    "category": "external",
+    "summary": "Fedora Security Advisory FEDORA-2026-92436BEF9C vom 2026-10-26",
+    "url": "https://bodhi.fedoraproject.org/updates/FEDORA-2026-92436bef9c"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500516 vom 2026-10-27",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-500516.html"
+   },
+   {
+    "category": "external",
+    "summary": "Ubuntu Security Notice USN-8956-1 vom 2026-10-26",
+    "url": "https://ubuntu.com/security/notices/USN-8956-1"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500513 vom 2026-10-27",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-500513.html"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500512 vom 2026-10-27",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-500512.html"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500520 vom 2026-10-27",
+    "url": "https://linux.oracle.com/errata/ELSA-2026-500520.html"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500518 vom 2026-10-26",
+    "url": "https://linux.oracle.com/errata/ELSA-2026-500518.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90449 vom 2026-10-26",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90449"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-500519 vom 2026-10-27",
+    "url": "https://linux.oracle.com/errata/ELSA-2026-500519.html"
+   },
+   {
+    "category": "external",
+    "summary": "Palo Alto Security Advisory",
+    "url": "https://security.paloaltonetworks.com/CVE-2026-111497"
+   },
+   {
+    "category": "external",
+    "summary": "Exploit CVE-2026-111497",
+    "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:89206 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:89206"
+   },
+   {
+    "category": "external",
+    "summary": "National Vulnerability Database CVE-2026-28330 vom 2026-10-27",
+    "url": "https://documentation.solarwinds.com/en/success_center/orionplatform/content/release_notes/solarwinds_platform_2026-4-1_release_notes.htm"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90893 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90893"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90914 vom 2026-10-27",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90914"
+   },
+   {
+    "category": "external",
+    "summary": "VMware Security Advisory VMSA-2026-0008 vom 2026-10-28",
+    "url": "https://app.sw.broadcom.com/e/er?utm_content=VCF_FY26_VCF_VMSA-2026-0008_6932_SecurityAlert_MKT_TRANS_EM_14419&s=3805888&lid=15186&elqTrackId=694685E6DA8205B11F1CE8D2643AF3F4&elq=52cf0ef17e344c04a8ca0714bf95a772&elqaid=14419&elqat=1&elqak=8AF5120EAAFB11729B015FB40A016A9CD159ABE36BB05B3C2B383233A22C02602D8E"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:87702 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:87702"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-90449 vom 2026-10-27",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-90449.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90888 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90888"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90892 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90892"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-90501 vom 2026-10-27",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-90501.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90891 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90891"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90889 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90889"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:90890 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:90890"
+   },
+   {
+    "category": "external",
+    "summary": "Splunk Security Advisory SVD-2026-1015 vom 2026-10-28",
+    "url": "https://advisory.splunk.com/advisories/SVD-2026-1015"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:91709 vom 2026-10-28",
+    "url": "https://access.redhat.com/errata/RHSA-2026:91709"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:91709 vom 2026-10-29",
+    "url": "https://access.redhat.com/errata/RHSA-2026:91709"
+   },
+   {
+    "category": "external",
+    "summary": "IBM Security Bulletin 7294670 vom 2026-10-29",
+    "url": "https://www.ibm.com/support/pages/node/7294670"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:90449 vom 2026-10-29",
+    "url": "https://errata.build.resf.org/RLSA-2026:90449"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:90495 vom 2026-10-29",
+    "url": "https://errata.build.resf.org/RLSA-2026:90495"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:92376 vom 2026-10-29",
+    "url": "https://access.redhat.com/errata/RHSA-2026:92376"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:4945-1 vom 2026-10-30",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-October/030256.html"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:92376 vom 2026-10-30",
+    "url": "https://errata.build.resf.org/RLSA-2026:92376"
+   },
+   {
+    "category": "external",
+    "summary": "Ubuntu Security Notice USN-8958-1 vom 2026-10-30",
+    "url": "https://ubuntu.com/security/notices/USN-8958-1"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:92378 vom 2026-10-29",
+    "url": "https://access.redhat.com/errata/RHSA-2026:92378"
+   },
+   {
+    "category": "external",
+    "summary": "Broadcom Security Advisory",
+    "url": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/39445"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:92378 vom 2026-10-30",
+    "url": "https://errata.build.resf.org/RLSA-2026:92378"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-92378 vom 2026-11-02",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-92378.html"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-92492 vom 2026-11-02",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-92492.html"
+   },
+   {
+    "category": "external",
+    "summary": "Nutanix Security Advisory vom 2026-10-31",
+    "url": "https://download.nutanix.com/alerts/Security_Advisory_0061.pdf"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:4957-1 vom 2026-11-02",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030279.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93065 vom 2026-10-31",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93065"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93065 vom 2026-10-30",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93065"
+   },
+   {
+    "category": "external",
+    "summary": "HCL Security Bulletin vom 2026-10-30",
+    "url": "https://support.hcl-software.com/csm?id=kb_article&sysparm_article=KB0134995"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93457 vom 2026-11-02",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93457"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93456 vom 2026-11-02",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93456"
+   },
+   {
+    "category": "external",
+    "summary": "Ubuntu Security Notice USN-8956-2 vom 2026-10-30",
+    "url": "https://ubuntu.com/security/notices/USN-8956-2"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93550 vom 2026-11-02",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93550"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93455 vom 2026-11-02",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93455"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94453 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94453"
+   },
+   {
+    "category": "external",
+    "summary": "Arista Security Advisory 0202 vom 2026-11-03",
+    "url": "https://www.arista.com/en/support/advisories-notices/security-advisory/24853-security-advisory-0202"
+   },
+   {
+    "category": "external",
+    "summary": "Fedora Security Advisory FEDORA-2026-094B09B38E vom 2026-11-02",
+    "url": "https://bodhi.fedoraproject.org/updates/FEDORA-2026-094b09b38e"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:5036-1 vom 2026-11-03",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030308.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94101 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94101"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94457 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94457"
+   },
+   {
+    "category": "external",
+    "summary": "Anaconda Navigator Release Notes",
+    "url": "https://www.anaconda.com/docs/legacy/anaconda-navigator/release-notes#2-7-4"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94100 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94100"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:5037-1 vom 2026-11-03",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030307.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93987 vom 2026-11-02",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93987"
+   },
+   {
+    "category": "external",
+    "summary": "IGEL Security Notice ISN-2026-43 vom 2026-11-02",
+    "url": "https://kb.igel.com/en/security-safety/current/isn-2026-43-critical-brotli-issue-in-igel-os"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93984 vom 2026-11-02",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93984"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93980 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93980"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94108 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94108"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93908 vom 2026-11-02",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93908"
+   },
+   {
+    "category": "external",
+    "summary": "Fedora Security Advisory FEDORA-2026-3A916DBB6C vom 2026-11-02",
+    "url": "https://bodhi.fedoraproject.org/updates/FEDORA-2026-3a916dbb6c"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94455 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94455"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94460 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94460"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:93902 vom 2026-11-02",
+    "url": "https://access.redhat.com/errata/RHSA-2026:93902"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94452 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94452"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94454 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94454"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94476 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94476"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94469 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94469"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94470 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94470"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94471 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94471"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94472 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94472"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94473 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94473"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94474 vom 2026-11-03",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94474"
+   },
+   {
+    "category": "external",
+    "summary": "openSUSE Security Update OPENSUSE-SU-2026:22210-1 vom 2026-11-04",
+    "url": "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/2QOGNPIUBNEFTZIG6JO2SZC7SVSEXZRF/"
+   },
+   {
+    "category": "external",
+    "summary": "openSUSE Security Update OPENSUSE-SU-2026:22213-1 vom 2026-11-04",
+    "url": "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/R5VGVOMAJBLTJU7RXDOBYYGGMFVAALR4/"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:94802 vom 2026-11-04",
+    "url": "https://access.redhat.com/errata/RHSA-2026:94802"
+   },
+   {
+    "category": "external",
+    "summary": "Elastic Security Announcement ESA-2026-232 vom 2026-11-03",
+    "url": "https://discuss.elastic.co/t/kibana-8-19-24-9-4-9-9-5-6-security-update-esa-2026-232/391369"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24476-1 vom 2026-11-03",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030368.html"
+   },
+   {
+    "category": "external",
+    "summary": "SolarWinds Dameware 2026.3.1 release notes vom 2026-11-03",
+    "url": "https://documentation.solarwinds.com/en/success_center/dameware/content/release_notes/dameware_2026-3-1_release_notes.htm"
+   },
+   {
+    "category": "external",
+    "summary": "IBM Security Bulletin 7295464 vom 2026-11-04",
+    "url": "https://www.ibm.com/support/pages/node/7295464"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24518-1 vom 2026-11-04",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030415.html"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-90495 vom 2026-11-04",
+    "url": "https://linux.oracle.com/errata/ELSA-2026-90495.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95360 vom 2026-11-04",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95360"
+   },
+   {
+    "category": "external",
+    "summary": "Citrix XenServer Security Update vom 2026-11-05",
+    "url": "https://support.citrix.com/support-home/kbsearch/article?articleNumber=CTX697256"
+   },
+   {
+    "category": "external",
+    "summary": "Google Cloud Platform Security Bulletin GCP-2026-079 vom 2026-11-05",
+    "url": "https://docs.cloud.google.com/support/bulletins#gcp-2026-079"
+   },
+   {
+    "category": "external",
+    "summary": "Devolutions Security Advisory DEVO-2026-0040 vom 2026-11-05",
+    "url": "https://devolutions.net/security/advisories/DEVO-2026-0040/"
+   },
+   {
+    "category": "external",
+    "summary": "Synology Security Advisory SYNOLOGY-SA-26:15 vom 2026-11-06",
+    "url": "https://www.synology.com/de-de/security/advisory/Synology_SA_26_15"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24556-1 vom 2026-11-06",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030477.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95656 vom 2026-11-05",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95656"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95657 vom 2026-11-05",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95657"
+   },
+   {
+    "category": "external",
+    "summary": "Siemens Security Advisory by Siemens ProductCERT",
+    "url": "https://productcert.siemens.com/productcert/html/ssa-443410.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95408 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95408"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95523 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95523"
+   },
+   {
+    "category": "external",
+    "summary": "openSUSE Security Update OPENSUSE-SU-2026:12232-1 vom 2026-11-07",
+    "url": "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/QH65FUGIOFDXYGCYYZKYTX6BYSDON4HI/"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95346 vom 2026-11-06",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95346"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24600-1 vom 2026-11-06",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030489.html"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24601-1 vom 2026-11-06",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030488.html"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24597-1 vom 2026-11-06",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030491.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95377 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95377"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:5125-1 vom 2026-11-06",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030484.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96234 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96234"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96088 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96088"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96094 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96094"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24542-1 vom 2026-11-10",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030520.html"
+   },
+   {
+    "category": "external",
+    "summary": "Apple Security Advisory 149716 vom 2026-11-06",
+    "url": "https://support.apple.com/en-us/149716"
+   },
+   {
+    "category": "external",
+    "summary": "Apple Security Advisory 149719 vom 2026-11-06",
+    "url": "https://support.apple.com/en-us/149719"
+   },
+   {
+    "category": "external",
+    "summary": "Apple Security Advisory 149720 vom 2026-11-06",
+    "url": "https://support.apple.com/en-us/149720"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95508 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95508"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96391 vom 2026-11-09",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96391"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-96226 vom 2026-11-09",
+    "url": "https://linux.oracle.com/errata/ELSA-2026-96226.html"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24548-1 vom 2026-11-10",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030514.html"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-96094 vom 2026-11-09",
+    "url": "https://linux.oracle.com/errata/ELSA-2026-96094.html"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:96234 vom 2026-11-10",
+    "url": "https://errata.build.resf.org/RLSA-2026:96234"
+   },
+   {
+    "category": "external",
+    "summary": "Apple Security Advisory 149718 vom 2026-11-06",
+    "url": "https://support.apple.com/en-us/149718"
+   },
+   {
+    "category": "external",
+    "summary": "IBM Security Bulletin 7296009 vom 2026-11-09",
+    "url": "https://www.ibm.com/support/pages/node/7296009"
+   },
+   {
+    "category": "external",
+    "summary": "Apple Security Advisory 149715 vom 2026-11-06",
+    "url": "https://support.apple.com/en-us/149715"
+   },
+   {
+    "category": "external",
+    "summary": "Siemens Security Advisory SSA-242944 vom 2026-11-10",
+    "url": "https://cert-portal.siemens.com/productcert/html/ssa-242944.html"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:96094 vom 2026-11-10",
+    "url": "https://errata.build.resf.org/RLSA-2026:96094"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:96088 vom 2026-11-10",
+    "url": "https://errata.build.resf.org/RLSA-2026:96088"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:98113 vom 2026-11-11",
+    "url": "https://access.redhat.com/errata/RHSA-2026:98113"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:96282 vom 2026-11-11",
+    "url": "https://access.redhat.com/errata/RHSA-2026:96282"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95745 vom 2026-11-11",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95745"
+   },
+   {
+    "category": "external",
+    "summary": "Gentoo Linux Security Advisory GLSA-202611-01 vom 2026-11-11",
+    "url": "https://security.gentoo.org/glsa/202611-01"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:98113 vom 2026-11-11",
+    "url": "https://errata.build.resf.org/RLSA-2026:98113"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:99044 vom 2026-11-11",
+    "url": "https://access.redhat.com/errata/RHSA-2026:99044"
+   },
+   {
+    "category": "external",
+    "summary": "Oracle Linux Security Advisory ELSA-2026-96234 vom 2026-11-12",
+    "url": "http://linux.oracle.com/errata/ELSA-2026-96234.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:98619 vom 2026-11-11",
+    "url": "https://access.redhat.com/errata/RHSA-2026:98619"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:98522 vom 2026-11-11",
+    "url": "https://access.redhat.com/errata/RHSA-2026:98522"
+   },
+   {
+    "category": "external",
+    "summary": "Rocky Linux Security Advisory RLSA-2026:98522 vom 2026-11-12",
+    "url": "https://errata.build.resf.org/RLSA-2026:98522"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24707-1 vom 2026-11-12",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030635.html"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24690-1 vom 2026-11-12",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030649.html"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24696-1 vom 2026-11-12",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030643.html"
+   },
+   {
+    "category": "external",
+    "summary": "Red Hat Security Advisory RHSA-2026:95104 vom 2026-11-13",
+    "url": "https://access.redhat.com/errata/RHSA-2026:95104"
+   },
+   {
+    "category": "external",
+    "summary": "SUSE Security Update SUSE-SU-2026:24719-1 vom 2026-11-13",
+    "url": "https://lists.suse.com/pipermail/sle-security-updates/2026-November/030665.html"
+   },
+   {
+    "category": "external",
+    "summary": "openSUSE Security Update OPENSUSE-SU-2026:22312-1 vom 2026-11-13",
+    "url": "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/5XIPZBCFB3QPLIMJ64XUBW44TDUCJYZU/"
+   },
+   {
+    "category": "external",
+    "summary": "openSUSE Security Update OPENSUSE-SU-2026:22292-1 vom 2026-11-13",
+    "url": "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/SE7VS4RFH5AU3Z2HGRIFZYGIRRCDC4AH/"
+   },
+   {
+    "category": "external",
+    "summary": "openSUSE Security Update OPENSUSE-SU-2026:12305-1 vom 2026-11-14",
+    "url": "https://lists.opensuse.org/archives/list/security-announce@lists.opensuse.org/thread/HVMV3GPGYAWICXXF7LFPAFV7MBGWLPGT/"
+   }
+  ],
+  "source_lang": "en-US",
+  "title": "Node.js: Mehrere Schwachstellen",
+  "tracking": {
+   "current_release_date": "2026-11-15T23:00:00.000+00:00",
+   "generator": {
+    "date": "2026-11-16T09:27:07.572+00:00",
+    "engine": {
+     "name": "BSI-WID",
+     "version": "1.7.0"
+    }
+   },
+   "id": "WID-SEC-W-2026-4117",
+   "initial_release_date": "2026-10-21T22:00:00.000+00:00",
+   "revision_history": [
+    {
+     "date": "2026-10-21T22:00:00.000+00:00",
+     "number": "1",
+     "summary": "Initiale Fassung"
+    },
+    {
+     "date": "2026-10-22T22:00:00.000+00:00",
+     "number": "2",
+     "summary": "PoC aufgenommen CVE-2026-111497 (\"Node2Shell\")"
+    },
+    {
+     "date": "2026-10-25T23:00:00.000+00:00",
+     "number": "3",
+     "summary": "Neue Updates von Fedora und Debian aufgenommen"
+    },
+    {
+     "date": "2026-10-26T23:00:00.000+00:00",
+     "number": "4",
+     "summary": "Neue Updates von Oracle Linux, Red Hat, Fedora und Ubuntu aufgenommen"
+    },
+    {
+     "date": "2026-10-27T23:00:00.000+00:00",
+     "number": "5",
+     "summary": "Exploit aufgenommen CVE-2026-111497, Bewertung angepasst"
+    },
+    {
+     "date": "2026-10-28T23:00:00.000+00:00",
+     "number": "6",
+     "summary": "Neue Updates von Splunk-SVD und Red Hat aufgenommen"
+    },
+    {
+     "date": "2026-10-29T23:00:00.000+00:00",
+     "number": "7",
+     "summary": "Neue Updates von Red Hat, SUSE, Rocky Enterprise Software Foundation und Ubuntu aufgenommen"
+    },
+    {
+     "date": "2026-11-01T23:00:00.000+00:00",
+     "number": "8",
+     "summary": "Neue Updates von Oracle Linux, SUSE, Red Hat, HCL und Ubuntu aufgenommen"
+    },
+    {
+     "date": "2026-11-02T23:00:00.000+00:00",
+     "number": "9",
+     "summary": "Neue Updates von Red Hat, Fedora, SUSE und IGEL aufgenommen"
+    },
+    {
+     "date": "2026-11-03T23:00:00.000+00:00",
+     "number": "10",
+     "summary": "Neue Updates von openSUSE, Red Hat, Elastic und SUSE aufgenommen"
+    },
+    {
+     "date": "2026-11-04T23:00:00.000+00:00",
+     "number": "11",
+     "summary": "Neue Updates von SUSE, Oracle Linux, Red Hat und Citrix aufgenommen"
+    },
+    {
+     "date": "2026-11-05T23:00:00.000+00:00",
+     "number": "12",
+     "summary": "Neue Updates von Google, Devolutions, Synology, SUSE und Red Hat aufgenommen"
+    },
+    {
+     "date": "2026-11-08T23:00:00.000+00:00",
+     "number": "13",
+     "summary": "Neue Updates von Red Hat, openSUSE und SUSE aufgenommen"
+    },
+    {
+     "date": "2026-11-09T23:00:00.000+00:00",
+     "number": "14",
+     "summary": "Neue Updates von SUSE, Apple, Red Hat, Oracle Linux, Rocky Enterprise Software Foundation und IBM aufgenommen"
+    },
+    {
+     "date": "2026-11-10T23:00:00.000+00:00",
+     "number": "15",
+     "summary": "Neue Updates von Red Hat und Gentoo aufgenommen"
+    },
+    {
+     "date": "2026-11-11T23:00:00.000+00:00",
+     "number": "16",
+     "summary": "Neue Updates von Red Hat, Oracle Linux und Rocky Enterprise Software Foundation aufgenommen"
+    },
+    {
+     "date": "2026-11-12T23:00:00.000+00:00",
+     "number": "17",
+     "summary": "Neue Updates von SUSE aufgenommen"
+    },
+    {
+     "date": "2026-11-15T23:00:00.000+00:00",
+     "number": "18",
+     "summary": "Neue Updates von Red Hat, SUSE und openSUSE aufgenommen"
+    }
+   ],
+   "status": "final",
+   "version": "18"
+  }
+ },
+ "product_tree": {
+  "branches": [
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<2.7.4",
+        "product": {
+         "name": "Anaconda Navigator <2.7.4",
+         "product_id": "T062331"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "2.7.4",
+        "product": {
+         "name": "Anaconda Navigator 2.7.4",
+         "product_id": "T062331-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:anaconda:anaconda_navigator:2.7.4"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Navigator"
+     }
+    ],
+    "category": "vendor",
+    "name": "Anaconda"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<27.2.1",
+        "product": {
+         "name": "Apple iOS <27.2.1",
+         "product_id": "T062647"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "27.2.1",
+        "product": {
+         "name": "Apple iOS 27.2.1",
+         "product_id": "T062647-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:apple:iphone_os:27.2.1"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<26.7.3",
+        "product": {
+         "name": "Apple iOS <26.7.3",
+         "product_id": "T062648"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "26.7.3",
+        "product": {
+         "name": "Apple iOS 26.7.3",
+         "product_id": "T062648-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:apple:iphone_os:26.7.3"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "iOS"
+     },
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<27.2.1",
+        "product": {
+         "name": "Apple macOS <27.2.1",
+         "product_id": "T062650"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "27.2.1",
+        "product": {
+         "name": "Apple macOS 27.2.1",
+         "product_id": "T062650-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:apple:mac_os:27.2.1"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<26.7.3",
+        "product": {
+         "name": "Apple macOS <26.7.3",
+         "product_id": "T062651"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "26.7.3",
+        "product": {
+         "name": "Apple macOS 26.7.3",
+         "product_id": "T062651-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:apple:mac_os:26.7.3"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<15.8.3",
+        "product": {
+         "name": "Apple macOS <15.8.3",
+         "product_id": "T062652"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "15.8.3",
+        "product": {
+         "name": "Apple macOS 15.8.3",
+         "product_id": "T062652-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:apple:mac_os:15.8.3"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "macOS"
+     }
+    ],
+    "category": "vendor",
+    "name": "Apple"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<6.4.2.14",
+        "product": {
+         "name": "Arista VeloCloud Orchestrator <6.4.2.14",
+         "product_id": "T062311"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "6.4.2.14",
+        "product": {
+         "name": "Arista VeloCloud Orchestrator 6.4.2.14",
+         "product_id": "T062311-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:arista:velocloud_orchestrator:6.4.2.14"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<6.1.3.12",
+        "product": {
+         "name": "Arista VeloCloud Orchestrator <6.1.3.12",
+         "product_id": "T062312"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "6.1.3.12",
+        "product": {
+         "name": "Arista VeloCloud Orchestrator 6.1.3.12",
+         "product_id": "T062312-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:arista:velocloud_orchestrator:6.1.3.12"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<5.2.3.20",
+        "product": {
+         "name": "Arista VeloCloud Orchestrator <5.2.3.20",
+         "product_id": "T062313"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "5.2.3.20",
+        "product": {
+         "name": "Arista VeloCloud Orchestrator 5.2.3.20",
+         "product_id": "T062313-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:arista:velocloud_orchestrator:5.2.3.20"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "VeloCloud Orchestrator"
+     }
+    ],
+    "category": "vendor",
+    "name": "Arista"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Citrix Systems XenServer",
+      "product": {
+       "name": "Citrix Systems XenServer",
+       "product_id": "T004077",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:citrix:xenserver:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Citrix Systems"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Debian Linux",
+      "product": {
+       "name": "Debian Linux",
+       "product_id": "2951",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:debian:debian_linux:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Debian"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "Windows <2026.3.16.0",
+        "product": {
+         "name": "Devolutions Remote Desktop Manager Windows <2026.3.16.0",
+         "product_id": "T062556"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "Windows 2026.3.16.0",
+        "product": {
+         "name": "Devolutions Remote Desktop Manager Windows 2026.3.16.0",
+         "product_id": "T062556-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:devolutions:remote_desktop_manager:windows__2026.3.16.0"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "macOS <2026.3.2.3",
+        "product": {
+         "name": "Devolutions Remote Desktop Manager macOS <2026.3.2.3",
+         "product_id": "T062557"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "macOS 2026.3.2.3",
+        "product": {
+         "name": "Devolutions Remote Desktop Manager macOS 2026.3.2.3",
+         "product_id": "T062557-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:devolutions:remote_desktop_manager:macos__2026.3.2.3"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "Linux <2026.3.2.1",
+        "product": {
+         "name": "Devolutions Remote Desktop Manager Linux <2026.3.2.1",
+         "product_id": "T062558"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "Linux 2026.3.2.1",
+        "product": {
+         "name": "Devolutions Remote Desktop Manager Linux 2026.3.2.1",
+         "product_id": "T062558-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:devolutions:remote_desktop_manager:linux__2026.3.2.1"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Remote Desktop Manager"
+     }
+    ],
+    "category": "vendor",
+    "name": "Devolutions"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Fedora Linux",
+      "product": {
+       "name": "Fedora Linux",
+       "product_id": "74178",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:fedoraproject:fedora:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Fedora"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Gentoo Linux",
+      "product": {
+       "name": "Gentoo Linux",
+       "product_id": "T033788",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:gentoo:linux:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Gentoo"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Google Cloud Platform",
+      "product": {
+       "name": "Google Cloud Platform",
+       "product_id": "393401",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:google:cloud_platform:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Google"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version",
+        "name": "WebUI",
+        "product": {
+         "name": "HCL BigFix WebUI",
+         "product_id": "T047570",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:hcltech:bigfix:webui"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "BigFix"
+     }
+    ],
+    "category": "vendor",
+    "name": "HCL"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_name",
+        "name": "IBM App Connect Enterprise",
+        "product": {
+         "name": "IBM App Connect Enterprise",
+         "product_id": "T058846",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:ibm:app_connect_enterprise:-"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "Certified Container Operator <13.7.0",
+        "product": {
+         "name": "IBM App Connect Enterprise Certified Container Operator <13.7.0",
+         "product_id": "T062645"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "Certified Container Operator 13.7.0",
+        "product": {
+         "name": "IBM App Connect Enterprise Certified Container Operator 13.7.0",
+         "product_id": "T062645-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:ibm:app_connect_enterprise:certified_container_operator__13.7.0"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "Certified Container Operator <12.0.29",
+        "product": {
+         "name": "IBM App Connect Enterprise Certified Container Operator <12.0.29",
+         "product_id": "T062646"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "Certified Container Operator 12.0.29",
+        "product": {
+         "name": "IBM App Connect Enterprise Certified Container Operator 12.0.29",
+         "product_id": "T062646-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:ibm:app_connect_enterprise:certified_container_operator__12.0.29"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "App Connect Enterprise"
+     },
+     {
+      "category": "product_name",
+      "name": "IBM QRadar SIEM",
+      "product": {
+       "name": "IBM QRadar SIEM",
+       "product_id": "T021415",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:ibm:qradar_siem:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "IBM"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "IGEL OS",
+      "product": {
+       "name": "IGEL OS",
+       "product_id": "T017865",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:igel:os:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "IGEL"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Microsoft .NET",
+      "product": {
+       "name": "Microsoft .NET",
+       "product_id": "T052840",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:microsoft:.net:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Microsoft"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Nutanix AHV",
+      "product": {
+       "name": "Nutanix AHV",
+       "product_id": "873898",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:nutanix:ahv:-"
+       }
+      }
+     },
+     {
+      "category": "product_name",
+      "name": "Nutanix AOS",
+      "product": {
+       "name": "Nutanix AOS",
+       "product_id": "42DA0488-D958-4770-963C-3371DEBA782A",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:nutanix:aos:-"
+       }
+      }
+     },
+     {
+      "category": "product_name",
+      "name": "Nutanix Objects",
+      "product": {
+       "name": "Nutanix Objects",
+       "product_id": "T054407",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:nutanix:objects:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Nutanix"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<8.19.24",
+        "product": {
+         "name": "Open Source Kibana <8.19.24",
+         "product_id": "T062381"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "8.19.24",
+        "product": {
+         "name": "Open Source Kibana 8.19.24",
+         "product_id": "T062381-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:elasticsearch:kibana:8.19.24"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<9.4.9",
+        "product": {
+         "name": "Open Source Kibana <9.4.9",
+         "product_id": "T062382"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "9.4.9",
+        "product": {
+         "name": "Open Source Kibana 9.4.9",
+         "product_id": "T062382-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:elasticsearch:kibana:9.4.9"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<9.5.6",
+        "product": {
+         "name": "Open Source Kibana <9.5.6",
+         "product_id": "T062383"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "9.5.6",
+        "product": {
+         "name": "Open Source Kibana 9.5.6",
+         "product_id": "T062383-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:elasticsearch:kibana:9.5.6"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Kibana"
+     },
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<26.12.1",
+        "product": {
+         "name": "Open Source Node.js <26.12.1",
+         "product_id": "T061609"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "26.12.1",
+        "product": {
+         "name": "Open Source Node.js 26.12.1",
+         "product_id": "T061609-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:nodejs:nodejs:26.12.1"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<24.22.1",
+        "product": {
+         "name": "Open Source Node.js <24.22.1",
+         "product_id": "T061610"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "24.22.1",
+        "product": {
+         "name": "Open Source Node.js 24.22.1",
+         "product_id": "T061610-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:nodejs:nodejs:24.22.1"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<22.23.4",
+        "product": {
+         "name": "Open Source Node.js <22.23.4",
+         "product_id": "T061611"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "22.23.4",
+        "product": {
+         "name": "Open Source Node.js 22.23.4",
+         "product_id": "T061611-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:nodejs:nodejs:22.23.4"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Node.js"
+     }
+    ],
+    "category": "vendor",
+    "name": "Open Source"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version",
+        "name": "25.0.5.0.2",
+        "product": {
+         "name": "Oracle Java SE 25.0.5.0.2",
+         "product_id": "T061793",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:25.0.5.0.2"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "17.0.21.0.2",
+        "product": {
+         "name": "Oracle Java SE 17.0.21.0.2",
+         "product_id": "T061794",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:17.0.21.0.2"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "8u511-perf-b32",
+        "product": {
+         "name": "Oracle Java SE 8u511-perf-b32",
+         "product_id": "T061795",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:8u511-perf-b32"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "21.0.13.0.2",
+        "product": {
+         "name": "Oracle Java SE 21.0.13.0.2",
+         "product_id": "T061796",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:21.0.13.0.2"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "8u511-b32",
+        "product": {
+         "name": "Oracle Java SE 8u511-b32",
+         "product_id": "T061797",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:8u511-b32"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "27.0.1.0.2",
+        "product": {
+         "name": "Oracle Java SE 27.0.1.0.2",
+         "product_id": "T061798",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:27.0.1.0.2"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "11.0.33.0.2",
+        "product": {
+         "name": "Oracle Java SE 11.0.33.0.2",
+         "product_id": "T061799",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:11.0.33.0.2"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "Oracle GraalVM for JDK 17.0.21.0.2",
+        "product": {
+         "name": "Oracle Java SE Oracle GraalVM for JDK 17.0.21.0.2",
+         "product_id": "T061800",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:oracle_graalvm_for_jdk_17.0.21.0.2"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "Oracle GraalVM for JDK 21.0.13.0.2",
+        "product": {
+         "name": "Oracle Java SE Oracle GraalVM for JDK 21.0.13.0.2",
+         "product_id": "T061801",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:oracle_graalvm_for_jdk_21.0.13.0.2"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "Oracle GraalVM Enterprise Edition 21.3.20.0.2",
+        "product": {
+         "name": "Oracle Java SE Oracle GraalVM Enterprise Edition 21.3.20.0.2",
+         "product_id": "T061802",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:oracle:java_se:oracle_graalvm_enterprise_edition_21.3.20.0.2"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Java SE"
+     },
+     {
+      "category": "product_name",
+      "name": "Oracle Linux",
+      "product": {
+       "name": "Oracle Linux",
+       "product_id": "T056236",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:oracle:linux:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Oracle"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<12.2.4-h1",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <12.2.4-h1",
+         "product_id": "T061906"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "12.2.4-h1",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 12.2.4-h1",
+         "product_id": "T061906-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:12.2.4-h1"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<12.1.4-h13",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <12.1.4-h13",
+         "product_id": "T061907"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "12.1.4-h13",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 12.1.4-h13",
+         "product_id": "T061907-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:12.1.4-h13"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<12.1.7-h11",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <12.1.7-h11",
+         "product_id": "T061908"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "12.1.7-h11",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 12.1.7-h11",
+         "product_id": "T061908-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:12.1.7-h11"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<12.1.10-h3",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <12.1.10-h3",
+         "product_id": "T061909"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "12.1.10-h3",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 12.1.10-h3",
+         "product_id": "T061909-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:12.1.10-h3"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<11.2.4-h23",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <11.2.4-h23",
+         "product_id": "T061910"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "11.2.4-h23",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 11.2.4-h23",
+         "product_id": "T061910-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:11.2.4-h23"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<11.2.7-h23",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <11.2.7-h23",
+         "product_id": "T061911"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "11.2.7-h23",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 11.2.7-h23",
+         "product_id": "T061911-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:11.2.7-h23"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<11.2.10-h17",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <11.2.10-h17",
+         "product_id": "T061912"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "11.2.10-h17",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 11.2.10-h17",
+         "product_id": "T061912-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:11.2.10-h17"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<11.2.13-h4",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <11.2.13-h4",
+         "product_id": "T061913"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "11.2.13-h4",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 11.2.13-h4",
+         "product_id": "T061913-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:11.2.13-h4"
+         }
+        }
+       },
+       {
+        "category": "product_version_range",
+        "name": "<11.2.16-h1",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS <11.2.16-h1",
+         "product_id": "T061914"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "11.2.16-h1",
+        "product": {
+         "name": "Palo Alto Networks PAN-OS 11.2.16-h1",
+         "product_id": "T061914-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/o:paloaltonetworks:pan-os:11.2.16-h1"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "PAN-OS"
+     },
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "Application Security Transporter Client <0.2.9",
+        "product": {
+         "name": "Palo Alto Networks Prisma Cloud Application Security Transporter Client <0.2.9",
+         "product_id": "T061915"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "Application Security Transporter Client 0.2.9",
+        "product": {
+         "name": "Palo Alto Networks Prisma Cloud Application Security Transporter Client 0.2.9",
+         "product_id": "T061915-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:palo_alto_networks:prisma_cloud:application_security_transporter_client__0.2.9"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Prisma Cloud"
+     }
+    ],
+    "category": "vendor",
+    "name": "Palo Alto Networks"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "RESF Rocky Linux",
+      "product": {
+       "name": "RESF Rocky Linux",
+       "product_id": "T054581",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:resf:rocky_linux:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "RESF"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Red Hat Enterprise Linux",
+      "product": {
+       "name": "Red Hat Enterprise Linux",
+       "product_id": "67646",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:redhat:enterprise_linux:-"
+       }
+      }
+     },
+     {
+      "branches": [
+       {
+        "category": "product_version",
+        "name": "Container Platform",
+        "product": {
+         "name": "Red Hat OpenShift Container Platform",
+         "product_id": "T040130",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:redhat:openshift:container_platform"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "OpenShift"
+     },
+     {
+      "category": "product_name",
+      "name": "Red Hat Satellite",
+      "product": {
+       "name": "Red Hat Satellite",
+       "product_id": "T012791",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:redhat:satellite:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Red Hat"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "SUSE Linux",
+      "product": {
+       "name": "SUSE Linux",
+       "product_id": "T054646",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:suse:suse_linux:-"
+       }
+      }
+     },
+     {
+      "category": "product_name",
+      "name": "SUSE openSUSE",
+      "product": {
+       "name": "SUSE openSUSE",
+       "product_id": "T055946",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:suse:opensuse:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "SUSE"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Siemens Industrial Edge Management",
+      "product": {
+       "name": "Siemens Industrial Edge Management",
+       "product_id": "1097742",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:siemens:industrial_edge_management:-"
+       }
+      }
+     },
+     {
+      "category": "product_name",
+      "name": "Siemens SIMATIC",
+      "product": {
+       "name": "Siemens SIMATIC",
+       "product_id": "T062736",
+       "product_identification_helper": {
+        "cpe": "cpe:/h:siemens:simatic:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Siemens"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<2026.3.1",
+        "product": {
+         "name": "SolarWinds Dameware <2026.3.1",
+         "product_id": "T062372"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "2026.3.1",
+        "product": {
+         "name": "SolarWinds Dameware 2026.3.1",
+         "product_id": "T062372-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:solarwinds:dameware:2026.3.1"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Dameware"
+     },
+     {
+      "branches": [
+       {
+        "category": "product_version_range",
+        "name": "<2026.4.1",
+        "product": {
+         "name": "SolarWinds Platform <2026.4.1",
+         "product_id": "T061942"
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "2026.4.1",
+        "product": {
+         "name": "SolarWinds Platform 2026.4.1",
+         "product_id": "T061942-fixed",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:solarwinds:orion_platform:2026.4.1"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Platform"
+     }
+    ],
+    "category": "vendor",
+    "name": "SolarWinds"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Splunk SOAR",
+      "product": {
+       "name": "Splunk SOAR",
+       "product_id": "T062052",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:splunk:soar:-"
+       }
+      }
+     },
+     {
+      "category": "product_name",
+      "name": "Splunk Splunk Enterprise",
+      "product": {
+       "name": "Splunk Splunk Enterprise",
+       "product_id": "T062051",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:splunk:splunk:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Splunk"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Synology DiskStation Manager",
+      "product": {
+       "name": "Synology DiskStation Manager",
+       "product_id": "T062582",
+       "product_identification_helper": {
+        "cpe": "cpe:/a:synology:diskstation_manager:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Synology"
+   },
+   {
+    "branches": [
+     {
+      "category": "product_name",
+      "name": "Ubuntu Linux",
+      "product": {
+       "name": "Ubuntu Linux",
+       "product_id": "T055947",
+       "product_identification_helper": {
+        "cpe": "cpe:/o:canonical:ubuntu_linux:-"
+       }
+      }
+     }
+    ],
+    "category": "vendor",
+    "name": "Ubuntu"
+   },
+   {
+    "branches": [
+     {
+      "branches": [
+       {
+        "category": "product_name",
+        "name": "VMware Cloud Foundation",
+        "product": {
+         "name": "VMware Cloud Foundation",
+         "product_id": "T035644",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:vmware:cloud_foundation:-"
+         }
+        }
+       },
+       {
+        "category": "product_version",
+        "name": "SDDC Manager",
+        "product": {
+         "name": "VMware Cloud Foundation SDDC Manager",
+         "product_id": "T062063",
+         "product_identification_helper": {
+          "cpe": "cpe:/a:vmware:cloud_foundation:sddc_manager"
+         }
+        }
+       }
+      ],
+      "category": "product_name",
+      "name": "Cloud Foundation"
+     }
+    ],
+    "category": "vendor",
+    "name": "VMware"
+   }
+  ]
+ },
+ "vulnerabilities": [
+  {
+   "cve": "CVE-2026-105481",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-105481"
+  },
+  {
+   "cve": "CVE-2026-105482",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-105482"
+  },
+  {
+   "cve": "CVE-2026-105483",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-105483"
+  },
+  {
+   "cve": "CVE-2026-106069",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-106069"
+  },
+  {
+   "cve": "CVE-2026-106070",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-106070"
+  },
+  {
+   "cve": "CVE-2026-106071",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-106071"
+  },
+  {
+   "cve": "CVE-2026-106072",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-106072"
+  },
+  {
+   "cve": "CVE-2026-106073",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-106073"
+  },
+  {
+   "cve": "CVE-2026-106074",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-106074"
+  },
+  {
+   "cve": "CVE-2026-111497",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-111497"
+  },
+  {
+   "cve": "CVE-2026-28330",
+   "product_status": {
+    "known_affected": [
+     "T004077",
+     "T056236",
+     "T061942",
+     "T062558",
+     "T055946",
+     "T061906",
+     "T061907",
+     "T061908",
+     "T061909",
+     "T040130",
+     "T021415",
+     "T054407",
+     "T061795",
+     "T061796",
+     "T061797",
+     "T061798",
+     "T062645",
+     "T061793",
+     "T061794",
+     "T061913",
+     "T061914",
+     "T058846",
+     "T061915",
+     "T061799",
+     "T062646",
+     "T061910",
+     "T062647",
+     "T061911",
+     "T062648",
+     "T061912",
+     "T054646",
+     "T062051",
+     "T062052",
+     "T062372",
+     "2951",
+     "T062331",
+     "T062650",
+     "T062651",
+     "T062652",
+     "67646",
+     "T061800",
+     "T061801",
+     "T062736",
+     "T061802",
+     "74178",
+     "393401",
+     "T012791",
+     "T061609",
+     "T062381",
+     "T062063",
+     "T062382",
+     "T062383",
+     "T062582",
+     "T061610",
+     "T061611",
+     "T033788",
+     "T035644",
+     "T054581",
+     "T047570",
+     "873898",
+     "T052840",
+     "1097742",
+     "T017865",
+     "42DA0488-D958-4770-963C-3371DEBA782A",
+     "T055947",
+     "T062312",
+     "T062313",
+     "T062556",
+     "T062557",
+     "T062311"
+    ]
+   },
+   "release_date": "2026-10-21T22:00:00.000+00:00",
+   "title": "CVE-2026-28330"
+  }
+ ]
+}

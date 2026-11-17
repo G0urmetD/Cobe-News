@@ -1,0 +1,237 @@
+{
+  "document": {
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "distribution": {
+      "text": "Disclosure is not limited. (TLPv2: TLP:CLEAR)",
+      "tlp": {
+        "label": "WHITE"
+      }
+    },
+    "lang": "en",
+    "notes": [
+      {
+        "category": "summary",
+        "text": "Mendix Studio Pro contains multiple vulnerabilities in the MCP Server, that could allow an attacker with network access to interact with the server remotely or trick a user's browser into sending unauthorized requests, potentially leading to unauthorized data access, tool execution, or system compromise.\n\nSiemens has released new versions for the affected products and recommends to update to the latest versions.",
+        "title": "Summary"
+      },
+      {
+        "category": "general",
+        "text": "As a general security measure, Siemens strongly recommends to protect network access to devices with appropriate mechanisms. In order to operate the devices in a protected IT environment, Siemens recommends to configure the environment according to Siemens' operational guidelines for Industrial Security (Download: https://www.siemens.com/cert/operational-guidelines-industrial-security), and to follow the recommendations in the product manuals.\nAdditional information on Industrial Security by Siemens can be found at: https://www.siemens.com/industrialsecurity",
+        "title": "General Recommendations"
+      },
+      {
+        "category": "general",
+        "text": "For further inquiries on security vulnerabilities in Siemens products and solutions, please contact the Siemens ProductCERT: https://www.siemens.com/cert/advisories",
+        "title": "Additional Resources"
+      },
+      {
+        "category": "legal_disclaimer",
+        "text": "The use of Siemens Security Advisories is subject to the terms and conditions listed on: https://www.siemens.com/productcert/terms-of-use.",
+        "title": "Terms of Use"
+      }
+    ],
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "productcert@siemens.com",
+      "name": "Siemens ProductCERT",
+      "namespace": "https://www.siemens.com"
+    },
+    "references": [
+      {
+        "category": "self",
+        "summary": "SSA-710379: Multiple Vulnerabilities in Mendix Studio Pro's MCP Server - HTML Version",
+        "url": "https://cert-portal.siemens.com/productcert/html/ssa-710379.html"
+      },
+      {
+        "category": "self",
+        "summary": "SSA-710379: Multiple Vulnerabilities in Mendix Studio Pro's MCP Server - CSAF Version",
+        "url": "https://cert-portal.siemens.com/productcert/csaf/ssa-710379.json"
+      }
+    ],
+    "title": "SSA-710379: Multiple Vulnerabilities in Mendix Studio Pro's MCP Server",
+    "tracking": {
+      "current_release_date": "2026-11-10T00:00:00.000Z",
+      "generator": {
+        "engine": {
+          "name": "Siemens ProductCERT CSAF Generator",
+          "version": "1"
+        }
+      },
+      "id": "SSA-710379",
+      "initial_release_date": "2026-11-10T00:00:00.000Z",
+      "revision_history": [
+        {
+          "date": "2026-11-10T00:00:00.000Z",
+          "legacy_version": "1.0",
+          "number": "1",
+          "summary": "Publication Date"
+        }
+      ],
+      "status": "interim",
+      "version": "1"
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "branches": [
+          {
+            "branches": [
+              {
+                "category": "product_version_range",
+                "name": "vers:intdot/>=11.15.0|<11.16.0",
+                "product": {
+                  "name": "Mendix Studio Pro 11 >= V11.15.0 < V11.16.0",
+                  "product_id": "1"
+                }
+              }
+            ],
+            "category": "product_name",
+            "name": "Mendix Studio Pro 11"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version_range",
+                "name": "vers:intdot/>=11.12.6|<11.12.7",
+                "product": {
+                  "name": "Mendix Studio Pro 11.12 >= V11.12.6 < V11.12.7",
+                  "product_id": "2"
+                }
+              }
+            ],
+            "category": "product_name",
+            "name": "Mendix Studio Pro 11.12"
+          }
+        ],
+        "category": "vendor",
+        "name": "Siemens"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2026-112136",
+      "cwe": {
+        "id": "CWE-1327",
+        "name": "Binding to an Unrestricted IP Address"
+      },
+      "notes": [
+        {
+          "category": "description",
+          "text": "The affected products MCP Server does not properly restrict its HTTP listener to the loopback interface, leaving it potentially exposed to remote systems. This could allow an attacker with network access to interact with the MCP Server remotely.",
+          "title": "CVE Description"
+        }
+      ],
+      "product_status": {
+        "known_affected": [
+          "1",
+          "2"
+        ]
+      },
+      "remediations": [
+        {
+          "category": "mitigation",
+          "details": "Maintain strict inbound firewall policies (such as Windows Defender Firewall) blocking external traffic on port 7782. This is already the case by default on standard Windows installations. If remote access is required, restrict traffic via a secure, authenticated channel (e.g., a VPN or SSH tunnel) rather than opening direct inbound firewall rules.",
+          "product_ids": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "category": "vendor_fix",
+          "details": "Update to V11.12.7 or later version",
+          "product_ids": [
+            "2"
+          ],
+          "url": "https://docs.mendix.com/releasenotes/studio-pro/11.12/"
+        },
+        {
+          "category": "vendor_fix",
+          "details": "Update to V11.16.0 or later version",
+          "product_ids": [
+            "1"
+          ],
+          "url": "https://docs.mendix.com/releasenotes/studio-pro/11/"
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "baseScore": 8.8,
+            "baseSeverity": "HIGH",
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
+            "version": "3.1"
+          },
+          "products": [
+            "1",
+            "2"
+          ]
+        }
+      ],
+      "title": "CVE-2026-112136"
+    },
+    {
+      "cve": "CVE-2026-112137",
+      "cwe": {
+        "id": "CWE-352",
+        "name": "Cross-Site Request Forgery (CSRF)"
+      },
+      "notes": [
+        {
+          "category": "description",
+          "text": "The affected products MCP Server does not properly validate Content-Type and Origin headers on incoming HTTP requests, leaving it vulnerable to Cross-Site Request Forgery (CSRF). This could allow a malicious web page to trick a user's browser into sending unauthorized requests and executing unintended actions on the local MCP Server.",
+          "title": "CVE Description"
+        }
+      ],
+      "product_status": {
+        "known_affected": [
+          "1",
+          "2"
+        ]
+      },
+      "remediations": [
+        {
+          "category": "mitigation",
+          "details": "Utilize modern Chromium- or WebKit-based browsers with Private Network Access protections enabled, or use browser extensions (such as uBlock Origin or NoScript) to block external websites from issuing fetch requests to localhost (127.0.0.1).",
+          "product_ids": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "category": "vendor_fix",
+          "details": "Update to V11.12.7 or later version",
+          "product_ids": [
+            "2"
+          ],
+          "url": "https://docs.mendix.com/releasenotes/studio-pro/11.12/"
+        },
+        {
+          "category": "vendor_fix",
+          "details": "Update to V11.16.0 or later version",
+          "product_ids": [
+            "1"
+          ],
+          "url": "https://docs.mendix.com/releasenotes/studio-pro/11/"
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "baseScore": 5.4,
+            "baseSeverity": "MEDIUM",
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:L",
+            "version": "3.1"
+          },
+          "products": [
+            "1",
+            "2"
+          ]
+        }
+      ],
+      "title": "CVE-2026-112137"
+    }
+  ]
+}

@@ -1,0 +1,377 @@
+[
+ {
+  "ID": "CVE-2026-0328",
+  "threatSeverity": "LOW",
+  "baseSeverity": "HIGH",
+  "baseScore": 7,
+  "threatScore": 2.7,
+  "AV": "NETWORK",
+  "PR": "NONE",
+  "UI": "NONE",
+  "AC": "LOW",
+  "title": "PAN-OS: User Impersonation through GlobalProtect Portal",
+  "product": [
+   "Cloud NGFW",
+   "PAN-OS",
+   "Prisma Access"
+  ],
+  "version": [
+   "Cloud NGFW",
+   "PAN-OS 12.2",
+   "PAN-OS 12.1",
+   "PAN-OS 11.2",
+   "PAN-OS 11.1",
+   "PAN-OS 10.2",
+   "Prisma Access"
+  ],
+  "affected": [
+   "None",
+   "< 12.2.4-h2",
+   "< 12.1.4-h14, < 12.1.7-h12, < 12.1.10-h4",
+   "< 11.2.4-h24, < 11.2.7-h24, < 11.2.10-h18, < 11.2.13-h5, < 11.2.16-h2",
+   "< 11.1.4-h39, < 11.1.6-h41, < 11.1.7-h13, < 11.1.10-h37, < 11.1.13-h17, < 11.1.16-h5",
+   "< 10.2.7-h40, < 10.2.10-h43, < 10.2.13-h28, < 10.2.16-h13, < 10.2.18-h14",
+   "None"
+  ],
+  "fixed": [
+   "All",
+   ">= 12.2.4-h2",
+   ">= 12.1.4-h14, >= 12.1.7-h12, >= 12.1.10-h4",
+   ">= 11.2.4-h24, >= 11.2.7-h24, >= 11.2.10-h18, >= 11.2.13-h5, >= 11.2.16-h2",
+   ">= 11.1.4-h39, >= 11.1.6-h41, >= 11.1.7-h13, >= 11.1.10-h37, >= 11.1.13-h17, >= 11.1.16-h5",
+   ">= 10.2.7-h40, >= 10.2.10-h43, >= 10.2.13-h28, >= 10.2.16-h13, >= 10.2.18-h14",
+   "All"
+  ],
+  "date": "2026-11-11T17:00:00.000Z",
+  "updated": "2026-11-11T17:00:00.000Z",
+  "problem": [
+   {
+    "lang": "en",
+    "value": "Authentication bypass vulnerabilities in the GlobalProtect™ portal and gateway of Palo Alto Networks PAN-OS® software enables an unauthenticated user to bypass security restrictions and establish an unauthorized VPN connection.\n\nPanorama, Cloud NGFW, and Prisma® Access are not affected by this vulne"
+   }
+  ],
+  "solution": [
+   {
+    "lang": "eng",
+    "value": "VERSION           MINOR VERSION                SUGGESTED SOLUTION\nCloud NGFW                                     No action needed.\nPAN-OS 12.2       12.2.0 through 12.2.4-h*     Upgrade to 12.2.4-h2 or later.\nPAN-OS 12.1       12.1.8 through 12.1.10-h*    Upgrade to 12.1.10-h4 or later.\n            "
+   }
+  ],
+  "work_around": [
+   {
+    "lang": "eng",
+    "value": "No known workarounds exist for this issue."
+   }
+  ],
+  "affected_list": [
+   "PAN-OS 12.2.4-h1",
+   "PAN-OS 12.2.4",
+   "PAN-OS 12.2.3",
+   "PAN-OS 12.2.2",
+   "PAN-OS 12.1.10-h3",
+   "PAN-OS 12.1.10-h2",
+   "PAN-OS 12.1.10",
+   "PAN-OS 12.1.9",
+   "PAN-OS 12.1.8",
+   "PAN-OS 12.1.7-h11",
+   "PAN-OS 12.1.7-h9",
+   "PAN-OS 12.1.7-h8",
+   "PAN-OS 12.1.7-h6",
+   "PAN-OS 12.1.7-h5",
+   "PAN-OS 12.1.7-h3",
+   "PAN-OS 12.1.7-h2",
+   "PAN-OS 12.1.7-h1",
+   "PAN-OS 12.1.7",
+   "PAN-OS 12.1.6",
+   "PAN-OS 12.1.5"
+  ],
+  "show_cvss_in_header": true,
+  "C": "product:LOW subsequent:HIGH",
+  "I": "product:NONE subsequent:HIGH",
+  "A": "product:NONE subsequent:NONE",
+  "severity": "LOW"
+ },
+ {
+  "ID": "CVE-2026-0331",
+  "threatSeverity": "MEDIUM",
+  "baseSeverity": "HIGH",
+  "baseScore": 8.7,
+  "threatScore": 6.6,
+  "AV": "NETWORK",
+  "PR": "NONE",
+  "UI": "NONE",
+  "AC": "LOW",
+  "title": "PAN-OS: Sensitive Information Disclosure Vulnerability",
+  "product": [
+   "Cloud NGFW",
+   "PAN-OS",
+   "Prisma Access"
+  ],
+  "version": [
+   "Cloud NGFW",
+   "PAN-OS 12.2",
+   "PAN-OS 12.1",
+   "PAN-OS 11.2",
+   "PAN-OS 11.1",
+   "PAN-OS 10.2",
+   "Prisma Access 12.1",
+   "Prisma Access 11.2",
+   "Prisma Access 10.2"
+  ],
+  "affected": [
+   "All*",
+   "< 12.2.4-h2",
+   "< 12.1.4-h14, < 12.1.7-h12, < 12.1.10-h4",
+   "< 11.2.4-h24, < 11.2.7-h24, < 11.2.10-h18, < 11.2.13-h5, < 11.2.16-h2",
+   "< 11.1.4-h39, < 11.1.6-h41, < 11.1.7-h13, < 11.1.10-h37, < 11.1.13-h17, < 11.1.16-h5",
+   "< 10.2.7-h40, < 10.2.10-h43, < 10.2.13-h28, < 10.2.16-h13, < 10.2.18-h14",
+   "< 12.1.10-h4*",
+   "< 11.2.7-h24*",
+   "< 10.2.10-h43*"
+  ],
+  "fixed": [
+   "None*",
+   ">= 12.2.4-h2",
+   ">= 12.1.4-h14, >= 12.1.7-h12, >= 12.1.10-h4",
+   ">= 11.2.4-h24, >= 11.2.7-h24, >= 11.2.10-h18, >= 11.2.13-h5, >= 11.2.16-h2",
+   ">= 11.1.4-h39, >= 11.1.6-h41, >= 11.1.7-h13, >= 11.1.10-h37, >= 11.1.13-h17, >= 11.1.16-h5",
+   ">= 10.2.7-h40, >= 10.2.10-h43, >= 10.2.13-h28, >= 10.2.16-h13, >= 10.2.18-h14",
+   ">= 12.1.10-h4*",
+   ">= 11.2.7-h24*",
+   ">= 10.2.10-h43*"
+  ],
+  "date": "2026-11-11T17:00:00.000Z",
+  "updated": "2026-11-11T17:00:00.000Z",
+  "problem": [
+   {
+    "lang": "en",
+    "value": "An information disclosure vulnerability in Palo Alto Networks PAN-OS® software enables an unauthenticated remote attacker with network access to obtain sensitive firewall and session information by sending traffic to or through a dataplane interface.\n\nPanorama is not affected by this vulnerability."
+   }
+  ],
+  "solution": [
+   {
+    "lang": "eng",
+    "value": "VERSION              MINOR VERSION                SUGGESTED SOLUTION\nCloud NGFW                                        Customers who prefer to upgrade can work with Palo Alto\n                                                  Networks support to schedule an on-demand software upgrade.\nPAN-OS 12.2    "
+   }
+  ],
+  "work_around": [
+   {
+    "lang": "eng",
+    "value": "No known workarounds exist for this issue."
+   }
+  ],
+  "affected_list": [
+   "PAN-OS 12.2.4-h1",
+   "PAN-OS 12.2.4",
+   "PAN-OS 12.2.3",
+   "PAN-OS 12.2.2",
+   "PAN-OS 12.1.10-h3",
+   "PAN-OS 12.1.10-h2",
+   "PAN-OS 12.1.10",
+   "PAN-OS 12.1.9",
+   "PAN-OS 12.1.8",
+   "PAN-OS 12.1.7-h11",
+   "PAN-OS 12.1.7-h9",
+   "PAN-OS 12.1.7-h8",
+   "PAN-OS 12.1.7-h6",
+   "PAN-OS 12.1.7-h5",
+   "PAN-OS 12.1.7-h3",
+   "PAN-OS 12.1.7-h2",
+   "PAN-OS 12.1.7-h1",
+   "PAN-OS 12.1.7",
+   "PAN-OS 12.1.6",
+   "PAN-OS 12.1.5"
+  ],
+  "show_cvss_in_header": true,
+  "C": "product:HIGH subsequent:NONE",
+  "I": "product:NONE subsequent:NONE",
+  "A": "product:NONE subsequent:NONE",
+  "severity": "MEDIUM"
+ },
+ {
+  "ID": "CVE-2026-111497",
+  "threatSeverity": "CRITICAL",
+  "baseSeverity": "CRITICAL",
+  "baseScore": 9.2,
+  "threatScore": 9.2,
+  "AV": "NETWORK",
+  "PR": "NONE",
+  "UI": "NONE",
+  "AC": "LOW",
+  "title": "Portfolio Status: Impact of Brotli Vulnerability (CVE-2026-111497) on Palo Alto Networks Products",
+  "product": [
+   "Prisma Cloud - Application Security Transporter Client",
+   "PAN-OS",
+   "PAN-OS 11.1",
+   "PAN-OS 10.2"
+  ],
+  "version": [
+   "Prisma Cloud - Application Security Transporter Client  ",
+   "PAN-OS 12.2",
+   "PAN-OS 12.1",
+   "PAN-OS 11.2",
+   "PAN-OS 11.1",
+   "PAN-OS 10.2"
+  ],
+  "affected": [
+   "< 0.2.9",
+   "< 12.2.4-h1",
+   "< 12.1.4-h13, < 12.1.7-h11, < 12.1.10-h3",
+   "< 11.2.4-h23, < 11.2.7-h23, < 11.2.10-h17, < 11.2.13-h4, < 11.2.16-h1",
+   "None",
+   "None"
+  ],
+  "fixed": [
+   ">= 0.2.9",
+   ">= 12.2.4-h1",
+   ">= 12.1.4-h13, >= 12.1.7-h11, >= 12.1.10-h3",
+   ">= 11.2.4-h23, >= 11.2.7-h23, >= 11.2.10-h17, >= 11.2.13-h4, >= 11.2.16-h1",
+   "All",
+   "All"
+  ],
+  "date": "2026-10-26T18:30:00.000Z",
+  "updated": "2026-11-09T21:00:00.000Z",
+  "problem": [
+   {
+    "lang": "en",
+    "value": "Palo Alto Networks is aware of the vulnerability in Brotli: CVE-2026-111497.\n\nA buffer overflow vulnerability in the Brotli decoder (c/dec/decode.c) in Google Brotli versions 1.0.3 through 1.2.0 on all platforms allows a remote unauthenticated attacker to corrupt adjacent decoder state memory, discl"
+   }
+  ],
+  "solution": [
+   {
+    "lang": "eng",
+    "value": "PAN-OS\n\nThis issue will be fixed in the upcoming releases of PAN-OS. Refer Product Status table for details.\n\nUntil PAN-OS fix versions are available we recommend implementing the workaround and mitigations listed below.\n\nPrisma Cloud - Application Security Transporter Client\n\nUpgrade to the fixed v"
+   }
+  ],
+  "work_around": [
+   {
+    "lang": "eng",
+    "value": "PAN-OS\n\nCustomers can mitigate the risk of this issue by taking any of the following actions:\n\nDisable Brotli Inspection via the CLI (PAN-OS 11.2.4 or higher):\n\n 1. You can disable the Brotli inspection engine globally on the firewall by running the following command in the command-line interface (h"
+   }
+  ],
+  "affected_list": [
+   "PAN-OS 12.2.4",
+   "PAN-OS 12.2.3",
+   "PAN-OS 12.2.2",
+   "PAN-OS 12.1.10-h2",
+   "PAN-OS 12.1.10",
+   "PAN-OS 12.1.9",
+   "PAN-OS 12.1.8",
+   "PAN-OS 12.1.7-h9",
+   "PAN-OS 12.1.7-h8",
+   "PAN-OS 12.1.7-h6",
+   "PAN-OS 12.1.7-h5",
+   "PAN-OS 12.1.7-h3",
+   "PAN-OS 12.1.7-h2",
+   "PAN-OS 12.1.7-h1",
+   "PAN-OS 12.1.7",
+   "PAN-OS 12.1.6",
+   "PAN-OS 12.1.5",
+   "PAN-OS 12.1.4-h12",
+   "PAN-OS 12.1.4-h11",
+   "PAN-OS 12.1.4-h10"
+  ],
+  "show_cvss_in_header": true,
+  "C": "product:HIGH subsequent:NONE",
+  "I": "product:HIGH subsequent:NONE",
+  "A": "product:HIGH subsequent:NONE",
+  "severity": "CRITICAL"
+ },
+ {
+  "ID": "PAN-SA-2026-0005",
+  "threatSeverity": "INFORMATIONAL",
+  "baseSeverity": "INFORMATIONAL",
+  "baseScore": 0,
+  "threatScore": 0,
+  "AV": "PHYSICAL",
+  "PR": "HIGH",
+  "UI": "ACTIVE",
+  "AC": "HIGH",
+  "title": "Informational Bulletin: Precautionary Fixes for Non-Exploitable OSS CVEs in PAN-OS",
+  "product": [
+   "PAN-OS"
+  ],
+  "version": [
+   "PAN-OS"
+  ],
+  "affected": [
+   "None"
+  ],
+  "fixed": [
+   "All"
+  ],
+  "date": "2026-04-08T16:00:00.000Z",
+  "updated": "2026-04-08T16:00:00.000Z",
+  "problem": [
+   {
+    "lang": "en",
+    "value": "The Palo Alto Networks Product Security Assurance team has evaluated the following open source software (OSS) CVEs as they relate to PAN-OS. These CVEs were determined to have no impact on PAN-OS, but they have been fixed out of an abundance of caution."
+   }
+  ],
+  "solution": [
+   {
+    "lang": "eng",
+    "value": "The OSS CVEs are fixed in the respective PAN-OS versions.\n"
+   }
+  ],
+  "show_cvss_in_header": false,
+  "C": "product:NONE subsequent:NONE",
+  "I": "product:NONE subsequent:NONE",
+  "A": "product:NONE subsequent:NONE",
+  "severity": "INFORMATIONAL"
+ },
+ {
+  "ID": "CVE-2012-6602",
+  "threatSeverity": "",
+  "baseSeverity": "HIGH",
+  "baseScore": 8.4,
+  "AV": "LOCAL",
+  "PR": "NONE",
+  "UI": "NONE",
+  "AC": "LOW",
+  "title": "Command Injection Vulnerability",
+  "product": [
+   "PAN-OS"
+  ],
+  "version": [
+   "PAN-OS 4.0",
+   "PAN-OS 3.1"
+  ],
+  "affected": [
+   "<= 4.0.3",
+   "<= 3.1.9"
+  ],
+  "fixed": [
+   ">= 4.0.4",
+   ">= 3.1.10"
+  ],
+  "date": "2012-04-27T23:30:00.000Z",
+  "updated": "2012-04-27T23:30:00.000Z",
+  "problem": [
+   {
+    "lang": "en",
+    "value": "A vulnerability exists whereby an authenticated user can inject arbitrary shell commands using the device management command line interface.  (Ref #30122)\nThis vulnerability can result in arbitrary command execution, and can result in total compromise of the device.\nThis issue affects PAN-OS 4.0.3 a"
+   }
+  ],
+  "solution": [
+   {
+    "lang": "en",
+    "value": "PAN-OS 4.0.4 and later; PAN-OS 3.1.10 and later."
+   }
+  ],
+  "work_around": [
+   {
+    "lang": "en",
+    "value": "This issue affects the management interface of the device.  Security appliance management best practices dictate that the management interface be isolated and strictly limited only to security administration personnel."
+   }
+  ],
+  "affected_list": [
+   "PAN-OS 4.0",
+   "PAN-OS 3.1"
+  ],
+  "C": "HIGH",
+  "I": "HIGH",
+  "A": "HIGH",
+  "show_cvss_in_header": true,
+  "severity": "HIGH"
+ }
+]

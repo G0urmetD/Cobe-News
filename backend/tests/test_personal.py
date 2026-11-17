@@ -7,6 +7,7 @@ settings only. No mail server, Microsoft or push service is contacted: mails are
 
 import json
 import socket
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -226,6 +227,49 @@ async def test_routing_all_members_or_chosen_ones_and_leaving_drops_it(admin_cli
         assert await s.scalar(select(func.count()).select_from(TeamProductMember)) == 1  # only panos' A (B is gone, cisco is for all again)
         tp_cisco = await s.scalar(select(TeamProduct.id).join(VendorFollow).where(VendorFollow.product == "cisco-asa"))
         assert set(await s.scalars(select(PersonRoute.user_id).where(PersonRoute.team_product_id == tp_cisco))) == {d.id}
+
+
+async def test_products_and_their_routing_are_saved_together_or_not_at_all(admin_client):
+    """0.1.57: the products part sends its routings with the products – one transaction: a refused routing (a stranger)
+    leaves the products as they were, and a new product can get its people in the same save."""
+    from app.models import AuditEntry
+
+    await _switch()
+    a, b = await _person("anja"), await _person("bert")
+    tid, _ = await _team([a, b], products=("panos",))
+    async with db.session() as s:
+        s.add(VendorFollow(product="cisco-asa"))
+        await s.commit()
+    stranger = await _person("zora")
+    # a new product and a routing nobody may get: refused, and nothing of it is stored (no audit entry either)
+    r = await admin_client.put(
+        f"/api/admin/teams/{tid}/products",
+        json={"products": ["panos", "cisco-asa"], "routing": [{"product": "panos", "all_members": False, "members": [str(a.id)]}, {"product": "cisco-asa", "all_members": False, "members": [str(stranger.id)]}]},
+    )
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "not_member"
+    team = next(x for x in (await admin_client.get("/api/admin/teams")).json() if x["id"] == str(tid))
+    assert [(p["key"], p["all_members"]) for p in team["products"]] == [("panos", True)]
+    async with db.session() as s:
+        assert await s.scalar(select(func.count()).select_from(AuditEntry).where(AuditEntry.action.in_(["team.products_changed", "team.routing_changed"]))) == 0
+        assert await s.scalar(select(func.count()).select_from(TeamProductMember)) == 0
+    # a routing of a product the team does not get: refused as well
+    r = await admin_client.put(f"/api/admin/teams/{tid}/products", json={"products": ["panos"], "routing": [{"product": "cisco-asa", "all_members": True}]})
+    assert r.status_code == 404
+    # all fine: both products, the new one for B only, panos for A only – one save, each change in the audit log
+    r = await admin_client.put(
+        f"/api/admin/teams/{tid}/products",
+        json={"products": ["panos", "cisco-asa"], "routing": [{"product": "panos", "all_members": False, "members": [str(a.id)]}, {"product": "cisco-asa", "all_members": False, "members": [str(b.id)]}]},
+    )
+    assert r.status_code == 200, r.text
+    prods = {p["key"]: p for p in r.json()["products"]}
+    assert [x["username"] for x in prods["panos"]["people"]] == ["anja"] and [x["username"] for x in prods["cisco-asa"]["people"]] == ["bert"]
+    async with db.session() as s:
+        actions = sorted(await s.scalars(select(AuditEntry.action).where(AuditEntry.action.in_(["team.products_changed", "team.routing_changed"]))))
+        assert actions == ["team.products_changed", "team.routing_changed", "team.routing_changed"]
+        assert await s.scalar(select(func.count()).select_from(TeamProductMember)) == 2
+    # an older client without `routing`: the products alone, as before
+    r = await admin_client.put(f"/api/admin/teams/{tid}/products", json={"products": ["panos"]})
+    assert r.status_code == 200 and [p["key"] for p in r.json()["products"]] == ["panos"] and r.json()["products"][0]["all_members"] is False
 
 
 async def test_leaving_through_the_sync_drops_the_routing(monkeypatch):
@@ -639,3 +683,51 @@ async def test_personal_teams_url_never_reaches_private_addresses_even_when_list
     with pytest.raises(notify.NotifyError) as e:
         personal.check_teams_url("https://10.1.2.3/x")
     assert e.value.category == "forbidden_target"
+
+
+async def test_personal_teams_url_through_the_proxy_is_checked_where_it_resolves(monkeypatch, web):
+    """0.1.57: with HTTPS_PROXY the proxy resolves the name – the pinned check did not apply to a person's Teams URL.
+    Now the name is resolved here first: an address that is not public is refused (visibly), a name this server
+    cannot resolve (internet only through the proxy) still goes through the proxy."""
+    import dataclasses
+
+    from app import config
+
+    c = dataclasses.replace(config.get_config(), proxy="http://proxy.corp.example:3128", webhook_private_nets=("10.0.0.0/8",))
+    monkeypatch.setattr(personal, "get_config", lambda: c)
+    monkeypatch.setattr(notify, "get_config", lambda: c)
+    monkeypatch.setattr(netaddr, "get_config", lambda: c)
+
+    def resolves_to(addr):  # noqa: ANN001, ANN202
+        return lambda host, port, *a, **kw: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (addr, port or 443))]
+
+    for addr in ("10.20.30.40", "127.0.0.1", "169.254.169.254"):
+        monkeypatch.setattr(socket, "getaddrinfo", resolves_to(addr))
+        with pytest.raises(notify.NotifyError) as e:
+            await personal.post_teams(TEAMS_URL, b"{}")
+        assert e.value.category == "forbidden_target"
+    assert web.to("logic.azure.com") == []  # nothing went out
+    monkeypatch.setattr(socket, "getaddrinfo", resolves_to("52.169.10.20"))
+    await personal.post_teams(TEAMS_URL, b"{}")
+
+    def no_dns(*a, **kw):  # noqa: ANN002, ANN003, ANN202
+        raise socket.gaierror(socket.EAI_NONAME, "no outside DNS")
+
+    monkeypatch.setattr(socket, "getaddrinfo", no_dns)
+    await personal.post_teams(TEAMS_URL, b"{}")
+    monkeypatch.setattr(personal, "TEAMS_DNS_S", 0.05)
+
+    def slow(*a, **kw):  # noqa: ANN002, ANN003, ANN202
+        time.sleep(0.3)
+        raise socket.gaierror(socket.EAI_AGAIN, "timeout")
+
+    monkeypatch.setattr(socket, "getaddrinfo", slow)
+    await personal.post_teams(TEAMS_URL, b"{}")  # no answer in time: left to the proxy
+    assert len(web.to("logic.azure.com")) == 3
+    # without a proxy: the pinned connection decides, as before (no look-up of its own)
+    c2 = dataclasses.replace(c, proxy=None)
+    monkeypatch.setattr(personal, "get_config", lambda: c2)
+    calls = []
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: calls.append(a) or resolves_to("10.1.1.1")(*a, **kw))
+    await personal.post_teams(TEAMS_URL, b"{}")  # the mock transport stands in for the pinned one here
+    assert calls == []

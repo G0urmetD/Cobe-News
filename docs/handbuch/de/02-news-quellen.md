@@ -260,7 +260,7 @@ Der Schnellfilter **„Betrifft unsere Produkte“** zeigt nur die Meldungen, di
 
 ## Eingebaute Quellen {#eingebaute-quellen}
 
-Cobe News bringt 46 Quellen mit, in fünf Gruppen. Ab Werk sind 14 davon eingeschaltet; Admins schalten weitere ein
+Cobe News bringt 44 Quellen mit, in fünf Gruppen. Ab Werk sind 14 davon eingeschaltet; Admins schalten weitere ein
 oder aus ([Integrationen → News](/docs/integrationen#news)). Die Sprache steht als DE, EN oder FR neben der Quelle.
 
 | Gruppe | Ab Werk an | Wählbar |

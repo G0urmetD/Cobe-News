@@ -11,7 +11,9 @@ the feature is switched off or nothing is followed.
 The structured sources run in the same task (sync_structured, after_round – each switchable): the CSAF providers of the
 followed vendors (csaf_providers), cvelistV5's hourly delta and single records (cvelist), OSV and EPSS for the CVEs of
 the findings (osv, epss). Verdict order per vulnerability: the vendor's own advisory first, then per CVE the NVD where
-it analysed the CVE, cvelistV5 where it did not, OSV where those leave it open (cve_verdict).
+it analysed the CVE, cvelistV5 where it did not, OSV where those leave it open (cve_verdict). Rating per vulnerability
+("Hersteller zählt", rating): the vendor's own advisory and the CNA's rating of each CVE; the NVD's own analysis, a
+coordinator's document (the BSI) and CISA's ADP only for a CVE none of those rated – NVD's value shown beside it.
 
 After a round (and right after a version is added or changed) every followed product is evaluated; what is new becomes
 a VendorEvent (once per product, version and finding). The first evaluation of a new product or version is the
@@ -52,7 +54,7 @@ from app.config import get_config, tls_verify
 from app.crypto import decrypt_str
 from app.models import Counter, NewsItem, NewsItemSource, NewsSource, VendorAdvisory, VendorAdvisoryProduct, VendorAdvisoryState, VendorEvent, VendorFetch, VendorFollow, VendorKev, VendorVersion
 from app.news import NewsError
-from app.vendor_match import ORDER, THIRD_PARTY, Verdict, evaluate, name_matches, name_words, with_third_party
+from app.vendor_match import BY_VENDOR, ORDER, THIRD_PARTY, Verdict, csaf_by, evaluate, name_matches, name_words, with_third_party
 from app.vendor_match import _cna_names as cna_names
 from app.vendor_versions import BUILD_DEPTH, VEEAM_BUILD_DEPTH, V, parse
 
@@ -353,6 +355,9 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
     known_keys = [p["key"] for p in ix.products]
     targets: dict[str, dict] | None = None  # the followed products and versions – read once, when a stored one comes again
     poc_moved: list[str] = []  # CVEs whose SSVC "poc" came or went: the news naming them get their topics again
+    rerated: set[str] = set()  # products of records rated anew by a parser fix (_change_plans): their ratings taken quietly
+    written_cves: list[str] = []  # CVE records written: a coordinator's document naming one is rated by it (cve_ratings)
+    rerated_cves: list[str] = []  # … of them those rated anew
     for i in range(0, len(advs), STORE_BATCH):
         part = list({a["id"]: a for a in advs[i : i + STORE_BATCH]}.values())
         ids = [a["id"] for a in part]
@@ -407,9 +412,21 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
                     skipped.append(str(a.get("id")))
                 continue
             changed += 1
+            if a.get("source") in CVE_SOURCES:
+                written_cves.append(str(a.get("ident") or "").upper())
+            if plan is not None and "rerated" in plan:
+                rerated.update(plan["rerated"])
+                if a.get("source") in CVE_SOURCES:
+                    rerated_cves.append(str(a.get("ident") or "").upper())
             if a.get("source") == "cvelist" and _ssvc_poc(olds[a["id"]].data if a["id"] in olds else None) != _ssvc_poc(a.get("data")):
                 poc_moved.append(str(a.get("ident") or ""))
         await db.commit()
+    # the products of a coordinator's document naming a CVE written here: their findings are rated by its record too
+    # (cve_ratings) – their views are recomputed, and a re-rating is taken quietly there as well
+    touched |= await _csaf_naming(db, written_cves)
+    rerated |= await _csaf_naming(db, rerated_cves)
+    if rerated:
+        await unprime(db, rerated)
     if changed:
         bump(touched)
     if poc_moved:
@@ -418,6 +435,16 @@ async def store(db: AsyncSession, advs: list[dict], ix: Index, skipped: list[str
         await news.retopic_cves(db, poc_moved)  # "Exploit veröffentlicht" (news.exploit_cves)
         await db.commit()
     return changed
+
+
+async def _csaf_naming(db: AsyncSession, cves: list[str]) -> set[str]:
+    """The products linked to a CSAF document that names one of these CVEs (the GIN index on cves)."""
+    out: set[str] = set()
+    for i in range(0, len(cves), 1000):
+        part = sorted(set(cves[i : i + 1000]))
+        q = select(VendorAdvisoryProduct.product).join(VendorAdvisory, VendorAdvisory.id == VendorAdvisoryProduct.advisory_id).where(VendorAdvisory.source == "csaf", VendorAdvisory.cves.op("?|")(pg_array(part)))
+        out.update(await db.scalars(q.distinct()))
+    return out
 
 
 def _ssvc_poc(data: dict | None) -> bool:
@@ -457,10 +484,18 @@ def _change_plans(links: list[tuple[dict, set[str]]], prev: dict[str, tuple], li
             before = stored
         else:  # no state yet (stored before 0.1.32) or another extractor: the stored record, read as now
             before = changes_svc.facts_of(source, sev, cvss, cves, data)
+        if changes_svc.rerated(source, data, a.get("data")):
+            # Palo Alto's record of the parser before 0.1.57, which rated by the CVSS base: the vendor's own rating now
+            # (its threat score) is no revision and no event – what else changed in the same record still is
+            before = {**before, "sev": new["sev"], "cvss": new["cvss"]}
         silent = changes_svc.reparsed(source, stored, data, a.get("data")) or bool((a.get("data") or {}).get("initial"))
         merged = new if silent else changes_svc.merge(before, new)  # silent: as the source says now, nothing kept
         facts = _stamped(merged, source)
         plan = {"facts": facts, "revision": state[1] if state is not None else 1, "change": None, "write": stored != facts}
+        if changes_svc.rerated(source, data, a.get("data")) and (sev, cvss) != (a.get("severity"), a.get("cvss")):
+            # rated anew by a parser fix: its products' next evaluation takes their findings' ratings as they are then
+            # (unprime: no "jetzt höher eingestuft", a confirmation stays – finding_confirm.check)
+            plan["rerated"] = sorted((linked.get(a["id"]) or set()) | keys)
         if not silent:
             diff = changes_svc.diff(before, merged)
             tg = [targets[k] for k in sorted((linked.get(a["id"]) or set()) | keys) if k in targets]
@@ -1639,10 +1674,19 @@ def _day(text: str | None) -> date | None:
 
 
 def findings(
-    product: dict, advs: list[VendorAdvisory], versions: list[VendorVersion], kev: dict, euvd: set[str], groups: list[dict] | None = None, epss: dict | None = None
+    product: dict,
+    advs: list[VendorAdvisory],
+    versions: list[VendorVersion],
+    kev: dict,
+    euvd: set[str],
+    groups: list[dict] | None = None,
+    epss: dict | None = None,
+    rated: "dict[str, list[Adv]] | None" = None,
 ) -> list[dict]:
     """One row per vulnerability (a vendor advisory with the CVE records of its CVEs, or the records of one CVE alone),
-    with a verdict per followed version – or "unversioned" when the product has no version. `epss`: CVE → score row."""
+    with a verdict per followed version – or "unversioned" when the product has no version. `epss`: CVE → score row.
+    `rated`: CVE → its CVE records not linked to the product, for the rating only (cve_ratings)."""
+    rated = rated or {}
     groups = groups if groups is not None else groups_of(advs)
     epss = epss or {}
     out = []
@@ -1669,8 +1713,7 @@ def findings(
             rows.append((ver, text, verdict))
         if not rows:
             continue
-        cvss = max((x.cvss for x in all_advs if x.cvss is not None), default=None)
-        sev = max((x.severity for x in all_advs), key=lambda s: SEV_RANK.get(s, 0))
+        cvss, sev, nvd_own = rating([*all_advs, *(x for c in cves for x in rated.get(str(c).upper(), ()))] if rated else all_advs, cves)
         if exploited and SEV_RANK.get(sev, 0) < SEV_RANK["high"]:
             sev = "high"
         worst = max((r[2] for r in rows), key=lambda v: ORDER[v.status])
@@ -1689,6 +1732,10 @@ def findings(
                 "also": [{"source": n.source, "ident": n.ident, "url": n.url} for n in others][:6],
                 "cves": cves[:30],
                 "cvss": cvss,
+                # Palo Alto rates by its threat score (CVSS-BT, vendor_sources._pan_one): the CVSS base beside it
+                "cvss_base": _base_beside(a, cvss),
+                # NVD's own analysis where it differs from the rating that counts (the vendor's, the CNA's): "NVD 8.8"
+                "cvss_nvd": nvd_own,
                 "severity": sev,
                 "exploited": exploited,
                 "kev": {"added": k.date_added, "due": k.due, "ransomware": k.ransomware} if k else None,
@@ -1713,6 +1760,137 @@ def findings(
     out.sort(key=lambda f: f["published_at"] or "", reverse=True)
     out.sort(key=lambda f: (-ORDER[f["status"]], not f["exploited"], -(f["cvss"] or 0)))
     return out
+
+
+# ---------------------------------------------------------------- the rating of a finding
+# "Hersteller zählt" (0.1.57): what counts is the rating of who publishes the vulnerability – the vendor's own advisory
+# (Palo Alto, Fortinet, Veeam, a vendor's CSAF document: Siemens, Cisco, the CSAF providers) and the CNA's rating of
+# each CVE (its CVE record, as cve.org shows it – the NVD record keeps it, vendor_sources._nvd_metrics). The NVD's own
+# analysis, a coordinator's document (the BSI's WID) and CISA's ADP are a fallback: only for a CVE nobody of those rated.
+# Before, the highest score of all records counted – NVD's 8.8 HIGH over GitLab's own 3.1 LOW (CVE-2025-2938), the
+# BSI's one score for 11 CVEs over each of them.
+VENDOR_OWN = ("paloalto", "fortinet", "veeam")
+
+
+def _rated(x: VendorAdvisory) -> bool:
+    return x.cvss is not None or SEV_RANK.get(x.severity or "", 0) > 0
+
+
+def _rated_by(x: VendorAdvisory) -> str | None:
+    """Whose rating a CVE record carries: "cna", "nvd" (NVD's own analysis), "adp" (CISA) – None for a record of the
+    parser before 0.1.57, which does not say (it counts as it was stored, until its next fetch)."""
+    data = x.data or {}
+    if x.source == "cvelist":
+        return data.get("rated") or ("adp" if data.get("cvss_from_adp") else "cna")
+    r = data.get("rated")
+    return r if isinstance(r, str) else None
+
+
+def _counts(x: VendorAdvisory) -> bool:
+    """The record's rating is the vendor's or the CNA's own word."""
+    if x.source in VENDOR_OWN:
+        return True
+    if x.source == "csaf":
+        return csaf_by(x.data or {}) == BY_VENDOR
+    if x.source in ("nvd", "cvelist"):
+        return _rated_by(x) in ("cna", None)
+    return False  # OSV: no rating of its own
+
+
+def _fallback(x: VendorAdvisory, cve: str) -> tuple[int, float | None, str] | None:
+    """A rating of `cve` from a record that does not count by itself – (rank, CVSS, severity), the lowest rank first:
+    NVD's own analysis, a coordinator's score of this CVE, CISA's ADP, a coordinator's one score of its document."""
+    if x.source in ("nvd", "cvelist") and x.ident.upper() == cve:
+        by = _rated_by(x)
+        if by == "nvd":
+            return 1, x.cvss, x.severity
+        if by == "adp":
+            return 3, x.cvss, x.severity
+        return None
+    if x.source == "csaf" and cve in {str(c).upper() for c in x.cves or []}:
+        score = src._score(src._d((x.data or {}).get("scores")).get(cve))
+        if score is not None:
+            return 2, score, src.severity_of(score)
+        return 4, x.cvss, x.severity
+    return None
+
+
+def rating(advs: list[VendorAdvisory], cves: list[str]) -> tuple[float | None, str, float | None]:
+    """(CVSS, severity, NVD's own CVSS beside it) of a finding from its records (the vendor's advisory, the CVE records
+    of its CVEs): the highest of the ratings that count – the vendor's own advisory (for each of its CVEs) and the CNA's
+    rating of each CVE –, for a CVE none of them rated its best fallback (_fallback). What the NVD rates the finding
+    (the highest of its CVEs, where it rates each of them) is returned where it differs, else None."""
+    got: list[tuple[float | None, str]] = []
+    covered: set[str] = set()
+    # the vendor's own advisory first: for its CVEs a CVE record (NVD, cvelistV5) says nothing more – where the vendor
+    # is the CNA it is the same word, only read another way (Palo Alto's cvelistV5 record of before 0.1.57 carries the
+    # pure CVSS-B 8.7 beside the threat score 6.6 of its advisory, CVE-2026-0331), and another CNA's rating does not
+    # outweigh the vendor's
+    for x in advs:
+        if x.source not in ("nvd", "cvelist") and _rated(x) and _counts(x):
+            got.append((x.cvss, x.severity))
+            covered |= {str(c).upper() for c in x.cves or []}
+    cna = [x for x in advs if x.source in ("nvd", "cvelist") and _rated(x) and _counts(x) and x.ident.upper() not in covered]
+    got += [(x.cvss, x.severity) for x in cna]
+    covered |= {x.ident.upper() for x in cna}
+    for c in dict.fromkeys(str(c).upper() for c in cves):
+        if c in covered:
+            continue
+        best = None
+        for x in advs:
+            f = _fallback(x, c)
+            if f is not None and (f[1] is not None or SEV_RANK.get(f[2] or "", 0) > 0) and (best is None or (f[0], -(f[1] or 0)) < (best[0], -(best[1] or 0))):
+                best = f
+        if best is not None:
+            got.append((best[1], best[2]))
+    if not got:  # nothing rated by the rule (a document without CVEs, of a coordinator): what the records say
+        got = [(x.cvss, x.severity) for x in advs if _rated(x)]
+    cvss = max((v for v, _ in got if v is not None), default=None)
+    sev = max((s for _, s in got), key=lambda s: SEV_RANK.get(s or "", 0), default="info") or "info"
+    # what the NVD rates the finding: only where it rates each of its CVEs (a part of them would say less than it seems)
+    own = {x.ident.upper(): v for x in advs if x.source == "nvd" and (v := _nvd_own(x)) is not None}
+    want = {str(c).upper() for c in cves}
+    nvd = max(own[c] for c in want) if want and want <= own.keys() else None
+    return cvss, sev, (nvd if nvd is not None and (cvss is None or abs(nvd - cvss) >= 0.05) else None)
+
+
+async def cve_ratings(db: AsyncSession, advs: "list[Adv]", off: frozenset[str] = frozenset()) -> "dict[str, list[Adv]]":
+    """The CVE records (NVD, cvelistV5) of the CVEs a coordinator's document names (the BSI's WID: "Node.js: Mehrere
+    Schwachstellen" listed with Panorama) that are not linked to the product – read for the rating only: their CNA's
+    rating counts for them (rating), not the document's one word for all. One query by id; a few columns."""
+    have = {a.ident.upper() for a in advs if a.source in ("nvd", "cvelist")}
+    want = sorted({str(c).upper() for a in advs if a.source == "csaf" and csaf_by(a.data or {}) != BY_VENDOR for c in a.cves or []} - have)
+    if not want:
+        return {}
+    ids = [f"{s_}:{c}" for c in want for s_ in ("nvd", "cvelist") if s_ not in off]
+    cols = (VendorAdvisory.id, VendorAdvisory.source, VendorAdvisory.ident, VendorAdvisory.cvss, VendorAdvisory.severity, VendorAdvisory.data["rated"].as_string(), VendorAdvisory.data["cvss_from_adp"].as_boolean(), cast(VendorAdvisory.data["nvd_own"], Text))
+    out: dict[str, list[Adv]] = {}
+    for i in range(0, len(ids), 1000):
+        for aid, source, ident, cvss, sev, by, from_adp, own in await db.execute(select(*cols).where(VendorAdvisory.id.in_(ids[i : i + 1000]))):
+            data: dict = {k: v for k, v in (("rated", by), ("cvss_from_adp", from_adp)) if v is not None}
+            if own:
+                data["nvd_own"] = json.loads(own)
+            out.setdefault(str(ident).upper(), []).append(Adv(aid, source, ident or "", "", "", "", [ident], cvss, sev or "info", False, None, None, data))
+    return out
+
+
+def _nvd_own(x: VendorAdvisory) -> float | None:
+    """What the NVD rates the CVE of an NVD record: its own analysis where it differs from the record's rating
+    (data["nvd_own"]), else the rating it shows. None for a record of the parser before 0.1.57 (it does not say)."""
+    data = x.data or {}
+    if "rated" not in data:
+        return None
+    own = src._score(src._d(data.get("nvd_own")).get("cvss"))
+    return own if own is not None else x.cvss
+
+
+def _base_beside(a: VendorAdvisory, cvss: float | None) -> float | None:
+    """The CVSS base a Palo Alto advisory keeps beside its rating (the threat score) – where the finding shows that
+    rating (not another record's higher score) and the base differs from it; else None."""
+    if a.source != "paloalto" or a.cvss is None or cvss is None or abs(a.cvss - cvss) >= 0.05:
+        return None
+    base = src._d((a.data or {}).get("base")).get("cvss")
+    return float(base) if isinstance(base, int | float) and not isinstance(base, bool) and abs(base - cvss) >= 0.05 else None
 
 
 # ---------------------------------------------------------------- the version to go to
@@ -2206,12 +2384,13 @@ async def _compute_view(f: VendorFollow, vers: list[VendorVersion], kev: dict, e
     async with dbm.session() as db:  # its own session: a request that waits for it may end first
         advs = await load_advs(db, f.product)
         off = switched_off(await config(db))
-    if off:
-        advs = [a for a in advs if counts(a, off)]
+        if off:
+            advs = [a for a in advs if counts(a, off)]
+        rated = await cve_ratings(db, advs, off)
 
     def evaluate_all() -> tuple[list[dict], dict[str, dict]]:
         groups = groups_of(advs)
-        found = findings(p, advs, vers, kev, euvd, groups)
+        found = findings(p, advs, vers, kev, euvd, groups, rated=rated)
         return found, target_versions(p, groups, found, vers)
 
     found, targets = await asyncio.to_thread(evaluate_all)
@@ -2436,6 +2615,28 @@ async def _primed_products(db: AsyncSession) -> set[str]:
         _rated_primed.update(n.partition(":")[2] for n in names)
         _rated_loaded[0] = True
     return _rated_primed
+
+
+async def unprime(db: AsyncSession, products: "set[str] | list[str]") -> None:
+    """Records of these products were rated anew by a parser fix (advisory_changes.rerated – "Hersteller zählt", Palo
+    Alto's threat score): their next evaluation is a first one again for the ratings (rated_quiet) – a finding rated
+    higher by it is no "jetzt höher eingestuft" and its confirmation stays (finding_confirm.check: the severity is taken
+    as it is then); a lowering never was news. Committed here."""
+    keys = sorted(set(products))
+    if not keys:
+        return
+    await _primed_products(db)
+    await db.execute(delete(Counter).where(Counter.name.in_([f"{RATED_PRIMED}:{k}" for k in keys])))
+    await db.commit()
+    _rated_primed.difference_update(keys)
+
+
+def pending_rerate(products: "set[str] | list[str]") -> frozenset[str]:
+    """Of these products the ones whose ratings are taken anew by their next evaluation (unprime) – known once the
+    primed products were read (_primed_products); before that none."""
+    if not _rated_loaded[0]:
+        return frozenset()
+    return frozenset(k for k in products if k not in _rated_primed)
 
 
 def event_rest(key: str) -> str:
@@ -2676,7 +2877,7 @@ async def _evaluate_product(db: AsyncSession, f: VendorFollow, p: dict, vs: list
     created = 0
     # a confirmed finding that changed materially: the confirmation ends before the events are made – the event of the
     # change goes out and says so (app/finding_confirm.py)
-    lapsed = await finding_confirm.check(db, p, view["findings"], now)
+    lapsed = await finding_confirm.check(db, p, view["findings"], now, rerate=rated_quiet)
     targets = [(v.version, v) for v in vs] or [("*", None)]
     scopes = [f"vuln:{f.product}:{text}" for text, _ in targets]
     said = await _known(db, scopes)

@@ -3,7 +3,8 @@ the requests (through the news fetcher's hardened download: https only, no inter
 limits, no XML DTDs).
 
 - Palo Alto Networks: security.paloaltonetworks.com/json/?product=<name>&sort=-updated&page=<n> – 25 advisories a page,
-  per product line the affected and fixed versions ("< 11.2.4-h22, …"), an explicit list of affected versions, CVSS.
+  per product line the affected and fixed versions ("< 11.2.4-h22, …"), an explicit list of affected versions, CVSS
+  (Palo Alto's own rating: the CVSS-BT threat score where there is one, the base kept beside it).
 - Fortinet: the PSIRT RSS (filestore.fortinet.com/fortiguard/rss/ir.xml, the newest 50 advisories) names a CSAF file
   per advisory: affected and not affected version ranges per product, the fix per line.
 - Veeam: the security KB feed (www.veeam.com/services/open/kb/security-feed, Atom, the newest ~20 KB articles) – per
@@ -160,7 +161,15 @@ def _pan_one(a) -> dict | None:
     title = html.unescape(_s(a.get("title"), 400))
     problem = " ".join(_s(p.get("value"), 3000) for p in _l(a.get("problem")) if isinstance(p, dict))[:3000]
     solution = " ".join(_s(p.get("value"), 2000) for p in _l(a.get("solution")) if isinstance(p, dict))[:2000]
-    score = _score(a.get("baseScore"))
+    # Palo Alto's own rating is CVSS-BT (CVSS 4.0 base + threat metrics: E:U lowers an unexploited one) – what its page
+    # shows as "Severity", the RSS title says ("(Severity: MEDIUM)") and it publishes to cve.org and the NVD as the
+    # score. The JSON keeps the pure base beside it (baseScore 8.7 HIGH, threatScore 6.6 MEDIUM, severity MEDIUM for
+    # CVE-2026-0331): the rating is the threat score, the base is kept for the drawer ("Basis 8.7"). Older advisories
+    # (CVSS 3.x) have no threat score – their base is the rating, as before.
+    base = _score(a.get("baseScore"))
+    threat = _score(a.get("threatScore"))
+    score = threat if threat is not None else base
+    given = next((g for k in ("severity", "threatSeverity", "baseSeverity") if (g := _s(a.get(k), 20))), "")
     cves = pan_cves(ident, title, problem)
     return {
         "id": f"paloalto:{ident}",
@@ -171,7 +180,7 @@ def _pan_one(a) -> dict | None:
         "url": f"{PAN_BASE}/{quote(ident)}",
         "cves": cves,
         "cvss": score,
-        "severity": severity_of(score, _s(a.get("baseSeverity"), 20)),
+        "severity": severity_of(score, given),
         "published_at": _date(_s(a.get("date"), 40)),
         "updated_at": _date(_s(a.get("updated"), 40)) or _date(_s(a.get("date"), 40)),
         "names": products + [ln["name"] for ln in lines],
@@ -180,6 +189,9 @@ def _pan_one(a) -> dict | None:
             "affected_list": [_s(x, 60) for x in _l(a.get("affected_list")) if isinstance(x, str)][:3000],
             "products": products,
             "solution": html_to_text(solution)[:1500],
+            # the CVSS base beside the rating (always there since 0.1.57 – advisory_changes.rerated: the record of the
+            # parser before, which rated by the base, is re-rated silently once)
+            "base": {"cvss": base, "severity": severity_of(base, _s(a.get("baseSeverity"), 20))},
         },
     }
 
@@ -492,15 +504,53 @@ def nvd_time(d: datetime) -> str:
     return d.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.000")
 
 
-def _nvd_metrics(m: dict) -> tuple[float | None, str]:
-    for key in ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
-        rows = [r for r in _l(m.get(key)) if isinstance(r, dict)]
-        rows.sort(key=lambda r: r.get("type") != "Primary")
-        for r in rows:
-            d = _d(r.get("cvssData"))
-            if (s := _score(d.get("baseScore"))) is not None:
-                return s, _s(d.get("baseSeverity") or r.get("baseSeverity"), 20)
+# the rating rule of the CVE records (0.1.57, "Hersteller zählt"): the CNA's own rating first – what cve.org and the
+# vendor's page show –, the NVD's own analysis (NVD Primary) where the CNA gives none, CISA's ADP (Vulnrichment) last.
+# Raised with a change of the rule: a record that comes with another one is re-rated quietly (advisory_changes.rerated).
+RATING_V = 2
+CVSS_KEYS = ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2")
+
+
+def _best(rows_by_version: list[list[tuple[float, str]]]) -> tuple[float | None, str]:
+    """The rating of one rater: its newest CVSS version (4.0 before 3.1, 3.0, 2) – of several metrics of that version
+    (scenarios: Palo Alto rates PA-Series and Prisma Access apart) the highest."""
+    for rows in rows_by_version:
+        if rows:
+            return max(rows, key=lambda r: r[0])
     return None, ""
+
+
+def _nvd_metrics(m: dict, cna: str = "") -> dict:
+    """The rating of an NVD record. NVD lists several raters side by side, each row with its `source` and `type`: the
+    CNA's own metric (type Secondary, source = the record's sourceIdentifier – the vendor for GitLab, Palo Alto,
+    Fortinet …), its own analysis (Primary, nvd@nist.gov) and CISA's ADP (Secondary as well – so the CNA is known by
+    its source, not by "Secondary"). The rating is the CNA's (`rated` "cna"), else NVD's own ("nvd"), else the ADP's
+    ("adp"); NVD's own value is kept beside a rating of another rater where it differs (`nvd`; stored as data["nvd_own"],
+    shown "NVD 8.8"): GitLab
+    rates CVE-2025-2938 3.1 LOW, NVD's analysis 8.8 HIGH – the vendor's word counts, NVD's is an addition."""
+    raters: dict[str, list[list[tuple[float, str]]]] = {"cna": [], "nvd": [], "adp": []}
+    for key in CVSS_KEYS:
+        got: dict[str, list[tuple[float, str]]] = {"cna": [], "nvd": [], "adp": []}
+        for r in _l(m.get(key)):
+            if not isinstance(r, dict):
+                continue
+            d = _d(r.get("cvssData"))
+            if (s := _score(d.get("baseScore"))) is None:
+                continue
+            row = (s, _s(d.get("baseSeverity") or r.get("baseSeverity"), 20))
+            src = _s(r.get("source"), 200)
+            who = "cna" if cna and src == cna else "nvd" if r.get("type") == "Primary" else "adp"
+            got[who].append(row)
+        for who, rows in got.items():
+            raters[who].append(rows)
+    best = {who: _best(rows) for who, rows in raters.items()}
+    rated = next((who for who in ("cna", "nvd", "adp") if best[who][0] is not None), "")
+    score, given = best[rated] if rated else (None, "")
+    out = {"cvss": score, "given": given, "rated": rated, "nvd": None}
+    own = best["nvd"]
+    if rated != "nvd" and own[0] is not None and score is not None and abs(own[0] - score) >= 0.05:
+        out["nvd"] = {"cvss": own[0], "severity": severity_of(own[0], own[1])}
+    return out
 
 
 def _trim_configs(configs) -> list:
@@ -591,10 +641,11 @@ def _nvd_one(item, rejected: list[str] | None) -> dict | None:
             rejected.append(f"nvd:{cid}")
         return None
     desc = next((_s(d.get("value"), 4000) for d in _l(c.get("descriptions")) if isinstance(d, dict) and d.get("lang") == "en"), "")
-    score, given = _nvd_metrics(_d(c.get("metrics")))
+    source_id = _s(c.get("sourceIdentifier"), 200)
+    rating = _nvd_metrics(_d(c.get("metrics")), source_id)
+    score, given = rating["cvss"], rating["given"]
     kev = _s(c.get("cisaExploitAdd"), 10)
     short = re.sub(r"\s+", " ", desc)
-    source_id = _s(c.get("sourceIdentifier"), 200)
     cna, adp = _split_affected(c.get("affected"), source_id)
     data = {
         "configs": _trim_configs(c.get("configurations")),
@@ -608,6 +659,12 @@ def _nvd_one(item, rejected: list[str] | None) -> dict | None:
         data["adp"] = adp_rows  # only where there is one: a record without stays as it was stored
     if source_id:
         data["assigner"] = source_id  # the CNA (an address or its UUID): is its affected data the vendor's? (vendor_match.cna_by)
+    # whose rating it is (the CNA's, NVD's own, CISA's ADP) and the rule it was chosen by – the record of the parser
+    # before (NVD's own analysis first) is re-rated quietly once (advisory_changes.rerated); NVD's own value beside it
+    data["rating"] = RATING_V
+    data["rated"] = rating["rated"]
+    if rating["nvd"]:
+        data["nvd_own"] = rating["nvd"]
     return {
         "id": f"nvd:{cid}",
         "source": "nvd",

@@ -21,7 +21,6 @@ import { api } from "@/lib/api"
 import { CARE_COLOR, type CareStatus, careItems, careReason, useCatalogCare } from "@/lib/catalog-care"
 import { docPath } from "@/lib/docs"
 import { errorText } from "@/lib/errors"
-import { HEALTH_KEY } from "@/lib/source-health"
 import { confirmDiscard } from "@/lib/unsaved"
 import { cn } from "@/lib/utils"
 import {
@@ -33,6 +32,7 @@ import {
   type VendorAdmin,
   type VendorSettings,
   exploitSwitch,
+  refreshVendor,
   useVendorAdmin,
 } from "@/lib/vendor-api"
 import { REVIEW_CHOICES } from "@/lib/version-review"
@@ -187,7 +187,7 @@ function CatalogCarePane({ enabled }: { enabled: boolean }) {
       await api.post("/api/admin/vendor/catalog-check")
       toast.success(t("vendor.care.checking"))
       if (later.current) clearTimeout(later.current)
-      later.current = setTimeout(() => void qc.invalidateQueries({ queryKey: ["vendor"] }), 15_000)
+      later.current = setTimeout(() => void refreshVendor(qc), 15_000)
     } catch (e) {
       toast.error(errorText(t, e))
     } finally {
@@ -306,7 +306,7 @@ function VendorForm({ data }: { data: VendorAdmin }) {
   // the structured sources' queries are listed in their own tab
   const own = data.sources.filter((s) => !isStructured(s.key))
   const valid = v.every_h >= 1 && v.every_h <= 48 && v.eol_every_h >= 6 && v.eol_every_h <= 168 && /^[A-Za-z0-9-]*$/.test(v.nvd_key)
-  const refresh = () => void qc.invalidateQueries({ queryKey: ["vendor"] })
+  const refresh = () => void refreshVendor(qc)
   // a second look after the server's background work – dropped when the drawer closes before
   const later = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(
@@ -534,8 +534,7 @@ function SourcesForm({ data }: { data: VendorAdmin }) {
       const st = data.settings
       await api.put("/api/admin/vendor", { enabled: st.enabled, every_h: st.every_h, eol_every_h: st.eol_every_h, ...v, csaf_green: green, rev: st.rev })
       toast.success(t("common.saved"))
-      void qc.invalidateQueries({ queryKey: ["vendor"] })
-      void qc.invalidateQueries({ queryKey: HEALTH_KEY })
+      void refreshVendor(qc)
     } catch (e) {
       toast.error(errorText(t, e))
     } finally {

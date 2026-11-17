@@ -868,7 +868,8 @@ by default**:
 - With Teams switched off there are no personal notifications.
 - A person's Teams webhook may only be a Microsoft address (`*.logic.azure.com`, `*.powerplatform.com`,
   `*.webhook.office.com`, https, port 443) and only a public target. `WEBHOOK_HOSTS` and `WEBHOOK_PRIVATE_NETS` do not
-  apply here.
+  apply here. Through an outbound proxy (`HTTPS_PROXY`) as well, the server checks the address itself as far as it can
+  resolve the name – a private address (Logic Apps over Private Link, say) is "target not allowed".
 - The switches need no re-confirmation – they do not change who may read.
 - **Security stories by own choice** (off by default): with the switch on, **every person** – also without a team – can
   have security stories of their own choice sent by e-mail or to their Teams webhook

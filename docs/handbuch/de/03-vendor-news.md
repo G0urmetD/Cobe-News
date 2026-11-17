@@ -787,10 +787,10 @@ Ein Vorschlag wird genau einmal beantwortet. Adressen werden nur als Text und Li
 
 | Quelle | Wofür |
 |---|---|
-| Palo Alto Networks ([PSIRT](term:psirt)) | PAN-OS, Panorama, GlobalProtect, Prisma, Cortex u. a.: betroffene und behobene Versionen je Linie, Hotfix-genau |
+| Palo Alto Networks ([PSIRT](term:psirt)) | PAN-OS, Panorama, GlobalProtect, Prisma, Cortex u. a.: betroffene und behobene Versionen je Linie, Hotfix-genau. Schwere und [CVSS](term:cvss) sind die Bewertung von Palo Alto – CVSS-BT, also mit der Bedrohungslage, wie auf der Seite von Palo Alto; der reine Basiswert steht daneben („CVSS 6.6 · Basis 8.7“) |
 | Fortinet (PSIRT-RSS und je Hinweis die [CSAF](term:csaf)-Datei) | betroffene und nicht betroffene Bereiche je Produkt, Fix je Linie |
 | Veeam (Security-KB-Feed) | betroffene Builds und Fix-Builds je Release-Linie |
-| [NVD](term:nvd) | alle Produkte mit CPE: CVEs mit Versionsbereichen und den Angaben des Herstellers (Microsoft: Build-Bereiche), [CVSS](term:cvss); neue, noch nicht analysierte CVEs per Stichwortsuche der letzten 30 Tage |
+| [NVD](term:nvd) | alle Produkte mit CPE: CVEs mit Versionsbereichen und den Angaben des Herstellers (Microsoft: Build-Bereiche), [CVSS](term:cvss) – die Bewertung des Herstellers, die eigene der NVD daneben ([Welche Bewertung zählt](#welche-bewertung)); neue, noch nicht analysierte CVEs per Stichwortsuche der letzten 30 Tage |
 | CISA [KEV](term:kev) | „aktiv ausgenutzt“ |
 | endoflife.date | Release-Linien, aktuellste Version je Linie, Support-Ende |
 | GitHub-Releases, Release Notes der Hersteller | Release-Linien und aktuellste Version für Produkte ohne endoflife.date ([Release-Daten](#release-daten)) – kein Support-Ende |
@@ -817,6 +817,29 @@ Je CPE holt Vendor News zuerst die neuesten 2000 CVEs, danach nur, was die NVD s
 Nach Fehlern wird mit wachsenden Pausen erneut gefragt; lehnt die NVD ab („zu viele Anfragen“), pausieren alle
 NVD-Abfragen gemeinsam. Admins finden die Einstellungen unter *Einstellungen → Integrationen → Vendor News*, siehe
 [Integrationen](/docs/integrationen#vendor-news).
+
+### Welche Bewertung zählt {#welche-bewertung}
+
+Zu einer CVE gibt es oft mehrere Bewertungen: die des Herstellers, die eigene Analyse der NVD, die des BSI, die der
+CISA. Sie weichen teils stark ab – GitLab bewertet CVE-2025-2938 mit 3,1 (niedrig), die NVD mit 8,8 (hoch).
+**Es zählt die Bewertung des Herstellers** – genauer: dessen, der die CVE veröffentlicht hat (der [CNA](term:cna)),
+so wie sie auf cve.org und auf der Seite des Herstellers steht. Er kennt sein Produkt am besten.
+
+- **Schwere und CVSS eines Befunds** kommen aus dem Hinweis des Herstellers (Palo Alto, Fortinet, Veeam, die
+  [CSAF](term:csaf)-Hinweise von Siemens, Cisco und den anderen Anbietern) und aus der Bewertung des Herstellers je
+  CVE. Hat ein Befund mehrere CVEs, zählt die höchste.
+- **Nur wenn der Hersteller eine CVE nicht bewertet**, springt der Reihe nach ein: die eigene Analyse der NVD, eine
+  Bewertung der CVE im Dokument des BSI, die der CISA, zuletzt die eine Schwere des BSI-Dokuments für alle seine CVEs.
+  Nennt nur ein BSI-Hinweis eine CVE (etwa Node.js-Lücken bei PAN-OS), holt Vendor News ihren Eintrag aus der
+  CVE-Liste nach, damit auch dort die Bewertung des Herstellers gilt.
+- **Daneben** steht die eigene Bewertung der NVD, wenn sie abweicht – etwa „CVSS 3.1 · NVD 8.8“ am Befund und in den
+  Details aus der Quelle. Beim Darüberfahren steht, was gilt.
+- Bei Palo Alto ist die Bewertung des Herstellers CVSS-BT, der reine Basiswert steht daneben („CVSS 6.6 · Basis 8.7“).
+
+Mit 0.1.57 werden die gespeicherten Einträge einmal nach dieser Regel neu bewertet. Das geschieht still: keine
+Änderung im Reiter **Änderungen**, keine Benachrichtigung, auch kein „Jetzt höher eingestuft“, und eine Bestätigung
+([Treffer bestätigen](#treffer-bestaetigen)) bleibt stehen – auch wenn ein Befund dabei höher eingestuft wird. Eine
+spätere Änderung durch den Hersteller meldet Vendor News wie gewohnt.
 
 ### Citrix und NetScaler {#citrix}
 

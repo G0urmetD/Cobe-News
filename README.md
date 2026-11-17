@@ -19,19 +19,27 @@ Dringlichkeit mit CISA KEV und EPSS und benachrichtigt Teams und Personen per E-
 
 ## Funktionen
 
-- **News** – 46 eingebaute Feeds (CERTs und Behörden, Hersteller-PSIRTs, Fachpresse, Research, KEV-/EUVD-Kataloge),
+- **News** – 44 eingebaute Feeds (CERTs und Behörden, Hersteller-PSIRTs, Fachpresse, Research, KEV-/EUVD-Kataloge),
   jede Meldung nur einmal, mit Schwere, Themen (ausgenutzt, Zero-Day, Ransomware …) und CVEs; eigene Feeds lassen sich
   ergänzen.
 - **Vendor News** – Produkten aus einem kuratierten Katalog oder per CPE folgen, die installierten Versionen eintragen
   und genau sehen, welche Schwachstellen sie betreffen, welche Version sie behebt und wann der Support endet.
+  Release-Linien und neue Versionen kommen von endoflife.date, aus den GitHub-Releases des Projekts oder von der
+  Release-Seite des Herstellers.
+- **Treffer bestätigen** – einen Treffer gemeinsam als „Nicht betroffen“, „Maßnahme umgesetzt“ oder „Risiko
+  akzeptiert“ bewerten, mit Begründung; er zählt dann nicht mehr als offen und meldet sich erst wieder, wenn sich
+  Wesentliches ändert (ausgenutzt, höher eingestuft, neue CVEs). Stummschalten bleibt daneben die persönliche Pause.
 - **Dringlichkeit** – Befunde nach CVSS, CISA KEV und FIRST EPSS geordnet, aktiv ausgenutzte Lücken zuerst.
 - **Beobachtete CVEs** – einzelnen CVEs folgen und benachrichtigt werden, wenn ein Fix erscheint, sie in CISA KEV
   landen oder ihr EPSS-Wert springt.
 - **Teams und Zuständigkeit** – Teams aus AD- oder Entra-ID-Gruppen, Produkte je Team, Benachrichtigungen an die
   Zuständigen.
 - **Benachrichtigungen** – E-Mail, Microsoft Teams, Slack, Discord, Mattermost, Telegram, ntfy, Gotify, signierte
-  generische Webhooks und Desktop-Push, mit Regeln nach Schwere, Quelle und Team.
-- **Anmeldung** – lokale Konten, Active Directory (LDAP) und Entra ID (OIDC), mit TOTP und Passkeys.
+  generische Webhooks und Desktop-Push, mit Regeln nach Schwere, Quelle, Thema, Team, Systemen (Hersteller, einzelne
+  Produkte oder „Unsere Produkte“ aus Vendor News) und Schlagwörtern. Dazu persönliche Benachrichtigungen je Person –
+  mit Ruhezeiten, Abwesenheit und Vertretung; die Links führen direkt zum Treffer.
+- **Anmeldung** – lokale Konten, Active Directory (LDAP) und Entra ID (OIDC), mit TOTP und Passkeys; auf Wunsch
+  merkt sich ein Gerät den zweiten Faktor für eine Weile (ab Werk aus).
 - **Betrieb** – Protokoll (Audit-Log), lesende REST-API und Prometheus-Metriken, verschlüsselte Sicherungen mit
   automatischem Rücksicherungs-Test, HTTPS ab Werk.
 - Oberfläche auf **Deutsch und Englisch**, helles und dunkles Design, eingebautes Handbuch.
