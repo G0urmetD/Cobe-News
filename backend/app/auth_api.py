@@ -45,6 +45,11 @@ OIDC_COOKIE = "cobe_news_oidc"
 OIDC_TTL = 600
 OIDC_PER_IP = 30  # sign-in starts per address and 10 minutes
 OIDC_PER_SHARED = 300  # … through an address everybody shares (Docker gateway, proxy): not one person's limit
+# Where the sign-in with Microsoft lands: the link that brought the person here – a story (?story=…), a product's drawer
+# (/vendor?product=…&finding=…), and also a message's "Cobe News öffnen" for several stories (/?ids=…, up to
+# notify.LINK_MAX with the address in front). It travels in the encrypted cookie (about 3 KB at this length, under the
+# browsers' 4 KB). Longer: the start page – the sign-in itself never fails for it (it did with 300: 422 at the start).
+NEXT_MAX = 2000
 REAUTH_SKEW = 120  # s: Entra's auth_time may be this much before the re-confirmation started (clocks)
 _oidc_starts: dict[str, list[float]] = {}
 
@@ -666,14 +671,14 @@ def _oidc_rate_ok(ip: str) -> bool:
 def _safe_next(value: str | None) -> str:
     """Where to land after the sign-in: only a path of this app (no other site, no scheme-relative //host)."""
     v = (value or "").strip()
-    return v if v.startswith("/") and not v.startswith("//") and "\\" not in v and len(v) <= 300 else "/"
+    return v if v.startswith("/") and not v.startswith("//") and "\\" not in v and len(v) <= NEXT_MAX else "/"
 
 
 @router.get("/auth/oidc/start")
 async def oidc_start(
     request: Request,
     db: Db,
-    next: str | None = Query(default=None, max_length=300),  # noqa: A002 - the query name
+    next: str | None = Query(default=None, max_length=8192),  # noqa: A002 - the query name; longer than NEXT_MAX: "/"
     reauth: bool = False,
 ) -> RedirectResponse:
     """`reauth=1`: an Entra admin confirms who they are for a sensitive action – Microsoft asks for the sign-in again

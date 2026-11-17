@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 import time
+import uuid
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -15,7 +16,7 @@ from conftest import make_client
 from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy import select
 
-from app import auth_api, db
+from app import auth_api, db, notify
 from app.crypto import decrypt_str
 from app import settings as settings_store
 from app.auth import entra
@@ -99,9 +100,14 @@ async def ms(admin_client, monkeypatch):
     return fake
 
 
-async def _sign_in(fake: FakeMicrosoft, *, tamper=None) -> tuple[httpx.Response, httpx.AsyncClient]:
+def _oidc_state(c: httpx.AsyncClient) -> dict:
+    """The state cookie of the start – quoted by the cookie jar when its base64 ends in "=" (the server unquotes it)."""
+    return json.loads(decrypt_str(c.cookies.get(auth_api.OIDC_COOKIE).strip('"')))
+
+
+async def _sign_in(fake: FakeMicrosoft, *, tamper=None, next_: str | None = None) -> tuple[httpx.Response, httpx.AsyncClient]:
     c = make_client()
-    start = await c.get("/api/auth/oidc/start")
+    start = await c.get("/api/auth/oidc/start", params={"next": next_} if next_ is not None else None)
     assert start.status_code == 302
     url = urlsplit(start.headers["location"])
     q = parse_qs(url.query)
@@ -109,12 +115,35 @@ async def _sign_in(fake: FakeMicrosoft, *, tamper=None) -> tuple[httpx.Response,
     assert q["redirect_uri"] == ["https://news.corp.example:8095/api/auth/oidc/callback"] and q["code_challenge_method"] == ["S256"]
     state = q["state"][0]
     # stateless: the nonce travels encrypted in the browser's cookie, nothing is kept on the server
-    fake.nonce = json.loads(decrypt_str(c.cookies.get(auth_api.OIDC_COOKIE)))["n"]
+    fake.nonce = _oidc_state(c)["n"]
     fake.challenge = q["code_challenge"][0]
     if tamper:
         tamper(c, state)
     cb = await c.get("/api/auth/oidc/callback", params={"code": "the-code", "state": state})
     return cb, c
+
+
+async def test_sign_in_lands_on_the_link_that_brought_the_person(ms):
+    """A link from a notification survives the sign-in with Microsoft – also a message's "Cobe News öffnen" for several
+    stories (/?ids=…, as long as notify.LINK_MAX lets it be): it failed with 422 at the start beyond 300 characters."""
+    ids = ",".join(str(uuid.UUID(int=i)) for i in range(1, 51))  # notify.NEWS_IDS_MAX stories
+    for link in ("/?story=0b7c6f8e-6a43-4b8e-9a51-3d2f1c0e9b11", "/vendor?product=pan-os&view=versions", "/watch?cve=CVE-2024-3094", f"/?ids={ids}"):
+        cb, c = await _sign_in(ms, next_=link)
+        assert cb.status_code == 302 and cb.headers["location"] == link, link
+        await c.aclose()
+    assert len(f"/?ids={ids}") <= auth_api.NEXT_MAX and len(f"https://news.corp.example:8095/?ids={ids}") <= notify.LINK_MAX
+    # the state cookie with the longest link still fits a browser's 4 KB per cookie
+    c = make_client()
+    start = await c.get("/api/auth/oidc/start", params={"next": "/?ids=" + "a" * (auth_api.NEXT_MAX - 6)})
+    assert start.status_code == 302
+    assert len(auth_api.OIDC_COOKIE) + len(c.cookies.get(auth_api.OIDC_COOKIE)) < 4000
+    await c.aclose()
+    # longer (or no path of this app): the start page – the sign-in itself goes on
+    for bad in ("/?ids=" + "a" * auth_api.NEXT_MAX, "https://evil.example/", "//evil.example/x"):
+        c = make_client()
+        start = await c.get("/api/auth/oidc/start", params={"next": bad})
+        assert start.status_code == 302 and _oidc_state(c)["to"] == "/"
+        await c.aclose()
 
 
 async def test_sign_in_with_microsoft(ms):
