@@ -489,3 +489,54 @@ async def test_coordinator_cves_skip_vendor_documents_and_known_records(admin_cl
     async with db.session() as s:
         got = await cvelist.coordinator_cves(s, ["panos"], datetime.now(UTC), 20)
     assert got == ["CVE-2026-105482"]  # NVD knows CVE-2024-0012; the vendor's own document is no coordinator's
+
+
+async def test_a_lookup_failing_halfway_leaves_the_backlog_quiet(admin_client, monkeypatch, net, structured_on, hooks):
+    """Each record of the backlog is committed as it is stored: when a later lookup of the round fails (GitHub 503),
+    the ones stored before it are still the update's backlog – taken quietly, the confirmation stays."""
+    await _follow(admin_client, "panos", "11.2.4-h20")
+    await _webhook_rule(admin_client, ["vendor_vuln"])
+    await _baseline(monkeypatch)
+    cves = ["CVE-2026-105481", "CVE-2026-106070", "CVE-2026-111497", "CVE-2026-99999"]  # asked in this order
+    await _store(_wid("WID-SEC-W-2026-4117", cves, "medium"))
+    await _dispatch()
+    sent = len(hooks)
+    f = _finding_of((await admin_client.get("/api/vendor/products/panos")).json(), "CVE-2026-111497")
+    r = await admin_client.post("/api/vendor/findings/confirm", json={"product": "panos", "finding": f["id"], "status": "accepted", "note": "Node.js nicht im Einsatz"})
+    assert r.status_code == 200, r.text
+    asked: list[str] = []
+
+    def answer(req: httpx.Request) -> httpx.Response:
+        c = str(req.url).rsplit("/", 1)[1].removesuffix(".json")
+        asked.append(c)
+        if c == "CVE-2026-99999":  # the round's last lookup fails – after Google's 9.2 of CVE-2026-111497 is stored
+            return httpx.Response(503, text="unavailable")
+        return httpx.Response(200, content=(FIX / f"cve5_rating_{c}.json").read_bytes())
+
+    for c in cves:
+        net.add(cvelist.raw_url(c), answer)
+    await _backfill()
+    async with db.session() as s:
+        stored = set(await s.scalars(select(VendorAdvisory.ident).where(VendorAdvisory.source == "cvelist")))
+        assert asked == cves and stored == set(cves[:3])  # the ones before the failure are kept
+        assert await vendor.evaluate_events(s) == 0  # and taken quietly
+    await _dispatch()
+    assert len(hooks) == sent
+    async with db.session() as s:
+        conf = await s.scalar(select(VendorConfirm).where(VendorConfirm.finding == f["id"]))
+        assert conf.ended_at is None and conf.facts["severity"] == "critical"
+
+
+def test_palo_altos_cve_record_does_not_outweigh_its_advisory():
+    """CVE-2026-0331: Palo Alto's advisory rates by the threat score (6.6 MEDIUM); its cvelistV5 record carries the pure
+    base 8.7 as baseScore beside threatScore 6.6. The record is read by the threat score, and the vendor's advisory
+    counts for its CVEs before any CVE record – also one stored by the parser before 0.1.57 (8.7)."""
+    rec = cvelist.parse_record(json.loads((FIX / "cve5_pan_0331.json").read_bytes()))
+    assert (rec["cvss"], rec["severity"]) == (6.6, "medium")
+    pan = _adv("paloalto:CVE-2026-0331", 6.6, "medium", ["CVE-2026-0331"], base={"cvss": 8.7, "severity": "high"})
+    old = _adv("cvelist:CVE-2026-0331", 8.7, "high", ["CVE-2026-0331"])
+    nvd = _adv("nvd:CVE-2026-0331", 8.7, "high", ["CVE-2026-0331"], rated="cna")
+    assert vendor.rating([pan, old, nvd], pan.cves)[:2] == (6.6, "medium")
+    # a CVE the advisory does not name keeps its CNA's rating
+    other = _adv("nvd:CVE-2026-0332", 7.1, "high", ["CVE-2026-0332"], rated="cna")
+    assert vendor.rating([pan, other], [*pan.cves, "CVE-2026-0332"])[:2] == (7.1, "high")

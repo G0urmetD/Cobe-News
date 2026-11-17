@@ -1822,10 +1822,17 @@ def rating(advs: list[VendorAdvisory], cves: list[str]) -> tuple[float | None, s
     (the highest of its CVEs, where it rates each of them) is returned where it differs, else None."""
     got: list[tuple[float | None, str]] = []
     covered: set[str] = set()
+    # the vendor's own advisory first: for its CVEs a CVE record (NVD, cvelistV5) says nothing more – where the vendor
+    # is the CNA it is the same word, only read another way (Palo Alto's cvelistV5 record of before 0.1.57 carries the
+    # pure CVSS-B 8.7 beside the threat score 6.6 of its advisory, CVE-2026-0331), and another CNA's rating does not
+    # outweigh the vendor's
     for x in advs:
-        if _rated(x) and _counts(x):
+        if x.source not in ("nvd", "cvelist") and _rated(x) and _counts(x):
             got.append((x.cvss, x.severity))
             covered |= {str(c).upper() for c in x.cves or []}
+    cna = [x for x in advs if x.source in ("nvd", "cvelist") and _rated(x) and _counts(x) and x.ident.upper() not in covered]
+    got += [(x.cvss, x.severity) for x in cna]
+    covered |= {x.ident.upper() for x in cna}
     for c in dict.fromkeys(str(c).upper() for c in cves):
         if c in covered:
             continue

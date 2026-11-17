@@ -103,12 +103,15 @@ def parse_release(data: bytes) -> dict:
 def _metric(metrics) -> tuple[float | None, str, str]:  # noqa: ANN001
     """(score, severity, vector) of a container's rating: its newest CVSS version (4.0, 3.1, 3.0) – of several metrics
     of that version (scenarios: Palo Alto rates PA-Series and Prisma Access apart) the highest, as for the NVD's copy
-    (vendor_sources._nvd_metrics)."""
+    (vendor_sources._nvd_metrics). A CVSS 4.0 metric with threat metrics rates by its threatScore (CVSS-BT, Palo Alto's
+    official rating, as in its advisory and in the NVD's copy: CVE-2026-0331 6.6, not the pure base 8.7)."""
     for key in ("cvssV4_0", "cvssV3_1", "cvssV3_0"):
         rows = []
         for m in src._l(metrics):
             d = src._d(m.get(key)) if isinstance(m, dict) else {}
-            if (s := src._score(d.get("baseScore"))) is not None:
+            if (s := src._score(d.get("threatScore"))) is not None:
+                rows.append((s, src._s(d.get("threatSeverity"), 20), src._s(d.get("vectorString"), 200)))
+            elif (s := src._score(d.get("baseScore"))) is not None:
                 rows.append((s, src._s(d.get("baseSeverity"), 20), src._s(d.get("vectorString"), 200)))
         if rows:
             return max(rows, key=lambda r: r[0])
@@ -606,19 +609,23 @@ async def backfill(db: AsyncSession, products: list[dict], ix, force: bool) -> i
     meter = source_health.start()
     got = 0
     budget = [len(cves)]
+    # the backlog of before the update ("Hersteller zählt" 0.1.57): the CNA's rating replacing the document's word is
+    # no news – the products of those documents take their ratings quietly (vendor.unprime). Before the lookups and
+    # again after them, failed or not: each record is committed as it is stored, so a lookup failing halfway must not
+    # leave the ones stored before it to an evaluation that counts them as news.
+    quiet = await vendor._csaf_naming(db, coord) if coord and primed is None else set()
+    await vendor.unprime(db, quiet)
     try:
         for c in cves:
             if await single(db, c, budget, ix) is not None:
                 got += 1
-        if coord and primed is None:
-            # the backlog of before the update ("Hersteller zählt" 0.1.57): the CNA's rating replacing the document's
-            # word is no news – the products of those documents take their ratings quietly (vendor.unprime)
-            await vendor.unprime(db, await vendor._csaf_naming(db, coord))
+        await vendor.unprime(db, quiet)
         st = await vendor._state(db, SINGLE_KEY)
         vendor._ok(st, DELTA_EVERY, got)
         vendor._record(db, st, meter, items=got)
     except Exception as exc:  # noqa: BLE001
         await db.rollback()
+        await vendor.unprime(db, quiet)
         st = await vendor._state(db, SINGLE_KEY)
         vendor._record(db, st, meter, exc=vendor._fail(st, exc, DELTA_EVERY))
     await db.commit()
