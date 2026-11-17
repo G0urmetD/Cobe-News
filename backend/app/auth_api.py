@@ -668,11 +668,18 @@ def _oidc_rate_ok(ip: str) -> bool:
     return True
 
 
+# the characters of an address as the browser sends it (the rest percent-encoded) – the ones that neither the cookie's
+# JSON nor the redirect's Location header write longer (Starlette quotes everything else: "|" would be three bytes, "é"
+# six in the JSON): a link of NEXT_MAX stays NEXT_MAX on its way, under the browsers' 4 KB for the cookie
+_NEXT_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~:/?#[]@!$&'()*+,;=%")
+
+
 def _safe_next(value: str | None) -> str:
-    """Where to land after the sign-in: only a path of this app (no other site, no scheme-relative //host). NEXT_MAX
-    counts bytes: what the cookie carries (2000 characters of a non-Latin script would not fit in it)."""
+    """Where to land after the sign-in: only a path of this app (no other site, no scheme-relative //host), in the
+    characters of an address as the browser sends it (_NEXT_CHARS) and at most NEXT_MAX long – else the start page."""
     v = (value or "").strip()
-    return v if v.startswith("/") and not v.startswith("//") and "\\" not in v and len(v.encode()) <= NEXT_MAX else "/"
+    ok = v.startswith("/") and not v.startswith("//") and len(v) <= NEXT_MAX and all(c in _NEXT_CHARS for c in v)
+    return v if ok else "/"
 
 
 @router.get("/auth/oidc/start")

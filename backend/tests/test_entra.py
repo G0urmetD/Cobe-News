@@ -7,6 +7,7 @@ import hashlib
 import json
 import time
 import uuid
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -137,9 +138,16 @@ async def test_sign_in_lands_on_the_link_that_brought_the_person(ms):
     start = await c.get("/api/auth/oidc/start", params={"next": "/?ids=" + "a" * (auth_api.NEXT_MAX - 6)})
     assert start.status_code == 302
     assert len(auth_api.OIDC_COOKIE) + len(c.cookies.get(auth_api.OIDC_COOKIE)) < 4000
+    # … and the start's headers fit the proxy's buffer for them (deploy/nginx: proxy_buffer_size 16k; its default of
+    # 4 KB answered this with 502)
+    head = sum(len(k) + len(v) + 4 for k, v in start.headers.multi_items())
+    assert 4096 < head < 8192
+    tpl = (Path(__file__).parents[2] / "deploy" / "nginx" / "cobe-news.conf.template").read_text()
+    assert "proxy_buffer_size 16k;" in tpl.split("location / {", 1)[1]
     await c.aclose()
-    # longer (or no path of this app): the start page – the sign-in itself goes on
-    for bad in ("/?ids=" + "a" * auth_api.NEXT_MAX, "https://evil.example/", "//evil.example/x"):
+    # longer, no path of this app, or characters the cookie's JSON or the redirect would write longer ("é" six bytes,
+    # "|" three): the start page – the sign-in itself goes on
+    for bad in ("/?ids=" + "a" * auth_api.NEXT_MAX, "https://evil.example/", "//evil.example/x", "/?q=" + "é" * 999, "/?q=" + "|" * 1990, '/?q="x"', "/\\evil", "/\t//evil", "/?a=b c"):
         c = make_client()
         start = await c.get("/api/auth/oidc/start", params={"next": bad})
         assert start.status_code == 302 and _oidc_state(c)["to"] == "/"
