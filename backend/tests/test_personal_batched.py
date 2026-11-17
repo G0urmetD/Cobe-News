@@ -207,3 +207,28 @@ async def test_security_stories_same_outcomes_whatever_the_batches(monkeypatch, 
     assert rows["berta"].email_checked_seq == 0 and rows["berta"].email_on_seq == top
     # no way on: not even looked at
     assert rows["dora"].email_seen_at is None and rows["dora"].teams_seen_at is None
+
+
+async def test_after_a_batch_falls_back_the_next_people_are_judged(monkeypatch, mails, caplog):  # noqa: F811
+    """A batch whose statements fail together is written one by one – its rollback expires every person loaded: the
+    people of the round are read again, so the next chunk's person-ways are judged and sent in the same round."""
+    import logging
+
+    async def broken(*_a, **_k):
+        raise RuntimeError("batch refused")
+
+    monkeypatch.setattr(personal_news, "_write_all", broken)
+    monkeypatch.setattr(personal_news, "CHUNK", 1)
+    await _allow()
+    src = await _source()
+    async with db.session() as s:
+        top = await news.last_seq(s)
+    ps = [await _person(n) for n in ("anja", "berta", "carl", "dora")]
+    for p in ps:
+        await _news_person(p, top, email=True)
+    await _news(src, "Kritische Lücke in PAN-OS", severity="high")
+    caplog.set_level(logging.INFO)
+    async with db.session() as s:
+        await personal_news.dispatch(s)
+    assert not [r for r in caplog.records if "not prepared" in r.getMessage()]
+    assert len(mails.sent) == 4

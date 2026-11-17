@@ -373,9 +373,20 @@ async def _prepare(db: AsyncSession, ways: dict[str, bool], top: int, now: datet
                 _state.more = True
                 break
         if len(plan) >= CHUNK:
-            jobs += await _write(db, plan, top, now)  # claimed and committed: sent (or taken back) by the round
+            got, rolled_back = await _write(db, plan, top, now)  # claimed and committed: sent (or taken back) by the round
+            jobs += got
             plan = []
-    jobs += await _write(db, plan, top, now)
+            if rolled_back:
+                try:
+                    # the batch's rollback expired everything loaded: the people read again for the rest of the round
+                    people = {p.user_id: (p, email, sched, url) for p, email, sched, url in await db.execute(q)}
+                    await db.commit()
+                except Exception:  # noqa: BLE001 - the database itself: what was claimed so far still goes, the rest next round
+                    await db.rollback()
+                    log.exception("personal news: the people not read again")
+                    _state.more = True
+                    break
+    jobs += (await _write(db, plan, top, now))[0]
     db.expunge_all()
     return jobs
 
@@ -422,17 +433,18 @@ def _error_patch(error: str, now: datetime) -> dict:
     return {"last_error": error, "last_error_at": now.isoformat()}
 
 
-async def _write(db: AsyncSession, plan: list[tuple], top: int, now: datetime) -> list[_Job]:
-    """What _judge decided for some person-ways, written together and committed – the jobs whose claim went in. The
-    claim (the stories written as sent, the claim marked) only while the way is still on and nothing claimed it
-    meanwhile. If the statements fail together: person-way by person-way (one person's write must not undo the others')."""
+async def _write(db: AsyncSession, plan: list[tuple], top: int, now: datetime) -> tuple[list[_Job], bool]:
+    """What _judge decided for some person-ways, written together and committed – the jobs whose claim went in, and
+    whether a rollback was needed (it expires every object loaded: the caller reads its people again). The claim (the
+    stories written as sent, the claim marked) only while the way is still on and nothing claimed it meanwhile. If the
+    statements fail together: person-way by person-way (one person's write must not undo the others')."""
     if not plan:
         await db.commit()  # the reads' transaction ends
-        return []
+        return [], False
     try:
         jobs = await _write_all(db, plan, top, now)
         await db.commit()
-        return jobs
+        return jobs, False
     except Exception:  # noqa: BLE001 - written one by one instead
         await db.rollback()
         log.exception("personal news: a batch of claims not written at once – one by one")
@@ -445,7 +457,7 @@ async def _write(db: AsyncSession, plan: list[tuple], top: int, now: datetime) -
         except Exception as exc:  # noqa: BLE001 - this person's claim undone – their stories come again
             await db.rollback()
             _failed_log(what[0], what[1], exc)
-    return jobs
+    return jobs, True
 
 
 async def _write_all(db: AsyncSession, plan: list[tuple], top: int, now: datetime) -> list[_Job]:
