@@ -642,3 +642,17 @@ async def test_a_feed_of_pre_releases_only_is_no_error_while_the_tags_know_versi
     await _follow(admin_client, "bloodhound")
     await _round()
     assert (await _state("releases:bloodhound")).error == "parse: no version found"
+
+
+def test_adselfservice_plus_release_notes_builds():
+    p = catalog.product("manageengine-adselfservice")
+    vs = release_sources.parse(fx("manageengine_adss_release_notes.html"), cfg_of("manageengine-adselfservice"))
+    # the headings only – "From build 6520 onwards … (Released on Nov 05, 2025 …)" in the notes is no release
+    assert [(v["v"], v["date"]) for v in vs] == [
+        ("7001", "2026-08-21"), ("7000", "2026-06-13"), ("6529", "2026-06-03"), ("6519", "2025-10-01"), ("6500", "2024-06-14"), ("5500", "2017-06-23"), ("5318", "2016-09-12"),
+    ]  # fmt: skip
+    e, _ = release_sources.merge(None, vs, cfg_of("manageengine-adselfservice"), datetime(2026, 11, 25, tzinfo=UTC))
+    release_sources.store(p["key"], e)
+    assert [(ln["name"], ln["latest"]) for ln in catalog.product_releases(p)] == [("7", "7.0 Build 7001"), ("6", "6.5 Build 6529"), ("5", "5.5 Build 5500")]
+    info = vendor.release_info(p, "6.5 Build 6519")
+    assert info["update_available"] and info["line"]["latest"] == "6.5 Build 6529" and info["newer_line"]["name"] == "7"

@@ -26,6 +26,11 @@
   kw: [ADSelfService Plus]
   scheme: build
   example: 6.5 Build 6519
+  # the release notes list every build since 2016 as a heading with its day ("Build 7001" – "Released on Aug 21, 2026");
+  # "From build 6520 onwards" in the notes is no release (checked 2026-11-25)
+  releases:
+    page: https://www.manageengine.com/products/self-service-password/release-notes.html
+    pattern: '\bBuild (?P<version>\d{4,5})\s*Released on (?P<date>[A-Z][a-z]{2,8} \d{1,2}, \d{4})'
 
 # ---------------------------------------------------------------- identity & access (IAM/SSO)
 - key: adfs
