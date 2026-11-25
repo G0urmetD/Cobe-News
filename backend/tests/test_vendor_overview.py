@@ -270,3 +270,50 @@ def test_target_names_what_it_would_newly_be_affected_by():
     v = _ver("4.14.4")
     _, t = _targets(WAZUH, [a, b], [v])
     assert t[str(v.id)]["to"] == "4.14.6" and t[str(v.id)]["introduces"] == 1
+
+
+def _cna_only(cve: str, rows: list[dict], cpes: list[str]) -> VendorAdvisory:
+    """An NVD record whose CNA (a third party) names a range, NVD's own analysis only the pre-releases (CVE-2026-67307)."""
+    desc = f"{ABOUT_WAZUH}Wazuh 5.0.0-beta1 (fixed in 5.0.0-beta3) does not validate a field of inventory-sync messages."
+    nodes = [{"cpeMatch": [{"vulnerable": True, "criteria": c} for c in cpes]}]
+    return VendorAdvisory(
+        id=f"nvd:{cve}", source="nvd", ident=cve, title=desc[:180], summary=desc, url=f"https://nvd.nist.gov/vuln/detail/{cve}", cves=[cve], cvss=7.7,
+        severity="high", exploited=False, published_at=datetime(2026, 11, 1, tzinfo=UTC), updated_at=None,
+        data={"configs": [{"nodes": nodes}], "cna": [{"affectedData": [{"vendor": "wazuh", "product": "wazuh", "versions": rows, "defaultStatus": "unaffected"}]}],
+              "assigner": "disclosure@vulncheck.com", "desc": desc, "cwe": []},
+    )  # fmt: skip
+
+
+def test_a_pre_release_is_never_the_target():
+    """Wazuh 4.14.10, the live case of 0.1.58: the CNA's range "0 < 5.0.0-beta3" – the only fix a beta. No "Neuere Linie
+    nötig: 5.0 – 5.0.0-beta3 behebt die Lücke": no stable fix yet, the pre-release named as such."""
+    beta = _cna_only("CVE-2026-67307", [{"status": "affected", "version": "0", "lessThan": "5.0.0-beta3", "versionType": "semver"}], ["cpe:2.3:a:wazuh:wazuh:5.0.0:beta1:*:*:*:*:*:*"])
+    v = _ver("4.14.10")
+    found, t = _targets(WAZUH, [beta], [v])
+    row = found[0]["versions"][0]
+    assert row["status"] == "affected" and row["fixed"] == "5.0.0-beta3" and row["fixed_pre"] is True
+    assert t[str(v.id)] == {"kind": "no_fix", "to": None, "line": None, "fixes": 0, "total": 1, "open": 1, "possible": 0, "newer": None, "prerelease": {"to": "5.0.0-beta3", "fixes": 1}}
+    # next to a stable fix in the line: the update stays the target, the beta is named only for what remains
+    stable = _nvd("CVE-2026-61000", end_excl="4.14.11")
+    old = _ver("4.14.4")
+    _, t = _targets(WAZUH, [beta, stable], [old])
+    assert t[str(old.id)] | {"newer": None} == {"kind": "update", "to": "4.14.11", "line": "4.14", "fixes": 1, "total": 2, "open": 1, "possible": 0, "newer": None, "prerelease": {"to": "5.0.0-beta3", "fixes": 1}}
+    # a stable 5.0.0 that fixes it as well: the newer line, no pre-release hint
+    rel = _cna_only("CVE-2026-67308", [{"status": "affected", "version": "0", "lessThan": "5.0.0", "versionType": "semver"}], ["cpe:2.3:a:wazuh:wazuh:5.0.0:beta1:*:*:*:*:*:*"])
+    _, t = _targets(WAZUH, [rel], [v])
+    assert t[str(v.id)]["kind"] == "newer_line" and t[str(v.id)]["to"] == "5.0.0" and "prerelease" not in t[str(v.id)]
+    # a stable fix: no flag on the row
+    found, _ = _targets(WAZUH, [stable], [old])
+    assert "fixed_pre" not in found[0]["versions"][0]
+
+
+def test_a_notification_names_a_pre_release_fix_as_such():
+    from app import notify
+
+    data = {"product": "Wazuh Manager (Server)", "version": "4.14.10", "status": "affected", "fixed": "5.0.0-beta3", "ident": "CVE-2026-67307", "title": "x", "url": "https://nvd.nist.gov/x"}
+    ev = VendorEvent(id=uuid.uuid4(), key="vuln:wazuh:4.14.10:nvd:CVE-2026-67307", kind="vuln", product="wazuh", severity="high", data=data, created_at=datetime.now(UTC))
+    de = notify.vendor_story(ev, "de")
+    assert "Fix: 5.0.0-beta3 (Vorabversion – noch kein stabiler Fix)" in de.summary and "→" not in de.product
+    assert "(pre-release – no stable fix yet)" in notify.vendor_story(ev, "en").summary
+    ev.data = data | {"fixed": "4.14.11"}
+    assert "Fix: 4.14.11 ·" in notify.vendor_story(ev, "de").summary + " ·" and notify.vendor_story(ev, "de").product.endswith("→ 4.14.11")

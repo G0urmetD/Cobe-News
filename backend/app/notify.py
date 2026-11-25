@@ -59,7 +59,7 @@ from app import concerns
 from app import keywords as words_svc
 from app import netaddr
 from app import news as news_svc
-from app import quiet, reader
+from app import quiet, reader, release_sources
 from app import systems as systems_svc
 from app import settings as settings_store
 from app import vendor_titles as titles
@@ -2206,6 +2206,7 @@ VENDOR_LABELS = {
         "service": "betrifft den Cloud-Dienst – behebt der Hersteller",
         "status": "Status",
         "fix": "Fix",
+        "pre": "Vorabversion – noch kein stabiler Fix",
         "exploited": "aktiv ausgenutzt",
         "now_exploited": "Jetzt aktiv ausgenutzt",
         "rated_higher": "Jetzt höher eingestuft: {to} (vorher {was})",
@@ -2242,6 +2243,7 @@ VENDOR_LABELS = {
         "service": "concerns the cloud service – fixed by the vendor",
         "status": "Status",
         "fix": "Fix",
+        "pre": "pre-release – no stable fix yet",
         "exploited": "actively exploited",
         "now_exploited": "Now actively exploited",
         "rated_higher": "Now rated higher: {to} (was {was})",
@@ -2311,7 +2313,9 @@ def vendor_story(ev: VendorEvent, lang: str) -> Story:
     if ev.kind == "vuln":
         parts = [f"{lb['status']}: {lb.get(str(d.get('status')), str(d.get('status')))}"]
         if d.get("fixed"):
-            parts.append(f"{lb['fix']}: {d['fixed']}")
+            # a record that names only a pre-release as the fix ("5.0.0-beta3"): said so, never as the version to go to
+            pre = release_sources.is_prerelease(str(d["fixed"]))
+            parts.append(f"{lb['fix']}: {d['fixed']}" + (f" ({lb['pre']})" if pre else ""))
         if d.get("cvss") is not None:
             parts.append(f"CVSS {float(d['cvss']):.1f}")
         if d.get("exploited"):
@@ -2335,7 +2339,7 @@ def vendor_story(ev: VendorEvent, lang: str) -> Story:
         tlp = "GREEN" if d.get("tlp") == "GREEN" else ""
         if tlp:
             title = TLP_PREFIX + title  # also in a subject, a compact list and a desktop notification
-        product_line = f"{product} {version}".strip() + (f" → {d['fixed']}" if d.get("fixed") and version else "")
+        product_line = f"{product} {version}".strip() + (f" → {d['fixed']}" if d.get("fixed") and version and not release_sources.is_prerelease(str(d["fixed"])) else "")
         return Story(
             str(ev.id), title[:300], summary[:600], str(d.get("url") or link), ev.severity, lb["source"], ev.created_at, list(d.get("cves") or []), "vendor.vuln", link,
             product=product_line, topics=["exploited"] if d.get("exploited") else [], source_kind="vendor_news", tlp=tlp,
