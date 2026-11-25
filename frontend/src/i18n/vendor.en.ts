@@ -172,6 +172,8 @@ const vendorEn: Record<string, string> = {
   "vendor.reason.all_listed_by": "every version affected according to {{src}}",
   "vendor.reason.all_listed_disputed": "version not decisive – every version affected according to {{src}} (no version given), not affected according to the CVE data",
   "vendor.reason.vendor_unaffected": "version not decisive – not affected according to the vendor, in the affected range according to the NVD",
+  "vendor.reason.prerelease_only":
+    "Version not decidable – only a third party (not the vendor) names every version before a pre-release as affected; NVD and the description name pre-releases only",
   "vendor.reason.source": "source: {{src}}",
   "vendor.by.vendor": "vendor",
   // the CNA of a CVE record that is not the product's vendor (GitHub's advisory database, VulDB, MITRE …)

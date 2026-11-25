@@ -284,9 +284,13 @@ def _cna_only(cve: str, rows: list[dict], cpes: list[str]) -> VendorAdvisory:
     )  # fmt: skip
 
 
-def test_a_pre_release_is_never_the_target():
+def test_a_pre_release_is_never_the_target(monkeypatch):
     """Wazuh 4.14.10, the live case of 0.1.58: the CNA's range "0 < 5.0.0-beta3" – the only fix a beta. No "Neuere Linie
-    nötig: 5.0 – 5.0.0-beta3 behebt die Lücke": no stable fix yet, the pre-release named as such."""
+    nötig: 5.0 – 5.0.0-beta3 behebt die Lücke": no stable fix yet, the pre-release named as such. (That record itself is
+    "möglicherweise" since – test_third_party_range_…; the target logic is checked here with it read as affected.)"""
+    from app import vendor_match
+
+    monkeypatch.setattr(vendor_match, "_prerelease_only", lambda *a, **k: False)
     beta = _cna_only("CVE-2026-67307", [{"status": "affected", "version": "0", "lessThan": "5.0.0-beta3", "versionType": "semver"}], ["cpe:2.3:a:wazuh:wazuh:5.0.0:beta1:*:*:*:*:*:*"])
     v = _ver("4.14.10")
     found, t = _targets(WAZUH, [beta], [v])
@@ -317,3 +321,79 @@ def test_a_notification_names_a_pre_release_fix_as_such():
     assert "(pre-release – no stable fix yet)" in notify.vendor_story(ev, "en").summary
     ev.data = data | {"fixed": "4.14.11"}
     assert "Fix: 4.14.11 ·" in notify.vendor_story(ev, "de").summary + " ·" and notify.vendor_story(ev, "de").product.endswith("→ 4.14.11")
+
+
+# ---------------------------------------------------------------- a third party's range for a record about pre-releases
+
+
+def _wazuh_67307(**over) -> VendorAdvisory:  # noqa: ANN003
+    a = _cna_only("CVE-2026-67307", [{"status": "affected", "version": "0", "lessThan": "5.0.0-beta3", "versionType": "semver"}], ["cpe:2.3:a:wazuh:wazuh:5.0.0:beta1:*:*:*:*:*:*"])
+    a.data = {**a.data, **over}
+    return a
+
+
+def test_third_party_range_from_zero_for_a_pre_release_record_is_only_possible():
+    """The user's decision on CVE-2026-67307: VulnCheck (not Wazuh) writes "0 < 5.0.0-beta3", NVD's analysis names only
+    5.0.0 beta1, the description "Wazuh 5.0.0-beta1 (fixed in 5.0.0-beta3)" – 4.14.10 is possibly affected, not surely."""
+    from app import vendor_match
+
+    p = catalog.product("wazuh")
+    adv = _wazuh_67307()
+    got = vendor_match.evaluate(p, "nvd", adv.data, "4.14.10")
+    assert (got.status, got.reason, got.fixed, got.detail) == ("possible", "prerelease_only", "5.0.0-beta3", {"by": "cna", "cna": "VulnCheck"})
+    assert vendor_match.evaluate(p, "nvd", adv.data, "5.0.0-beta1").status == "affected"  # the beta itself: as listed
+    assert vendor_match.evaluate(p, "nvd", adv.data, "5.0.0").status == "not_affected"
+    # without NVD's analysis the description alone decides the same
+    assert vendor_match.evaluate(p, "nvd", _wazuh_67307(configs=[]).data, "4.14.10").reason == "prerelease_only"
+
+
+def test_a_genuine_third_party_range_stays_affected():
+    from app import vendor_match
+
+    p = catalog.product("wazuh")
+    # NVD's analysis names stable versions too (a range up to the fix): the range counts as written
+    ranged = [{"nodes": [{"cpeMatch": [{"vulnerable": True, "criteria": "cpe:2.3:a:wazuh:wazuh:*:*:*:*:*:*:*:*", "versionEndExcluding": "4.14.11"},
+                                       {"vulnerable": True, "criteria": "cpe:2.3:a:wazuh:wazuh:5.0.0:beta1:*:*:*:*:*:*"}]}]}]  # fmt: skip
+    assert vendor_match.evaluate(p, "nvd", _wazuh_67307(configs=ranged).data, "4.14.10").status == "affected"
+    # the description names a stable version
+    desc = "Wazuh 4.0.0 before 4.14.11 and 5.0.0-beta2 allow a denial of service."
+    assert vendor_match.evaluate(p, "nvd", _wazuh_67307(desc=desc, configs=[]).data, "4.14.10").status == "affected"
+    # a lower bound: no open range
+    rows = [{"status": "affected", "version": "4.0.0", "lessThan": "5.0.0-beta3", "versionType": "semver"}]
+    lo = _cna_only("CVE-2026-67309", rows, ["cpe:2.3:a:wazuh:wazuh:5.0.0:beta1:*:*:*:*:*:*"])
+    assert vendor_match.evaluate(p, "nvd", lo.data, "4.14.10").status == "affected"
+    # the vendor itself as CNA stays authoritative
+    own = _wazuh_67307(assigner="security@wazuh.com")
+    assert vendor_match.cna_by(p, own.data) == ("vendor", "")
+    assert vendor_match.evaluate(p, "nvd", own.data, "4.14.10").status == "affected"
+
+
+async def test_affected_turning_possible_sends_nothing(admin_client, monkeypatch):
+    """0.1.58 made "betroffen" events for CVE-2026-67307; the downgrade to "möglicherweise" is no news (same event key)."""
+    from app import vendor_match
+    from app.models import VendorAdvisoryProduct
+
+    async with db.session() as s:
+        s.add(_wazuh_67307())
+        await s.flush()
+        s.add(VendorAdvisoryProduct(product="wazuh", advisory_id="nvd:CVE-2026-67307"))
+        await s.commit()
+    assert (await admin_client.put("/api/vendor/follows/wazuh", json={"enabled": True})).status_code == 200
+    assert (await admin_client.post("/api/vendor/follows/wazuh/versions", json={"version": "4.14.10"})).status_code == 200
+    monkeypatch.setattr(vendor, "_ready", lambda *_a: True)  # the sources' first answers (a round) are not part of this
+    real = vendor_match._prerelease_only
+    monkeypatch.setattr(vendor_match, "_prerelease_only", lambda *a, **k: False)  # as 0.1.58 judged it
+    async with db.session() as s:
+        await vendor.evaluate_events(s, full=True)
+        await s.commit()
+        before = list(await s.scalars(select(VendorEvent).where(VendorEvent.kind == "vuln")))
+    assert [e.data["status"] for e in before] == ["affected"]
+    monkeypatch.setattr(vendor_match, "_prerelease_only", real)
+    vendor.bump(["wazuh"])
+    async with db.session() as s:
+        await vendor.evaluate_events(s, full=True)
+        await s.commit()
+        after = list(await s.scalars(select(VendorEvent).where(VendorEvent.kind == "vuln")))
+    assert [e.id for e in after] == [e.id for e in before]  # no new event
+    d = (await admin_client.get("/api/vendor/products/wazuh")).json()
+    assert d["findings"][0]["versions"][0]["reason"] == "prerelease_only"

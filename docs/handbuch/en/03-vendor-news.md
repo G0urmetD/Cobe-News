@@ -338,6 +338,9 @@ For each entered version Vendor News works out what to do:
   "Fixed only in 5.0.0-beta3 (pre-release) – no stable version yet", and the vulnerability's fix carries the mark
   "pre-release".
 - If the target version is itself affected by another vulnerability, that is shown as well.
+- If only a **third party** (a CNA that is not the vendor) names "every version before 5.0.0-beta3" as affected while
+  NVD and the description name pre-releases only, a stable version counts as "possibly affected", not "affected". The
+  vendor's own data count as before.
 
 **Update available** means: your release line has a newer patch (according to endoflife.date or the product's
 [release source](#release-daten)) – an update within the line, not a line change. "Current" means: you run the newest
@@ -354,9 +357,11 @@ BloodHound CE, LibreNMS, Wazuh, ServiceDesk Plus …). For them the catalogue na
   public list every `git clone` asks for first – no token, no GitHub API), on the first fetch and weekly after that.
   Tags carry no date: "Released" is shown only where the feed names the date, otherwise "unknown". Pre-releases (rc,
   beta, alpha …) do not count.
-- the **vendor's release notes** (e.g. passwork.pro, the ServiceDesk Plus ReadMe) – only the product's own entries; for
-  Passwork "Passwork 7.7.0" counts, "Desktop app 1.4.1" or "Browser extension 2.0.37" do not. For ServiceDesk Plus the
-  build is the version and the major version the line (14600 → line 14).
+- the **vendor's release notes** (e.g. passwork.pro, the ServiceDesk Plus ReadMe, the ADSelfService Plus release notes)
+  – only the product's own entries; for Passwork "Passwork 7.7.0" counts, "Desktop app 1.4.1" or "Browser extension
+  2.0.37" do not. For ServiceDesk Plus and ADSelfService Plus the build is the version and the major version the line
+  (14600 → line 14, 6529 → line 6); "Released" is shown there only when the page names the major's first build (16000,
+  7000).
 
 From these come the lines (usually the first two parts: 7.6, 7.7; for Portainer with the LTS mark), the newest version
 per line and the newest of all – "Update available", "Newer line" and the target versions work the same way. Which line

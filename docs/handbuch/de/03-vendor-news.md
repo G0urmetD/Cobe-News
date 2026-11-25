@@ -352,6 +352,9 @@ Für jede eingetragene Version rechnet Vendor News aus, was zu tun ist:
   „Behoben erst in 5.0.0-beta3 (Vorabversion) – noch keine stabile Version“, beim Fix der Lücke die Marke
   „Vorabversion“.
 - Ist die Zielversion selbst von einer anderen Lücke betroffen, steht das dabei.
+- Nennt nur ein **Dritter** (eine CNA, die nicht der Hersteller ist) „alle Versionen vor 5.0.0-beta3“ als betroffen,
+  während NVD und Beschreibung nur Vorabversionen nennen, gilt eine stabile Version als „möglicherweise betroffen“,
+  nicht als „betroffen“. Die Angaben des Herstellers selbst gelten wie bisher.
 
 **Update verfügbar** heißt: In eurer Release-Linie gibt es einen neueren Patch (laut endoflife.date oder der
 [Release-Quelle](#release-daten) des Produkts) – ein Update innerhalb der Linie, kein Linienwechsel. „Aktuell“ heißt:
@@ -368,9 +371,11 @@ BookStack, BloodHound CE, LibreNMS, Wazuh, ServiceDesk Plus …). Für sie nennt
   Projekts (dieselbe öffentliche Liste, die jedes `git clone` zuerst abfragt – ohne Token, ohne GitHub-API), beim
   ersten Abruf und danach wöchentlich. Tags haben kein Datum: „Erschienen“ steht nur, wo der Feed das Datum nennt,
   sonst „unbekannt“. Vorabversionen (rc, beta, alpha …) zählen nicht.
-- die **Release Notes des Herstellers** (z. B. passwork.pro, das ReadMe von ServiceDesk Plus) – nur die Einträge des
-  Produkts selbst; bei Passwork zählt „Passwork 7.7.0“, nicht „Desktop app 1.4.1“ oder „Browser extension 2.0.37“.
-  Bei ServiceDesk Plus ist der Build die Version und die Hauptversion die Linie (14600 → Linie 14).
+- die **Release Notes des Herstellers** (z. B. passwork.pro, das ReadMe von ServiceDesk Plus, die Release Notes von
+  ADSelfService Plus) – nur die Einträge des Produkts selbst; bei Passwork zählt „Passwork 7.7.0“, nicht „Desktop app
+  1.4.1“ oder „Browser extension 2.0.37“. Bei ServiceDesk Plus und ADSelfService Plus ist der Build die Version und
+  die Hauptversion die Linie (14600 → Linie 14, 6529 → Linie 6); „Erschienen“ steht dort nur, wenn die Seite den
+  ersten Build der Hauptversion nennt (16000, 7000).
 
 Daraus entstehen die Linien (meist die ersten zwei Stellen: 7.6, 7.7; bei Portainer mit LTS-Kennzeichen), die neueste
 Version je Linie und die neueste überhaupt – „Update verfügbar“, „Neuere Linie“ und die Zielversionen funktionieren

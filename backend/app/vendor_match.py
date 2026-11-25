@@ -1302,7 +1302,12 @@ def _nvd_verdict(product: dict, data: dict, v: V | None) -> tuple[Verdict | None
         # clear NVD verdict (VMware Cloud Foundation CVE-2022-22948: CISA "4.0 – < 5.0", NVD "< 4.4.1")
         b = eval_cna(_adp_product(product), _adp_rows(adp), v, "adp")
     if a is None or b is None:
+        if b is not None and a is None and _prerelease_only(product, data, cna, b, v):
+            return _like(b, "possible", "prerelease_only", b.fixed), a, b
         return a or b, a, b
+    if a.status != "affected" and _prerelease_only(product, data, cna, b, v):
+        # a third party's "0 < 5.0.0-beta3" for a record about a beta only (CVE-2026-67307): possibly, never surely
+        return _like(b, "possible", "prerelease_only", b.fixed), a, b
     if a.status == "affected" and b.status == "not_affected" and b.reason in ("out_of_range", "fixed") and b.detail.get("by") == BY_VENDOR and _vendor_ranges(product, cna):
         # (only the vendor's own word – a CNA that is not the vendor, by "cna", leaves NVD's "affected" as it is)
         # the vendor names its affected ranges and says this version is not affected – outside of them with every
@@ -1317,6 +1322,67 @@ def _nvd_verdict(product: dict, data: dict, v: V | None) -> tuple[Verdict | None
     if a.status == "not_affected" and b.status == "possible" and b.reason == "unparsed_data":
         return a, a, b  # the CNA wrote prose ("versions prior to v22.09"): NVD's analysed ranges decide (BookStack CVE-2022-40690)
     return worst(a, b), a, b
+
+
+_PRE_TOKEN = re.compile(r"(?i)(?<![\w.])v?\d{1,9}(?:\.\d{1,9})+(?:[-.]?(?:alpha|beta|rc|pre|preview|dev|ea|cr|m|a|b)\.?\d{0,6}(?![a-z]))?")
+
+
+def _is_pre(text: str) -> bool:
+    from app.release_sources import is_prerelease
+
+    return is_prerelease(text)
+
+
+def _nvd_names_only_prereleases(product: dict, configs: list) -> bool | None:
+    """Whether NVD's analysis names the product only in pre-release versions (cpe …:5.0.0:beta1:…): True / False (also a
+    stable version, a range, every version) / None (it does not name the product)."""
+    wanted = {c.replace("\\", "") for c in product.get("cpes") or []}
+    seen = False
+    stack = list(configs or [])
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, dict):
+            continue
+        stack.extend(node.get("nodes") or [])
+        stack.extend(node.get("children") or [])
+        for m in node.get("cpeMatch") or []:
+            if not isinstance(m, dict) or not m.get("vulnerable", True):
+                continue
+            f = cpe_fields(str(m.get("criteria") or ""))
+            if len(f) < 4 or ":".join(f[:3]) not in wanted:
+                continue
+            seen = True
+            bounds = [m.get(k) for k in ("versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding") if m.get(k)]
+            ver, upd = f[3], (f[4] if len(f) > 4 else "*")
+            text = ver + (f"-{upd}" if upd not in ("*", "-", "") else "")
+            if bounds or ver in ("*", "-", "") or not _is_pre(text):
+                return False
+    return True if seen else None
+
+
+def _prerelease_only(product: dict, data: dict, cna: list, b: Verdict | None, v: V | None) -> bool:
+    """A third party's affected range that starts at 0 (or has no lower bound) for a record about pre-releases only: a
+    CNA that is not the vendor (VulnCheck, by "cna") writes "0 < 5.0.0-beta3", while NVD's analysis names only 5.0.0
+    beta1 and the description "Wazuh 5.0.0-beta1 (fixed in 5.0.0-beta3)" – a stable installed version is "possibly"
+    affected, not surely (CVE-2026-67307). Narrow: the vendor as CNA stays authoritative; a range with a lower bound,
+    NVD naming a stable version or a range, or a description naming a stable version – the range counts as written."""
+    if b is None or b.status != "affected" or b.detail.get("by") != BY_CNA or v is None or any(k < 0 for k in v.key):
+        return False
+    names = _cna_names(product)
+    rows: list[dict] = []
+    for src in cna or []:
+        for a in (src.get("affectedData") or []) if isinstance(src, dict) else []:
+            if not isinstance(a, dict):
+                continue
+            vendor, prod = str(a.get("vendor") or ""), str(a.get("product") or "")
+            if any(name_matches(prod, want, vendor) and (_norm(vendor)[:1] == _norm(wv)[:1] or name_matches(vendor, wv)) for wv, want in names):
+                rows += [_range_row(x) for x in a.get("versions") or [] if isinstance(x, dict) and x.get("status") == "affected"]
+    if not rows or not all(str(x.get("version") or "").strip() in _OPEN and (x.get("lessThan") or x.get("lessThanOrEqual")) for x in rows):
+        return False
+    nvd = _nvd_names_only_prereleases(product, data.get("configs") or [])
+    tokens = _PRE_TOKEN.findall(str(data.get("desc") or ""))
+    desc = (all(_is_pre(t) for t in tokens) if tokens else None)
+    return nvd is not False and desc is not False and bool(nvd or desc)
 
 
 # ---------------------------------------------------------------- CSAF advisories (BSI, Siemens, Cisco): ranges per product

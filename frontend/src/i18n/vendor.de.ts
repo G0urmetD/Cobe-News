@@ -173,6 +173,8 @@ const vendorDe: Record<string, string> = {
   "vendor.reason.all_listed_by": "laut {{src}} alle Versionen betroffen",
   "vendor.reason.all_listed_disputed": "Version nicht eindeutig – laut {{src}} alle Versionen betroffen (ohne Versionsangabe), laut den CVE-Daten nicht betroffen",
   "vendor.reason.vendor_unaffected": "Version nicht eindeutig – laut Hersteller nicht betroffen, laut NVD im betroffenen Bereich",
+  "vendor.reason.prerelease_only":
+    "Version nicht eindeutig – nur ein Dritter (nicht der Hersteller) nennt alle Versionen vor einer Vorabversion als betroffen; NVD und Beschreibung nennen nur Vorabversionen",
   "vendor.reason.source": "Quelle: {{src}}",
   "vendor.by.vendor": "Hersteller",
   // the CNA of a CVE record that is not the product's vendor (GitHub's advisory database, VulDB, MITRE …)

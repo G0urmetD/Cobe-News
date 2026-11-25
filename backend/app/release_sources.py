@@ -10,8 +10,10 @@ ReleaseSource) names a source per product, as data:
   no API, one request; it lists every branch, pull request and tag – n8n's 2.7 MB – so it is read bounded, see
   git_tags). Tags have no date and no title: their versions are kept without a date ("unbekannt") and LTS comes from
   the feed's titles only. The tags are read on the first fetch and then weekly (HISTORY_EVERY); the feed in between
-  keeps the newest releases and their dates. A tag is not a release: one ahead of its line's newest release in the
-  feed (tagged, the release not published yet) waits for the feed. The version is read from the tag (from the release's link), never from
+  keeps the newest releases and their dates. A tag is not a release: one ahead of what the feed released (tagged, the
+  release not published yet; an unreleased or later deleted v15.0.0) waits – for the feed, or for the next weekly read
+  of the tags that still has it (merge). A feed entry is a pre-release by its tag, its title only with the word right
+  next to a version (titles are free text). The version is read from the tag (from the release's link), never from
   the free-text title; "v" is dropped.
 - A vendor's release notes page: `releases: {page: https://…, pattern: <regex with 'version' and optionally 'date'>}` –
   the HTML read as text (no JavaScript, bounded size), the pattern searched in it (Passwork: "Aug 03, 2026 — Passwork
@@ -75,6 +77,9 @@ KEEP_VERSIONS = 300  # per product (the oldest by version go first)
 LINES_MAX = 30
 DEFAULT_TAG = r"^v?(?P<version>\d+(?:\.\d+){1,3})$"
 PRERELEASE = re.compile(r"(?i)(?:^|[^a-z])(?:rc|beta|alpha|preview|pre-?release|dev|nightly|snapshot|test|canary|insider)(?:[^a-z]|$)")
+# a release title marks a pre-release only with the word right next to a version ("v5.0.0 Beta 2", "2.1 (RC1)") – a
+# title is free text (Seafile's are commit messages: "v14.0.8-server: Test gc when concurrent upload")
+TITLE_PRE = re.compile(r"(?i)\d[\s._(-]{0,2}(?:rc|beta|alpha|preview|pre-?release|dev|nightly|snapshot|canary)(?:[^a-z]|$)")
 VERSION = re.compile(r"^\d+(?:\.\d+){0,5}$")
 DATE_FORMATS = ("%Y-%m-%d", "%b %d, %Y", "%B %d, %Y", "%d %B %Y", "%d %b %Y", "%d %B, %Y", "%d %b, %Y", "%d.%m.%Y", "%b %d %Y", "%B %d %Y")
 OID = re.compile(rb"[0-9a-f]{40}(?:[0-9a-f]{24})?")  # SHA-1 or SHA-256 object names
@@ -162,9 +167,19 @@ def _pre(*texts: str) -> bool:
 
 
 def is_prerelease(text: str | None) -> bool:
-    """A version that names itself a pre-release ("5.0.0-beta3", "7.4.0-alpha", "1.6.0-RC3") – never a target to
-    recommend (vendor.target_versions), said as "Vorabversion" where a record names it as the fix."""
-    return bool(text) and _pre(str(text)[:80])
+    """A version that names itself a pre-release ("5.0.0-beta3", "7.4.0-alpha", "1.6.0-RC3") or that the version parser
+    ranks below its release ("5.0.0b3", "8.0.0-ea", "11.0.0-M5", "1.0.0.CR1": a negative part of the generic key) –
+    never a target to recommend (vendor.target_versions), said as "Vorabversion" where a record names it as the fix.
+    Words that only contain such a word ("devices", "latest", "(Testing)") and hotfix forms (22.4R3-S5) are none."""
+    if not text:
+        return False
+    t = str(text)[:80]
+    if _pre(t):
+        return True
+    from app.vendor_versions import parse as parse_version
+
+    v = parse_version("generic", t)
+    return v is not None and any(k < 0 for k in v.key)
 
 
 def parse_github_atom(body: bytes, cfg: dict) -> list[dict]:
@@ -192,7 +207,7 @@ def parse_github_atom(body: bytes, cfg: dict) -> list[dict]:
         m = tag_rx.fullmatch(tag.strip()[:120])
         if m is None or not m.groupdict().get("version"):
             continue
-        if not cfg.get("prerelease") and _pre(tag, title):
+        if not cfg.get("prerelease") and (_pre(tag) or TITLE_PRE.search(title)):
             continue
         v = _norm(m.group("version"))
         if v is None:
@@ -205,16 +220,18 @@ def parse_github_atom(body: bytes, cfg: dict) -> list[dict]:
     return list(out.values())
 
 
-def git_tags(body: bytes) -> list[str]:
+def git_tags(body: bytes) -> tuple[list[str], bool]:
     """The tag names of a git smart-HTTP ref advertisement, in its order (each once – an annotated tag's peeled
-    "<tag>^{}" is the same tag). The format (gitprotocol-http, gitprotocol-pack): pkt-lines – four hex digits giving
-    the length including themselves, then the payload; 0000 flushes. First "# service=git-upload-pack", a flush, then
-    one line per ref: "<object name> <ref name>" (the first with NUL and the capabilities). Read strictly and bounded:
-    a length that is no hex number, below 4 or beyond PKT_MAX or the body, a ref line without an object name, no
-    service line – ValueError (a page in between, a cut answer); at most REFS_PKTS lines, TAGS_MAX tags. Linear: one
-    pass, no regular expression over the body (each pkt-line is sliced, not searched)."""
+    "<tag>^{}" is the same tag), and whether TAGS_MAX cut the list (then the history is not complete). The format
+    (gitprotocol-http, gitprotocol-pack): pkt-lines – four hex digits giving the length including themselves, then the
+    payload; 0000 flushes. First "# service=git-upload-pack", a flush, then one line per ref: "<object name> <ref
+    name>" (the first with NUL and the capabilities), a flush at the end. Read strictly and bounded: a length that is no
+    hex number, below 4 or beyond PKT_MAX or the body, a ref line without an object name, no service line, no closing
+    flush – ValueError (a page in between, a cut answer); at most REFS_PKTS lines, TAGS_MAX tags. Linear: one pass, no
+    regular expression over the body (each pkt-line is sliced, not searched)."""
     size, pos, n = len(body), 0, 0
     service = False
+    flushed = False  # the last pkt-line was a flush: the advertisement is whole
     tags: dict[str, None] = {}
     while pos < size:
         n += 1
@@ -227,10 +244,12 @@ def git_tags(body: bytes) -> list[str]:
         if ln < 4:  # 0000 flush, 0001 delimiter, 0002 end of response
             if ln == 3:
                 raise ValueError("bad pkt-line length")
+            flushed = ln == 0
             pos += 4
             continue
         if ln > PKT_MAX or pos + ln > size:
             raise ValueError("bad pkt-line length")
+        flushed = False
         line = body[pos + 4 : pos + ln].split(b"\0", 1)[0].rstrip(b"\n")
         pos += ln
         if not service:
@@ -249,18 +268,20 @@ def git_tags(body: bytes) -> list[str]:
         if 0 < len(name) <= 200:
             tags.setdefault(name.decode("utf-8", "replace"))
             if len(tags) >= TAGS_MAX:
-                break
+                return list(tags), True
     if not service:
         raise ValueError("not a git ref advertisement")
-    return list(tags)
+    if not flushed:
+        raise ValueError("cut off (no closing flush)")
+    return list(tags), False
 
 
-def parse_tags(body: bytes, cfg: dict) -> list[dict]:
-    """The versions of a GitHub repository's tags (git_tags): [{"v", "date": None, "lts": False}] – the catalogue's `tag`
+def tag_versions(names: list[str], cfg: dict) -> list[dict]:
+    """The versions of a repository's tag names (git_tags): [{"v", "date": None, "lts": False}] – the catalogue's `tag`
     rule and the pre-release filter as for the feed (only the tag is known here, no title)."""
     tag_rx = re.compile(cfg.get("tag") or DEFAULT_TAG)
     out: dict[str, dict] = {}
-    for tag in git_tags(body):
+    for tag in names:
         m = tag_rx.fullmatch(tag.strip()[:120])
         if m is None or not m.groupdict().get("version"):
             continue
@@ -270,6 +291,11 @@ def parse_tags(body: bytes, cfg: dict) -> list[dict]:
         if v is not None and v not in out:
             out[v] = {"v": v, "date": None, "lts": False}
     return list(out.values())
+
+
+def parse_tags(body: bytes, cfg: dict) -> list[dict]:
+    """The versions of a GitHub repository's ref advertisement (git_tags → tag_versions)."""
+    return tag_versions(git_tags(body)[0], cfg)
 
 
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
@@ -374,11 +400,21 @@ def _line_name(v: str, depth: int, scheme: str) -> str | None:
     return ".".join(v.split(".")[:depth])
 
 
+def _build_start(v: str) -> bool:
+    """A build that starts its major (vendor_versions.build_line): 16000 for 16, 7000 for 7, 120000 for OpManager 12."""
+    if not v.isdigit():
+        return False
+    n = int(v)
+    return n % (10000 if n >= 100000 else 1000) == 0
+
+
 def lines_of(versions: list[dict], depth: int = 2, scheme: str = "generic", complete: bool = False) -> list[dict]:
     """endoflife.date-shaped release lines, newest (by version) first: name (the first `depth` parts as written –
     "26.09"; the build scheme: the major), latest (the highest version of the line) and its date, isLts, and
     releaseDate – the date of the line's first release, only where it is known: the line's lowest version has a date
-    and it is the line's start (x.y or x.y.0), or the source lists every release (`complete`, a vendor's page). The
+    and it is the line's start (x.y or x.y.0; a build: x000 – 16000 for line 16, the start of its major), or the source
+    lists every release (`complete`, a vendor's page – not for builds: ADSelfService Plus lists line 5 only from 5318,
+    years after 5.0 came out, and a wrong early date would make old CVEs "unklare Altdaten"). The
     earliest date merely seen in a line (the feed's newest 10 had 4.14.7, not 4.14.0) is no release date of the line.
     No support fields – unknown."""
     by: dict[str, list[dict]] = {}
@@ -394,7 +430,7 @@ def lines_of(versions: list[dict], depth: int = 2, scheme: str = "generic", comp
         line = {"name": name, "latest": shown(top["v"], scheme), "isLts": any(r.get("lts") for r in rows), "_k": _key(name)}
         if top.get("date"):
             line["latestDate"] = top["date"]
-        if first.get("date") and (complete or (scheme != "build" and _key(first["v"]) == _key(name))):
+        if first.get("date") and (_build_start(first["v"]) if scheme == "build" else complete or _key(first["v"]) == _key(name)):
             line["releaseDate"] = first["date"]
         out.append(line)
     out.sort(key=lambda r: r["_k"], reverse=True)
@@ -418,14 +454,20 @@ def history_due(e: dict | None, now: datetime) -> bool:
     return tried + wait <= now
 
 
-def merge(old: dict | None, found: list[dict], cfg: dict, now: datetime, tags: list[dict] | None = None, history_error: str | None = None) -> tuple[dict, int]:
+def merge(
+    old: dict | None, found: list[dict], cfg: dict, now: datetime, tags: list[dict] | None = None, history_error: str | None = None, cut: bool = False
+) -> tuple[dict, int]:
     """The stored entry with a fetch's versions added: (entry, how many versions are new). The first fetch of a source
-    (or one changed in the catalogue) is the baseline – its versions are marked `base`. `tags`: the versions of the
-    repository's tags (parse_tags) when they were read this time – the first complete history is a baseline too; a tag
-    newer than the newest release the feed named in its line (v4.14.11 tagged, its release not published yet) waits for
-    the feed – a line the feed never named comes from the tags alone. `history_error`: why they could not be read (the
-    history stays as it was). New: versions that are news – kept (not trimmed away again: an old tag below the
-    KEEP_VERSIONS newest is no news) and not of a baseline."""
+    (or one changed in the catalogue) is the baseline – its versions are marked `base`. LTS marks of the feed's titles
+    stay (a tag never takes one away). `tags`: the versions of the repository's tags (tag_versions) when they were read
+    this time – the first complete history is a baseline too. A tag is not a release: one newer than the newest release
+    the feed named in its line (v4.14.11 tagged, the release not published yet), or newer than every release the feed
+    named at all (a v15.0.0 tag nobody released), waits – for the feed, or for the next read of the tags: a tag two reads
+    saw (`history.waiting`: version → first seen) is taken (a release the feed's 10 missed). A line the feed never named
+    below its newest release comes from the tags alone; a feed without any stable release (only pre-releases) lets every
+    tag in. A waiting tag that is gone (deleted) is forgotten. `cut`: TAGS_MAX cut the tags – the history is not
+    complete. `history_error`: why they could not be read (the history stays as it was). New: versions that are news –
+    kept (not trimmed away again: an old tag below the KEEP_VERSIONS newest is no news) and not of a baseline."""
     sig = signature(cfg)
     fresh = old is None or old.get("sig") != sig or not old.get("versions")
     have = {} if fresh else {r["v"]: dict(r) for r in old.get("versions") or [] if isinstance(r, dict) and r.get("v")}
@@ -449,15 +491,22 @@ def merge(old: dict | None, found: list[dict], cfg: dict, now: datetime, tags: l
             if r.get("date") and VERSION.fullmatch(r["v"]):
                 ln = ".".join(r["v"].split(".")[:depth])
                 released[ln] = max(released.get(ln, ()), _key(r["v"]))
+        top = max(released.values(), default=None)  # the newest release the feed named at all
+        before = hist.get("waiting") if isinstance(hist.get("waiting"), dict) else {}
+        waiting: dict[str, str] = {}
         for r in tags:
             if r["v"] in have:
                 continue
             ln = ".".join(r["v"].split(".")[:depth])
-            if ln in released and _key(r["v"]) > released[ln]:
-                continue  # tagged ahead of its line's newest release (the release not published yet): the feed brings it
-            have[r["v"]] = {"v": r["v"], "date": None, "lts": False, "base": first}
+            k = _key(r["v"])
+            ahead = (ln in released and k > released[ln]) or (ln not in released and top is not None and k > top)
+            if ahead and r["v"] not in before:
+                waiting[r["v"]] = at  # seen once: waits for the feed or the next read of the tags
+                continue
+            # taken: from the tags alone, or a waiting one seen again (no release in the feed: news, never a baseline)
+            have[r["v"]] = {"v": r["v"], "date": None, "lts": False, "base": first and not ahead}
             added.add(r["v"])
-        hist = {"ok_at": at, "tried_at": at, "error": None, "tags": len(tags)}
+        hist = {"ok_at": at, "tried_at": at, "error": None, "tags": len(tags)} | ({"cut": True} if cut else {}) | ({"waiting": waiting} if waiting else {})
     elif history_error:
         hist = hist | {"tried_at": at, "error": history_error[:120]}
     rows = sorted(have.values(), key=lambda r: _key(r["v"]), reverse=True)[:KEEP_VERSIONS]
@@ -547,7 +596,8 @@ def info(product: dict) -> dict | None:
     out = describe(cfg) | {"fetched_at": e.get("fetched_at") if ok else None}
     if ok:
         out["known"] = len(e.get("versions") or [])
-        out["complete"] = bool((e.get("history") or {}).get("ok_at")) if cfg.get("github") else None
+        h = e.get("history") or {}
+        out["complete"] = bool(h.get("ok_at") and not h.get("cut")) if cfg.get("github") else None
     return out
 
 
@@ -586,20 +636,21 @@ def fetch_key(product: dict) -> str:
     return f"{KEY_PREFIX}{product['key']}"[:300]
 
 
-async def _history(db, cfg: dict, memo: dict[str, bytes | str]) -> tuple[list[dict] | None, str | None]:  # noqa: ANN001
+async def _history(db, cfg: dict, memo: dict[str, tuple[list[str], bool] | str]) -> tuple[list[dict] | None, str | None, bool]:  # noqa: ANN001
     """The versions of a GitHub source's tags (git_tags through vendor.get: https only, github.com only, REFS_LIMIT) –
-    (versions, None), or (None, why not). A failure costs the feed nothing: it is kept, the tags are asked again later.
-    `memo`: the round's answers (or errors) per URL – a repository two products share is asked once."""
+    (versions, None, cut), or (None, why not, False). A failure costs the feed nothing: it is kept, the tags are asked
+    again later. `memo`: the round's tag names (or errors) per URL – a repository two products share is asked once; the
+    body itself is not kept (up to REFS_LIMIT per repository)."""
     from app import vendor as svc
     from app.news import NewsError
 
     url = refs_url(cfg)
     got = memo.get(url)
     if isinstance(got, str):
-        return None, got
+        return None, got, False
     try:
         if got is None:
-            got = await svc.get(
+            body = await svc.get(
                 url,
                 db=db,
                 headers={"Accept": "application/x-git-upload-pack-advertisement, */*;q=0.1"},
@@ -607,16 +658,18 @@ async def _history(db, cfg: dict, memo: dict[str, bytes | str]) -> tuple[list[di
                 conditional=False,
                 only=lambda u: urlsplit(u).hostname == "github.com",
             )
-            if got is None:
+            if body is None:
                 raise NewsError("http", "no answer")
-            memo[url] = got
-        return await asyncio.to_thread(parse_tags, got, cfg), None
+            got = memo[url] = await asyncio.to_thread(git_tags, body)
+            del body
+        names, cut = got
+        return await asyncio.to_thread(tag_versions, names, cfg), None, cut
     except NewsError as exc:
         err = f"{exc.category}: {exc.detail}" if exc.detail else exc.category
     except (ValueError, UnicodeError, re.error) as exc:
         err = f"parse: {exc}"[:120]
     memo[url] = err
-    return None, err
+    return None, err, False
 
 
 async def sync(db, products: list[dict], every: timedelta, force: bool) -> dict[str, int]:  # noqa: ANN001
@@ -629,7 +682,7 @@ async def sync(db, products: list[dict], every: timedelta, force: bool) -> dict[
 
     out: dict[str, int] = {}
     bodies: dict[str, bytes] = {}
-    refs: dict[str, bytes | str] = {}
+    refs: dict[str, tuple[list[str], bool] | str] = {}
     for p in wanted(products):
         cfg = config(p)
         assert cfg is not None
@@ -658,9 +711,9 @@ async def sync(db, products: list[dict], every: timedelta, force: bool) -> dict[
                 found = await asyncio.to_thread(parse, body, cfg)
                 if not found and not cfg.get("github"):
                     raise NewsError("parse", "no version found")
-            tags, hist_err = None, None
+            tags, hist_err, cut = None, None, False
             if cfg.get("github") and history_due(old if have else None, datetime.now(UTC)):
-                tags, hist_err = await _history(db, cfg, refs)
+                tags, hist_err, cut = await _history(db, cfg, refs)
                 if hist_err:
                     log.info("release data %s: tags of %s not read (%s) – the feed's newest releases only", p["key"], cfg["github"], hist_err)
             if body is not None and not found and not tags and not have:
@@ -672,7 +725,7 @@ async def sync(db, products: list[dict], every: timedelta, force: bool) -> dict[
                 svc._record(db, st, meter)
                 await db.commit()
                 continue
-            e, new = merge(old if have else None, found, cfg, datetime.now(UTC), tags=tags, history_error=hist_err)
+            e, new = merge(old if have else None, found, cfg, datetime.now(UTC), tags=tags, history_error=hist_err, cut=cut)
             if body is None and have:
                 e["found"] = old.get("found", 0)  # the feed was unchanged (304): what it listed last time
             await asyncio.to_thread(store, p["key"], e)
