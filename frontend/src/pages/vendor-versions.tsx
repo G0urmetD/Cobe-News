@@ -693,10 +693,24 @@ function SourceLine({ source }: { source: ReleaseSource | null }) {
       ) : (
         <> – {t("vendor.lines.notFetched")}</>
       )}
+      {/* how complete the history is: GitHub's feed alone has only the newest releases – never implied to be all */}
+      {source.fetched_at && completeness(t, source) && (
+        <>
+          {" · "}
+          <span className={source.complete === false ? "text-warning" : undefined}>{completeness(t, source)}</span>
+        </>
+      )}
       {" · "}
       {t("vendor.lines.noSupportData")}
     </p>
   )
+}
+
+function completeness(t: (k: string, o?: Record<string, unknown>) => string, source: Exclude<ReleaseSource, { kind: "eol" }>): string {
+  if (source.kind === "page") return t("vendor.lines.pageAsListed")
+  if (source.complete) return t("vendor.lines.completeGithub")
+  if (source.complete === false) return t("vendor.lines.recentGithub", { count: source.known ?? 0 })
+  return ""
 }
 
 /** A product with a release source that has no lines yet (not fetched, or nothing found). */
@@ -713,13 +727,17 @@ function SourceNote({ source }: { source: ReleaseSource }) {
   )
 }
 
+const OWN_LINES_SHOWN = 6 // a release source's newest lines shown at once (Wazuh's tags: 30 lines back to 2.1)
+
 function ReleaseLines({ lines, yours, source }: { lines: ReleaseLine[]; yours: Set<string>; source: ReleaseSource | null }) {
   const { t } = useTranslation()
   const own = !!source && source.kind !== "eol"
   const [showOld, setShowOld] = useState(false)
-  const rows = lines.map((l) => ({ l, s: supportState(l.eolFrom, l.isEol), mine: yours.has(l.name) }))
-  const current = rows.filter((r) => r.s !== "past" || r.mine)
-  const old = rows.filter((r) => r.s === "past" && !r.mine)
+  const rows = lines.map((l, n) => ({ l, s: supportState(l.eolFrom, l.isEol), mine: yours.has(l.name), n }))
+  // a release source has no support data: its old lines (the whole history from the tags) are folded after the newest
+  const folded = (r: (typeof rows)[number]) => !r.mine && (own ? r.n >= OWN_LINES_SHOWN : r.s === "past")
+  const current = rows.filter((r) => !folded(r))
+  const old = rows.filter(folded)
   const shown = showOld ? rows : current
   const grid = "sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_6.5rem_6.5rem_8.5rem] sm:items-center sm:gap-3"
   return (
@@ -733,7 +751,7 @@ function ReleaseLines({ lines, yours, source }: { lines: ReleaseLine[]; yours: S
         <div className={cn("hidden border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground", grid)}>
           <span>{t("vendor.lines.colLine")}</span>
           <Explained label={t("vendor.lines.colLatest")} text={t("vendor.lines.colLatestHelp")} />
-          <Explained label={t("vendor.lines.colReleased")} text={t("vendor.lines.colReleasedHelp")} />
+          <Explained label={t("vendor.lines.colReleased")} text={t(own ? "vendor.lines.colReleasedHelpSource" : "vendor.lines.colReleasedHelp")} />
           <span>
             <Term k="eol">{t("vendor.lines.colEol")}</Term>
           </span>
@@ -757,7 +775,7 @@ function ReleaseLines({ lines, yours, source }: { lines: ReleaseLine[]; yours: S
               </span>
               <span className="tabular">
                 <span className="text-muted-foreground sm:hidden">{t("vendor.lines.colReleased")}: </span>
-                {l.releaseDate ? fmtDay(l.releaseDate) : "–"}
+                {l.releaseDate ? fmtDay(l.releaseDate) : own ? <span className="text-muted-foreground">{t("vendor.lines.dateUnknown")}</span> : "–"}
               </span>
               <span className="tabular" style={s === "past" || s === "soon" ? { color: `var(${SUPPORT_COLOR[s]})` } : undefined}>
                 <span className="text-muted-foreground sm:hidden">{t("vendor.lines.colEol")}: </span>
@@ -779,7 +797,7 @@ function ReleaseLines({ lines, yours, source }: { lines: ReleaseLine[]; yours: S
             className="flex w-full items-center justify-center gap-1.5 border-t px-3 py-2 text-xs font-medium text-muted-foreground outline-none hover:bg-muted/40 hover:text-foreground focus-visible:bg-muted/40"
           >
             <ChevronDown className={cn("size-3.5 transition-transform", showOld && "rotate-180")} />
-            {showOld ? t("vendor.lines.hideOld") : t("vendor.lines.showOld", { count: old.length })}
+            {showOld ? t("vendor.lines.hideOld") : t(own ? "vendor.lines.showOlder" : "vendor.lines.showOld", { count: old.length })}
           </button>
         )}
       </div>

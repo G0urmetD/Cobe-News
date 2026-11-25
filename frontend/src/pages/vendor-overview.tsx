@@ -63,7 +63,6 @@ import {
   type OverviewItem,
   type SortKey,
   type StatusFilter,
-  type TargetGroup,
   type Urgency,
   byUrgency,
   matchScore,
@@ -72,6 +71,7 @@ import {
   statusOf,
   sortItems,
   supportOf,
+  actionText,
   targetGroups,
   urgencyOf,
   useVendorOverview,
@@ -502,27 +502,6 @@ function FilterMenu({
 }
 
 // ---------------------------------------------------------------- the action line
-
-/** One line: what to do for these versions ("Update auf 4.14.6 behebt alle 31 Lücken"). */
-function actionText(t: (k: string, o?: Record<string, unknown>) => string, g: TargetGroup): string {
-  const x = g.target
-  // the target itself affected by holes the installed version does not have: said, never hidden
-  const intro = x.introduces && x.to ? ` – ${t("vendor.action.introduces", { to: x.to, count: x.introduces })}` : ""
-  if (x.kind === "update" && x.to) {
-    const head = x.open === 0 ? t("vendor.action.updateAll", { to: x.to, count: x.total }) : t("vendor.action.updatePart", { to: x.to, fixes: x.fixes, total: x.total })
-    if (x.open === 0) return head + intro
-    const rest = x.newer ? t("vendor.action.openNewer", { count: x.newer.fixes, line: x.newer.line }) : t("vendor.action.openNoFix", { count: x.open })
-    return `${head} – ${rest}${intro}`
-  }
-  if (x.kind === "newer_line" && x.line) {
-    const detail = !x.to
-      ? ""
-      : ` – ${x.open === 0 ? t("vendor.action.newerLineAll", { to: x.to, count: x.total }) : t("vendor.action.newerLineTo", { to: x.to, fixes: x.fixes, total: x.total })}`
-    return t("vendor.action.newerLine", { line: x.line }) + detail + intro
-  }
-  if (x.kind === "no_fix") return t("vendor.action.noFix", { count: x.total })
-  return t("vendor.action.versionOk")
-}
 
 const TIER_TONE: Record<Urgency, string> = {
   exploited: "--sev-critical",
@@ -1052,7 +1031,9 @@ const ListRow = memo(function ListRow({ item, onOpen }: { item: OverviewItem; on
             {groups.length > 1 && <span className="ml-1 font-sans text-muted-foreground">+{groups.length - 1}</span>}
           </span>
         ) : first?.kind === "no_fix" ? (
-          <span className="text-warning">{t("vendor.action.noFix", { count: first.total })}</span>
+          <span className="text-warning" title={actionText(t, groups[0])}>
+            {first.prerelease ? t("vendor.col.preOnly", { to: first.prerelease.to }) : t("vendor.action.noFix", { count: first.total })}
+          </span>
         ) : (
           <span className="text-muted-foreground">{t("vendor.col.noTarget")}</span>
         )}

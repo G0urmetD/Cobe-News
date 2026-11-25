@@ -91,6 +91,8 @@ export interface VersionVerdict {
   /** why (vendor.reason.<key>) */
   reason: string
   fixed: string | null
+  /** `fixed` is a pre-release ("5.0.0-beta3"): no stable fix yet */
+  fixed_pre?: boolean
   /** by: where the verdict comes from (vendor, cna, nvd, adp, bsi, csaf, osv – backend vendor_match.BY_VENDOR …);
    *  cna: the name of the CVE record's CNA when it is not the vendor (by "cna": GitHub, VulDB …) */
   detail: { platform?: string; after?: string; lines?: { line: string; affected: string; fixed: string }[]; line?: string; released?: string; by?: string; cna?: string }
@@ -188,7 +190,12 @@ export type EolState = "ok" | "soon" | "past" | "unknown"
  * source of the catalogue (GitHub releases, the vendor's release notes page: lines and newest versions, no support
  * dates). `fetched_at` null: not fetched yet (fetched for followed products only).
  */
-export type ReleaseSource = { kind: "eol" } | { kind: "github" | "page"; ref: string; url: string; fetched_at: string | null }
+/**
+ * Where the lines come from. A release source (app/release_sources.py): `complete` – GitHub: true once the repository's
+ * tags were read (every version, dates only for the newest releases), false: only the feed's newest releases are known;
+ * a page: null (what the page lists). `known`: how many versions are stored. Both missing before the first fetch.
+ */
+export type ReleaseSource = { kind: "eol" } | { kind: "github" | "page"; ref: string; url: string; fetched_at: string | null; complete?: boolean | null; known?: number }
 
 export interface ReleaseInfo {
   lines?: ReleaseLine[]
@@ -258,6 +265,8 @@ export interface VersionTarget {
   newer: { to: string; line: string; fixes: number } | null
   /** `to` itself is affected by this many vulnerabilities the installed version is not (no release of its line avoids them yet) */
   introduces?: number
+  /** of what stays open, `fixes` are fixed only in this pre-release ("5.0.0-beta3") – never the target, no stable fix yet */
+  prerelease?: { to: string; fixes: number }
 }
 
 export interface VersionSummary {
@@ -780,6 +789,38 @@ export function supportOf(i: OverviewItem): { state: Support; until: string | nu
 export interface TargetGroup {
   target: VersionTarget
   versions: FollowedVersion[]
+}
+
+/** One line: what to do for these versions ("Update auf 4.14.6 behebt alle 31 Lücken"). */
+export function actionText(t: (k: string, o?: Record<string, unknown>) => string, g: TargetGroup): string {
+  const x = g.target
+  // the target itself affected by holes the installed version does not have: said, never hidden
+  const intro = x.introduces && x.to ? ` – ${t("vendor.action.introduces", { to: x.to, count: x.introduces })}` : ""
+  // what only a pre-release fixes ("5.0.0-beta3"): named as such, never as the version to go to
+  const pre = x.prerelease
+  const openPre = pre ? t("vendor.action.openPre", { count: pre.fixes, to: pre.to }) : ""
+  if (x.kind === "update" && x.to) {
+    const head = x.open === 0 ? t("vendor.action.updateAll", { to: x.to, count: x.total }) : t("vendor.action.updatePart", { to: x.to, fixes: x.fixes, total: x.total })
+    if (x.open === 0) return head + intro
+    const noFix = x.open - (x.newer?.fixes ?? 0) - (pre?.fixes ?? 0)
+    const rest = [
+      x.newer && t("vendor.action.openNewer", { count: x.newer.fixes, line: x.newer.line }),
+      noFix > 0 && !x.newer && t("vendor.action.openNoFix", { count: noFix }),
+      openPre,
+    ].filter(Boolean)
+    return `${head} – ${(rest.length ? rest : [t("vendor.action.openNoFix", { count: x.open })]).join(", ")}${intro}`
+  }
+  if (x.kind === "newer_line" && x.line) {
+    const detail = !x.to
+      ? ""
+      : ` – ${x.open === 0 ? t("vendor.action.newerLineAll", { to: x.to, count: x.total }) : t("vendor.action.newerLineTo", { to: x.to, fixes: x.fixes, total: x.total })}`
+    return t("vendor.action.newerLine", { line: x.line }) + detail + (pre && x.open > 0 ? `, ${openPre}` : "") + intro
+  }
+  if (x.kind === "no_fix") {
+    if (pre && pre.fixes >= x.total) return t("vendor.action.prerelease", { count: pre.fixes, to: pre.to })
+    return t("vendor.action.noFix", { count: x.total }) + (pre ? ` – ${openPre}` : "")
+  }
+  return t("vendor.action.versionOk")
 }
 
 /** Versions with the same target together (one action line each): the most open first. */
