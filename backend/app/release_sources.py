@@ -10,7 +10,8 @@ ReleaseSource) names a source per product, as data:
   no API, one request; it lists every branch, pull request and tag – n8n's 2.7 MB – so it is read bounded, see
   git_tags). Tags have no date and no title: their versions are kept without a date ("unbekannt") and LTS comes from
   the feed's titles only. The tags are read on the first fetch and then weekly (HISTORY_EVERY); the feed in between
-  keeps the newest releases and their dates. The version is read from the tag (from the release's link), never from
+  keeps the newest releases and their dates. A tag is not a release: one ahead of its line's newest release in the
+  feed (tagged, the release not published yet) waits for the feed. The version is read from the tag (from the release's link), never from
   the free-text title; "v" is dropped.
 - A vendor's release notes page: `releases: {page: https://…, pattern: <regex with 'version' and optionally 'date'>}` –
   the HTML read as text (no JavaScript, bounded size), the pattern searched in it (Passwork: "Aug 03, 2026 — Passwork
@@ -420,9 +421,11 @@ def history_due(e: dict | None, now: datetime) -> bool:
 def merge(old: dict | None, found: list[dict], cfg: dict, now: datetime, tags: list[dict] | None = None, history_error: str | None = None) -> tuple[dict, int]:
     """The stored entry with a fetch's versions added: (entry, how many versions are new). The first fetch of a source
     (or one changed in the catalogue) is the baseline – its versions are marked `base`. `tags`: the versions of the
-    repository's tags (parse_tags) when they were read this time – the first complete history is a baseline too;
-    `history_error`: why they could not be read (the history stays as it was). New: versions that are news – kept
-    (not trimmed away again: an old tag below the KEEP_VERSIONS newest is no news) and not of a baseline."""
+    repository's tags (parse_tags) when they were read this time – the first complete history is a baseline too; a tag
+    newer than the newest release the feed named in its line (v4.14.11 tagged, its release not published yet) waits for
+    the feed – a line the feed never named comes from the tags alone. `history_error`: why they could not be read (the
+    history stays as it was). New: versions that are news – kept (not trimmed away again: an old tag below the
+    KEEP_VERSIONS newest is no news) and not of a baseline."""
     sig = signature(cfg)
     fresh = old is None or old.get("sig") != sig or not old.get("versions")
     have = {} if fresh else {r["v"]: dict(r) for r in old.get("versions") or [] if isinstance(r, dict) and r.get("v")}
@@ -440,10 +443,20 @@ def merge(old: dict | None, found: list[dict], cfg: dict, now: datetime, tags: l
     at = now.replace(microsecond=0).isoformat()
     if tags is not None:
         first = fresh or not hist.get("ok_at")  # the first complete history: what it fills in was out before
+        depth = int(cfg.get("lines") or 2)
+        released: dict[str, tuple[int, ...]] = {}  # line → the newest version the feed named (only the feed has dates)
+        for r in have.values():
+            if r.get("date") and VERSION.fullmatch(r["v"]):
+                ln = ".".join(r["v"].split(".")[:depth])
+                released[ln] = max(released.get(ln, ()), _key(r["v"]))
         for r in tags:
-            if r["v"] not in have:
-                have[r["v"]] = {"v": r["v"], "date": None, "lts": False, "base": first}
-                added.add(r["v"])
+            if r["v"] in have:
+                continue
+            ln = ".".join(r["v"].split(".")[:depth])
+            if ln in released and _key(r["v"]) > released[ln]:
+                continue  # tagged ahead of its line's newest release (the release not published yet): the feed brings it
+            have[r["v"]] = {"v": r["v"], "date": None, "lts": False, "base": first}
+            added.add(r["v"])
         hist = {"ok_at": at, "tried_at": at, "error": None, "tags": len(tags)}
     elif history_error:
         hist = hist | {"tried_at": at, "error": history_error[:120]}

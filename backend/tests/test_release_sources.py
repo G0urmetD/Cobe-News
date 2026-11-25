@@ -514,9 +514,14 @@ def test_merge_backfilled_tags_are_a_baseline_later_ones_news():
     assert filled["history"]["ok_at"] and filled["history"]["error"] is None
     assert len(filled["versions"]) == len(tags) and next(r for r in filled["versions"] if r["v"] == "4.14.10")["date"] == "2026-11-09"  # the feed's date kept
     assert not release_sources.history_due(filled, now + timedelta(days=6)) and release_sources.history_due(filled, now + timedelta(days=7))
-    # a week later the tags have a version nobody saw (more than 10 releases between two fetches): news
-    later, new = release_sources.merge(filled, [], cfg, now + timedelta(days=7), tags=[*tags, {"v": "4.13.2", "date": None, "lts": False}])
+    # a week later the tags have a version nobody saw (more than 10 releases between two fetches): news – but a tag
+    # ahead of its line's newest release (v4.14.11 tagged, the release not out yet) waits for the feed
+    ahead = [*tags, {"v": "4.13.2", "date": None, "lts": False}, {"v": "4.14.11", "date": None, "lts": False}, {"v": "4.10.6", "date": None, "lts": False}]
+    later, new = release_sources.merge(filled, [], cfg, now + timedelta(days=7), tags=ahead)
     assert new == 1 and next(r for r in later["versions"] if r["v"] == "4.13.2")["base"] is False
+    assert not {"4.14.11", "4.10.6"} & {r["v"] for r in later["versions"]}
+    released, new = release_sources.merge(later, [{"v": "4.14.11", "date": "2026-11-25"}], cfg, now + timedelta(days=8))
+    assert new == 1 and released["versions"][0] == {"v": "4.14.11", "date": "2026-11-25", "lts": False, "base": False}
     # an old tag below the KEEP_VERSIONS newest is trimmed again – no news
     many = [{"v": f"4.14.{i}", "date": None, "lts": False} for i in range(11, 11 + release_sources.KEEP_VERSIONS)]
     full, _ = release_sources.merge(filled, many, cfg, now)
