@@ -2,6 +2,29 @@
 
 Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 
+## 0.1.59 – Release-Linien vollständig und nach Versionsnummer
+
+### Neu
+- **Release-Daten für ServiceDesk Plus und ADSelfService Plus**: Cobe News liest die Builds aus den Release Notes von ManageEngine; der Build ist die Version, die Hauptversion die Linie (14.6 Build 14600 → Update auf 14.9 Build 14990, neuere Linie 16).
+- **Release-Daten für 18 weitere Produkte**: KeePassXC, Dockge, DFIR-IRIS, Fluentd, Helm, privacyIDEA, Rspamd, Unbound, 7-Zip, Nagios Core, WildFly, ownCloud, Harvester, Elastic Agent, ScubaGear, PingCastle, GPOZaurr und Seafile bekommen Release-Linien aus ihren GitHub-Releases.
+
+### Verbessert
+- **Vollständige Versionsgeschichte aus GitHub**: Der Releases-Feed nennt nur die neuesten 10 Releases – ältere Versionen und Linien kommen jetzt aus den Git-Tags des Projekts (ohne Token, ohne GitHub-API; beim ersten Abruf, dann wöchentlich). Bei Wazuh erscheinen so 4.11 bis 4.13 und ältere Linien; die nachgetragenen Versionen lösen keine Meldungen aus.
+- **Release-Quelle sagt, wie vollständig sie ist**: Unter den Release-Linien steht, ob alle Versionen bekannt sind oder nur die neuesten Releases; lange Listen sind eingeklappt („Ältere Linien anzeigen“).
+- **Tags ohne Release warten**: Ein Tag, der neuer ist als alles, was der Feed veröffentlicht hat (z. B. ein nie veröffentlichtes v15.0.0), zählt erst, wenn der Release erscheint oder der Tag bei der nächsten wöchentlichen Abfrage noch da ist.
+- **Feed nur mit Vorabversionen ist kein Fehler mehr**: Solange die Tags stabile Versionen kennen (DFIR-IRIS), gilt die Quelle als in Ordnung.
+
+### Fixes
+- **„Neuere Linie“ nach Versionsnummer statt Datum**: Ein später Patch einer älteren Linie (Wazuh 4.10.5) machte sie fälschlich zur „Neueren Linie“ neben 4.14 – bei GitHub- und Hersteller-Quellen entscheidet jetzt die Versionsnummer.
+- **Vorabversion nie als Zielversion**: Nennt eine Lücke nur eine Vorabversion als Fix (z. B. 5.0.0-beta3), steht jetzt „Behoben erst in 5.0.0-beta3 (Vorabversion) – noch keine stabile Version“ statt „Neuere Linie nötig: 5.0“; der Fix trägt die Marke „Vorabversion“, auch in Benachrichtigungen. Auch Formen wie 5.0.0b3, 8.0.0-ea, 11.0.0-M5 oder 1.0.0.CR1 gelten als Vorabversion.
+- **Dritte CNA mit Bereich ab 0 bei reinen Vorabversionen**: Nennt nur ein Dritter (nicht der Hersteller) „alle Versionen vor 5.0.0-beta3“ als betroffen, während NVD und Beschreibung nur Vorabversionen nennen (CVE-2026-67307), gilt eine stabile Version jetzt als „möglicherweise betroffen“ statt „betroffen“ – ohne neue Meldung.
+- **Release-Titel entscheiden nicht mehr über Vorabversionen**: Ein GitHub-Release gilt nur noch nach seinem Tag (oder einem Wort direkt an der Versionsnummer) als Vorabversion – Seafile-Releases mit „Test …“ im Titel werden nicht mehr übersehen.
+- **„Erschienen“ einer Linie ehrlich**: Die Spalte zeigt nur noch das Datum der ersten Version einer Linie, wenn die Quelle es kennt – sonst „unbekannt“ statt des Tages, an dem Cobe News die Linie zuerst sah.
+
+### Betrieb
+- **Neuer ausgehender Abruf für GitHub-Quellen**: `github.com/<owner>/<repo>.git/info/refs?service=git-upload-pack` (bis 16 MB, wöchentlich je gefolgtem GitHub-Produkt); für ServiceDesk Plus und ADSelfService Plus zusätzlich `www.manageengine.com`.
+- Keine Migration. **Zurück auf 0.1.58** wie bei jedem Update (Images der Vorversion, Datenbank aus dem Backup vor dem Update).
+
 ## 0.1.58 – Anmeldung mit Microsoft über lange Links
 
 ### Verbessert
