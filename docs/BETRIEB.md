@@ -915,7 +915,7 @@ Zusammenlegen von Katalog-Schlüsseln muss `vendor_confirms` und `vendor_confirm
 **Ausgehende Hosts** (nur bei gefolgten Produkten): `services.nvd.nist.gov`, `endoflife.date`, `www.cisa.gov`;
 mit Palo-Alto-Produkten `security.paloaltonetworks.com`, mit Fortinet-Produkten `filestore.fortinet.com`, mit
 Veeam-Produkten `www.veeam.com`; mit Produkten ohne endoflife.date-Daten deren Release-Quelle: `github.com` (Portainer,
-BookStack, BloodHound CE, LibreNMS, Wazuh, Vaultwarden, Gitea, NetBox …) bzw. die Seite des Herstellers (`passwork.pro`, für ServiceDesk Plus `www.manageengine.com`);
+BookStack, BloodHound CE, LibreNMS, Wazuh, Vaultwarden, Gitea, NetBox …) bzw. die Seite des Herstellers (`passwork.pro`, für ServiceDesk Plus und ADSelfService Plus `www.manageengine.com`);
 dazu die [weiteren Quellen](#weitere-quellen-csaf-anbieter-cvelistv5-epss-osv). Eine Egress-Freigabe (Firewall,
 Proxy-Allow-List) braucht diese Hosts, für Passwork also `passwork.pro`. Die Liste aller Hosts je Produkt steht im
 Katalog (`releases:` in `backend/app/catalog/products/*.yaml`).
