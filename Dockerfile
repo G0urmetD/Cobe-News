@@ -2,7 +2,7 @@
 # base images pinned by digest (the tag for the reader; update both together – docs/BETRIEB.md: Entwicklung, Basis-Images)
 # built once on the build machine's platform: the result is static files, the same for amd64 and arm64 – nothing of this
 # stage but dist/ reaches the image (so no system updates here)
-FROM --platform=$BUILDPLATFORM node:24-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS ui
+FROM --platform=$BUILDPLATFORM node:24-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 AS ui
 WORKDIR /ui
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -10,7 +10,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---- 2: runtime (FastAPI + the built UI + background jobs, one process; nginx in front) --------
-FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
+FROM python:3.13-slim@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data STATIC_DIR=/srv/static TLS_PATH=/tls
 WORKDIR /srv
 # pg_dump / pg_restore / psql of PostgreSQL 18 for backups (app/backup.py) – a pg_dump older than the server refuses to

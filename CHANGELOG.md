@@ -21,6 +21,9 @@ Versionierung: 0.1.x – jede Änderung erhöht die letzte Stelle.
 - **Release-Titel entscheiden nicht mehr über Vorabversionen**: Ein GitHub-Release gilt nur noch nach seinem Tag (oder einem Wort direkt an der Versionsnummer) als Vorabversion – Seafile-Releases mit „Test …“ im Titel werden nicht mehr übersehen.
 - **„Erschienen“ einer Linie ehrlich**: Die Spalte zeigt nur noch das Datum der ersten Version einer Linie, wenn die Quelle es kennt – sonst „unbekannt“ statt des Tages, an dem Cobe News die Linie zuerst sah.
 
+### Sicherheit
+- **Basis-Images aktualisiert**: nginx 1.30.7 (behebt vier kritische Lücken im Proxy-Image), PostgreSQL-, Python- und Node-Image auf dem neuesten Stand samt Sicherheitsupdates von Debian (Kerberos-Bibliotheken) und Alpine (libxml2) – der Scan der Images ist ohne behebbaren hohen oder kritischen Befund.
+
 ### Betrieb
 - **Neuer ausgehender Abruf für GitHub-Quellen**: `github.com/<owner>/<repo>.git/info/refs?service=git-upload-pack` (bis 16 MB, wöchentlich je gefolgtem GitHub-Produkt); für ServiceDesk Plus und ADSelfService Plus zusätzlich `www.manageengine.com`.
 - Keine Migration. **Zurück auf 0.1.58** wie bei jedem Update (Images der Vorversion, Datenbank aus dem Backup vor dem Update).
