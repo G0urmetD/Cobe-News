@@ -95,6 +95,7 @@
   aliases: [JBoss AS, WildFly Application Server]
   example: 37.0.1
   version_cmd: $JBOSS_HOME/bin/standalone.sh --version
+  releases: {github: wildfly/wildfly, tag: '^(?P<version>\d+\.\d+\.\d+)\.Final$'}  # tags 42.0.0.Final; 42.0.0.Beta1 left out (checked 2026-11-25)
 - key: weblogic
   label: Oracle WebLogic Server
   vendor: Oracle

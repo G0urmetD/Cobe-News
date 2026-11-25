@@ -109,6 +109,7 @@
   kw: [Rspamd]
   example: 3.12.0
   version_cmd: rspamd --version
+  releases: {github: rspamd/rspamd}  # tags 4.3.1 (checked 2026-11-25)
 
 # ---------------------------------------------------------------- added 0.1.45 (Katalog-Erweiterung)
 - key: open-xchange

@@ -40,6 +40,7 @@
   kw: [PingCastle]
   example: "4.0.0.33"
   hint: nocpe
+  releases: {github: netwrix/pingcastle}  # tags 4.1.2.0 (four parts) (checked 2026-11-25)
 - key: purple-knight
   label: Semperis Purple Knight
   vendor: Semperis
@@ -54,6 +55,7 @@
   example: "1.1.11"
   version_cmd: Get-Module -ListAvailable GPOZaurr
   hint: nocpe
+  releases: {github: EvotecIT/GPOZaurr}  # tags v1.1.11 (checked 2026-11-25)
 - key: scubagear
   label: ScubaGear (CISA SCuBA)
   vendor: CISA
@@ -63,3 +65,4 @@
   example: "2.0.0"
   version_cmd: Get-Module -ListAvailable ScubaGear
   hint: nocpe
+  releases: {github: cisagov/ScubaGear}  # tags v2.0.0 (checked 2026-11-25)

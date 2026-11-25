@@ -161,6 +161,7 @@
   example: "10.15.0"
   version_cmd: occ -V
   where: web_about
+  releases: {github: owncloud/core}  # tags v10.16.8, v11.1.0 (checked 2026-11-25)
 - key: seafile
   label: Seafile Server
   vendor: Seafile
@@ -168,6 +169,7 @@
   kw: [Seafile]
   example: "11.0.12"
   where: web_about
+  releases: {github: haiwen/seafile-server, tag: '^v(?P<version>\d+\.\d+\.\d+)-server$'}  # tags v13.0.30-server, v14.0.9-server (checked 2026-11-25)
 # ---------------------------------------------------------------- added 0.1.47
 - key: bookstack
   label: BookStack

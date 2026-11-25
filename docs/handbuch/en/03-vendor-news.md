@@ -334,6 +334,9 @@ For each entered version Vendor News works out what to do:
   affecting this version. Each candidate is checked with the same data as your version (hotfix levels, builds). The
   card then says "Updating to … fixes all 3 vulnerabilities" or "Updating to … fixes 2 of 3".
 - If your line has no fix, it says "Newer line needed: …". If there is no fix at all yet, it says "No fix yet for …".
+- If the record names only a **pre-release** as the fix (e.g. 5.0.0-beta3), it is never the target version: it says
+  "Fixed only in 5.0.0-beta3 (pre-release) – no stable version yet", and the vulnerability's fix carries the mark
+  "pre-release".
 - If the target version is itself affected by another vulnerability, that is shown as well.
 
 **Update available** means: your release line has a newer patch (according to endoflife.date or the product's
@@ -344,22 +347,30 @@ patch of the line.
 
 Release lines, the latest version per line and the end of support come from **endoflife.date** – when it knows the
 product, that always counts. Many self-hosted products are not on endoflife.date (Passwork, Portainer, BookStack,
-BloodHound CE, LibreNMS, Wazuh …). For them the catalogue names a **release source**:
+BloodHound CE, LibreNMS, Wazuh, ServiceDesk Plus …). For them the catalogue names a **release source**:
 
 - the project's **GitHub releases** (e.g. `portainer/portainer`) – Cobe News reads the public releases feed, no token.
-  Pre-releases (rc, beta, alpha …) do not count.
-- the **vendor's release notes** (e.g. passwork.pro) – only the product's own entries; for Passwork "Passwork 7.7.0"
-  counts, "Desktop app 1.4.1" or "Browser extension 2.0.37" do not.
+  The feed lists only the **newest 10 releases**; every older version comes from the project's **Git tags** (the same
+  public list every `git clone` asks for first – no token, no GitHub API), on the first fetch and weekly after that.
+  Tags carry no date: "Released" is shown only where the feed names the date, otherwise "unknown". Pre-releases (rc,
+  beta, alpha …) do not count.
+- the **vendor's release notes** (e.g. passwork.pro, the ServiceDesk Plus ReadMe) – only the product's own entries; for
+  Passwork "Passwork 7.7.0" counts, "Desktop app 1.4.1" or "Browser extension 2.0.37" do not. For ServiceDesk Plus the
+  build is the version and the major version the line (14600 → line 14).
 
 From these come the lines (usually the first two parts: 7.6, 7.7; for Portainer with the LTS mark), the newest version
-per line and the newest of all – "Update available", "Newer line" and the target versions work the same way. **These
-sources know no end of support:** it says "End of support unknown", and they never lead to an "end of support soon"
-notification. Below the lines the source is named with its last fetch ("Source: GitHub releases portainer/portainer,
-fetched 3 hours ago").
+per line and the newest of all – "Update available", "Newer line" and the target versions work the same way. Which line
+is newer is decided by the **version number**, not the date: a late patch of an old line (Wazuh 4.10.5) does not make it
+newer than 4.14. **These sources know no end of support:** it says "End of support unknown", and they never lead to an
+"end of support soon" notification. Below the lines the source is named with its last fetch and how complete it is
+("Source: GitHub releases portainer/portainer, fetched 3 hours ago · every version from the Git tags …"; while the tags
+are not read yet: "only the newest 5 releases known – older lines still missing"). Older lines are folded ("Show older
+lines").
 
 Like endoflife.date they are fetched once a day (setting "Versions & KEV every") and **only for followed products**.
 The first fetch of a product sends no notifications for versions that were already out – only a version released after
-it reports "New version available". When a source fails or finds nothing any more, that shows in
+it reports "New version available". The same holds when the Git tags are read for the first time: the older lines
+filled in that way notify nothing. When a source fails or finds nothing any more, that shows in
 [source health](/docs/news-quellen#quellen-gesundheit) and in [catalogue care](#was-geprueft-wird).
 
 **End of support** ([EOL](term:eol)) comes from endoflife.date:

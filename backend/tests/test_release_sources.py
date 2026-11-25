@@ -107,6 +107,25 @@ TAGS = {
     "bitwarden": [("v2026.10.1", "2026.10.1")],
     "zammad": [("7.2.3", "7.2.3"), ("7.4.0-alpha", None)],
     "wazuh-agent": [("v4.14.10", "4.14.10"), ("v5.0.0-beta5", None)],
+    # added 0.1.59 (tags as the feeds and the repositories named them, 2026-11-25)
+    "keepassxc": [("2.8.0", "2.8.0"), ("2.8.0-beta1", None), ("latest", None)],
+    "dockge": [("1.5.0", "1.5.0"), ("1.4.0-beta.0", None)],
+    "dfir-iris": [("v2.4.29", "2.4.29"), ("v3.0.0-beta.23", None)],
+    "fluentd": [("v1.20.1", "1.20.1")],
+    "helm": [("v4.3.2", "4.3.2"), ("v4.3.0-rc.1", None)],
+    "privacyidea": [("v3.14.1", "3.14.1"), ("v3.14", "3.14"), ("v3.14dev4", None), ("v3.14.1dev0", None)],
+    "rspamd": [("4.3.1", "4.3.1")],
+    "unbound": [("release-1.26.2", "1.26.2"), ("release-1.26.0rc1", None)],
+    "7-zip": [("26.06", "26.06")],
+    "nagios": [("nagios-4.5.14", "4.5.14")],
+    "wildfly": [("42.0.0.Final", "42.0.0"), ("42.0.0.Beta1", None)],
+    "owncloud": [("v10.16.8", "10.16.8"), ("v11.1.0", "11.1.0")],
+    "harvester": [("v1.9.1", "1.9.1"), ("v1.10.0-rc3", None), ("prime-v1.9.1", None)],
+    "elastic-agent": [("v9.5.7", "9.5.7")],
+    "scubagear": [("v2.0.0", "2.0.0")],
+    "pingcastle": [("4.1.2.0", "4.1.2.0")],
+    "gpozaurr": [("v1.1.11", "1.1.11")],
+    "seafile": [("v13.0.30-server", "13.0.30"), ("v14.0.9-server", "14.0.9")],
 }
 
 
@@ -125,6 +144,13 @@ def test_catalogue_rules_take_the_real_tags(key):
     for tag, want in TAGS[key]:
         got = {v["v"] for v in release_sources.parse(_feed(tag), cfg)}
         assert got == ({want} if want else set()), (key, tag)
+        # the same rule on the repository's tags (the history)
+        assert {v["v"] for v in release_sources.parse_tags(_adv(b"refs/tags/" + tag.encode()), cfg)} == got, (key, tag)
+
+
+def test_every_github_source_of_the_catalogue_has_its_tags_checked():
+    gh = {p["key"] for p in catalog.load()["products"] if (c := release_sources.config(p)) and c.get("github")}
+    assert gh - set(TAGS) == {"bloodhound", "portainer", "wazuh"}  # those three: their real feeds above
 
 
 def test_every_release_source_of_the_catalogue_is_valid_and_has_no_endoflife_data():
@@ -593,3 +619,21 @@ def test_servicedesk_plus_readme_builds_and_lines():
     assert vendor.release_info(p, "14990")["update_available"] is False  # a bare build is the same version
     assert catalog.release_baseline(p, "14.9 Build 14990") and not catalog.release_baseline(p, "14.9 Build 14991")
     assert not vendor.short_version(p, "14.6 Build 14600")
+
+
+async def test_a_feed_of_pre_releases_only_is_no_error_while_the_tags_know_versions(admin_client, reader_client, sites):
+    """DFIR-IRIS: the feed's newest 10 are all v3.0.0-beta.N – the stable 2.4 line comes from the tags."""
+    sites.github["dfir-iris/iris-web"] = _feed(*(f"v3.0.0-beta.{n}" for n in range(1, 10)))
+    sites.refs["dfir-iris/iris-web"] = _adv(b"refs/tags/v2.4.29", b"refs/tags/v2.4.28", b"refs/tags/v3.0.0-beta.9")
+    await _follow(admin_client, "dfir-iris", "2.4.28")
+    await _round()
+    st = await _state("releases:dfir-iris")
+    assert st is not None and st.error is None
+    rel = (await reader_client.get("/api/vendor/products/dfir-iris")).json()["versions"][0]["release"]
+    assert rel["line"]["latest"] == "2.4.29" and rel["update_available"]
+    # neither the feed nor the tags know a version: the source is broken
+    sites.github["SpecterOps/BloodHound"] = _feed("v9.10.0-rc1")
+    sites.refs["SpecterOps/BloodHound"] = _adv(b"refs/tags/v9.10.0-rc1")
+    await _follow(admin_client, "bloodhound")
+    await _round()
+    assert (await _state("releases:bloodhound")).error == "parse: no version found"

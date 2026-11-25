@@ -643,13 +643,17 @@ async def sync(db, products: list[dict], every: timedelta, force: bool) -> dict[
             found: list[dict] = []
             if body is not None:
                 found = await asyncio.to_thread(parse, body, cfg)
-                if not found:
+                if not found and not cfg.get("github"):
                     raise NewsError("parse", "no version found")
             tags, hist_err = None, None
             if cfg.get("github") and history_due(old if have else None, datetime.now(UTC)):
                 tags, hist_err = await _history(db, cfg, refs)
                 if hist_err:
                     log.info("release data %s: tags of %s not read (%s) – the feed's newest releases only", p["key"], cfg["github"], hist_err)
+            if body is not None and not found and not tags and not have:
+                # a feed whose newest 10 are all pre-releases (DFIR-IRIS: v3.0.0-beta.N) is fine while the tags or
+                # the stored history know versions – with neither the rule finds nothing: the source is broken
+                raise NewsError("parse", "no version found")
             if body is None and tags is None and hist_err is None:  # 304: unchanged
                 svc._ok(st, every)
                 svc._record(db, st, meter)

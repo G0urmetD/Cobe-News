@@ -348,6 +348,9 @@ Für jede eingetragene Version rechnet Vendor News aus, was zu tun ist:
   Karte zeigt dann „Update auf … behebt alle 3 Lücken“ oder „Update auf … behebt 2 von 3“.
 - Gibt es in eurer Linie keinen Fix, steht „Neuere Linie nötig: …“. Gibt es noch gar keinen, steht „Noch kein Fix
   für …“.
+- Nennt der Datensatz nur eine **Vorabversion** als Fix (z. B. 5.0.0-beta3), ist sie nie die Zielversion: Dort steht
+  „Behoben erst in 5.0.0-beta3 (Vorabversion) – noch keine stabile Version“, beim Fix der Lücke die Marke
+  „Vorabversion“.
 - Ist die Zielversion selbst von einer anderen Lücke betroffen, steht das dabei.
 
 **Update verfügbar** heißt: In eurer Release-Linie gibt es einen neueren Patch (laut endoflife.date oder der
@@ -358,22 +361,30 @@ ihr habt den neuesten Patch der Linie.
 
 Release-Linien, die aktuellste Version je Linie und das Support-Ende kommen von **endoflife.date** – wenn es das
 Produkt kennt, gilt immer das. Viele selbst betriebene Produkte kennt endoflife.date nicht (Passwork, Portainer,
-BookStack, BloodHound CE, LibreNMS, Wazuh …). Für sie nennt der Katalog eine **Release-Quelle**:
+BookStack, BloodHound CE, LibreNMS, Wazuh, ServiceDesk Plus …). Für sie nennt der Katalog eine **Release-Quelle**:
 
 - **GitHub-Releases** des Projekts (z. B. `portainer/portainer`) – Cobe News liest den öffentlichen Feed der Releases,
-  ohne Token. Vorabversionen (rc, beta, alpha …) zählen nicht.
-- die **Release Notes des Herstellers** (z. B. passwork.pro) – nur die Einträge des Produkts selbst; bei Passwork zählt
-  „Passwork 7.7.0“, nicht „Desktop app 1.4.1“ oder „Browser extension 2.0.37“.
+  ohne Token. Der Feed nennt nur die **neuesten 10 Releases**; alle älteren Versionen kommen aus den **Git-Tags** des
+  Projekts (dieselbe öffentliche Liste, die jedes `git clone` zuerst abfragt – ohne Token, ohne GitHub-API), beim
+  ersten Abruf und danach wöchentlich. Tags haben kein Datum: „Erschienen“ steht nur, wo der Feed das Datum nennt,
+  sonst „unbekannt“. Vorabversionen (rc, beta, alpha …) zählen nicht.
+- die **Release Notes des Herstellers** (z. B. passwork.pro, das ReadMe von ServiceDesk Plus) – nur die Einträge des
+  Produkts selbst; bei Passwork zählt „Passwork 7.7.0“, nicht „Desktop app 1.4.1“ oder „Browser extension 2.0.37“.
+  Bei ServiceDesk Plus ist der Build die Version und die Hauptversion die Linie (14600 → Linie 14).
 
 Daraus entstehen die Linien (meist die ersten zwei Stellen: 7.6, 7.7; bei Portainer mit LTS-Kennzeichen), die neueste
 Version je Linie und die neueste überhaupt – „Update verfügbar“, „Neuere Linie“ und die Zielversionen funktionieren
-damit genauso. **Ein Support-Ende kennen diese Quellen nicht:** dort steht „Support-Ende unbekannt“, und es gibt nie
-eine Meldung „Support endet bald“ aus ihnen. Unter den Linien steht die Quelle mit dem letzten Abruf („Quelle:
-GitHub-Releases portainer/portainer, abgerufen vor 3 Stunden“).
+damit genauso. Welche Linie neuer ist, entscheidet die **Versionsnummer**, nicht das Datum: Ein später Patch einer alten
+Linie (Wazuh 4.10.5) macht sie nicht neuer als 4.14. **Ein Support-Ende kennen diese Quellen nicht:** dort steht
+„Support-Ende unbekannt“, und es gibt nie eine Meldung „Support endet bald“ aus ihnen. Unter den Linien steht die
+Quelle mit dem letzten Abruf und wie vollständig sie ist („Quelle: GitHub-Releases portainer/portainer, abgerufen vor
+3 Stunden · alle Versionen aus den Git-Tags …“; solange die Tags noch nicht gelesen sind: „nur die neuesten 5 Releases
+bekannt – ältere Linien fehlen noch“). Ältere Linien sind eingeklappt („Ältere Linien anzeigen“).
 
 Abgerufen wird wie endoflife.date einmal am Tag (Einstellung „Versionen & KEV alle“) und **nur für gefolgte
 Produkte**. Beim ersten Abruf eines Produkts gibt es keine Meldungen für Versionen, die schon erschienen waren – erst
-eine danach erscheinende Version meldet „Neue Version verfügbar“. Fehlt eine Quelle oder findet sie nichts mehr, steht
+eine danach erscheinende Version meldet „Neue Version verfügbar“. Dasselbe gilt, wenn die Git-Tags zum ersten Mal
+gelesen werden: Die so nachgetragenen älteren Linien melden nichts. Fehlt eine Quelle oder findet sie nichts mehr, steht
 das in der [Quellen-Gesundheit](/docs/news-quellen#quellen-gesundheit) und in der [Katalog-Pflege](#was-geprueft-wird).
 
 **Support-Ende** ([EOL](term:eol)) kommt von endoflife.date:

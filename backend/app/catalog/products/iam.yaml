@@ -76,6 +76,7 @@
   cpes: [a:privacyidea:privacyidea]
   kw: [privacyIDEA]
   example: 3.11.2
+  releases: {github: privacyidea/privacyidea}  # tags v3.14.1, v3.14; v3.14dev4, v3.14.1dev0 left out (checked 2026-11-25)
 - key: freeipa
   label: FreeIPA
   vendor: Red Hat
