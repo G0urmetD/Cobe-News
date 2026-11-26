@@ -232,6 +232,7 @@
   kw: [Harvester]
   example: 1.5.1
   hint: nocpe
+  releases: {github: harvester/harvester}  # tags v1.9.1; rcs and SUSE's prime-v1.9.1 left out (checked 2026-11-25)
 - key: parallels-desktop
   label: Parallels Desktop
   vendor: Parallels (Alludo)

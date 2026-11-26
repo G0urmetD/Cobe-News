@@ -20,6 +20,7 @@
   kw: [Unbound]
   example: 1.23.0
   version_cmd: unbound -V
+  releases: {github: NLnetLabs/unbound, tag: '^release-(?P<version>\d+\.\d+\.\d+)$'}  # tags release-1.26.2; release-1.26.0rc1 left out (checked 2026-11-25)
 - key: windows-dns
   label: Windows DNS Server
   vendor: Microsoft

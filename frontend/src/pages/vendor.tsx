@@ -1346,6 +1346,17 @@ const FindingRow = memo(function FindingRow({
             {v.fixed && (
               <span>
                 {t("vendor.fixIn")} <span className="font-mono font-semibold">{v.fixed}</span>
+                {v.fixed_pre && (
+                  // the record names only a pre-release as the fix: no stable version with it yet
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0} className="ml-1.5 cursor-help rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                        <Pill color="--warning">{t("vendor.fixPre")}</Pill>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs leading-relaxed">{t("vendor.fixPreHint")}</TooltipContent>
+                  </Tooltip>
+                )}
               </span>
             )}
             <span className="text-muted-foreground">{reasonText(t, v)}</span>

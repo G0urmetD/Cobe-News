@@ -47,6 +47,7 @@
   kw: [Helm, Helm chart, Helm charts]  # "Helm" alone is an ordinary word
   example: 3.18.4
   version_cmd: helm version
+  releases: {github: helm/helm}  # tags v4.3.2, v3.22.1; rcs left out (checked 2026-11-25)
 - key: portainer
   label: Portainer
   vendor: Portainer.io
@@ -76,3 +77,4 @@
   kw: [Dockge]
   example: "1.5.0"
   where: web_about
+  releases: {github: louislam/dockge}  # tags 1.5.0; 1.4.0-beta.0 left out (checked 2026-11-25)

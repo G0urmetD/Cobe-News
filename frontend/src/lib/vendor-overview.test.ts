@@ -6,6 +6,7 @@ import { fmtDayFrom } from "@/lib/format"
 import {
   type OverviewItem,
   type VersionTarget,
+  actionText,
   byUrgency,
   matchesFilter,
   matchesStatus,
@@ -196,5 +197,29 @@ describe("status row", () => {
     expect(statusCounts(supportOnly)).toEqual({ action: 1, check: 1, ok: 0, all: 2 })
     expect(items.filter((i) => matchesStatus(i, "ok")).map((i) => i.product.label)).toEqual(["GitLab", "Redis"])
     expect(items.filter((i) => matchesStatus(i, "all"))).toHaveLength(8)
+  })
+})
+
+describe("the action line", () => {
+  const line = (x: Partial<VersionTarget>) => actionText(i18n.t.bind(i18n) as (k: string, o?: Record<string, unknown>) => string, { target: target(x), versions: [] })
+
+  it("never offers a pre-release as the version to go to", () => {
+    // Wazuh 4.14.10: the only fix a beta of 5.0 – no "Neuere Linie nötig: 5.0"
+    expect(line({ kind: "no_fix", total: 1, open: 1, prerelease: { to: "5.0.0-beta3", fixes: 1 } })).toBe("Behoben erst in 5.0.0-beta3 (Vorabversion) – noch keine stabile Version")
+    expect(line({ kind: "no_fix", total: 3, open: 3, prerelease: { to: "5.0.0-beta3", fixes: 1 } })).toBe(
+      "Noch kein Fix für 3 Lücken – für 1 gibt es nur die Vorabversion 5.0.0-beta3",
+    )
+    expect(line({ kind: "update", to: "4.14.11", line: "4.14", fixes: 1, total: 2, open: 1, prerelease: { to: "5.0.0-beta3", fixes: 1 } })).toBe(
+      "Update auf 4.14.11 behebt 1 von 2 – für 1 gibt es nur die Vorabversion 5.0.0-beta3",
+    )
+    expect(line({ kind: "update", to: "4.14.11", line: "4.14", fixes: 1, total: 3, open: 2, prerelease: { to: "5.0.0-beta3", fixes: 1 } })).toBe(
+      "Update auf 4.14.11 behebt 1 von 3 – für 1 gibt es noch keinen Fix, für 1 gibt es nur die Vorabversion 5.0.0-beta3",
+    )
+  })
+
+  it("stays as it was without a pre-release", () => {
+    expect(line({ kind: "no_fix", total: 2, open: 2 })).toBe("Noch kein Fix für 2 Lücken")
+    expect(line({ kind: "update", to: "4.14.6", line: "4.14", fixes: 2, total: 3, open: 1 })).toBe("Update auf 4.14.6 behebt 2 von 3 – für 1 gibt es noch keinen Fix")
+    expect(line({ kind: "newer_line", to: "4.14.6", line: "4.14", fixes: 2, total: 2, open: 0 })).toBe("Neuere Linie nötig: 4.14 – 4.14.6 behebt alle 2")
   })
 })

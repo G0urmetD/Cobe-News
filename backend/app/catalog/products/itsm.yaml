@@ -27,6 +27,12 @@
   kw: [ServiceDesk Plus]
   scheme: build
   example: 14.9 Build 14910
+  # no endoflife.date, no feed: the on-premises ReadMe lists every build of series 13–16 with its day ("16040 (Released
+  # on November 19, 2026)", older ones "14600 (Released on 11 December, 2023)"); a build is the version, its major the
+  # line ("fixed in build 15280" in the notes is no release) – readme.html redirects to readme-new.html (checked 2026-11-25)
+  releases:
+    page: https://www.manageengine.com/products/service-desk/on-premises/readme.html
+    pattern: '\b(?P<version>\d{4,5})\s*\(Released on (?P<date>[A-Z][a-z]{2,8} \d{1,2}, \d{4}|\d{1,2} [A-Z][a-z]{2,8},? \d{4})\)'
 
 # ---------------------------------------------------------------- ITSM, ticketing
 - key: servicenow

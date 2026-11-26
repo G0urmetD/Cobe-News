@@ -36,6 +36,7 @@
   kw: [Nagios]
   example: 4.5.9
   version_cmd: nagios --version
+  releases: {github: NagiosEnterprises/nagioscore, tag: '^nagios-(?P<version>\d+\.\d+\.\d+)$'}  # tags nagios-4.5.14 (checked 2026-11-25)
 - key: icinga-web
 - key: grafana
   vendor: Grafana Labs

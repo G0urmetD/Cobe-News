@@ -336,7 +336,7 @@ def product_releases(product: dict) -> list[dict]:
 
 def release_source(product: dict) -> dict | None:
     """Where the product's release lines come from: {"kind": "eol"}, a release source ({"kind": "github"|"page", "ref",
-    "url", "fetched_at"}) or None (no release data)."""
+    "url", "fetched_at"} and, once fetched, "complete" and "known" – release_sources.info) or None (no release data)."""
     if releases(product.get("eol")):
         return {"kind": "eol"}
     from app import release_sources

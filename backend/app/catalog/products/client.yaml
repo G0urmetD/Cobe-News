@@ -52,6 +52,7 @@
   cpes: [a:7-zip:7-zip]
   kw: [7-Zip]
   example: "24.09"
+  releases: {github: ip7z/7zip, lines: 1}  # tags 26.06 – YY.MM, only the newest is maintained: the year is the line (checked 2026-11-25)
 - key: winrar
   label: WinRAR
   vendor: RARLAB

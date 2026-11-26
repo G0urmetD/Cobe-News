@@ -44,6 +44,7 @@ from app import advisory_changes as changes_svc
 from app import cve_watch
 from app import db as dbm
 from app import news as news_svc
+from app import release_sources
 from app import settings as settings_store
 from app import source_health
 from app import vendor_catalog as catalog
@@ -1752,6 +1753,7 @@ def findings(
                 "status": worst.status,
                 "versions": [
                     {"id": str(ver.id) if ver else None, "version": text, "status": vd.status, "reason": vd.reason, "fixed": vd.fixed, "detail": vd.detail}
+                    | ({"fixed_pre": True} if release_sources.is_prerelease(vd.fixed) else {})
                     for ver, text, vd in rows
                 ],
             }
@@ -1922,18 +1924,36 @@ def _line_name(rels: list[dict], scheme: str, v: V) -> str:
     return ".".join(str(x) for x in v.key[: 3 if scheme == "windows" else 1 if scheme == "build" else 2])
 
 
+def _line_order(product: dict):  # noqa: ANN202
+    """How release lines are ordered from old to new: endoflife.date's by the line's release date (its own data – a
+    line's start, and its names are not always versions: "23h2", "se"); a release source's by the line's version – its
+    dates are only when a release was published or seen, so an older line's late backport (Wazuh 4.10.5 after 4.14.7)
+    would make 4.10 "newer" than 4.14."""
+    if catalog.releases(product.get("eol")):
+        return lambda r: (r.get("releaseDate") or "",)
+    return lambda r: (v.key if (v := parse("generic", str(r.get("name") or ""))) is not None else ())
+
+
+def newest_line(product: dict, rels: list[dict]) -> dict | None:
+    """The newest of the product's release lines that is maintained (all, when none is): `_line_order`."""
+    if not rels:
+        return None
+    maintained = [r for r in rels if r.get("isMaintained") or not r.get("isEol")]
+    return max(maintained or rels, key=_line_order(product))
+
+
 def target_versions(product: dict, groups: list[dict], found: list[dict], versions: list[VendorVersion]) -> dict[str, dict]:
     """Per installed version the version to go to: the smallest version of its own release line that fixes the most of
     the vulnerabilities affecting it (each candidate checked with the same matching as the version itself – a PAN-OS
     hotfix branch fixes only its own base, a Veeam build only its line). Candidates: the fixed versions the findings
     name, the latest release of the line and of the newest line (endoflife.date). Kinds: none (nothing affects it) |
     update (`to` in the own line; `open` remain – `newer` a newer line that fixes some of them) | newer_line (only a
-    newer line fixes anything) | no_fix."""
+    newer line fixes anything) | no_fix. A pre-release a record names as the fix ("5.0.0-beta3") is never a target:
+    where only one fixes what stays open, `prerelease` says so ({"to", "fixes"}: no stable fix yet)."""
     scheme = product.get("scheme") or "generic"
     rels = catalog.product_releases(product)
     by_id = {g["primary"].id: g for g in groups}
-    maintained = [r for r in rels if r.get("isMaintained") or not r.get("isEol")]
-    newest = max(maintained or rels, key=lambda r: r.get("releaseDate") or "") if rels else None
+    newest = newest_line(product, rels)
     out: dict[str, dict] = {}
     for ver in versions:
         vid = str(ver.id)
@@ -1948,9 +1968,13 @@ def target_versions(product: dict, groups: list[dict], found: list[dict], versio
         if v is None:
             continue
         cands: dict[V, None] = {}
-        for _, r in aff:
+        pre: dict[str, tuple[V, str]] = {}  # finding → the pre-release a record names as its fix
+        for f, r in aff:
             if (c := _fix_v(scheme, r["fixed"])) is not None and c > v:
-                cands.setdefault(c)
+                if release_sources.is_prerelease(r["fixed"]):
+                    pre[f["id"]] = (c, str(r["fixed"]))
+                else:
+                    cands.setdefault(c)
         own = _line(rels, v) if rels else None
         for r in (own, newest):
             if r is not None and (c := _fix_v(scheme, r.get("latest"))) is not None and c > v:
@@ -2036,7 +2060,7 @@ def target_versions(product: dict, groups: list[dict], found: list[dict], versio
                 bad = introduced(c)
                 if not bad:
                     return c, 0
-                nxt = [h for vd in bad.values() if (h := _fix_v(scheme, vd.fixed)) is not None and h > c]
+                nxt = [h for vd in bad.values() if (h := _fix_v(scheme, vd.fixed)) is not None and h > c and not release_sources.is_prerelease(vd.fixed)]
                 c2 = max(nxt) if nxt else None
                 if c2 is None or _line_name(rels, scheme, c2) != _line_name(rels, scheme, c) or not want <= fixes(c2, want):
                     return c, len(bad)
@@ -2057,6 +2081,15 @@ def target_versions(product: dict, groups: list[dict], found: list[dict], versio
             new = 0
         if new:
             t["introduces"] = new  # the target is itself affected by these (no release of its line avoids them yet)
+        if pre:
+            # what neither the target nor the newer line fixes – and a record names a pre-release as its fix: said so
+            # ("behoben erst in 5.0.0-beta3, einer Vorabversion"), never offered as the version to go to
+            done = (fixes(to, ids) if (to := _fix_v(scheme, t["to"])) is not None else set()) | (
+                fixes(nv, ids) if t["newer"] and (nv := _fix_v(scheme, t["newer"]["to"])) is not None else set()
+            )
+            left = [pre[fid] for fid in ids - done if fid in pre]
+            if left:
+                t["prerelease"] = {"to": max(left)[1], "fixes": len(left)}
     return out
 
 
@@ -2119,8 +2152,8 @@ def release_info(product: dict, version: str | None, today: date | None = None) 
             return "unknown"
         return "past" if at <= today else "soon" if at - today < EOL_SOON else "ok"
 
-    maintained = [r for r in rels if r.get("isMaintained") or not r.get("isEol")]
-    newest = max(maintained or rels, key=lambda r: r.get("releaseDate") or "")
+    newest = newest_line(product, rels)
+    order = _line_order(product)
     out: dict = {"lines": [{k: r.get(k) for k in ("name", "label", "latest", "latestDate", "releaseDate", "eolFrom", "eoasFrom", "isEol", "isLts", "isMaintained")} | {"eol_state": state(r.get("eolFrom")) if r.get("eolFrom") else ("past" if r.get("isEol") else "unknown")} for r in rels[:30]]}
     out["source"] = catalog.release_source(product)
     if v is None:
@@ -2135,7 +2168,7 @@ def release_info(product: dict, version: str | None, today: date | None = None) 
     unknown = bool(update and short_version(product, v.text) and latest.startswith(v))
     eol_state = state(line.get("eolFrom")) if line.get("eolFrom") else ("past" if line.get("isEol") else "unknown")
     newer = None
-    if newest is not line and (newest.get("releaseDate") or "") > (line.get("releaseDate") or "") and newest.get("name") != line.get("name"):
+    if newest is not None and newest is not line and order(newest) > order(line) and newest.get("name") != line.get("name"):
         newer = {"name": newest["name"], "label": newest.get("label"), "latest": newest.get("latest")}
     out |= {
         "line": {"name": line["name"], "label": line.get("label"), "latest": line.get("latest"), "latest_date": line.get("latestDate"), "release_date": line.get("releaseDate"), "eol_from": line.get("eolFrom"), "eoas_from": line.get("eoasFrom"), "lts": line.get("isLts")},

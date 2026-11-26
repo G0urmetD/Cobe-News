@@ -107,6 +107,25 @@ TAGS = {
     "bitwarden": [("v2026.10.1", "2026.10.1")],
     "zammad": [("7.2.3", "7.2.3"), ("7.4.0-alpha", None)],
     "wazuh-agent": [("v4.14.10", "4.14.10"), ("v5.0.0-beta5", None)],
+    # added 0.1.59 (tags as the feeds and the repositories named them, 2026-11-25)
+    "keepassxc": [("2.8.0", "2.8.0"), ("2.8.0-beta1", None), ("latest", None)],
+    "dockge": [("1.5.0", "1.5.0"), ("1.4.0-beta.0", None)],
+    "dfir-iris": [("v2.4.29", "2.4.29"), ("v3.0.0-beta.23", None)],
+    "fluentd": [("v1.20.1", "1.20.1")],
+    "helm": [("v4.3.2", "4.3.2"), ("v4.3.0-rc.1", None)],
+    "privacyidea": [("v3.14.1", "3.14.1"), ("v3.14", "3.14"), ("v3.14dev4", None), ("v3.14.1dev0", None)],
+    "rspamd": [("4.3.1", "4.3.1")],
+    "unbound": [("release-1.26.2", "1.26.2"), ("release-1.26.0rc1", None)],
+    "7-zip": [("26.06", "26.06")],
+    "nagios": [("nagios-4.5.14", "4.5.14")],
+    "wildfly": [("42.0.0.Final", "42.0.0"), ("42.0.0.Beta1", None)],
+    "owncloud": [("v10.16.8", "10.16.8"), ("v11.1.0", "11.1.0")],
+    "harvester": [("v1.9.1", "1.9.1"), ("v1.10.0-rc3", None), ("prime-v1.9.1", None)],
+    "elastic-agent": [("v9.5.7", "9.5.7")],
+    "scubagear": [("v2.0.0", "2.0.0")],
+    "pingcastle": [("4.1.2.0", "4.1.2.0")],
+    "gpozaurr": [("v1.1.11", "1.1.11")],
+    "seafile": [("v13.0.30-server", "13.0.30"), ("v14.0.9-server", "14.0.9")],
 }
 
 
@@ -125,6 +144,13 @@ def test_catalogue_rules_take_the_real_tags(key):
     for tag, want in TAGS[key]:
         got = {v["v"] for v in release_sources.parse(_feed(tag), cfg)}
         assert got == ({want} if want else set()), (key, tag)
+        # the same rule on the repository's tags (the history)
+        assert {v["v"] for v in release_sources.parse_tags(_adv(b"refs/tags/" + tag.encode()), cfg)} == got, (key, tag)
+
+
+def test_every_github_source_of_the_catalogue_has_its_tags_checked():
+    gh = {p["key"] for p in catalog.load()["products"] if (c := release_sources.config(p)) and c.get("github")}
+    assert gh - set(TAGS) == {"bloodhound", "portainer", "wazuh"}  # those three: their real feeds above
 
 
 def test_every_release_source_of_the_catalogue_is_valid_and_has_no_endoflife_data():
@@ -166,9 +192,23 @@ class Sites(Vendors):
     def __init__(self):
         super().__init__()
         self.github: dict[str, bytes | int] = {"portainer/portainer": fx("github_portainer.atom")}
+        self.refs: dict[str, bytes | int] = {}  # the repositories' ref advertisements (404 when not set)
         self.passwork: bytes | int = fx("passwork_release_notes.html")
 
+    def atom(self) -> list[httpx.Request]:
+        return [c for c in self.to("github.com") if c.url.path.endswith("/releases.atom")]
+
+    def tags(self) -> list[httpx.Request]:
+        return [c for c in self.to("github.com") if c.url.path.endswith(".git/info/refs")]
+
     def handler(self, req: httpx.Request) -> httpx.Response:
+        if req.url.host == "github.com" and req.url.path.endswith(".git/info/refs"):
+            self.calls.append(req)
+            assert req.url.params.get("service") == "git-upload-pack" and "if-none-match" not in req.headers
+            body = self.refs.get(req.url.path.removesuffix(".git/info/refs").strip("/"), 404)
+            if isinstance(body, int):
+                return httpx.Response(body, content=b"")
+            return httpx.Response(200, content=body, headers={"Content-Type": "application/x-git-upload-pack-advertisement"})
         if req.url.host == "github.com":
             self.calls.append(req)
             repo = req.url.path.removesuffix("/releases.atom").strip("/")
@@ -274,14 +314,14 @@ async def _all_events() -> list[VendorEvent]:
 async def test_conditional_and_a_lost_cache_is_filled_again(admin_client, sites, rel_file):
     await _follow(admin_client, "portainer")
     await _round()
-    assert len(sites.to("github.com")) == 1 and rel_file.is_file()
+    assert len(sites.atom()) == 1 and rel_file.is_file()
     assert oct(rel_file.stat().st_mode & 0o777) == "0o600"
     await _round()
-    assert sites.to("github.com")[-1].headers.get("if-none-match")
+    assert sites.atom()[-1].headers.get("if-none-match")
     rel_file.unlink()  # a restore without the file: the next fetch asks in full (a 304 would leave it empty)
     release_sources.reset()
     await _round()
-    assert "if-none-match" not in sites.to("github.com")[-1].headers
+    assert "if-none-match" not in sites.atom()[-1].headers
     assert release_sources.lines(catalog.product("portainer"))
 
 
@@ -291,7 +331,7 @@ async def test_page_source_and_a_shared_feed_asked_once(admin_client, reader_cli
     await _follow(admin_client, "wazuh-agent", "4.14.9")
     sites.github["wazuh/wazuh"] = fx("github_wazuh.atom")
     await _round()
-    assert len(sites.to("passwork.pro")) == 1 and len(sites.to("github.com")) == 1  # manager and agent: one request
+    assert len(sites.to("passwork.pro")) == 1 and len(sites.atom()) == 1 and len(sites.tags()) == 1  # manager and agent: one request each
     d = (await reader_client.get("/api/vendor/products/passwork")).json()
     rel = d["versions"][0]["release"]
     assert rel["line"]["name"] == "7.6" and not rel["update_available"] and rel["newer_line"]["name"] == "7.7"
@@ -360,3 +400,364 @@ def test_bloodhound_ce_without_the_legacy_cpe_needs_no_care():
 def test_release_file_is_json_with_the_format(rel_file):
     release_sources.store("x", {"sig": "s", "versions": []})
     assert json.loads(rel_file.read_text())["format"] == release_sources.FORMAT
+
+
+# ---------------------------------------------------------------- the whole history: the repository's tags (0.1.59)
+
+
+def _pkt(payload: bytes) -> bytes:
+    return b"%04x" % (len(payload) + 4) + payload
+
+
+def _adv(*refs: bytes, oid: bytes = b"a" * 40) -> bytes:
+    body = _pkt(b"# service=git-upload-pack\n") + b"0000"
+    for n, ref in enumerate(refs):
+        body += _pkt(oid + b" " + ref + (b"\0multi_ack thin-pack agent=git/github\n" if n == 0 else b"\n"))
+    return body + b"0000"
+
+
+def test_tags_of_the_real_wazuh_advertisement_fill_the_missing_lines():
+    # the feed's newest 10 had 4.14 and the backport 4.10.5 only – the tags have every line in between
+    vs = release_sources.parse_tags(fx("github_wazuh.refs"), cfg_of("wazuh"))
+    got = {v["v"] for v in vs}
+    assert {"4.13.1", "4.12.0", "4.11.2", "4.10.5", "4.14.10", "3.13.6"} <= got
+    assert not any("-" in v for v in got) and all(v["date"] is None and v["lts"] is False for v in vs)  # rcs/betas out, no dates
+    names = [ln["name"] for ln in release_sources.lines_of(vs, 2)]
+    assert names[:5] == ["4.14", "4.13", "4.12", "4.11", "4.10"]  # by version
+    tags, cut = release_sources.git_tags(fx("github_wazuh.refs"))
+    assert not cut and "v5.0.0-beta3" in tags and len(tags) == len(set(tags)) and not any(t.endswith("^{}") for t in tags)  # peeled once
+    assert not any(t.startswith(("refs/", "pull/")) for t in tags)  # branches and pull requests are no tags
+
+
+def test_ref_advertisement_parser_is_strict_and_bounded(monkeypatch):
+    ok = _adv(b"HEAD", b"refs/heads/main", b"refs/pull/1/head", b"refs/tags/v1.2.3", b"refs/tags/v1.2.3^{}", b"refs/tags/v1.3.0-rc1")
+    assert release_sources.git_tags(ok) == (["v1.2.3", "v1.3.0-rc1"], False)
+    assert release_sources.git_tags(_adv(b"refs/tags/v2.0.0", oid=b"b" * 64)) == (["v2.0.0"], False)  # a SHA-256 repository
+    bad = [
+        b"",  # nothing
+        b"<!DOCTYPE html><html>Sign in</html>",  # a page in between
+        _pkt(b"# service=git-receive-pack\n") + b"0000",  # another service
+        b"zz1e# service=git-upload-pack\n",  # no hex length
+        _pkt(b"# service=git-upload-pack\n") + b"0003",  # length below 4 that is no flush/delimiter
+        _pkt(b"# service=git-upload-pack\n") + b"ffff" + b"x" * 10,  # beyond the body (a cut answer)
+        _pkt(b"# service=git-upload-pack\n") + b"0000" + _pkt(b"not-an-oid refs/tags/v1.0.0\n"),
+        _pkt(b"# service=git-upload-pack\n") + b"0000" + _pkt(b"a" * 40 + b"\n"),  # no ref name
+        _pkt(b"# service=git-upload-pack\n") + b"0000" + b"%04x" % 65530 + b"a" * 65526,  # longer than a pkt-line can be
+        ok[:-4],  # cut off after a whole ref line: no closing flush
+        _pkt(b"# service=git-upload-pack\n"),  # the service line alone
+    ]
+    for body in bad:
+        with pytest.raises(ValueError):
+            release_sources.git_tags(body)
+    monkeypatch.setattr(release_sources, "REFS_PKTS", 50)
+    with pytest.raises(ValueError):
+        release_sources.git_tags(_pkt(b"# service=git-upload-pack\n") + b"0000" * 100)
+    monkeypatch.setattr(release_sources, "REFS_PKTS", 500_000)
+    monkeypatch.setattr(release_sources, "TAGS_MAX", 3)
+    assert release_sources.git_tags(_adv(*(b"refs/tags/v1.0.%d" % i for i in range(10)))) == (["v1.0.0", "v1.0.1", "v1.0.2"], True)  # cut: said so
+
+
+def test_ref_advertisement_parser_is_linear():
+    import time
+
+    many = _pkt(b"# service=git-upload-pack\n") + b"0000" + b"".join(_pkt(b"a" * 40 + b" refs/pull/%d/head\n" % i) for i in range(300_000)) + b"0000"
+    assert len(many) > 15_000_000
+    t0 = time.perf_counter()
+    assert release_sources.git_tags(many) == ([], False)
+    assert time.perf_counter() - t0 < 3.0
+
+
+def test_lines_are_ordered_by_version_not_by_the_date_a_backport_was_seen():
+    # the live data of 0.1.58: 4.10.5 published 15.09., after 4.14.7 (30.07.) – 4.10 is still the older line
+    vs = [
+        {"v": "4.14.10", "date": "2026-11-09"},
+        {"v": "4.14.7", "date": "2026-07-30"},
+        {"v": "4.10.5", "date": "2026-09-15"},
+        {"v": "4.13.1", "date": None},
+        {"v": "4.14.0", "date": None},
+    ]
+    lines = release_sources.lines_of(vs, 2)
+    assert [ln["name"] for ln in lines] == ["4.14", "4.13", "4.10"]
+    # the date a line was first seen is no release date of the line: 4.14.0 has none, 4.10.5 is no line start
+    assert "releaseDate" not in lines[0] and "releaseDate" not in lines[2] and lines[0]["latestDate"] == "2026-11-09"
+    assert release_sources.lines_of([{"v": "4.15.0", "date": "2026-12-01"}, {"v": "4.15.1", "date": "2026-12-20"}])[0]["releaseDate"] == "2026-12-01"
+
+
+def _stored(key: str, versions: list[tuple[str, str | None]], **extra) -> None:  # noqa: ANN003
+    cfg = cfg_of(key)
+    release_sources.store(key, {"sig": release_sources.signature(cfg), "source": release_sources.describe(cfg), "fetched_at": "2026-11-21T16:13:24+00:00",
+                                "versions": [{"v": v, "date": d, "lts": False, "base": True} for v, d in versions]} | extra)
+
+
+def test_newer_line_and_target_by_version_for_a_release_source():
+    _stored("wazuh", [("4.14.10", "2026-11-09"), ("4.14.7", "2026-07-30"), ("4.10.5", "2026-09-15")])
+    p = catalog.product("wazuh")
+    assert [ln["name"] for ln in catalog.product_releases(p)] == ["4.14", "4.10"]
+    assert vendor.newest_line(p, catalog.product_releases(p))["name"] == "4.14"
+    cur = vendor.release_info(p, "4.14.10")
+    assert cur["line"]["name"] == "4.14" and cur["newer_line"] is None and not cur["update_available"]  # 4.10 is older, never "Neuere Linie"
+    old = vendor.release_info(p, "4.10.2")
+    assert old["newer_line"]["name"] == "4.14" and old["update_available"] and old["line"]["latest"] == "4.10.5"
+    # endoflife.date's lines keep their own order (the line's release date)
+    pan = catalog.product("panos")
+    rels = catalog.product_releases(pan)
+    assert vendor.newest_line(pan, rels) == max([r for r in rels if r.get("isMaintained") or not r.get("isEol")] or rels, key=lambda r: r.get("releaseDate") or "")
+
+
+def test_merge_backfilled_tags_are_a_baseline_later_ones_news():
+    cfg = cfg_of("wazuh")
+    now = datetime(2026, 11, 25, tzinfo=UTC)
+    # an installation of 0.1.58: the feed's versions, no history
+    before, _ = release_sources.merge(None, [{"v": "4.14.10", "date": "2026-11-09"}, {"v": "4.10.5", "date": "2026-09-15"}], cfg, now - timedelta(days=14))
+    assert "history" not in before and release_sources.history_due(before, now)
+    tags = release_sources.parse_tags(fx("github_wazuh.refs"), cfg)
+    filled, new = release_sources.merge(before, [], cfg, now, tags=tags)
+    assert new == 0 and all(r["base"] for r in filled["versions"])  # the old lines filled in silently
+    assert filled["history"]["ok_at"] and filled["history"]["error"] is None
+    assert len(filled["versions"]) == len(tags) and next(r for r in filled["versions"] if r["v"] == "4.14.10")["date"] == "2026-11-09"  # the feed's date kept
+    assert not release_sources.history_due(filled, now + timedelta(days=6)) and release_sources.history_due(filled, now + timedelta(days=7))
+    # a week later the tags have a version nobody saw (more than 10 releases between two fetches): news – but a tag
+    # ahead of its line's newest release (v4.14.11 tagged, the release not out yet) waits for the feed
+    ahead = [*tags, {"v": "4.13.2", "date": None, "lts": False}, {"v": "4.14.11", "date": None, "lts": False}, {"v": "4.10.6", "date": None, "lts": False}]
+    later, new = release_sources.merge(filled, [], cfg, now + timedelta(days=7), tags=ahead)
+    assert new == 1 and next(r for r in later["versions"] if r["v"] == "4.13.2")["base"] is False
+    assert not {"4.14.11", "4.10.6"} & {r["v"] for r in later["versions"]}
+    released, new = release_sources.merge(later, [{"v": "4.14.11", "date": "2026-11-25"}], cfg, now + timedelta(days=8))
+    assert new == 1 and released["versions"][0] == {"v": "4.14.11", "date": "2026-11-25", "lts": False, "base": False}
+    # an old tag below the KEEP_VERSIONS newest is trimmed again – no news
+    many = [{"v": f"4.14.{i}", "date": None, "lts": False} for i in range(11, 11 + release_sources.KEEP_VERSIONS)]
+    full, _ = release_sources.merge(filled, many, cfg, now)
+    again, new = release_sources.merge(full, [], cfg, now + timedelta(days=7), tags=[*tags, {"v": "1.0.1", "date": None, "lts": False}])
+    assert new == 0 and len(again["versions"]) == release_sources.KEEP_VERSIONS
+    # a failure keeps the history and is tried again a day later (a week when it was too large)
+    failed, _ = release_sources.merge(filled, [], cfg, now + timedelta(days=8), history_error="timeout")
+    assert failed["history"]["ok_at"] == filled["history"]["ok_at"] and failed["history"]["error"] == "timeout"
+    assert not release_sources.history_due(failed, now + timedelta(days=8, hours=23)) and release_sources.history_due(failed, now + timedelta(days=9))
+    big, _ = release_sources.merge(None, [{"v": "4.14.10", "date": None}], cfg, now, history_error="too_large: > 16384 KB")
+    assert not release_sources.history_due(big, now + timedelta(days=2)) and release_sources.history_due(big, now + timedelta(days=7))
+
+
+async def test_round_reads_the_tags_once_a_week_and_the_upgrade_stays_silent(admin_client, reader_client, sites):
+    sites.github["wazuh/wazuh"] = fx("github_wazuh.atom")
+    sites.refs["wazuh/wazuh"] = 500  # the tags not readable on the first round: the feed's releases still count
+    await _follow(admin_client, "wazuh", "4.12.0")
+    await _round()
+    assert len(sites.tags()) == 1
+    src_ = (await reader_client.get("/api/vendor/products/wazuh")).json()["releases"]["source"]
+    assert src_["complete"] is False and src_["known"] == 5  # the drawer says: only the newest releases
+    assert [ln["name"] for ln in (await reader_client.get("/api/vendor/products/wazuh")).json()["releases"]["lines"]] == ["4.14", "4.10"]
+    # a day later the tags answer: 4.12's own line appears with its latest 4.12.0 – the filled-in history is a baseline
+    sites.refs["wazuh/wazuh"] = fx("github_wazuh.refs")
+    async with db.session() as s:
+        (await s.get(VendorFetch, "releases:wazuh")).next_fetch_at = None
+        await s.commit()
+    release_sources._cache.stamp = None
+    e = release_sources.entry("wazuh")
+    e["history"]["tried_at"] = (datetime.now(UTC) - timedelta(days=2)).isoformat()
+    release_sources.store("wazuh", e)
+    await _round()
+    assert len(sites.tags()) == 2
+    d = (await reader_client.get("/api/vendor/products/wazuh")).json()
+    assert d["releases"]["source"]["complete"] is True and d["releases"]["source"]["known"] > 100
+    assert [ln["name"] for ln in d["releases"]["lines"]][:5] == ["4.14", "4.13", "4.12", "4.11", "4.10"]
+    rel = d["versions"][0]["release"]
+    assert rel["line"]["name"] == "4.12" and not rel["update_available"] and rel["newer_line"]["name"] == "4.14"
+    assert all(e.baseline for e in await _version_events())
+    # not due again within the week: the feed only
+    await _round()
+    assert len(sites.tags()) == 2
+
+
+async def test_upgrade_of_an_installation_with_the_feed_only_makes_no_news(admin_client, sites):
+    """0.1.58 stored the feed's 5 versions (base); 0.1.59's first round fills 4.11–4.13 in from the tags: whatever
+    becomes a line's latest (4.13.1 for an installed 4.13.0) was out long ago – shown, not notified."""
+    _stored("wazuh", [("4.14.10", "2026-11-09"), ("4.14.9", "2026-10-15"), ("4.14.8", "2026-09-25"), ("4.14.7", "2026-07-30"), ("4.10.5", "2026-09-15")], since="2026-11-11T16:24:35+00:00")
+    sites.github["wazuh/wazuh"] = fx("github_wazuh.atom")
+    sites.refs["wazuh/wazuh"] = 500
+    await _follow(admin_client, "wazuh", "4.13.0", "4.10.2")
+    await _round()  # the follow's own baseline is made (4.10.2 → 4.10.5 silently); 4.13 is no line yet
+    assert [(e.key, e.baseline) for e in await _version_events()] == [("version:wazuh:4.10.2:4.10.5", True)]
+    e = release_sources.entry("wazuh")
+    assert not e["history"].get("ok_at") and e["history"]["error"] == "http: HTTP 500"
+    e["history"]["tried_at"] = (datetime.now(UTC) - timedelta(days=2)).isoformat()
+    release_sources.store("wazuh", e)
+    sites.refs["wazuh/wazuh"] = fx("github_wazuh.refs")
+    async with db.session() as s:
+        (await s.get(VendorFetch, "releases:wazuh")).next_fetch_at = None
+        await s.commit()
+    await _round()
+    evs = await _version_events()
+    assert [(e.key, e.baseline) for e in evs] == [("version:wazuh:4.10.2:4.10.5", True), ("version:wazuh:4.13.0:4.13.1", True)]
+
+
+def test_drawer_source_says_how_complete_it_is():
+    p = catalog.product("wazuh")
+    assert release_sources.info(p)["fetched_at"] is None and "complete" not in release_sources.info(p)
+    _stored("wazuh", [("4.14.10", "2026-11-09")])
+    assert release_sources.info(p)["complete"] is False and release_sources.info(p)["known"] == 1
+    _stored("wazuh", [("4.14.10", "2026-11-09")], history={"ok_at": "2026-11-25T00:00:00+00:00", "tried_at": "2026-11-25T00:00:00+00:00", "error": None})
+    assert release_sources.info(p)["complete"] is True
+    pw = catalog.product("passwork")
+    _stored("passwork", [("7.7.0", "2026-08-03")])
+    assert release_sources.info(pw)["complete"] is None  # a page: what it lists
+
+
+# ---------------------------------------------------------------- ManageEngine ServiceDesk Plus: builds from the ReadMe
+
+
+def test_servicedesk_plus_readme_builds_and_lines():
+    p = catalog.product("manageengine-servicedesk")
+    vs = release_sources.parse(fx("manageengine_sdp_readme.html"), cfg_of("manageengine-servicedesk"))
+    # both date forms; the notes' "fixed in build 15280" and a script's text are no release
+    assert [(v["v"], v["date"]) for v in vs] == [
+        ("16040", "2026-11-19"), ("16030", "2026-11-04"), ("15100", "2025-06-18"), ("14990", "2025-08-11"), ("14870", "2025-08-13"),
+        ("14600", "2023-12-11"), ("14000", "2022-09-29"), ("13013", "2023-06-29"), ("13000", "2022-02-07"),
+    ]  # fmt: skip
+    lines = release_sources.lines_of(vs, 2, "build", complete=True)
+    assert [(ln["name"], ln["latest"], ln.get("releaseDate")) for ln in lines] == [
+        ("16", "16.0 Build 16040", None), ("15", "15.1 Build 15100", None), ("14", "14.9 Build 14990", "2022-09-29"), ("13", "13.0 Build 13013", "2022-02-07"),
+    ]  # fmt: skip  - a backport (14870 after 14990) is no newer release of the line; a line's date only from its x000 build
+    cfg = cfg_of("manageengine-servicedesk")
+    e, _ = release_sources.merge(None, vs, cfg, datetime(2026, 11, 25, tzinfo=UTC))
+    release_sources.store(p["key"], e)
+    info = vendor.release_info(p, "14.6 Build 14600")
+    assert info["line"]["name"] == "14" and info["line"]["latest"] == "14.9 Build 14990" and info["update_available"]
+    assert info["newer_line"]["name"] == "16" and info["source"]["kind"] == "page" and info["source"]["ref"] == "www.manageengine.com"
+    assert vendor.release_info(p, "14990")["update_available"] is False  # a bare build is the same version
+    assert catalog.release_baseline(p, "14.9 Build 14990") and not catalog.release_baseline(p, "14.9 Build 14991")
+    assert not vendor.short_version(p, "14.6 Build 14600")
+
+
+async def test_a_feed_of_pre_releases_only_is_no_error_while_the_tags_know_versions(admin_client, reader_client, sites):
+    """DFIR-IRIS: the feed's newest 10 are all v3.0.0-beta.N – the stable 2.4 line comes from the tags."""
+    sites.github["dfir-iris/iris-web"] = _feed(*(f"v3.0.0-beta.{n}" for n in range(1, 10)))
+    sites.refs["dfir-iris/iris-web"] = _adv(b"refs/tags/v2.4.29", b"refs/tags/v2.4.28", b"refs/tags/v3.0.0-beta.9")
+    await _follow(admin_client, "dfir-iris", "2.4.28")
+    await _round()
+    st = await _state("releases:dfir-iris")
+    assert st is not None and st.error is None
+    rel = (await reader_client.get("/api/vendor/products/dfir-iris")).json()["versions"][0]["release"]
+    assert rel["line"]["latest"] == "2.4.29" and rel["update_available"]
+    # neither the feed nor the tags know a version: the source is broken
+    sites.github["SpecterOps/BloodHound"] = _feed("v9.10.0-rc1")
+    sites.refs["SpecterOps/BloodHound"] = _adv(b"refs/tags/v9.10.0-rc1")
+    await _follow(admin_client, "bloodhound")
+    await _round()
+    assert (await _state("releases:bloodhound")).error == "parse: no version found"
+
+
+def test_adselfservice_plus_release_notes_builds():
+    p = catalog.product("manageengine-adselfservice")
+    vs = release_sources.parse(fx("manageengine_adss_release_notes.html"), cfg_of("manageengine-adselfservice"))
+    # the headings only – "From build 6520 onwards … (Released on Nov 05, 2025 …)" in the notes is no release
+    assert [(v["v"], v["date"]) for v in vs] == [
+        ("7001", "2026-08-21"), ("7000", "2026-06-13"), ("6529", "2026-06-03"), ("6519", "2025-10-01"), ("6500", "2024-06-14"), ("5500", "2017-06-23"), ("5318", "2016-09-12"),
+    ]  # fmt: skip
+    e, _ = release_sources.merge(None, vs, cfg_of("manageengine-adselfservice"), datetime(2026, 11, 25, tzinfo=UTC))
+    release_sources.store(p["key"], e)
+    assert [(ln["name"], ln["latest"]) for ln in catalog.product_releases(p)] == [("7", "7.0 Build 7001"), ("6", "6.5 Build 6529"), ("5", "5.5 Build 5500")]
+    info = vendor.release_info(p, "6.5 Build 6519")
+    assert info["update_available"] and info["line"]["latest"] == "6.5 Build 6529" and info["newer_line"]["name"] == "7"
+
+
+# ---------------------------------------------------------------- review of 0.1.59
+
+
+def _feed_titled(*rows: tuple[str, str]) -> bytes:
+    body = "".join(
+        f'<entry><id>tag:github.com,2008:Repository/1/{t}</id><updated>2026-11-0{i + 1}T10:00:00Z</updated>'
+        f'<link rel="alternate" type="text/html" href="https://github.com/o/r/releases/tag/{t}"/><title>{title}</title></entry>'
+        for i, (t, title) in enumerate(rows)
+    )
+    return f'<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">{body}</feed>'.encode()
+
+
+def test_a_feed_entry_is_a_pre_release_by_its_tag_not_by_free_text_in_its_title():
+    # Seafile's titles are commit messages: "Test" in one is no pre-release
+    feed = _feed_titled(("v14.0.8-server", "v14.0.8-server: Test gc when concurrent upload"), ("v14.0.9-server", "v14.0.9-server: fix dev branch merge"))
+    assert sorted(v["v"] for v in release_sources.parse(feed, cfg_of("seafile"))) == ["14.0.8", "14.0.9"]
+    # a pre-release word right next to the version in the title still counts; LTS titles stay releases
+    feed = _feed_titled(("v5.0.0", "Wazuh v5.0.0 Beta 2"), ("v5.0.1", "5.0.1 (RC1)"), ("2.45.3", "Release 2.45.3 LTS"), ("v4.14.10", "Wazuh v4.14.10"))
+    assert sorted(v["v"] for v in release_sources.parse(feed, {"github": "o/r"})) == ["2.45.3", "4.14.10"]
+
+
+@pytest.mark.parametrize(
+    ("text", "pre"),
+    [
+        ("5.0.0-beta3", True), ("5.0.0b3", True), ("5.0.0a1", True), ("5.0.0-pre1", True), ("8.0.0-ea", True), ("11.0.0-M5", True),
+        ("1.0.0.CR1", True), ("4.1.0-rc.1", True), ("3.14dev4", True), ("7.4.0-alpha", True),
+        ("4.14.10", False), ("devices", False), ("latest", False), ("1.2 (Testing)", False), ("Devolutions 2024.3", False),
+        ("22.4R3-S5", False), ("22.7R2.3", False), ("11.2.4-h23", False), ("14.9 Build 14910", False), ("16.0.4305.5 CU27+GDR", False),
+        ("8.0 U3", False), ("2.4.211-20260407", False), (None, False), ("", False),
+    ],
+)  # fmt: skip
+def test_is_prerelease_also_by_the_version_order(text, pre):
+    assert release_sources.is_prerelease(text) is pre
+
+
+def test_tags_ahead_of_every_release_wait_for_a_second_read():
+    cfg = cfg_of("wazuh")
+    now = datetime(2026, 11, 25, tzinfo=UTC)
+    base, _ = release_sources.merge(None, [{"v": "4.14.10", "date": "2026-11-09"}, {"v": "4.10.5", "date": "2026-09-15"}], cfg, now)
+    tags = [{"v": v, "date": None, "lts": False} for v in ("4.14.10", "4.13.1", "4.10.5", "15.0.0", "4.15.0", "4.14.11")]
+    first, new = release_sources.merge(base, [], cfg, now, tags=tags)
+    have = {r["v"]: r for r in first["versions"]}
+    assert "4.13.1" in have and have["4.13.1"]["base"] and new == 0  # an old line below the newest release: at once, silently
+    assert first["history"]["waiting"] == {"15.0.0": first["history"]["tried_at"], "4.15.0": first["history"]["tried_at"], "4.14.11": first["history"]["tried_at"]}
+    assert not {"15.0.0", "4.15.0", "4.14.11"} & set(have)  # never a newest line or a target from a bare tag
+    # a week later: 4.14.11 released (the feed), 4.15.0 still only a tag – taken now (two reads), as news; v15.0.0 deleted
+    week = now + timedelta(days=7)
+    later, new = release_sources.merge(first, [{"v": "4.14.11", "date": "2026-11-30"}], cfg, week, tags=[t for t in tags if t["v"] != "15.0.0"])
+    have = {r["v"]: r for r in later["versions"]}
+    assert have["4.15.0"]["base"] is False and have["4.14.11"]["base"] is False and new == 2
+    assert "15.0.0" not in have and "waiting" not in later["history"]  # gone from the tags: forgotten
+    # a feed without any stable release lets every tag in (DFIR-IRIS)
+    none, _ = release_sources.merge(None, [], cfg_of("dfir-iris"), now, tags=[{"v": "2.4.29", "date": None, "lts": False}])
+    assert [r["v"] for r in none["versions"]] == ["2.4.29"]
+
+
+def test_cut_tags_are_no_complete_history():
+    cfg = cfg_of("wazuh")
+    e, _ = release_sources.merge(None, [{"v": "4.14.10", "date": "2026-11-09"}], cfg, datetime(2026, 11, 25, tzinfo=UTC), tags=[], cut=True)
+    release_sources.store("wazuh", e)
+    assert release_sources.info(catalog.product("wazuh"))["complete"] is False
+
+
+def test_lts_of_the_feed_stays_when_tags_add_versions():
+    cfg = cfg_of("portainer")
+    now = datetime(2026, 11, 25, tzinfo=UTC)
+    tags = release_sources.parse_tags(fx("github_portainer.refs"), cfg)
+    # an installation of 0.1.58: 2.39 known LTS from earlier feed titles
+    old, _ = release_sources.merge(None, [{"v": "2.39.4", "date": "2026-06-25", "lts": True}, {"v": "2.45.3", "date": "2026-10-22", "lts": True}], cfg, now)
+    e, _ = release_sources.merge(old, [], cfg, now, tags=tags)
+    lts = {ln["name"]: ln["isLts"] for ln in release_sources.lines_of(e["versions"])}
+    assert lts["2.39"] and lts["2.45"] and not lts["2.44"]
+    # a new installation: feed and tags in one fetch – the feed's LTS titles count
+    new, _ = release_sources.merge(None, release_sources.parse(fx("github_portainer.atom"), cfg), cfg, now, tags=tags)
+    lts = {ln["name"]: ln["isLts"] for ln in release_sources.lines_of(new["versions"])}
+    assert lts["2.45"] and lts["2.39"] and not lts["2.44"]
+
+
+def test_build_line_date_only_from_the_start_of_its_major():
+    vs = release_sources.parse(fx("manageengine_adss_release_notes.html"), cfg_of("manageengine-adselfservice"))
+    dates = {ln["name"]: ln.get("releaseDate") for ln in release_sources.lines_of(vs, 2, "build", complete=True)}
+    # 7000 is the start of 7; line 5 is listed only from 5318 (2016) – years after 5.0: no date, no "unklare Altdaten" from it
+    assert dates == {"7": "2026-06-13", "6": None, "5": None}
+
+
+async def test_the_round_keeps_tag_names_not_bodies(monkeypatch):
+    from app import vendor as svc
+
+    calls = []
+
+    async def get(url, **_kw):  # noqa: ANN001, ANN202
+        calls.append(url)
+        return fx("github_wazuh.refs")
+
+    monkeypatch.setattr(svc, "get", get)
+    memo: dict = {}
+    a = await release_sources._history(None, cfg_of("wazuh"), memo)
+    b = await release_sources._history(None, cfg_of("wazuh-agent"), memo)
+    assert len(calls) == 1 and a == b and a[0] and a[2] is False
+    (names, cut), = memo.values()
+    assert isinstance(names, list) and "v4.13.1" in names and cut is False

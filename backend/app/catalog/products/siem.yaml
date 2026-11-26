@@ -69,6 +69,7 @@
   kw: [Elastic Agent, Fleet Server, Elastic Defend, Elastic Security]
   aliases: [Elastic Defend, Elastic Endpoint, Fleet]
   example: 8.18.2
+  releases: {github: elastic/elastic-agent}  # tags v9.5.7, v8.19.26 (checked 2026-11-25)
 - key: opensearch
   cpes: [a:amazon:opensearch]
 - key: splunk
@@ -166,6 +167,7 @@
   kw: [Fluentd]
   example: 1.18.0
   version_cmd: fluentd --version
+  releases: {github: fluent/fluentd}  # tags v1.20.1, v1.16.11 (checked 2026-11-25)
 - key: fluent-bit
   vendor: Fluentd Project
   cpes: [a:treasuredata:fluent_bit]
@@ -215,3 +217,4 @@
   aliases: [IRIS, iris-web]
   example: "2.4.29"
   where: web_about
+  releases: {github: dfir-iris/iris-web}  # tags v2.4.29; the feed's newest 10 are all v3.0.0-beta.N – the lines come from the tags (checked 2026-11-25)
